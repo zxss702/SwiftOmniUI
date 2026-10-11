@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 struct LabelSample: SampleContent, ExampleContent {
     static let id = "label"
@@ -21,7 +21,7 @@ struct LabelSample: SampleContent, ExampleContent {
 
             Text("Centred, with room around it")
                 .multilineTextAlignment(.center)
-                .contentPadding(8)
+                .padding(8)
 
             Text("A long line that has nowhere left to go, so it is cut short with an ellipsis")
                 .lineBreak(.tailTruncation)
@@ -80,7 +80,7 @@ struct LabelSample: SampleContent, ExampleContent {
             Text("Centred, with room around it")
                 .font(.system(size: 16))
                 .multilineTextAlignment(.center)
-                .contentPadding(8)
+                .padding(8)
 
             Text("A long line that has nowhere left to go, so it is cut short with an ellipsis")
                 .font(.system(size: 16))
@@ -130,8 +130,8 @@ struct LabelSample: SampleContent, ExampleContent {
                 .foregroundStyle(Palette.subtle)
 
             Text("The last two are both 16 until the system's text-size setting moves - "
-                + "iOS ▸ Settings ▸ Display & Brightness ▸ Text Size, Android ▸ Settings ▸ "
-                + "Display ▸ Font size. Then the first grows with it and the second stays "
+                + "Android ▸ Settings ▸ Display ▸ Font size. Then the first grows "
+                + "with it and the second stays "
                 + "where it is; where the platform offers no such setting, the two never "
                 + "differ.")
                 .font(.system(size: 12))

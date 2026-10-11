@@ -189,7 +189,7 @@ the SwiftUI vocabulary - with `symbolEffectOptions`, `symbolEffectActive` and
 `symbolEffectValue` beside it: which passes repeat, whether the effect runs,
 and the value whose change replays a `value:` write.
 
-A host plays what it can honestly. AppKit carries `bounce` and `pulse` over
+A host plays what it can honestly. A host may carry `bounce` and `pulse` over
 the whole view - a scale keyframe for the one, an opacity swing that
 `isActive` gates for the other - where the per-layer effects have no layer to
 name; `symbolEffectValue` moving is what replays either, as a plain write

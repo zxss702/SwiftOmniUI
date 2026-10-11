@@ -161,7 +161,7 @@ extension View {
 
     /// Draws the view offscreen first, the rendered bitmap then drawn where
     /// the view stands - the platform's own rasterizer standing in for the
-    /// Metal path SwiftUI takes:
+    /// GPU path SwiftUI takes:
     ///
     ///     graph.drawingGroup()
     public func drawingGroup() -> ModifiedContent {

@@ -30,7 +30,7 @@ import XCTest
         var files = try SourceTree.allSources().map {
             (path: "lib/SwiftOmniUI/Sources/\($0.path)", text: $0.text)
         }
-        for tree in ["lib/SwiftOmniUI.AppKit/Sources", "lib/SwiftOmniUI.Android/Sources", "lib/SwiftOmniUI.WinUI/Sources", "docs"] {
+        for tree in ["lib/SwiftOmniUI.Android/Sources", "lib/SwiftOmniUI.WinUI/Sources", "docs"] {
             files += try Self.files(under: tree)
         }
         files.append((
@@ -88,17 +88,15 @@ import XCTest
 
     /// Starts an act and lets it reach its suspension, the way an event does.
     ///
-    /// On MainActor, where `Task.immediate` runs the body inline up to its
-    /// first suspension - what `Renderer.dispatch` does for a real event - so by
-    /// the time this returns the act is on the act queue. Deterministic, not a
-    /// race.
+    /// The task's body runs a main-queue turn later - what `Renderer.dispatch`
+    /// does for a real event - and the yield gives the run loop that drains
+    /// the queue its turn, so by the time this returns the act is queued.
+    /// Deterministic, not a race.
     @MainActor
-    private static func begin<Value>(_ body: sending @escaping Act<Value>) -> Task<Value, Error> {
-        if #available(macOS 26, iOS 26, macCatalyst 26, *) {
-            return Task.immediate { @MainActor in try await body() }
-        }
-        // No inline start before macOS 26: the body runs a main-queue turn later.
-        return Task { @MainActor in try await body() }
+    private static func begin<Value>(_ body: sending @escaping Act<Value>) async -> Task<Value, Error> {
+        let task = Task { @MainActor in try await body() }
+        await Task.yield()
+        return task
     }
 
     /// The completion id in a taken batch, which is what the host quotes back.

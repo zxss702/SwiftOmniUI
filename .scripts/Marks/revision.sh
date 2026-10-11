@@ -8,10 +8,10 @@
 # and the dictionary's renderer read it the same way (HostVerdict.revision).
 #
 # USAGE:
-#   revision.sh <appkit|uikit|android|winui|gtk> <family>
+#   revision.sh <android|winui|gtk|web> <family>
 set -euo pipefail
 
-host="${1:?a host: appkit, uikit, android, winui or gtk}"
+host="${1:?a host: android, winui, gtk or web}"
 family="${2:?a family, such as Button}"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 every=1

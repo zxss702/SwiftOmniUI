@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The platform's C maths library, for the spring's `exp`, `sin` and `cos`.
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Android)
+#if canImport(Android)
 import Android
 #elseif canImport(Glibc)
 import Glibc

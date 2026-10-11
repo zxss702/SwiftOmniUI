@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Who is signed in - the object a whole branch shares. Its properties are
 /// `@State`, so a write to one rebuilds exactly the views that READ it.
@@ -120,7 +120,7 @@ struct EnvironmentSample: SampleContent, ExampleContent {
                     .background(Palette.accent)
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .horizontalAlignment(.center)
                     
 

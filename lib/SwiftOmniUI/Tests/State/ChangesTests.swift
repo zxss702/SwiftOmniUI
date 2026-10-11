@@ -395,7 +395,8 @@ private final class Log: @unchecked Sendable {
         renders.render(tree(2))
 
         // The handler ran up to its await and the act is on the queue, named
-        // and addressed the way every act is.
+        // and addressed the way every act is. Its job took a UI-thread turn.
+        _ = await settle()
         let acts = drainedActs()
         XCTAssertEqual(acts.first?.name, "focus")
         XCTAssertEqual(Array(acts.first?.arguments.prefix(1) ?? []), [.string("card")])

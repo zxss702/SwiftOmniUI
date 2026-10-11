@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A layout whose children travel to their new places when the layout changes.
 struct LivingLayoutSample: SampleContent, ExampleContent {
@@ -92,7 +92,7 @@ struct LivingLayoutSample: SampleContent, ExampleContent {
                             .verticalAlignment(.center)
                     }
                     .style("Card")
-                    .contentPadding(EdgeInsets(12, 8, 12, 8))
+                    .padding(EdgeInsets(12, 8, 12, 8))
                     .background(Palette.raised)
                     .strokeWidth(0)
                     .frame(height: 40)

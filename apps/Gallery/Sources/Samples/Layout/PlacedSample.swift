@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A layout of the author's own: one line of arithmetic says where each card
 /// goes and how it is turned, and the host puts every card there on its own
@@ -545,7 +545,7 @@ struct PlacedSample: SampleContent, ExampleContent {
                         .opacity(0.8)
                         .lineBreak(.tailTruncation)
                 }
-                .contentPadding(EdgeInsets(12, 10))
+                .padding(EdgeInsets(12, 10))
                 .spacing(1)
                 // A dark strip under the words, so a caption reads over a
                 // picture of any colour.

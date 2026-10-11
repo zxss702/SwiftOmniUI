@@ -23,10 +23,8 @@ Inherits: [PropertyContainer](tiers/PropertyContainer.md) · [VisualElement](tie
 
 See [the dictionary](README.md) for how a mark is given.
 
-| Host | Created | Members (105) | Realization | Notes |
+| Host | Created | Members (107) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit |  | 27 ✅ · 1 ☑️ · 3 – | custom `NSView` realizing the window it sees through the scroller | no run of it on these sources |
-| UIKit |  | 29 ✅ · 3 – | custom `UIView` driven the same | no run of it on these sources |
 | Android Views |  |  | custom `ViewGroup` driven the same | no run of it on these sources |
 | WinUI 3 |  |  | custom `Panel` driven the same | no run of it on these sources |
 | GTK 4 |  | 20 ✅ · 3 – | custom `GtkWidget` driven the same | no run of it on these sources |
@@ -36,166 +34,168 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Layouts/LazyHStackContra
 
 ## LazyHStack's own members
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `items` | property | `[String]` | native |  |  |  |  |  |  |  |
-| `realizedChanged` | event | `[String]` | structure |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `items` | property | `[String]` | native |  |  |  |  |  |
+| `realizedChanged` | event | `[String]` | structure |  |  |  |  |  |
 
 ## From [PropertyContainer](tiers/PropertyContainer.md)
 
 What anything carrying values in the tree has - a control, a `Style`, a text run: the name automation finds it by.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `accessibilityIdentifier` | property | `String` | native | ✅ | ✅ |  |  |  |  | GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `accessibilityIdentifier` | property | `String` | native |  |  |  |  | GTK 4: not realized |
 
 ## From [VisualElement](tiers/VisualElement.md)
 
 What every drawn element has: its size and its bounds, how it is shown and turned, whether it answers input and holds the keyboard focus, the visual states it enters, and what a screen reader says about it.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `blendMode` | property | `BlendMode` | native |  |  |  |  |  |  |  |
-| `accessibilityChildBehavior` | property | `AccessibilityChildBehavior` | native |  |  |  |  |  |  |  |
-| `accessibilityHeadingLevel` | property | `HeadingLevel` | native | · | · |  |  | · |  | cannot read a heading's level - AppKit marks a heading, not its level; UIKit: cannot read a heading's level - UIKit marks a heading, not its level; GTK 4: cannot read accessibilityHeadingLevel of LazyHStack - GTK's driver has no path for it yet |
-| `accessibilityHint` | property | `String` | native | ✅ | ✅ |  |  | · |  | GTK 4: cannot read accessibilityHint of LazyHStack - GTK's driver has no path for it yet |
-| `accessibilityLabel` | property | `String` | native | ✅ | ✅ |  |  | · |  | GTK 4: cannot read accessibilityLabel of LazyHStack - GTK's driver has no path for it yet |
-| `accessibilityTraits` | property | `AccessibilityTraits` | native |  |  |  |  |  |  |  |
-| `automationExcludedWithChildren` | property | `Bool` | native | ✅ | ✅ |  |  | · |  | GTK 4: cannot read automationExcludedWithChildren of LazyHStack - GTK's driver has no path for it yet |
-| `background` | property | `Background` | native | ☑️ | ✅ |  |  | · |  | AppKit paints a colour on this view; a brush is drawn only by a layout.; GTK 4: cannot read background of LazyHStack - GTK's driver has no path for it yet |
-| `blur` | property | `Double` | native |  |  |  |  |  |  |  |
-| `contentTransition` | property | `String` | native |  |  |  |  |  |  |  |
-| `compositingGroup` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `drawingGroup` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `focus` | act | `() -> Bool` |  | – | – |  |  | – |  | LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard; UIKit: LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard; GTK 4: LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard |
-| `frame` | property | `Rect` | structure | ✅ | ✅ |  |  | ✅ |  |  |
-| `height` | property | `Double` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `hint` | property | `String` | native |  |  |  |  |  |  |  |
-| `hintKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |  |  |
-| `ignoresInput` | property | `Bool` | native | ✅ | ✅ |  |  | · |  | GTK 4: cannot read what reaches LazyHStack - GTK's driver has no path for it yet |
-| `isAccessibilityHidden` | property | `Bool` | native | ✅ | ✅ |  |  | · |  | GTK 4: cannot read isAccessibilityHidden of LazyHStack - GTK's driver has no path for it yet |
-| `isEnabled` | property | `Bool` | native |  |  |  |  | ✅ |  | not realized; UIKit: not realized |
-| `isFocusedChanged` | event | `Bool` | native | – | – |  |  | – |  | LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard; UIKit: LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard; GTK 4: LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard |
-| `isVisible` | property | `Bool` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `layoutDirection` | property | `LayoutDirection` | native |  |  |  |  | · |  | not realized; UIKit: not realized; GTK 4: cannot read layoutDirection of LazyHStack - GTK's driver has no path for it yet |
-| `matchedGeometry` | property | `String` | native |  |  |  |  |  |  |  |
-| `matchedGeometrySource` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `maximumHeight` | property | `Double` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `maximumWidth` | property | `Double` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `minimumHeight` | property | `Double` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `minimumWidth` | property | `Double` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `opacity` | property | `Double` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `pivotX` | property | `Double` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read pivotX of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read pivotX of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read pivotX of LazyHStack - GTK's driver has no path for it yet |
-| `pivotY` | property | `Double` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read pivotY of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read pivotY of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read pivotY of LazyHStack - GTK's driver has no path for it yet |
-| `rotation` | property | `Angle` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read rotation of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read rotation of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read rotation of LazyHStack - GTK's driver has no path for it yet |
-| `rotationX` | property | `Angle` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read rotationX of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read rotationX of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read rotationX of LazyHStack - GTK's driver has no path for it yet |
-| `rotationY` | property | `Angle` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read rotationY of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read rotationY of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read rotationY of LazyHStack - GTK's driver has no path for it yet |
-| `scale` | property | `Double` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read scale of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read scale of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read scale of LazyHStack - GTK's driver has no path for it yet |
-| `scaleX` | property | `Double` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read scaleX of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read scaleX of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read scaleX of LazyHStack - GTK's driver has no path for it yet |
-| `scaleY` | property | `Double` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read scaleY of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read scaleY of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read scaleY of LazyHStack - GTK's driver has no path for it yet |
-| `shadow` | property | `DropShadow` | native |  |  |  |  |  |  |  |
-| `style` | property | `Name` | structure | ✅ | ✅ |  |  | ✅ |  |  |
-| `symbolEffect` | property | `String` | native |  |  |  |  |  |  |  |
-| `symbolEffectActive` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `symbolEffectOptions` | property | `Int` | native |  |  |  |  |  |  |  |
-| `symbolEffectValue` | property | `String` | native |  |  |  |  |  |  |  |
-| `transition` | property | `AnyTransition` | native |  |  |  |  |  |  |  |
-| `translationX` | property | `Double` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read translationX of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read translationX of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read translationX of LazyHStack - GTK's driver has no path for it yet |
-| `translationY` | property | `Double` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: read translationY of LazyHStack: the host's own transform, checked against the layer it composed itself; UIKit: only through the host's own: read translationY of LazyHStack: the host's own transform, checked against the layer it composed itself; GTK 4: cannot read translationY of LazyHStack - GTK's driver has no path for it yet |
-| `unfocus` | act | `() -> Void` |  | – | – |  |  | – |  | LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard; UIKit: LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard; GTK 4: LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard |
-| `width` | property | `Double` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `zIndex` | property | `Double` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `blendMode` | property | `BlendMode` | native |  |  |  |  |  |
+| `accessibilityChildBehavior` | property | `AccessibilityChildBehavior` | native |  |  |  |  |  |
+| `accessibilityHeadingLevel` | property | `HeadingLevel` | native |  |  | · |  | GTK 4: cannot read accessibilityHeadingLevel of LazyHStack - GTK's driver has no path for it yet |
+| `accessibilityHint` | property | `String` | native |  |  | · |  | GTK 4: cannot read accessibilityHint of LazyHStack - GTK's driver has no path for it yet |
+| `accessibilityLabel` | property | `String` | native |  |  | · |  | GTK 4: cannot read accessibilityLabel of LazyHStack - GTK's driver has no path for it yet |
+| `accessibilityTraits` | property | `AccessibilityTraits` | native |  |  |  |  |  |
+| `automationExcludedWithChildren` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read automationExcludedWithChildren of LazyHStack - GTK's driver has no path for it yet |
+| `background` | property | `Background` | native |  |  | · |  | GTK 4: cannot read background of LazyHStack - GTK's driver has no path for it yet |
+| `blur` | property | `Double` | native |  |  |  |  |  |
+| `contentTransition` | property | `String` | native |  |  |  |  |  |
+| `compositingGroup` | property | `Bool` | native |  |  |  |  |  |
+| `drawingGroup` | property | `Bool` | native |  |  |  |  |  |
+| `focus` | act | `() -> Bool` |  |  |  | – |  | GTK 4: LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard |
+| `frame` | property | `Rect` | structure |  |  | ✅ |  |  |
+| `height` | property | `Double` | native |  |  | ✅ |  |  |
+| `hint` | property | `String` | native |  |  |  |  |  |
+| `hintKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `ignoresInput` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read what reaches LazyHStack - GTK's driver has no path for it yet |
+| `isAccessibilityHidden` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read isAccessibilityHidden of LazyHStack - GTK's driver has no path for it yet |
+| `isEnabled` | property | `Bool` | native |  |  | ✅ |  |  |
+| `isFocusedChanged` | event | `Bool` | native |  |  | – |  | GTK 4: LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard |
+| `isVisible` | property | `Bool` | native |  |  | ✅ |  |  |
+| `layoutDirection` | property | `LayoutDirection` | native |  |  | · |  | GTK 4: cannot read layoutDirection of LazyHStack - GTK's driver has no path for it yet |
+| `matchedGeometry` | property | `String` | native |  |  |  |  |  |
+| `matchedGeometrySource` | property | `Bool` | native |  |  |  |  |  |
+| `maximumHeight` | property | `Double` | native |  |  | ✅ |  |  |
+| `maximumWidth` | property | `Double` | native |  |  | ✅ |  |  |
+| `minimumHeight` | property | `Double` | native |  |  | ✅ |  |  |
+| `minimumWidth` | property | `Double` | native |  |  | ✅ |  |  |
+| `opacity` | property | `Double` | native |  |  | ✅ |  |  |
+| `pivotX` | property | `Double` | native |  |  | · |  | GTK 4: cannot read pivotX of LazyHStack - GTK's driver has no path for it yet |
+| `pivotY` | property | `Double` | native |  |  | · |  | GTK 4: cannot read pivotY of LazyHStack - GTK's driver has no path for it yet |
+| `rotation` | property | `Angle` | native |  |  | · |  | GTK 4: cannot read rotation of LazyHStack - GTK's driver has no path for it yet |
+| `rotationX` | property | `Angle` | native |  |  | · |  | GTK 4: cannot read rotationX of LazyHStack - GTK's driver has no path for it yet |
+| `rotationY` | property | `Angle` | native |  |  | · |  | GTK 4: cannot read rotationY of LazyHStack - GTK's driver has no path for it yet |
+| `scale` | property | `Double` | native |  |  | · |  | GTK 4: cannot read scale of LazyHStack - GTK's driver has no path for it yet |
+| `scaleX` | property | `Double` | native |  |  | · |  | GTK 4: cannot read scaleX of LazyHStack - GTK's driver has no path for it yet |
+| `scaleY` | property | `Double` | native |  |  | · |  | GTK 4: cannot read scaleY of LazyHStack - GTK's driver has no path for it yet |
+| `shadow` | property | `DropShadow` | native |  |  |  |  |  |
+| `style` | property | `Name` | structure |  |  | ✅ |  |  |
+| `symbolEffect` | property | `String` | native |  |  |  |  |  |
+| `symbolEffectActive` | property | `Bool` | native |  |  |  |  |  |
+| `symbolEffectOptions` | property | `Int` | native |  |  |  |  |  |
+| `symbolEffectValue` | property | `String` | native |  |  |  |  |  |
+| `transition` | property | `AnyTransition` | native |  |  |  |  |  |
+| `translationX` | property | `Double` | native |  |  | · |  | GTK 4: cannot read translationX of LazyHStack - GTK's driver has no path for it yet |
+| `translationY` | property | `Double` | native |  |  | · |  | GTK 4: cannot read translationY of LazyHStack - GTK's driver has no path for it yet |
+| `unfocus` | act | `() -> Void` |  |  |  | – |  | GTK 4: LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard |
+| `width` | property | `Double` | native |  |  | ✅ |  |  |
+| `zIndex` | property | `Double` | native |  |  |  |  | GTK 4: not realized |
 
 ## From [View](tiers/View.md)
 
 What every view a layout positions has: where it sits in its layout, the space kept around it, and the gestures, drags and frame reports it answers.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `allowDrop` | property | `Bool` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `area` | property | `Area` | structure | ✅ | ✅ |  |  | ✅ |  |  |
-| `canDrag` | property | `Bool` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `coordinateSpaceName` | property | `String` | stateUI |  |  |  |  |  |  |  |
-| `dragLeave` | event |  | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dragOver` | event |  | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dragStarting` | event |  | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dragText` | property | `String` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `onDrop` (`drop`) | event | `String` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dropCompleted` | event |  | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dropPaths` | event | `([String], Point)` | native |  |  |  |  |  |  |  |
-| `flex` | property | `Double` | stateUI |  |  |  |  |  |  |  |
-| `frameChanged` | event | `[Double]` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `gridColumn` | property | `Int` | stateUI | ✅ | ✅ |  |  | ✅ |  |  |
-| `gridColumnSpan` | property | `Int` | stateUI | ✅ | ✅ |  |  | ✅ |  |  |
-| `gridRow` | property | `Int` | stateUI | ✅ | ✅ |  |  | ✅ |  |  |
-| `gridRowSpan` | property | `Int` | stateUI | ✅ | ✅ |  |  | ✅ |  |  |
-| `horizontalAlignment` | property | `AxisAlignment` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `horizontalGuide` | property | `[Double]` | stateUI |  |  |  |  |  |  |  |
-| `layoutPriority` | property | `Double` | stateUI |  |  |  |  |  |  |  |
-| `namedFramesChanged` | event | `[NamedSpaceFrame]` | native |  |  |  |  |  |  |  |
-| `padding` | property | `EdgeInsets` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `panTouchCount` | property | `Int` | structure | 🔌 | 🔌 |  |  | · |  | only through the host's own: pan on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: pan on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
-| `onPanUpdated` (`panUpdated`) | event | `(GesturePhase, Double, Double, Point?, Point?)` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: pan on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: pan on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
-| `panXChannel` | property | `Int` | structure | 🔌 | 🔌 |  |  | · |  | only through the host's own: pan on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: pan on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
-| `panYChannel` | property | `Int` | structure | 🔌 | 🔌 |  |  | · |  | only through the host's own: pan on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: pan on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
-| `pinchUpdated` | event | `(GesturePhase, Double, Point)` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: pinch on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: pinch on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot pinch on LazyHStack - GTK's driver has no path for it yet |
-| `pointerEntered` | event |  | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: hover on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: hover on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
-| `pointerExited` | event |  | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: hover on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: hover on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
-| `pointerMoved` | event | `Point?` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: hover on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: hover on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
-| `pointerPressed` | event | `Point?` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: hover on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: hover on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
-| `pointerReleased` | event | `Point?` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: hover on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: hover on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
-| `pointerStyle` | property | `PointerStyle` | native |  |  |  |  |  |  |  |
-| `swipeDirection` | property | `SwipeDirection` | structure | 🔌 | 🔌 |  |  | · |  | only through the host's own: pan on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: pan on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
-| `swipeThreshold` | property | `Double` | structure | 🔌 | 🔌 |  |  | · |  | only through the host's own: pan on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: pan on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
-| `onSwiped` (`swiped`) | event | `SwipeDirection` | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: pan on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: pan on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
-| `tag` | property | `PropValue` | stateUI |  |  |  |  |  |  |  |
-| `tapCount` | property | `Int` | structure | 🔌 | 🔌 |  |  | · |  | only through the host's own: tap on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: tap on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot tap on LazyHStack - GTK's driver has no path for it yet |
-| `onTapGesture` (`tapGesture`) | event |  | native | 🔌 | 🔌 |  |  | · |  | only through the host's own: tap on LazyHStack: handed to the host's recognizer or handler, no NSEvent sent; UIKit: only through the host's own: tap on LazyHStack: the view's listening handed the recognizer's states, no touch sent; GTK 4: cannot tap on LazyHStack - GTK's driver has no path for it yet |
-| `verticalAlignment` | property | `AxisAlignment` | native | ✅ | ✅ |  |  | ✅ |  |  |
-| `verticalGuide` | property | `[Double]` | stateUI |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `allowDrop` | property | `Bool` | native |  |  |  |  | GTK 4: not realized |
+| `area` | property | `Area` | structure |  |  | ✅ |  |  |
+| `canDrag` | property | `Bool` | native |  |  |  |  | GTK 4: not realized |
+| `coordinateSpaceName` | property | `String` | stateUI |  |  |  |  |  |
+| `dragLeave` | event |  | native |  |  |  |  | GTK 4: not realized |
+| `dragOver` | event |  | native |  |  |  |  | GTK 4: not realized |
+| `dragStarting` | event |  | native |  |  |  |  | GTK 4: not realized |
+| `dragText` | property | `String` | native |  |  |  |  | GTK 4: not realized |
+| `onDrop` (`drop`) | event | `String` | native |  |  |  |  | GTK 4: not realized |
+| `dropCompleted` | event |  | native |  |  |  |  | GTK 4: not realized |
+| `dropPaths` | event | `([String], Point)` | native |  |  |  |  |  |
+| `flex` | property | `Double` | stateUI |  |  |  |  |  |
+| `frameChanged` | event | `[Double]` | native |  |  | ✅ |  |  |
+| `gridColumn` | property | `Int` | stateUI |  |  | ✅ |  |  |
+| `gridColumnSpan` | property | `Int` | stateUI |  |  | ✅ |  |  |
+| `gridRow` | property | `Int` | stateUI |  |  | ✅ |  |  |
+| `gridRowSpan` | property | `Int` | stateUI |  |  | ✅ |  |  |
+| `horizontalAlignment` | property | `AxisAlignment` | native |  |  | ✅ |  |  |
+| `horizontalContentAlignment` | property | `AxisAlignment` | native |  |  |  |  |  |
+| `horizontalGuide` | property | `[Double]` | stateUI |  |  |  |  |  |
+| `layoutPriority` | property | `Double` | stateUI |  |  |  |  |  |
+| `namedFramesChanged` | event | `[NamedSpaceFrame]` | native |  |  |  |  |  |
+| `padding` | property | `EdgeInsets` | native |  |  | ✅ |  |  |
+| `panTouchCount` | property | `Int` | structure |  |  | · |  | GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
+| `onPanUpdated` (`panUpdated`) | event | `(GesturePhase, Double, Double, Point?, Point?)` | native |  |  | · |  | GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
+| `panXChannel` | property | `Int` | structure |  |  | · |  | GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
+| `panYChannel` | property | `Int` | structure |  |  | · |  | GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
+| `pinchUpdated` | event | `(GesturePhase, Double, Point)` | native |  |  | · |  | GTK 4: cannot pinch on LazyHStack - GTK's driver has no path for it yet |
+| `pointerEntered` | event |  | native |  |  | · |  | GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
+| `pointerExited` | event |  | native |  |  | · |  | GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
+| `pointerMoved` | event | `Point?` | native |  |  | · |  | GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
+| `pointerPressed` | event | `Point?` | native |  |  | · |  | GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
+| `pointerReleased` | event | `Point?` | native |  |  | · |  | GTK 4: cannot hover on LazyHStack - GTK's driver has no path for it yet |
+| `pointerStyle` | property | `PointerStyle` | native |  |  |  |  |  |
+| `swipeDirection` | property | `SwipeDirection` | structure |  |  | · |  | GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
+| `swipeThreshold` | property | `Double` | structure |  |  | · |  | GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
+| `onSwiped` (`swiped`) | event | `SwipeDirection` | native |  |  | · |  | GTK 4: cannot pan on LazyHStack - GTK's driver has no path for it yet |
+| `tag` | property | `PropValue` | stateUI |  |  |  |  |  |
+| `tapCount` | property | `Int` | structure |  |  | · |  | GTK 4: cannot tap on LazyHStack - GTK's driver has no path for it yet |
+| `onTapGesture` (`tapGesture`) | event |  | native |  |  | · |  | GTK 4: cannot tap on LazyHStack - GTK's driver has no path for it yet |
+| `verticalAlignment` | property | `AxisAlignment` | native |  |  | ✅ |  |  |
+| `verticalContentAlignment` | property | `AxisAlignment` | native |  |  |  |  |  |
+| `verticalGuide` | property | `[Double]` | stateUI |  |  |  |  |  |
 
 ## From [Layout](tiers/Layout.md)
 
 What every layout has: the screen's unsafe strips it keeps clear of, and whether its children are clipped or let input through.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `ignoresSafeArea` | property | `SafeAreaEdges` | adaptive |  | · |  |  |  |  | not realized; UIKit: cannot read ignoresSafeArea of LazyHStack - UIKit's driver has no path for it yet; GTK 4: not realized |
-| `clipsContent` | property | `Bool` | native | ✅ | ✅ |  |  | · |  | GTK 4: cannot read clipsContent of LazyHStack - GTK's driver has no path for it yet |
-| `letsInputThrough` | property | `Bool` | native | ◐ | ◐ |  |  | · |  | cannot read letsInputThrough of LazyHStack - AppKit's driver has no path for it yet; UIKit: cannot read letsInputThrough of LazyHStack - UIKit's driver has no path for it yet; GTK 4: cannot read letsInputThrough of LazyHStack - GTK's driver has no path for it yet |
-| `hitShape` | property | `ContainerShape` | native | ✅ | ◐ |  |  | · |  | UIKit: cannot read hitShape of LazyHStack - UIKit's driver has no path for it yet; GTK 4: cannot read hitShape of LazyHStack - GTK's driver has no path for it yet |
-| `scrollTargetLayout` | property | `Bool` | adaptive |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `ignoresSafeArea` | property | `SafeAreaEdges` | adaptive |  |  |  |  | GTK 4: not realized |
+| `clipsContent` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read clipsContent of LazyHStack - GTK's driver has no path for it yet |
+| `letsInputThrough` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read letsInputThrough of LazyHStack - GTK's driver has no path for it yet |
+| `hitShape` | property | `ContainerShape` | native |  |  | · |  | GTK 4: cannot read hitShape of LazyHStack - GTK's driver has no path for it yet |
+| `scrollTargetLayout` | property | `Bool` | adaptive |  |  |  |  |  |
 
 ## From [StackBase](tiers/StackBase.md)
 
 What both stacks have: the space between their children.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `spacing` | property | `Double` | native | ◐ | ◐ |  |  | ◐ |  | cannot read spacing of LazyHStack - AppKit's driver has no path for it yet; UIKit: cannot read spacing of LazyHStack - UIKit's driver has no path for it yet; GTK 4: cannot read spacing of LazyHStack - GTK's driver has no path for it yet |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `spacing` | property | `Double` | native |  |  | ◐ |  | GTK 4: cannot read spacing of LazyHStack - GTK's driver has no path for it yet |
 
 ## From [PaddingElement](tiers/PaddingElement.md)
 
 The space kept inside an element, around what it holds.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `contentPadding` | property | `EdgeInsets` | native | · | · |  |  | · |  | cannot read contentPadding of LazyHStack - AppKit's driver has no path for it yet; UIKit: cannot read contentPadding of LazyHStack - UIKit's driver has no path for it yet; GTK 4: cannot read contentPadding of LazyHStack - GTK's driver has no path for it yet |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `contentPadding` | property | `EdgeInsets` | native |  |  | · |  | GTK 4: cannot read contentPadding of LazyHStack - GTK's driver has no path for it yet |
 
 ## From [BorderElement](tiers/BorderElement.md)
 
 What an element draws of its own box: the shape its background, its outline and its cut follow, and the outline.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `shape` | property | `ContainerShape` | stateUI |  | · |  |  | · |  | not realized; UIKit: cannot read shape of LazyHStack - UIKit's driver has no path for it yet; GTK 4: cannot read shape of LazyHStack - GTK's driver has no path for it yet |
-| `stroke` | property | `Brush` | stateUI |  | ✅ |  |  | · |  | not realized; GTK 4: cannot read stroke of LazyHStack - GTK's driver has no path for it yet |
-| `strokeWidth` | property | `Double` | stateUI |  | ✅ |  |  | · |  | not realized; GTK 4: cannot read strokeWidth of LazyHStack - GTK's driver has no path for it yet |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `shape` | property | `ContainerShape` | stateUI |  |  | · |  | GTK 4: cannot read shape of LazyHStack - GTK's driver has no path for it yet |
+| `stroke` | property | `Brush` | stateUI |  |  | · |  | GTK 4: cannot read stroke of LazyHStack - GTK's driver has no path for it yet |
+| `strokeWidth` | property | `Double` | stateUI |  |  | · |  | GTK 4: cannot read strokeWidth of LazyHStack - GTK's driver has no path for it yet |
 
 ## From [ScrollContentElement](tiers/ScrollContentElement.md)
 
 What shows behind a scrollable view's content - a list's or an editor's own canvas, where the platform draws one.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `scrollContentBackground` | property | `Visibility` | native |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `scrollContentBackground` | property | `Visibility` | native |  |  |  |  |  |

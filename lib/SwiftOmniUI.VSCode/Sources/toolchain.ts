@@ -66,30 +66,9 @@ export function versionIn(text: string): string | undefined {
     return text.match(/\d+(\.\d+)+|\d+/)?.[0];
 }
 
-/** Xcode's version in `xcodebuild -version`'s output: "27.0" in "Xcode 27.0". */
-export function xcodeVersion(text: string): string | undefined {
-    return text.match(/Xcode (\d+(\.\d+)*)/)?.[1];
-}
-
 /** Whether a swift.org toolchain wrote `swift --version`'s output: its build is "swift-6.4-RELEASE", not "swiftlang-…". */
 export function isSwiftOrgBuild(text: string): boolean {
     return /\(swift-\d/.test(text);
-}
-
-/** The newest available iOS simulator runtime `xcrun simctl list runtimes available -j` lists, by its version. */
-export function newestIOSRuntime(json: string): string | undefined {
-    try {
-        const runtimes: { platform?: string; name?: string; version?: string; isAvailable?: boolean }[] =
-            JSON.parse(json).runtimes ?? [];
-        return runtimes
-            .filter((each) => (each.platform === "iOS" || each.name?.startsWith("iOS")) && each.isAvailable !== false)
-            .map((each) => each.version ?? "")
-            .filter((each) => each.length > 0)
-            .sort(compareVersions)
-            .pop();
-    } catch {
-        return undefined;
-    }
 }
 
 /** The file of the loader a gdk-pixbuf loaders cache names for SVG pictures, or undefined where it names none. */
@@ -162,11 +141,6 @@ function served(version: string | undefined, minimum: string, where?: string): s
     return atLeast(version, minimum) ? (where ? `${version} (${where})` : version) : new TooOld(version);
 }
 
-/** The first Apple Development identity `security find-identity -v -p codesigning` lists, by its name. */
-export function developmentIdentityIn(text: string): string | undefined {
-    return text.match(/"(Apple Development: [^"]+)"/)?.[1];
-}
-
 /** An NDK's release in its `source.properties`: "30.0.16248370". */
 export function ndkRevisionIn(properties: string): string | undefined {
     return properties.match(/^Pkg\.Revision\s*=\s*(\S+)/m)?.[1];
@@ -175,7 +149,7 @@ export function ndkRevisionIn(properties: string): string | undefined {
 /** Swift 6.4 or newer, as `swift --version` says. */
 const swift: Check = {
     component: "Swift 6.4 or newer", neededBy: "every host",
-    advice: "Install Swift 6.4 from https://www.swift.org/install (on macOS, Xcode 27 brings it).",
+    advice: "Install Swift 6.4 from https://www.swift.org/install.",
     look: async () => {
         const text = await run("swift", ["--version"]);
         return text === undefined ? undefined : served(swiftRelease(text), "6.4", onPath("swift"));
@@ -320,29 +294,9 @@ function ndkTheBuildTakes(sdk: string | undefined): string | undefined {
     return newest && isNDK(path.join(folder, newest)) ? path.join(folder, newest) : undefined;
 }
 
-/** What AppKit, UIKit and Android need on macOS. */
+/** What Android and the Web need on macOS. */
 function macChecks(): Check[] {
     return [
-        {
-            component: "macOS 26 or newer", neededBy: "AppKit", advice: "Update macOS to 26 or newer.",
-            look: async () => served((await run("sw_vers", ["-productVersion"]))?.trim(), "26"),
-        },
-        {
-            component: "Xcode 27 or newer", neededBy: "AppKit, UIKit",
-            advice: "Install Xcode 27 from the App Store, then run it once, or `xcode-select -s` it.",
-            look: async () => served(xcodeVersion((await run("xcodebuild", ["-version"])) ?? ""), "27"),
-        },
-        {
-            component: "an iOS 26 or newer simulator runtime", neededBy: "UIKit",
-            advice: "Install the iOS platform in Xcode's Settings, Components.",
-            look: async () => served(newestIOSRuntime((await run("xcrun", ["simctl", "list", "runtimes", "available", "-j"])) ?? ""), "26"),
-        },
-        {
-            component: "an Apple Development certificate", neededBy: "UIKit on an iPhone or iPad",
-            advice: "Sign in with your Apple Account in Xcode's Settings, Accounts, and make a development certificate there;"
-                + " Xcode makes a device's profile the first time it runs an application on it.",
-            look: async () => developmentIdentityIn((await run("security", ["find-identity", "-v", "-p", "codesigning"])) ?? ""),
-        },
         {
             component: "Swift 6.4 from swift.org, with the Swift SDK for Android of the same release", neededBy: "Android",
             advice: "Install the swift.org toolchain and its SDK: "

@@ -9,10 +9,6 @@ platform. A handler runs on `MainActor` and may suspend; it resumes on
 ## MainActor on every platform
 
 ```text
-  Apple                        MainActor's executor is the main queue, drained
-                               by the platform's own event loop on the thread
-                               it draws on. Nothing here replaces it.
-
   Android, Windows, Linux      the main queue would be libdispatch's, and
                                nothing drains it: the UI thread turns its own
                                loop (Looper, the message pump, GTK's main loop),
@@ -80,9 +76,7 @@ the doorbell:
 
 Nothing runs on the doorbell thread; it only asks. A wake is signalled at most
 once per park - the armed flag folds a thousand wakes inside one drain into
-one - and the count may be zero when another turn got there first. On Apple
-the doorbell rings for the work the main queue does not carry; `MainActor`'s
-jobs are the main queue's.
+one - and the count may be zero when another turn got there first.
 
 ## Draining jobs
 

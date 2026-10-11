@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Pictures from the app's resources: fitted, filled, and one per color scheme.
 struct ImageSample: SampleContent, ExampleContent {
@@ -54,9 +54,7 @@ struct ImageSample: SampleContent, ExampleContent {
             // Linux. The call site picks with #if.
             HStack {
                 Image(systemName: {
-                    #if os(macOS) || os(iOS)
-                    return "star.fill"
-                    #elseif os(Windows)
+                    #if os(Windows)
                     return "\\u{E734}"
                     #else
                     return "star-symbolic"
@@ -67,9 +65,7 @@ struct ImageSample: SampleContent, ExampleContent {
                     .frame(height: 24)
 
                 Label("Starred", systemImage: {
-                    #if os(macOS) || os(iOS)
-                    return "star.fill"
-                    #elseif os(Windows)
+                    #if os(Windows)
                     return "\\u{E734}"
                     #else
                     return "star-symbolic"
@@ -204,9 +200,7 @@ struct ImageSample: SampleContent, ExampleContent {
             // Windows, the icon theme on Linux. Each platform names them its
             // own way, so the list itself is per-platform.
             HStack {
-                #if os(macOS) || os(iOS)
-                let names = ["star", "heart.fill", "house", "gearshape", "magnifyingglass"]
-                #elseif os(Windows)
+                #if os(Windows)
                 let names = ["\u{E735}", "\u{EB51}", "\u{E80F}", "\u{E713}", "\u{E721}"]
                 #else
                 let names = ["star-symbolic", "heart-symbolic", "go-home-symbolic", "cogged-wheel-symbolic", "loupe-symbolic"]
@@ -226,9 +220,7 @@ struct ImageSample: SampleContent, ExampleContent {
             // picks which of the two shows.
             HStack {
                 Label("Starred", systemImage: {
-                    #if os(macOS) || os(iOS)
-                    return "star.fill"
-                    #elseif os(Windows)
+                    #if os(Windows)
                     return "\u{E734}"
                     #else
                     return "star-symbolic"
@@ -236,9 +228,7 @@ struct ImageSample: SampleContent, ExampleContent {
                 }())
 
                 Label("Bookmarked", systemImage: {
-                    #if os(macOS) || os(iOS)
-                    return "bookmark"
-                    #elseif os(Windows)
+                    #if os(Windows)
                     return "\u{E8A4}"
                     #else
                     return "bookmark-symbolic"
@@ -276,11 +266,11 @@ struct ImageSample: SampleContent, ExampleContent {
                 .foregroundStyle(Palette.subtle)
 
             Text("`Image(systemName:)` asks for no file: the name is a symbol "
-                + "in the PLATFORM's own set - an SF Symbols name on macOS, the "
-                + "Segoe Fluent glyph itself on Windows, the icon-theme name on "
-                + "Linux. The library holds no table between them; the call site "
-                + "names its own platform behind `#if os(...)`. `Label` pairs "
-                + "one with a title, and `.labelStyle` picks which shows.")
+                + "in the PLATFORM's own set - the Segoe Fluent glyph itself on "
+                + "Windows, the icon-theme name on Linux. The library holds no "
+                + "table between them; the call site names its own platform "
+                + "behind `#if os(...)`. `Label` pairs one with a title, and "
+                + "`.labelStyle` picks which shows.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 

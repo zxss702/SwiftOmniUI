@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Rectangles of colour - square, rounded, round and faded - and a divider.
 struct ColorBoxSample: SampleContent, ExampleContent {

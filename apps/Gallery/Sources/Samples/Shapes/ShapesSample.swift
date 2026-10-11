@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Six outlines, filled and stroked - with dashes, joins and a fill rule.
 struct ShapesSample: SampleContent, ExampleContent {
@@ -304,7 +304,7 @@ struct ShapesSample: SampleContent, ExampleContent {
 
             Button("fillRule: .\(rule)", action: { rule = rule == .evenOdd ? .nonzero : .evenOdd })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 
         }

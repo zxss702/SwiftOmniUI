@@ -6,12 +6,12 @@ import PackageDescription
 // package holds, so the editor completes the application through this
 // manifest as well.
 
-// The host a build is for: SWIFTOMNIUI_HOST - appkit, uikit, android, winui, gtk or web -
+// The host a build is for: SWIFTOMNIUI_HOST - android, winui, gtk or web -
 // which its script or the editor sets, or none for plain Swift - and then
 // `swift test` compiles no line of any host's half. The application's Swift for that host alone stands under its
-// condition - `#if APPKIT` - and the root package brings the host itself
+// condition - `#if GTK` - and the root package brings the host itself
 // to the head.
-let host = ["AppKit", "UIKit", "Android", "WinUI", "GTK", "Web"]
+let host = ["Android", "WinUI", "GTK", "Web"]
     .first { $0.lowercased() == Context.environment["SWIFTOMNIUI_HOST"] }
 
 // NonisolatedNonsendingByDefault is the one setting an application must not
@@ -56,8 +56,7 @@ var targets: [Target] = [
 ]
 
 // The head in Platforms/<Host>: an executable its host runs, and on Android a
-// library the platform loads. SwiftOmniUIHead brings the host; the gallery's cube
-// adds a native module to three of them.
+// library the platform loads. SwiftOmniUIHead brings the host.
 let head: [Target.Dependency] = ["GalleryUI", .product(name: "SwiftOmniUIHead", package: "SwiftOmniUIRoot")]
 // The web view's backend where the host's platform does not ship one - GTK's WebKitGTK, WinUI's WebView2 - which
 // the head registers: ../../lib/Backends/WebView.<Host>.
@@ -67,47 +66,23 @@ let webBackend: [Target.Dependency] = host.flatMap { host in
 switch host {
 case "Android"?:
     products.append(.library(name: "GalleryAndroid", type: .dynamic, targets: ["GalleryAndroid"]))
-    targets.append(contentsOf: [
-        .target(
-            name: "GalleryAndroid", dependencies: head + webBackend + ["CGalleryGLES"],
-            path: "Platforms/Android/Swift", swiftSettings: settings),
-        // OpenGL ES 3.0 for the cube: EGL, GLES3 and the NDK's window of a Java Surface.
-        .systemLibrary(name: "CGalleryGLES", path: "Platforms/Android/GLES"),
-    ])
+    targets.append(.target(
+        name: "GalleryAndroid", dependencies: head + webBackend,
+        path: "Platforms/Android/Swift", swiftSettings: settings))
 case "WinUI"?:
-    targets.append(contentsOf: [
-        .executableTarget(
-            name: "GalleryWinUI", dependencies: head + webBackend + ["CGalleryWinUI"],
-            path: "Platforms/WinUI", exclude: ["Relay"], swiftSettings: settings),
-        // The gallery's own WinUI elements, C++/WinRT behind C functions: the traffic light, the rating bar, the
-        // cube Direct3D 11.1 draws, and the battery. It includes the projection the WinUI host generated.
-        .target(
-            name: "CGalleryWinUI",
-            path: "Platforms/WinUI/Relay",
-            cxxSettings: [
-                .unsafeFlags(["-I", Context.packageDirectory + "/../../lib/SwiftOmniUI.WinUI/.projection"]),
-            ],
-            linkerSettings: [
-                .linkedLibrary("d3d11"), .linkedLibrary("dxgi"), .linkedLibrary("d3dcompiler"),
-                .linkedLibrary("powrprof"),
-            ]
-        ),
-    ])
+    targets.append(.executableTarget(
+        name: "GalleryWinUI",
+        dependencies: head + webBackend + [.product(name: "SwiftOmniUIWinUI", package: "SwiftOmniUIRoot")],
+        path: "Platforms/WinUI", swiftSettings: settings))
 case "GTK"?:
-    targets.append(contentsOf: [
-        .executableTarget(
-            name: "GalleryGTK",
-            dependencies: head + webBackend + ["CGalleryOpenGL"],
-            path: "Platforms/GTK", exclude: ["OpenGL"], swiftSettings: settings),
-        // OpenGL for the cube, through libepoxy - the loader GTK itself draws with.
-        .systemLibrary(name: "CGalleryOpenGL", path: "Platforms/GTK/OpenGL", pkgConfig: "epoxy"),
-    ])
+    targets.append(.executableTarget(
+        name: "GalleryGTK",
+        dependencies: head + webBackend + [.product(name: "SwiftOmniUIGTK", package: "SwiftOmniUIRoot")],
+        path: "Platforms/GTK", swiftSettings: settings))
 case let host?:
-    // The UIKit head's own Info.plist keys join the bundle's, and the Web head's page scripts stand beside its
-    // page: neither is a source.
     targets.append(.executableTarget(
         name: "Gallery\(host)", dependencies: head + webBackend, path: "Platforms/\(host)",
-        exclude: host == "UIKit" ? ["Info.plist"] : host == "Web" ? ["Page"] : [], swiftSettings: settings))
+        swiftSettings: settings))
 case nil:
     break
 }
@@ -128,6 +103,5 @@ let package = Package(
         .package(name: "SwiftOmniUIRoot", path: "../.."),
         .package(url: "https://github.com/zxss702/JsonData.git", branch: "main"),
     ],
-    targets: targets,
-    cxxLanguageStandard: .cxx20
+    targets: targets
 )

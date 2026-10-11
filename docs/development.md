@@ -4,30 +4,30 @@
 
 ```text
 Package.swift                      all SwiftOmniUI targets, products and test entry points
-lib/SwiftOmniUI/Sources/               platform-neutral SwiftOmniUI
+Sources/SwiftOmniUI/             the facade: SwiftUI on Apple platforms, SwiftOmniUI elsewhere
+lib/SwiftOmniUI/Sources/               platform-neutral SwiftOmniUI core
 lib/SwiftOmniUI/Tests/                 core tests and shared test support
 lib/SwiftOmniUI.Host/                  the host layer every host stands on, and its tests
 lib/SwiftOmniUI.Conformance/           the conformance suite every host's tests run
-lib/SwiftOmniUI.AppKit/                AppKit host target and tests
 lib/SwiftOmniUI.Android/               Android Views host target, its Java layer and tests
 lib/SwiftOmniUI.WinUI/                 WinUI host target, its C++/WinRT relay and tests
 lib/SwiftOmniUI.GTK/                   GTK host target, Swift over GTK's C API, and tests
+lib/SwiftOmniUI.Web/                   Web host target over WebAssembly
 lib/SwiftOmniUI.VSCode/                the editor extension
-.scripts/AppKit/                   AppKit Gallery bundling
 .scripts/Android/                  Android Views builds, runs, devices and tests
 .scripts/WinUI/                    WinUI builds, runs and tests, and the Windows App SDK
 .scripts/GTK/                      GTK builds and runs
 apps/Gallery/Sources/              platform-neutral Gallery application
-apps/Gallery/Platforms/AppKit/     Gallery AppKit entry point
 apps/Gallery/Platforms/Android/    Gallery Android head
 apps/Gallery/Platforms/WinUI/      Gallery WinUI head
 apps/Gallery/Platforms/GTK/        Gallery GTK head
+apps/Gallery/Platforms/Web/        Gallery Web head
 apps/Gallery/Tests/                Gallery acceptance tests
 apps/HelloWorld/Sources/           small platform-neutral example application
-apps/HelloWorld/Platforms/AppKit/  HelloWorld AppKit entry point
 apps/HelloWorld/Platforms/Android/ HelloWorld Android head
 apps/HelloWorld/Platforms/WinUI/   HelloWorld WinUI head
 apps/HelloWorld/Platforms/GTK/     HelloWorld GTK head
+apps/HelloWorld/Platforms/Web/     HelloWorld Web head
 ```
 
 The core and the host layer never import Foundation or a platform UI
@@ -35,26 +35,26 @@ framework. App code may import Foundation. Platform frameworks remain inside hos
 platform entry points.
 
 Swift written for one host alone stands under the condition named for it:
-`#if APPKIT`, `#if ANDROID`, `#if WINUI` and `#if GTK`, which every build of an
+`#if ANDROID`, `#if WINUI`, `#if GTK` and `#if WEB`, which every build of an
 application for that host defines through its manifest, from
-`SWIFTOMNIUI_HOST=appkit`, `uikit`, `android`, `winui`, `gtk` or `web`. `NativeProjectTests` refuses
+`SWIFTOMNIUI_HOST=android`, `winui`, `gtk` or `web`. `NativeProjectTests` refuses
 any other mention of a host in the library and in the applications'
 `Sources/`.
 
-`SWIFTOMNIUI_HOST=appkit` is what makes a build an AppKit one. An application's
-manifest reads it and then declares the `Platforms/AppKit` target, the product
-it makes and the `SwiftOmniUIAppKit` dependency, and defines `APPKIT` for every
+`SWIFTOMNIUI_HOST=gtk` is what makes a build a GTK one. An application's
+manifest reads it and then declares the `Platforms/GTK` target, the product
+it makes and the `SwiftOmniUIGTK` dependency, and defines `GTK` for every
 module of the application. A manifest cannot read a compiler flag - a flag
 reaches the targets of a build, never the manifest describing them - so no
-`-Xswiftc -DAPPKIT` is given beside the variable. Without it, `swift test`
+`-Xswiftc -DGTK` is given beside the variable. Without it, `swift test`
 declares no platform host target and compiles no line of one host's half, and a
-`Platforms/AppKit/` folder needs no condition inside it.
+`Platforms/GTK/` folder needs no condition inside it.
 
-`.scripts/AppKit/build-gallery-appkit.sh` and the AppKit tasks set the variable
-for a build. The editor gets it from the SwiftOmniUI extension (`lib/SwiftOmniUI.VSCode`):
-choosing AppKit in its status bar sets the variable for the Swift language
-server and restarts it, which then resolves `Platforms/AppKit` and completes the
-code inside `#if APPKIT`, with no window reload. A
+The host's own scripts set the variable for a build. The editor gets it from
+the SwiftOmniUI extension (`lib/SwiftOmniUI.VSCode`):
+choosing GTK in its status bar sets the variable for the Swift language
+server and restarts it, which then resolves `Platforms/GTK` and completes the
+code inside `#if GTK`, with no window reload. A
 `swift.swiftEnvironmentVariables` setting naming the variable would override
 that choice, so `.vscode/settings.json` sets none.
 
@@ -107,11 +107,11 @@ Treat one control, property, event, or host action as one vertical change:
 6. Add or update the smallest Gallery demonstration and handbook section.
 7. Let the host say what it realizes, only after its tests pass. A member a
    registration takes or raises records itself: with `SWIFTOMNIUI_UPDATE_EXPORTS=1`,
-   `SWIFTOMNIUI_HOST=appkit swift test --filter SwiftOmniUIAppKitTests` and
-   `.scripts/Android/test-android.sh <serial>` write `exports/appkit.txt` and
+   `SWIFTOMNIUI_HOST=gtk swift test --filter SwiftOmniUIGTKTests` and
+   `.scripts/Android/test-android.sh <serial>` write `exports/gtk.txt` and
    `android.txt`, and the contracts name each member's owner when the
    documents are rendered. What a registry cannot know stays written by hand,
-   in `AppKitRealization` and `AndroidRealization` - every judgement: a partial
+   in `GTKRealization` and `AndroidRealization` - every judgement: a partial
    record saying what is missing, what a host realizes none of, and what it
    presents with no view of its own.
    Then `SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests`
@@ -124,25 +124,16 @@ contract.
 
 ## Build
 
-The AppKit host requires macOS 15 or newer and Xcode 27, with its Swift 6.4.
-
-Build the runnable Gallery bundle:
+Build the smaller example as a GTK application:
 
 ```bash
-.scripts/AppKit/build-gallery-appkit.sh debug
-```
-
-Build the smaller example:
-
-```bash
-SWIFTOMNIUI_HOST=appkit swift build --package-path apps/HelloWorld --product HelloWorldAppKit
+SWIFTOMNIUI_HOST=gtk swift build --package-path apps/HelloWorld --product HelloWorldGTK
 ```
 
 In VS Code, the SwiftOmniUI extension (`lib/SwiftOmniUI.VSCode`) runs either
 application: "SwiftOmniUI: Debug" and "SwiftOmniUI: Release" build and start the one
 chosen in its status bar, on the host chosen there; installing it is under
-[Working in VS Code](getting-started.md#working-in-vs-code). The Gallery's
-build assembles its resources, icon, runtime libraries, and ad-hoc signature.
+[Working in VS Code](getting-started.md#working-in-vs-code).
 
 The Android Views host builds on macOS with the swift.org toolchain, the Swift
 SDK for Android, the NDK r30 and JDK 21. An application's Android head is
@@ -181,22 +172,15 @@ Each suite keeps its sources beside its module and runs from the root package:
 swift test
 swift test --filter SwiftOmniUIHostTests
 swift test --filter SwiftOmniUIConformanceTests
-SWIFTOMNIUI_HOST=appkit swift test --filter SwiftOmniUIAppKitTests
+SWIFTOMNIUI_HOST=gtk swift test --filter SwiftOmniUIGTKTests
 swift test --package-path apps/Gallery
-```
-
-`.scripts/test-native.sh` runs these Swift suites, then the Gallery again as an
-AppKit build (`SWIFTOMNIUI_HOST=appkit`), on a build directory of its own:
-
-```bash
-.scripts/test-native.sh
 ```
 
 The first suite covers core semantics and the typed boundary. The host
 layer's suite proves the rules every host shares, pure, with no toolkit. The
 conformance target's own tests prove its runner and that every member has
-its case; each host's suite runs the cases themselves. The AppKit suite drives
-native AppKit objects. The Gallery's treats Gallery as application behavior
+its case; each host's suite runs the cases themselves. The GTK suite drives
+native GTK objects. The Gallery's treats Gallery as application behavior
 and compiles the documentation examples. In VS Code, **SwiftOmniUI: Run Tests**
 runs them as the chosen host.
 
@@ -226,13 +210,11 @@ one application build at a time because Swift build directories are shared by
 the package graph.
 
 On GitHub each suite has a workflow of its own, so each shows its own state,
-the core apart from the hosts: **Core macOS**, **Core Linux** and **Core
-Windows** (`build-mac.yml`, `build-linux.yml`, `build-windows.yml` - the core,
-the host layer, Foundation and JsonData bridges, and the conformance runner,
-and on macOS the Gallery), and one
-for each host - **AppKit**, **UIKit** (an iPhone and an iPad simulator),
-**Android** (the test APK built on macOS, run on a Linux emulator), **WinUI**
-and **GTK**.
+the core apart from the hosts: **Core Linux** and **Core
+Windows** (`build-linux.yml`, `build-windows.yml` - the core,
+the host layer, Foundation and JsonData bridges, and the conformance runner),
+and one for each host - **Android** (the test APK built on macOS, run on a
+Linux emulator), **WinUI** and **GTK**.
 A host's workflow holds every conformance verdict to its marks and never
 writes them: a family whose verdicts changed fails there, and its marks are
 written again on that platform's machine.
@@ -268,6 +250,6 @@ verification before claiming that a process has one copy of a protocol.
 
 A release has one version, stated in the editor extension's
 `lib/SwiftOmniUI.VSCode/package.json`. Every other place that names it - the
-published-package line in each application `Package.swift`, each Android head's version,
-the Gallery's AppKit bundle, the bug report's example - names the same one, and
+published-package line in each application `Package.swift`, each Android head's
+version, the bug report's example - names the same one, and
 `ReleaseTests` holds them to it.

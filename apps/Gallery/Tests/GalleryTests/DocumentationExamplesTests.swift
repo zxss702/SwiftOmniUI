@@ -285,11 +285,7 @@ final class DocumentationExamplesTests: XCTestCase {
 
     /// The SDK the toolchain compiles against on this host, where one is needed.
     static func sdkPath() throws -> String? {
-        #if os(macOS)
-        return try run("/usr/bin/xcrun", ["--show-sdk-path"])?.trimmingCharacters(in: .whitespacesAndNewlines)
-        #else
-        return nil
-        #endif
+        nil
     }
 
     /// Type-checks one file; the compiler's output where it failed, nil where it passed.
@@ -314,14 +310,9 @@ final class DocumentationExamplesTests: XCTestCase {
         // for every listing, and the whole document went unchecked while
         // the suite went on running. Measured there: 132 listings, one
         // cause, and a document nobody was checking.
-        #if os(macOS)
-        let launcher = URL(fileURLWithPath: "/usr/bin/xcrun")
-        arguments.insert("swiftc", at: 0)
-        #else
         guard let launcher = onPath("swiftc") else {
             return "swiftc is not on PATH"
         }
-        #endif
         let process = Process()
         process.executableURL = launcher
         process.arguments = arguments

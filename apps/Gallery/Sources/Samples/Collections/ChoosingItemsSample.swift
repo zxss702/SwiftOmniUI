@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Rows chosen by the handful, and the list scrolled to a row from code.
 private struct PickList: ExampleContent {
@@ -23,7 +23,7 @@ private struct PickList: ExampleContent {
 
             // A Set binding: as many chosen as the user likes.
             List(0..<1_000) { number in
-                Text("Row \\(number)").contentPadding(EdgeInsets(14, 10))
+                Text("Row \\(number)").padding(EdgeInsets(14, 10))
             }
             .selection($chosen)
             .aim(list)
@@ -43,17 +43,17 @@ private struct PickList: ExampleContent {
             HStack {
                 Button("Top", action: { try await list.scrollTo(0, anchor: .start) })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
 
                 Button("Row 500", action: { try await list.scrollTo(500, anchor: .start) })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
 
                 Button("Clear", action: { chosen = [] })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     .disabled(chosen.isEmpty)
                     
             }
@@ -64,7 +64,7 @@ private struct PickList: ExampleContent {
             List(0..<1_000) { number in
                 Text("Row \(number)")
                     .font(.system(size: 14))
-                    .contentPadding(EdgeInsets(14, 10))
+                    .padding(EdgeInsets(14, 10))
             }
             .selection($chosen)
             .aim(list)

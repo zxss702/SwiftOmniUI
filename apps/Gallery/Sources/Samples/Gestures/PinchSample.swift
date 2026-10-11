@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Two fingers scaling a view, and every report the pinch sends as it arrives.
 struct PinchSample: SampleContent, ExampleContent {
@@ -141,7 +141,7 @@ struct PinchSample: SampleContent, ExampleContent {
                     log = []
                 })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 
         }

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A list that asks for thirty more as the user nears its end.
 private struct LoadingList: ExampleContent {
@@ -22,7 +22,7 @@ private struct LoadingList: ExampleContent {
                 .gridRow(0)
 
             List(0..<count) { number in
-                Text("Item \\(number + 1)").contentPadding(EdgeInsets(14, 10))
+                Text("Item \\(number + 1)").padding(EdgeInsets(14, 10))
             }
             // Within five items of the end, thirty more - once each time.
             .onEndReached(within: 5) {
@@ -48,7 +48,7 @@ private struct LoadingList: ExampleContent {
 
                 Button("Start over", action: { count = 30 })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     .disabled(count <= 30)
                     
             }
@@ -61,7 +61,7 @@ private struct LoadingList: ExampleContent {
             List(0..<count) { number in
                 Text("Item \(number + 1)")
                     .font(.system(size: 14))
-                    .contentPadding(EdgeInsets(14, 10))
+                    .padding(EdgeInsets(14, 10))
             }
             .onEndReached(within: 5) {
                 guard !loading, count < 300 else { return }

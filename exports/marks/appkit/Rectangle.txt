@@ -1,5 +1,0 @@
-# revision 1.1
-Rectangle: ✅
-Rectangle.cornerRadius: ✅
-Rectangle.fill: ✅
-Rectangle.frameChanged: ✅

@@ -29,8 +29,8 @@ A layout's values are read off the element once, by the core, so every host
 reads the same padding, alignment and stated size. The toolkit supplies only
 what it alone knows: whether the child is shown, and how big its view is for a
 width it is offered - a label wraps, an image keeps its ratio. The arithmetic
-is pure, so a host calls it from its own layout pass - `layout()` on AppKit, a
-`ViewGroup`'s layout on Android - and a test calls it with plain values.
+is pure, so a host calls it from its own layout pass - GTK's size-allocation
+pass, a `ViewGroup`'s layout on Android - and a test calls it with plain values.
 
 ## One axis of a slot
 

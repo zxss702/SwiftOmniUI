@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A native modal stack owned by application state.
 struct ModalSample: SampleContent, ExampleContent {
@@ -69,7 +69,7 @@ struct ModalSample: SampleContent, ExampleContent {
                 .background(Palette.accent)
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
@@ -88,7 +88,7 @@ struct ModalSample: SampleContent, ExampleContent {
                         Button("Dismiss", action: { sheeted = false })
                     }
                     .spacing(16)
-                    .contentPadding(EdgeInsets(40, 60))
+                    .padding(EdgeInsets(40, 60))
                     .background(Palette.raised)
                 }
 
@@ -96,7 +96,7 @@ struct ModalSample: SampleContent, ExampleContent {
             // the page; a user dismissal writes nil back.
             Button("Present .sheet(item:)", action: { request = Request(id: 1, title: "A request") })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(14, 6))
+                .padding(EdgeInsets(14, 6))
                 .accessibilityIdentifier("modal.itemSheet")
                 .sheet(item: $request) { request in
                     VStack {
@@ -105,7 +105,7 @@ struct ModalSample: SampleContent, ExampleContent {
                         Button("Done", action: { self.request = nil })
                     }
                     .spacing(16)
-                    .contentPadding(EdgeInsets(40, 60))
+                    .padding(EdgeInsets(40, 60))
                     .background(Palette.raised)
                 }
         }

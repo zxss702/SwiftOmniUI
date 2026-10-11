@@ -130,9 +130,8 @@ alignment, opacity, gestures, frame reports - measuring it by the view's own
 what the user did through a native method of the application's own, found by
 its JNI name (`@_cdecl("Java_..._lampTapped")`), handed the number the
 control made it with. A control that draws with the GPU is a view like any
-other: the Gallery's `Cube3D` is a `TextureView` whose surface Swift draws
-into with OpenGL ES 3.0 over EGL, following the display's frames only while
-it spins and stands in a window - the same declaration Metal draws on AppKit.
+other: a `TextureView` whose surface Swift draws into with OpenGL ES over EGL
+follows the display's frames only while it stands in a window.
 
 ### An act
 

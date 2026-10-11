@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A strip of tiles a fixed distance apart - the shape the grid and throw
 /// examples are cut from. A tile is 140 wide with 20 between them, so one
@@ -30,7 +30,7 @@ private func numberedLines() -> ScrollView {
             ForEach(1...40) { line in
                 Text("Line \(line)")
                     .font(.system(size: 14))
-                    .contentPadding(EdgeInsets(8, 6))
+                    .padding(EdgeInsets(8, 6))
             }
         }
     }
@@ -199,7 +199,7 @@ private struct OffsetStrips: ExampleContent {
                 VStack {
                     ForEach(1...40) { line in
                         Text("Line \\(line)")
-                            .contentPadding(EdgeInsets(8, 6))
+                            .padding(EdgeInsets(8, 6))
                     }
                 }
             }
@@ -354,12 +354,12 @@ private struct OffsetStrips: ExampleContent {
             HStack {
                 Button("Top", action: { try await move(to: 0) })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
 
                 Button("Line 9", action: { try await move(to: 240) })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
             }
             .spacing(16)
@@ -559,7 +559,7 @@ private struct BarStrips: ExampleContent {
                     VStack {
                         ForEach(1...40) { line in
                             Text("Line \\(line)")
-                                .contentPadding(EdgeInsets(6, 4))
+                                .padding(EdgeInsets(6, 4))
                         }
                     }
                 }
@@ -592,7 +592,7 @@ private struct BarStrips: ExampleContent {
                     ForEach(1...40) { line in
                         Text("Line \(line)")
                             .font(.system(size: 13))
-                            .contentPadding(EdgeInsets(6, 4))
+                            .padding(EdgeInsets(6, 4))
                     }
                 }
             }

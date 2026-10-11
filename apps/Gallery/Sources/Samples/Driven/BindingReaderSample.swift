@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A binding is no reader: one state, handed on as `$level` to a knob that
 /// drags it and to two meters that show it - one by READING the value, one by
@@ -131,7 +131,7 @@ private struct Knob: View {
                 Button("Full", action: { level = 1 })
                     .background(Palette.accent)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(16, 8))
+                    .padding(EdgeInsets(16, 8))
                     
 
                 Button("Empty", action: { level = 0 })
@@ -140,7 +140,7 @@ private struct Knob: View {
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(16, 8))
+                    .padding(EdgeInsets(16, 8))
                     
             }
             .spacing(10)

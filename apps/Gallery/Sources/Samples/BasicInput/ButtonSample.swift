@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A button wired to a click, beside an outlined one and a disabled one.
 struct ButtonSample: SampleContent, ExampleContent {
@@ -48,7 +48,7 @@ struct ButtonSample: SampleContent, ExampleContent {
                 .background(Palette.accent)
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
@@ -62,13 +62,13 @@ struct ButtonSample: SampleContent, ExampleContent {
                 .stroke(Palette.accent)
                 .strokeWidth(1)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
             Button("Disabled")
                 .disabled(true)
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
 
             // `.buttonStyle` is a logical look, not a platform widget: each

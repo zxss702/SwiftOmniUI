@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A switch bound to a flag, reporting each flip as the value it now has.
 struct SwitchSample: SampleContent, ExampleContent {
@@ -35,9 +35,7 @@ struct SwitchSample: SampleContent, ExampleContent {
             // A toggle as a button that holds its pressed look.
             Toggle(isOn: $boldOn) {
                 Label("Bold", systemImage: {
-                    #if os(macOS) || os(iOS)
-                    return "bold"
-                    #elseif os(Windows)
+                    #if os(Windows)
                     return "\\u{E8DD}"
                     #else
                     return "text-bold-symbolic"
@@ -70,9 +68,7 @@ struct SwitchSample: SampleContent, ExampleContent {
             // which is what `.toggleStyle(.button)` asks of each host.
             Toggle(isOn: $boldOn) {
                 Label("Bold", systemImage: {
-                    #if os(macOS) || os(iOS)
-                    return "bold"
-                    #elseif os(Windows)
+                    #if os(Windows)
                     return "\u{E8DD}"
                     #else
                     return "text-bold-symbolic"

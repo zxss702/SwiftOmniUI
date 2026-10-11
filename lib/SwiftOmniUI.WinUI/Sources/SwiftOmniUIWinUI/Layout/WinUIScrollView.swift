@@ -124,38 +124,15 @@ final class WinUIScrollView: WinUILayoutView {
         document.contentSize(width: width)
     }
 
-    /// Measures WinUI's scroller in every pass, as every child is, at the room it stands at the way it scrolls:
-    /// a scroller bigger than its room renders bigger than its place, so the room it last stood at is the room
-    /// it is asked to take where the offer has no bound - and its presenter bounds the shown room by the smaller
-    /// of the place arranged and the room it was offered, the same room twice over.
+    /// The scroller is measured at the room it stands in and nowhere else: the offer it was measured at is all
+    /// the room its presenter bounds the shown room by, and measuring while WinUI arranges defers to after the
+    /// pass - the same proposal the next pass finds already measured.
     /// Design: docs/design/platforms/winui/layout.md#scrolling
-    override func measure(width: Double, height: Double) -> LayoutSize {
-        let across = orientation == .horizontal || orientation == .both
-        let down = orientation == .vertical || orientation == .both
-        let room = scroller.placed
-        let proposal = (
-            width: across ? (width.isFinite ? width : room?.width ?? 0) : (width.isFinite ? width : nil),
-            height: down ? (height.isFinite ? height : room?.height ?? 0) : (height.isFinite ? height : nil))
-        #if DEBUG
-        WinUIDebugLog.log("scrollview[\(ObjectIdentifier(self).hashValue)].measure offered=(\(width),\(height)) room=\(String(describing: room)) proposal=\(proposal) arranging=\(WinUIView.arranging)")
-        #endif
-        _ = scroller.measure(width: proposal.width, height: proposal.height)
-        return super.measure(width: width, height: height)
-    }
-
     /// Stands WinUI's scroller over the whole of the room, then an offset the tree wrote before there was one - or,
     /// first time only, the default anchor a reader asked it to open at.
     override func arrange(in bounds: Rect) {
-        let room = scroller.placed
+        _ = scroller.measure(width: bounds.width, height: bounds.height)
         scroller.layout(bounds)
-        // A scroller measured at no room stands at its place's measure only once the pass that places it
-        // asks for one: the room it just took is the proposal it wants next.
-        if room?.width != bounds.width || room?.height != bounds.height {
-            scroller.invalidateMeasure()
-        }
-        #if DEBUG
-        WinUIDebugLog.log("scrollview[\(ObjectIdentifier(self).hashValue)].arrange bounds=\(bounds) desired=\(scroller.desiredSize) laidOut=\(scroller.laidOutFrame)")
-        #endif
         if let target = writtenOffset.laidOutNow() {
             move(to: target)
         } else if let defaultAnchor, !anchoredOnce {

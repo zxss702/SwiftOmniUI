@@ -26,7 +26,7 @@
 // Nothing lists these files: the build discovers them by globbing this
 // directory, subdirectories and all.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The gallery application.
 ///

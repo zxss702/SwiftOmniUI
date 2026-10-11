@@ -1,9 +1,0 @@
-# revision 1.1
-NavigationSplitView.icon: cannot read icon of NavigationSplitView - AppKit's driver has no path for it yet
-NavigationSplitView.title: cannot read title of NavigationSplitView - AppKit's driver has no path for it yet
-NavigationStack.icon: cannot read icon of NavigationStack - AppKit's driver has no path for it yet
-NavigationStack.title: cannot read title of NavigationStack - AppKit's driver has no path for it yet
-Page.icon: cannot read icon of Page - AppKit's driver has no path for it yet
-Page.title: ◐ cannot read title of Page - AppKit's driver has no path for it yet
-TabView.icon: cannot read icon of TabView - AppKit's driver has no path for it yet
-TabView.title: cannot read title of TabView - AppKit's driver has no path for it yet

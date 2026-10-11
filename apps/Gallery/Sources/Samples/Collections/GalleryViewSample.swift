@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A run of cards swiped through, in a shape one word chooses.
 struct GalleryViewSample: SampleContent, ExampleContent {
@@ -275,7 +275,7 @@ struct GalleryViewSample: SampleContent, ExampleContent {
                     .bold()
                     .foregroundStyle(Palette.onBrand)
                     .lineBreak(.tailTruncation)
-                    .contentPadding(EdgeInsets(12, 10))
+                    .padding(EdgeInsets(12, 10))
                     .background(Color("#B3000000"))
                     .verticalAlignment(.end)
             }

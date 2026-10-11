@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A page presented OVER everything - the bars, the menu and the stack alike.
 ///
@@ -30,12 +30,12 @@ struct ModalPage: View {
                 .background(Palette.accent)
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
             Button("Present another", action: { nav.present(.page) })
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
@@ -45,7 +45,7 @@ struct ModalPage: View {
                 .multilineTextAlignment(.center)
         }
         .spacing(16)
-        .contentPadding(24)
+        .padding(24)
         .verticalAlignment(.center)
         .onAppear {
             page.title = "Presented"

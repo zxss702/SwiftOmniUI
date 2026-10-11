@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Values changed by the sample and presented by the gallery window.
 final class TitleBarState {

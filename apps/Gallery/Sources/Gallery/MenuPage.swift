@@ -1,6 +1,6 @@
 // The menu that slides in from the side.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The gallery's sidebar - and it is an ordinary page.
 ///
@@ -101,15 +101,13 @@ struct MenuPage: View {
                 .opacity(0.85)
         }
         .spacing(6)
-        // Edge to edge, and padded down by hand. An iOS layout insets its
-        // children below the status bar at ARRANGE time while its MEASURED
-        // height knows nothing of it - so a header left to the platform kept its
-        // content-sized frame and had its bottom clipped by exactly the inset
-        // (measured on an iPhone 15 Pro simulator: 59 points, the tagline gone
-        // and the name cut mid-letter). The gradient was always meant to run
-        // behind the status bar anyway.
+        // Edge to edge, and padded down by hand. A layout that insets its
+        // children below a status bar at ARRANGE time while its MEASURED
+        // height knows nothing of it leaves a header's bottom clipped by
+        // exactly the inset - so the padding is the app's own, and the
+        // gradient was always meant to run behind the status bar anyway.
         .ignoresSafeArea(.none)
-        .contentPadding(EdgeInsets(20, 40, 20, 22))
+        .padding(EdgeInsets(20, 40, 20, 22))
         .background(Palette.identity)
     }
 
@@ -156,7 +154,7 @@ struct MenuPage: View {
             // Room under it for the home indicator, the content being edge to
             // edge: a phone with no home button draws a bar across the bottom
             // of the screen, and this line would otherwise sit under it.
-            .contentPadding(EdgeInsets(16, 16, 16, 30))
+            .padding(EdgeInsets(16, 16, 16, 30))
             // The footer's own row, written on the footer.
             .gridRow(2)
     }

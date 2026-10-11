@@ -21,7 +21,7 @@
 // that file; the colours that must not follow the color scheme, and a sample showing a
 // colour of its own, read them directly.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Every colour the gallery is built from, named for what it is rather than
 /// what it is for.
@@ -40,10 +40,9 @@ enum AppColors {
     /// caption stays white regardless.
     static let swiftOrangeLight = Color("#FF8A6B")
 
-    /// The yellow the WINDOW ITSELF is painted with - read off a running
-    /// window's minimise button on macOS, which is exactly this. The chrome's
-    /// accent, so what can be pressed up there is the colour of the other
-    /// things up there that can be pressed.
+    /// The yellow the WINDOW ITSELF is painted with. The chrome's accent, so
+    /// what can be pressed up there is the colour of the other things up
+    /// there that can be pressed.
     ///
     /// It also measures better than the orange: 5.0:1 against `violet`,
     /// where `swiftOrangeLight` is 3.4:1 and fails AA for text.

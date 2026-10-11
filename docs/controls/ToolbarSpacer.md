@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (2) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit |  |  | `NSToolbarItem`; `NSMenuToolbarItem` overflow; space for a spacer | no run of it on these sources |
-| UIKit |  |  | `UIBarButtonItem`; a spacer maps to the bar's own gap | no run of it on these sources |
 | Android Views |  |  | `Toolbar` `MenuItem` | no run of it on these sources |
 | WinUI 3 |  |  | `CommandBar` `AppBarButton`; `AppBarSeparator` for a spacer | no run of it on these sources |
 | GTK 4 |  |  | `GtkButton` in `GtkHeaderBar`; a spacer packs a separator | no run of it on these sources |
@@ -36,7 +34,7 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Menus/ToolbarSpacerContr
 
 ## ToolbarSpacer's own members
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `placement` | property | `ToolbarItemPlacement` | adaptive |  |  |  |  |  |  |  |
-| `variant` | property | `ToolbarSpacerVariant` | adaptive |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `placement` | property | `ToolbarItemPlacement` | adaptive |  |  |  |  |  |
+| `variant` | property | `ToolbarSpacerVariant` | adaptive |  |  |  |  |  |

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A time of day in a picker - bound, and one-way with the write back by hand.
 struct TimePickerSample: SampleContent, ExampleContent {
@@ -66,17 +66,17 @@ struct TimePickerSample: SampleContent, ExampleContent {
             HStack {
                 Button("Morning", action: { alarm = ClockTime(hour: 7, minute: 30) })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
 
                 Button("Lunch", action: { alarm = ClockTime(hour: 12, minute: 0) })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
 
                 Button("Evening", action: { alarm = ClockTime(hour: 21, minute: 5) })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
             }
             .spacing(10)

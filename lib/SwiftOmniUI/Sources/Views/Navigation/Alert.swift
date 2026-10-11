@@ -109,7 +109,7 @@ struct AlertAnchor<Actions: View, Message: View>: View {
 
     /// Asks the dialog the buttons amount to, then runs the pressed one's
     /// action - the answer reaching nobody runs nothing.
-    private func ask() async throws {
+    @MainActor func ask() async throws {
         let heading = if let titleKey { await Strings.localize(titleKey) } else { title }
         let note = if let messageKey { await Strings.localize(messageKey) } else { messageText }
         var names: [String] = []

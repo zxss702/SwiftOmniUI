@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A search box on the page, narrowing a list as the user types.
 struct SearchFieldSample: SampleContent, ExampleContent {
@@ -64,7 +64,7 @@ struct SearchFieldSample: SampleContent, ExampleContent {
                 ForEach(matches) { item in
                     Text(item)
                         .font(.system(size: 15))
-                        .contentPadding(EdgeInsets(8, 4))
+                        .padding(EdgeInsets(8, 4))
                         .id(item)
                 }
             }

@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (0) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ |  | `NSMenu` / `NSMenuItem` |  |
-| UIKit | ✅ |  | `UIMenu` / `UIAction` |  |
 | Android Views |  |  | `PopupMenu` / `MenuItem`; no menu bar | not realized |
 | WinUI 3 | ✅ |  | `MenuFlyout` / `MenuBar` |  |
 | GTK 4 | ✅ |  | `GMenu` in `GtkPopoverMenu` / `GtkPopoverMenuBar` |  |

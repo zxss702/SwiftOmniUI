@@ -32,7 +32,7 @@ import XCTest
 
     /// The launches are the SwiftOmniUI extension's: ONE Debug and ONE Release of
     /// type `swiftomniui`, which the extension resolves into the chosen host's own
-    /// debugger - AppKit's or Android's. No launch names a host or an
+    /// debugger - GTK's or Android's. No launch names a host or an
     /// application of its own, so none can drift from the extension that
     /// chooses them.
     func testTheLaunchesAreTheExtensions() throws {
@@ -77,8 +77,7 @@ import XCTest
     }
 
     /// The editor runs no .NET: no task, launch or setting names a MAUI head,
-    /// the MAUI extension or `dotnet`. A head is run by the SwiftOmniUI extension,
-    /// on AppKit or Android.
+    /// the MAUI extension or `dotnet`. A head is run by the SwiftOmniUI extension.
     func testTheEditorRunsNoDotNet() throws {
         for file in ["launch.json", "tasks.json", "settings.json"] {
             let text = try String(contentsOf: directory.appendingPathComponent(file), encoding: .utf8)
@@ -141,7 +140,7 @@ import XCTest
         let tasks = try json(at: directory.appendingPathComponent("tasks.json"))
         let labels = Set(array(tasks, "tasks").compactMap { $0["label"] as? String })
 
-        for label in ["Test SwiftOmniUI", "Test SwiftOmniUI.AppKit", "Test Gallery"] {
+        for label in ["Test SwiftOmniUI", "Test Gallery"] {
             XCTAssertTrue(labels.contains(label), "tasks.json declares no \"\(label)\"")
         }
     }

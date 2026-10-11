@@ -74,9 +74,6 @@ design notes beside them.
 Each page builds, runs, and tests one Swift host, in the application's
 process.
 
-- [AppKit](hosts/appkit.md) renders an application with AppKit on macOS.
-- [UIKit](hosts/uikit.md) renders it with UIKit on iOS and iPadOS, on a
-  simulator or a device.
 - [Android Views](hosts/android.md) renders it with Android views.
 - [WinUI](hosts/winui.md) renders it with WinUI 3 on Windows.
 - [GTK](hosts/gtk.md) renders it with GTK 4 and libadwaita on Linux.

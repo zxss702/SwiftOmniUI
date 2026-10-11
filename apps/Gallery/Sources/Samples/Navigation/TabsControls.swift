@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The panel every tab of the demonstration carries: what the tab list is, what
 /// the selection sends the host, and the buttons that change that list while a
@@ -90,7 +90,7 @@ struct TabsControls: View {
             if nav.tabs.count > 1 {
                 Button("close", action: { nav.closeTab(tab, showing: thisTab) })
                     .font(.system(size: 12))
-                    .contentPadding(EdgeInsets(10, 2))
+                    .padding(EdgeInsets(10, 2))
                     
             }
         }
@@ -101,7 +101,7 @@ struct TabsControls: View {
     private func move(_ caption: String, _ act: @escaping EventHandler) -> Button {
         Button(caption, action: act)
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(16, 6))
+            .padding(EdgeInsets(16, 6))
             .horizontalAlignment(.start)
             
     }

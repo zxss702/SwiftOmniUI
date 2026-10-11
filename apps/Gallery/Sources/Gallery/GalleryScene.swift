@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// One gallery - a SESSION of the application. *File ▸ New WindowScene* opens
 /// another, and so does the windows sample's "Open another gallery"; each has

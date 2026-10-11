@@ -1,6 +1,6 @@
 // The heading above a section.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The heading over a section of a page - "Example", "Notes", "In Swift".
 ///

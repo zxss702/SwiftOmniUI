@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A canvas drawn from state, and one drawn from a finger.
 struct CanvasSample: SampleContent {
@@ -83,7 +83,7 @@ private struct FollowsState: ExampleContent {
 
             Button("Different numbers", action: { bars = bars.map { _ in Double.random(in: 0.15...1) } })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 
         }
@@ -160,7 +160,7 @@ private struct FollowsAFinger: ExampleContent {
 
             Button("Clear", action: { trail = [] })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 .disabled(trail.isEmpty)
                 

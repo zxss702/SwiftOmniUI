@@ -3,9 +3,7 @@
 
 @_spi(Host) import SwiftOmniUICore
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Android)
+#if canImport(Android)
 import Android
 #elseif canImport(Glibc)
 import Glibc

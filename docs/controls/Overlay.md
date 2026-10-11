@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (0) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ |  | pass-through `NSView` above the page |  |
-| UIKit | ✅ |  | pass-through `UIView` above the page |  |
 | Android Views | · |  | top child of a `FrameLayout` | cannot read what reaches Text - Android's driver has no path for it yet |
 | WinUI 3 | ✅ |  | top layer of a root `Grid` |  |
 | GTK 4 | · |  | `GtkOverlay` | cannot read what reaches Text - GTK's driver has no path for it yet |

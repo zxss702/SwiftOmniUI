@@ -25,8 +25,7 @@ struct OpenURLSample: SampleContent, ExampleContent {
         VStack {
             Text("Drop a file onto the gallery's icon, open a document the app "
                 + "owns, or follow a gallery:// link and the URL lands here - "
-                + "on macOS `open https://…` works as well, though the browser "
-                + "answers first.")
+                + "a link the browser owns answers first.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
@@ -42,9 +41,7 @@ struct OpenURLSample: SampleContent, ExampleContent {
     var body: some View {
         VStack {
             Image(systemName: {
-                #if os(macOS) || os(iOS)
-                return "link"
-                #elseif os(Windows)
+                #if os(Windows)
                 return "\u{E71B}"
                 #else
                 return "chain-link-symbolic"

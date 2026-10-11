@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Which way a finger swiped, heard every way or narrowed to two.
 struct SwipeSample: SampleContent, ExampleContent {
@@ -25,7 +25,7 @@ struct SwipeSample: SampleContent, ExampleContent {
 
             ZStack {
                 Text("Swipe across this box")
-                    .contentPadding(32)
+                    .padding(32)
             }
             .style("Card")
             .stroke(Palette.accent)
@@ -40,7 +40,7 @@ struct SwipeSample: SampleContent, ExampleContent {
 
             ZStack {
                 Text("Left or right, and a long way")
-                    .contentPadding(32)
+                    .padding(32)
             }
             .style("Card")
             .stroke(Palette.accent)
@@ -72,7 +72,7 @@ struct SwipeSample: SampleContent, ExampleContent {
             ZStack {
                 Text("Swipe across this box")
                     .font(.system(size: 15))
-                    .contentPadding(32)
+                    .padding(32)
                     .multilineTextAlignment(.center)
             }
             .style("Card")
@@ -90,7 +90,7 @@ struct SwipeSample: SampleContent, ExampleContent {
             ZStack {
                 Text("Left or right, and a long way")
                     .font(.system(size: 15))
-                    .contentPadding(32)
+                    .padding(32)
                     .multilineTextAlignment(.center)
             }
             .style("Card")

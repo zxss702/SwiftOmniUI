@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A native context menu attached to any SwiftOmniUI view.
 struct ContextMenuSample: SampleContent, ExampleContent {
@@ -69,7 +69,7 @@ struct ContextMenuSample: SampleContent, ExampleContent {
                     let (index, item) = pair
                     return Text(item)
                         .font(.system(size: 16))
-                        .contentPadding(EdgeInsets(14, 10))
+                        .padding(EdgeInsets(14, 10))
                         .background(Palette.raised)
                         .contextMenu {
                             MenuItem("Duplicate")
@@ -109,7 +109,7 @@ struct ContextMenuSample: SampleContent, ExampleContent {
                     items = ["Alpha", "Beta", "Gamma"]
                     chosen = "nothing yet"
                 })
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.start)
                 
         }

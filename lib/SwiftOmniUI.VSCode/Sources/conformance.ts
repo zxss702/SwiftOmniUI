@@ -19,8 +19,8 @@ export interface RebuildStep extends Step {
 
 /**
  * The steps that make `host`'s marks again in `checkout` and render the documents from them: the host's conformance
- * families run writing their verdicts, then the dictionary's renderer. `device` - an Android serial, a simulator's
- * UDID - is where the host's suite runs on one. Undefined where the host cannot: a device the suite needs and was not
+ * families run writing their verdicts, then the dictionary's renderer. `device` - an Android serial -
+ * is where the host's suite runs on one. Undefined where the host cannot: a device the suite needs and was not
  * given, Android asked for the changed families, as its device reads no repository, or the Web, which has no
  * conformance driver yet.
  */
@@ -38,20 +38,8 @@ export function rebuildSteps(checkout: string, host: Host, rebuild: Rebuild, dev
             cwd: checkout, env: writing,
         };
         break;
-    case "appkit":
-        run = { command: "bash", args: [path.join(scripts, "AppKit", "test-appkit.sh"), "--filter", "AppKitConformanceTests"], cwd: checkout, env };
-        break;
     case "gtk":
         run = { command: "bash", args: [path.join(scripts, "GTK", "test-gtk.sh"), "--filter", "GTKConformanceTests"], cwd: checkout, env };
-        break;
-    case "uikit":
-        if (!device) {
-            return undefined;
-        }
-        run = {
-            command: "bash", args: [path.join(scripts, "UIKit", "test-uikit.sh"), device], cwd: checkout,
-            env: { ...env, SWIFTOMNIUI_FILTER: "UIKitConformanceTests" },
-        };
         break;
     case "web":
         return undefined;

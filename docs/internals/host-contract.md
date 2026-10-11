@@ -189,7 +189,7 @@ tests, Gallery coverage, and documentation that give it meaning. A host shows
 an unknown node as unsupported, and an unknown property has no effect. A token
 alone is not an implementation.
 
-The human-readable inventory and implementation matrix for AppKit, UIKit,
+The human-readable inventory and implementation matrix for
 GTK 4, Android Views, WinUI 3, and Web are maintained in
 [Platform contract](../platform-contract.md), and member by member in the
 [control dictionary](../controls/README.md). A check mark is evidence about a

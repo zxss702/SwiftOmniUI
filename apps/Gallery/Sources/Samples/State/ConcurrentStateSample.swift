@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Where `@State` may be written from, and the one move that is forbidden.
 ///
@@ -123,7 +123,7 @@ struct ConcurrentStateSample: SampleContent, ExampleContent {
                 .background(running ? Palette.disabled : Palette.accent)
                 .foregroundStyle(Palette.onAccent)
                 .shape(.roundedRectangle(10))
-                .contentPadding(EdgeInsets(22, 12))
+                .padding(EdgeInsets(22, 12))
                 .disabled(running)
                 .horizontalAlignment(.center)
                 

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A native slider driven by one shared SwiftOmniUI journey.
 struct SliderSample: SampleContent, ExampleContent {

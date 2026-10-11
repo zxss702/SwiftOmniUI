@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The platform's own map, with pins, a region to move to, and what it draws.
 struct MapSample: SampleContent, ExampleContent {
@@ -106,14 +106,14 @@ struct MapSample: SampleContent, ExampleContent {
                         try await map.moveToRegion(
                             latitude: 50.0617, longitude: 19.9373, radiusMeters: 1500)
                     })
-                    .contentPadding(EdgeInsets(14, 8))
+                    .padding(EdgeInsets(14, 8))
                     
 
                 Button("Poland", action: {
                         try await map.moveToRegion(
                             latitude: 52.1, longitude: 19.4, radiusMeters: 350_000)
                     })
-                    .contentPadding(EdgeInsets(14, 8))
+                    .padding(EdgeInsets(14, 8))
                     
 
                 Button(kind == .street ? "Street" : kind == .satellite ? "Satellite" : "Hybrid", action: {
@@ -122,7 +122,7 @@ struct MapSample: SampleContent, ExampleContent {
                             ? .satellite
                             : kind == .satellite ? .hybrid : .street
                     })
-                    .contentPadding(EdgeInsets(14, 8))
+                    .padding(EdgeInsets(14, 8))
                     
             }
             .spacing(8)

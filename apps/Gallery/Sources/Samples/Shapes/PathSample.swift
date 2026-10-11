@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// An outline written as calls - move, line, curve and arc - rather than
 /// read from path data; and the inits and helpers that stand beside them.

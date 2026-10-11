@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The two layers of reactivity side by side, and then what each costs.
 ///
@@ -60,7 +60,7 @@ private struct LayerRows: ExampleContent {
                 .background(Palette.accent)
                 .foregroundStyle(Palette.onAccent)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(22, 10))
+                .padding(EdgeInsets(22, 10))
                 .horizontalAlignment(.center)
                 
 
@@ -114,7 +114,7 @@ private struct LayerRows: ExampleContent {
             .spacing(6)
         }
         .style("Card")
-        .contentPadding(10)
+        .padding(10)
         .shape(.roundedRectangle(8))
         .stroke(Palette.outline)
     }
@@ -205,7 +205,7 @@ private struct LayerCost: ExampleContent {
                     .background(Palette.accent)
                     .foregroundStyle(Palette.onAccent)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(18, 8))
+                    .padding(EdgeInsets(18, 8))
                     
 
                 // A choice of more than two, so a button that cycles them.
@@ -216,7 +216,7 @@ private struct LayerCost: ExampleContent {
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(18, 8))
+                    .padding(EdgeInsets(18, 8))
                     
             }
             .spacing(10)

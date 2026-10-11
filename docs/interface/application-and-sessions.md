@@ -282,8 +282,8 @@ window.isMinimizable = true
 ```
 
 `width` and `height` describe the content area: what the window's title bar
-and toolbar leave uncovered. A host whose content reaches under them, as
-AppKit's does, sizes the window so that this area has the requested size, and
+and toolbar leave uncovered. A host whose content reaches under them
+sizes the window so that this area has the requested size, and
 bounds it the same way. Changing one axis must not reapply a stale value for
 another axis. `nil` leaves that axis under native
 window ownership, including user resizing and platform restoration. Minimum
@@ -294,8 +294,8 @@ host found when it adopted the window. Full-screen hosts may retain geometry
 requests without presenting movable or resizable window chrome.
 
 `title` names the window where the page on show does not. A host whose window
-chrome carries the visible page - AppKit's toolbar shows the visible page's
-title, the way a Mac window is named after what it shows - names the window
+chrome carries the visible page - a title bar that shows the visible page's
+title - names the window
 after that page while it has a title, and after `title` otherwise; native
 window menus, restoration surfaces, and accessibility follow the same name. A
 `titleBar`'s own title never names the window: it and the interactive slots
@@ -307,8 +307,8 @@ the corresponding value is `false`. `nil` preserves the platform's existing
 capability.
 
 `isTranslucent` asks for a window the desktop shows through, blurred, under
-whatever its pages leave uncovered or paint in a colour with an alpha - on
-AppKit the window's own material lies under the page, and the padding around a
+whatever its pages leave uncovered or paint in a colour with an alpha - the
+window's own material lies under the page, and the padding around a
 floating sidebar shows it. It is a desktop semantic: a host whose windows
 cannot show what is behind them keeps them opaque, and the application's
 colours read as written. Text belongs on a surface of its own rather than
@@ -455,11 +455,11 @@ closures are identified child subtrees, so controls in them keep ordinary
 state, events, and identity. Returning no child removes that slot; use a
 layout inside a slot when it contains several controls.
 
-The AppKit host puts the slots in the window's one native `NSToolbar`, beside
-the visible page's own furniture: the leading and trailing content as toolbar
+A desktop host puts the slots in the window's title area, beside
+the visible page's own furniture: the leading and trailing content as title
 items and the content in the centre. The title, subtitle and icon stand as
-text at the trailing edge of the title bar. AppKit owns placement, window
-dragging, overflow and the toolbar's material, so the title area's colours are
+text at the trailing edge of the title bar. The host owns placement, window
+dragging, overflow and the title area's material, so the title area's colours are
 the system's; the slot items keep the same SwiftOmniUI-created native views across
 updates.
 

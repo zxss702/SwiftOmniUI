@@ -4,9 +4,8 @@
 import Foundation
 import XCTest
 
-/// SwiftOmniUI builds with ONE Swift release on every platform - Xcode's on
-/// macOS, swift.org's everywhere else - with one Xcode and one NDK, for one
-/// oldest release of Apple's systems.
+/// SwiftOmniUI builds with ONE Swift release on every platform - swift.org's -
+/// and one NDK.
 ///
 /// The release is written in many places that nothing else compares: every
 /// manifest's tools version, the continuous integration's toolchains, images
@@ -114,35 +113,6 @@ import XCTest
 
         let patches = Set(named.map(\.value).filter { $0.split(separator: ".").count == 3 })
         XCTAssertLessThanOrEqual(patches.count, 1, "one patch release everywhere, not \(patches.sorted())")
-    }
-
-    /// The continuous integration and the handbook name one Xcode.
-    func testEveryPlaceThatNamesXcodeNamesOne() throws {
-        let named = try [
-            #"Xcode_(\d+)(?:\.\d+)*\.app"#, #"\bXcode (\d+)(?:\.\d+)?\b"#,
-        ].flatMap(values(of:))
-
-        XCTAssertGreaterThan(named.count, 10, "the walk found almost none of the places that name Xcode")
-        XCTAssertEqual(
-            Set(named.map(\.value)).count, 1,
-            "one Xcode: \(named.map { "\($0.place) \($0.value)" })")
-    }
-
-    /// Every manifest, project, script and handbook page names one release of
-    /// Apple's systems as the oldest SwiftOmniUI runs on: iOS, Mac Catalyst and
-    /// macOS alike.
-    func testEveryPlaceThatNamesTheFloorNamesOne() throws {
-        let named = try [
-            #"\.(?:iOS|macCatalyst|macOS)\(\.v(\d+)\)"#,
-            #"LSMinimumSystemVersion -string (\d+)"#,
-            #"\b(?:iOS|macOS|Mac Catalyst) (\d+) or newer"#,
-            #"minimum platforms are iOS (\d+)"#,
-        ].flatMap(values(of:))
-
-        XCTAssertGreaterThan(named.count, 12, "the walk found almost none of the places that name the floor")
-        XCTAssertEqual(
-            Set(named.map(\.value)).count, 1,
-            "one floor: \(named.map { "\($0.place) \($0.value)" })")
     }
 
     /// The handbook names one NDK, the one the Swift SDK for Android is built

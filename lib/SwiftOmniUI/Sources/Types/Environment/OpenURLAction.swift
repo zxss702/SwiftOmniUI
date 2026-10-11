@@ -1,9 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
+#if canImport(Glibc)
 import Glibc
 #elseif canImport(CRT)
 import CRT
@@ -53,9 +51,7 @@ public struct OpenURLAction: Sendable {
 
     /// The platform's own URL opener.
     private static let opener: (@Sendable (String) -> Void)? = {
-        #if canImport(Darwin)
-        return { url in spawn("/usr/bin/open", url) }
-        #elseif os(Windows)
+        #if os(Windows)
         return { url in
             "open".withCString(encodedAs: UTF16.self) { verb in
                 url.withCString(encodedAs: UTF16.self) { target in
@@ -72,7 +68,7 @@ public struct OpenURLAction: Sendable {
         #endif
     }()
 
-    #if canImport(Darwin) || canImport(Glibc) || canImport(Musl)
+    #if canImport(Glibc) || canImport(Musl)
     /// Runs `tool url` beside the process - the shell backgrounds it and is
     /// reaped at once, so the opener outlives no call. The arguments live only
     /// inside their `withCString` scopes, which the spawn copies before it

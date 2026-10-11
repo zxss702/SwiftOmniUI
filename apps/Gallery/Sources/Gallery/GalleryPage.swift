@@ -1,6 +1,6 @@
 // What every page of the gallery has in common.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 extension PageSession {
     /// Dresses a page the way every page of the gallery is dressed: its title,

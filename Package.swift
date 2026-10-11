@@ -4,7 +4,7 @@ import PackageDescription
 // One package owns every SwiftOmniUI module. Internal dependencies are targets;
 // ordinary library products expose those modules to applications.
 let settings: [SwiftSetting] = [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
-let host = ["AppKit", "UIKit", "Android", "WinUI", "GTK", "Web"]
+let host = ["Android", "WinUI", "GTK", "Web"]
     .first { $0.lowercased() == Context.environment["SWIFTOMNIUI_HOST"] }
 let selectedHost = host
 var products: [Product] = [
@@ -22,7 +22,13 @@ var targets: [Target] = [
         // it, the engine everywhere else - see Sources/SwiftOmniUI.
         .target(
             name: "SwiftOmniUI",
-            dependencies: ["SwiftOmniUICore", "SwiftOmniUIFoundation", "SwiftOmniUIJsonData"],
+            dependencies: [
+                // Engine-bound only where the platform ships no SwiftUI; on
+                // Apple platforms the facade depends on nothing at all.
+                .target(name: "SwiftOmniUICore", condition: .when(platforms: [.linux, .windows, .android, .wasi])),
+                .target(name: "SwiftOmniUIFoundation", condition: .when(platforms: [.linux, .windows, .android, .wasi])),
+                .target(name: "SwiftOmniUIJsonData", condition: .when(platforms: [.linux, .windows, .android, .wasi])),
+            ],
             path: "Sources/SwiftOmniUI",
             swiftSettings: settings
         ),
@@ -84,7 +90,7 @@ var targets: [Target] = [
 ]
 
 // Device and Web suites use their own platform runners.
-if selectedHost != "UIKit" && selectedHost != "Android" && selectedHost != "Web" {
+if selectedHost != "Android" && selectedHost != "Web" {
     targets += [
         .testTarget(name: "SwiftOmniUITests", dependencies: ["SwiftOmniUICore"],
             path: "lib/SwiftOmniUI/Tests", swiftSettings: settings),
@@ -117,33 +123,6 @@ if selectedHost != "UIKit" && selectedHost != "Android" && selectedHost != "Web"
 }
 
 switch selectedHost {
-case "AppKit"?:
-    products += [
-        .library(name: "SwiftOmniUIAppKit", targets: ["SwiftOmniUIAppKit"]),
-    ]
-    targets += [
-        .target(
-            name: "SwiftOmniUIAppKit",
-            dependencies: ["SwiftOmniUICore",
-                "SwiftOmniUIHost"],
-            path: "lib/SwiftOmniUI.AppKit/Sources",
-            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
-            linkerSettings: [.linkedFramework("AppKit")]
-        ),
-        .testTarget(
-            name: "SwiftOmniUIAppKitTests",
-            dependencies: [
-                "SwiftOmniUIAppKit",
-                "SwiftOmniUICore",
-                "SwiftOmniUIHost",
-                "SwiftOmniUIConformance",
-            ],
-            path: "lib/SwiftOmniUI.AppKit/Tests",
-            exclude: ["Resources"],
-            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
-            linkerSettings: [.linkedFramework("AppKit")]
-        ),
-    ]
 case "GTK"?:
     products += [
         .library(name: "SwiftOmniUIGTK", targets: ["SwiftOmniUIGTK"]),
@@ -234,33 +213,6 @@ case "WinUI"?:
                 "SwiftOmniUICore",
             ],
             path: "lib/Backends/WebView.WinUI/Sources/SwiftOmniUIWebViewWinUI", swiftSettings: settings + [.define("WINUI")]),
-    ]
-case "UIKit"?:
-    products += [
-        .library(name: "SwiftOmniUIUIKit", targets: ["SwiftOmniUIUIKit"]),
-        .executable(name: "SwiftOmniUIUIKitTests", targets: ["SwiftOmniUIUIKitTests"]),
-    ]
-    targets += [
-        .target(
-            name: "SwiftOmniUIUIKit",
-            dependencies: ["SwiftOmniUICore",
-                "SwiftOmniUIHost"],
-            path: "lib/SwiftOmniUI.UIKit/Sources",
-            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
-            linkerSettings: [.linkedFramework("UIKit")]
-        ),
-        .executableTarget(
-            name: "SwiftOmniUIUIKitTests",
-            dependencies: [
-                "SwiftOmniUICore",
-                "SwiftOmniUIUIKit",
-                "SwiftOmniUIHost",
-                "SwiftOmniUIConformance",
-            ],
-            path: "lib/SwiftOmniUI.UIKit/Tests/Sources",
-            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
-            linkerSettings: [.linkedFramework("XCTest"), .linkedFramework("UIKit")]
-        ),
     ]
 case "Android"?:
     products += [

@@ -106,25 +106,6 @@ extension View {
     }
 }
 
-#if canImport(Combine)
-import Combine
-
-extension View {
-    /// Performs `action` for each value a Combine `Publisher` emits while the
-    /// view is on screen - the SwiftUI signature on platforms that have
-    /// Combine. The subscription lives as long as the `.task` it rides.
-    ///
-    ///     Text(tick)
-    ///         .onReceive(timer) { tick = $0 }
-    public func onReceive<P: Publisher>(
-        _ publisher: P,
-        perform action: @escaping @Sendable (P.Output) -> Void
-    ) -> ModifiedContent where P.Failure == Never {
-        onReceive(publisher.values, perform: action)
-    }
-}
-#endif
-
 /// Carries a not-necessarily-Sendable sequence into the `.task` job;
 /// only its elements move through the job's work.
 private final class OnReceiveBox<S: AsyncSequence>: @unchecked Sendable {

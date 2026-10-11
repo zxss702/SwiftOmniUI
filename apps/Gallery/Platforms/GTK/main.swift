@@ -5,13 +5,8 @@ import GalleryUI
 import SwiftOmniUIGTK
 import SwiftOmniUIWebViewGTK
 
-// Register the gallery module, then say what this host answers for it before it runs: the controls it realizes,
-// the acts it performs, and the pushes it reports - each in Host/ beside this file. Then hand GTK this thread until
-// the last window closes.
+// Register the gallery module, then hand GTK this thread until the last window
+// closes. The web view's backend, over WebKitGTK, is registered first.
 swiftomniui_app_register()
-GalleryControls.register()
-GalleryActs.register()
-GalleryEventSources.start()
-// The backends the Gallery shows a library element through: the web view, over WebKitGTK.
 SwiftOmniUIWebViewGTK.register()
 SwiftOmniUIGTK.run(applicationID: "com.swiftomniui.gallery")

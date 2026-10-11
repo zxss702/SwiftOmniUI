@@ -1,6 +1,6 @@
 // What a route asks for that the catalog does not have.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A sample route with no sample behind it.
 ///
@@ -42,12 +42,12 @@ struct MissingPage: View {
                 .multilineTextAlignment(.center)
 
             Button("Back", action: { path.removeLast() })
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
         }
         .spacing(16)
-        .contentPadding(24)
+        .padding(24)
         .onAppear { page.gallery("Not found", scene: scene, nav: nav) }
     }
 }

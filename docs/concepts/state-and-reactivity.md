@@ -343,8 +343,8 @@ holding the last value. A persistent write is still drained when no body reads
 the state; persistence does not depend on description invalidation. Writing the
 same value also schedules a save because the host store may not hold it yet.
 
-Kept state lives in the platform's own settings store - `UserDefaults` on
-AppKit, `SharedPreferences` on Android. An application that keeps something
+Kept state lives in the platform's own settings store -
+`SharedPreferences` on Android. An application that keeps something
 in a file or a database of its own reads and writes it in its own code and
 hands the values to ordinary `@State`.
 

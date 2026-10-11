@@ -172,7 +172,7 @@ public final class Ticker: @unchecked Sendable {
     /// Starts counting, or does nothing if it is already counting. Returns at once;
     /// the first tick is an interval away, and a ticker at its limit starts over.
     /// Safe from any thread.
-    @_spi(Host) public func start() {
+    public func start() {
         let mine: Int? = guarded.withLock { () -> Int? in
             guard !running else { return nil }
 
@@ -197,7 +197,7 @@ public final class Ticker: @unchecked Sendable {
     ///
     /// Safe from any thread. The loop notices when it wakes, so a stop during a
     /// sleep costs at most the rest of that sleep - and nothing ticks after it.
-    @_spi(Host) public func stop() {
+    public func stop() {
         let changed = guarded.withLock {
             let was = running
             running = false
@@ -209,7 +209,7 @@ public final class Ticker: @unchecked Sendable {
     }
 
     /// Stops counting and puts the count back to zero. Safe from any thread.
-    @_spi(Host) public func reset() {
+    public func reset() {
         guarded.withLock {
             running = false
             count = 0

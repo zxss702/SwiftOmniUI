@@ -386,14 +386,14 @@ import XCTest
     private typealias Asking<Value> = nonisolated(nonsending) () async throws -> Value
 
     /// Starts an act and lets it reach its suspension, the way an event does:
-    /// by the time this returns the act is on the act queue.
+    /// the task's body runs a main-queue turn later, and the yield gives the
+    /// run loop that drains the queue its turn, so by the time this returns
+    /// the act is on the act queue.
     @MainActor
-    private static func begin<Value: Sendable>(_ body: sending @escaping Asking<Value>) -> Task<Value, Error> {
-        if #available(macOS 26, iOS 26, macCatalyst 26, *) {
-            return Task.immediate { @MainActor in try await body() }
-        }
-        // No inline start before macOS 26: the body runs a main-queue turn later.
-        return Task { @MainActor in try await body() }
+    private static func begin<Value: Sendable>(_ body: sending @escaping Asking<Value>) async -> Task<Value, Error> {
+        let task = Task { @MainActor in try await body() }
+        await Task.yield()
+        return task
     }
 
     /// The completion id in a taken batch, which is what the host quotes back.

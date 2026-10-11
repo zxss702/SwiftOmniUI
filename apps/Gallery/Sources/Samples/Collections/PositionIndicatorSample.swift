@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Dots marking a place in a sequence: their shape, their cap and a lone one.
 struct PositionIndicatorSample: SampleContent, ExampleContent {
@@ -127,13 +127,13 @@ struct PositionIndicatorSample: SampleContent, ExampleContent {
             HStack {
                 Button("Back", action: { step -= 1 })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     .disabled(step <= 0)
                     
 
                 Button("Next", action: { step += 1 })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     .disabled(step >= Self.steps.count - 1)
                     
             }

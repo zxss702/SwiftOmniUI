@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Children drawn one over another, each in the whole room or in the area it
 /// names, and which of them is on top.
@@ -52,7 +52,7 @@ private struct Areas: ExampleContent {
                 Text(text)
                     .foregroundStyle(.white)
                     .background(Color(color))
-                    .contentPadding(EdgeInsets(10, 6))
+                    .padding(EdgeInsets(10, 6))
             }
         }
         """
@@ -160,6 +160,6 @@ private struct Marker: View {
             .font(.system(size: 12))
             .foregroundStyle(.white)
             .background(Color(color))
-            .contentPadding(EdgeInsets(10, 6))
+            .padding(EdgeInsets(10, 6))
     }
 }

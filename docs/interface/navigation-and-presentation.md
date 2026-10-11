@@ -101,15 +101,12 @@ shows or hides the sidebar.
 
 The host adapts presentation to the available space. The state contract stays
 the same whether the two pages are temporarily overlaid or persistently side
-by side. On AppKit the sidebar runs the window's full height
-beside the detail, shown and hidden by the system sidebar button in the
-window's toolbar; a window wide enough for both panes opens with the sidebar
-shown, and after that the user and the binding decide. On Windows the
+by side. On Windows the
 sidebar opens over the detail from the navigation button beside the back
 button in the title bar, and the same button or a click outside it closes it.
-On a phone - iOS and Android alike - the sidebar slides over the detail from
+On a phone the sidebar slides over the detail from
 the leading edge, the detail shaded behind it, and a tap on the shade closes
-it; on an iPad or a wide tablet it stands beside the detail.
+it; on a wide tablet it stands beside the detail.
 
 ## Modal pages
 
@@ -246,10 +243,10 @@ Within either group, lower `priority` appears first and equal values retain
 source order. The host chooses the native placement appropriate to the window
 and available space. Give stable identities to items whose list can change.
 
-On AppKit a page's furniture is its window's toolbar: the top page's title
+On a desktop host a page's furniture is its window's title area: the top page's title
 names the window, the way back is the system's back item, primary actions are
-toolbar items, and secondary ones sit in the toolbar's overflow menu. A tabbed
-view on the window's page path shows its tabs in a row beneath the toolbar,
+title items, and secondary ones sit in the title area's overflow menu. A tabbed
+view on the window's page path shows its tabs in a row beneath the title area,
 beside any sidebar, the tabs sharing its width with each picture beside its
 title; one in a sidebar, a sheet or inside another tab is a tab view with its
 tabs on the top edge of its content.
@@ -259,10 +256,10 @@ accepts `barForegroundColor` for its title and native action affordances. Native
 selectors keep their selected and unselected states, legible over a written
 background. Leaving the background unwritten preserves the platform's
 material. A written colour is
-painted where the bars stand - on AppKit the band the title bar and toolbar
-cover over the visible content, with the page's title in `barForegroundColor` on it,
-and the window's background, which a Mac shows around a floating sidebar and
-through its glass - while the toolbar's own items keep the system's look. On a
+painted where the bars stand - the band the title area
+covers over the visible content, with the page's title in `barForegroundColor` on it,
+and the window's background, which a floating sidebar shows around it -
+while the title area's own items keep the system's look. On a
 translucent window the colour tints the window's material instead. Gradients
 remain ordinary view composition where the application owns the surface.
 

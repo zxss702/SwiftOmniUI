@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A page of the web: fetched by URL, and HTML written in place.
 struct WebViewSample: SampleContent {
@@ -108,16 +108,16 @@ private struct WebBrowserPart: ExampleContent {
                 HStack {
                     Button("Back", action: { try await browser.goBack() })
                         .disabled(!hasBack)
-                        .contentPadding(EdgeInsets(14, 8))
+                        .padding(EdgeInsets(14, 8))
                         
 
                     Button("Forward", action: { try await browser.goForward() })
                         .disabled(!hasForward)
-                        .contentPadding(EdgeInsets(14, 8))
+                        .padding(EdgeInsets(14, 8))
                         
 
                     Button("Reload", action: { try await browser.reload() })
-                        .contentPadding(EdgeInsets(14, 8))
+                        .padding(EdgeInsets(14, 8))
                         
                 }
                 .spacing(8)
@@ -156,7 +156,7 @@ private struct WebBrowserPart: ExampleContent {
             Button("Title?", action: {
                     answer = try await browser.evaluateJavaScript("document.title")
                 })
-                .contentPadding(EdgeInsets(14, 8))
+                .padding(EdgeInsets(14, 8))
                 .horizontalAlignment(.center)
                 
                 .gridRow(3)

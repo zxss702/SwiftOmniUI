@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (22) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ | 7 ✅ | `NSApplication` / structure |  |
-| UIKit | ✅ | 6 ✅ | `UIApplication` / `UIWindowScene` |  |
 | Android Views | ✅ | 4 ✅ | `App` / structure |  |
 | WinUI 3 | ✅ | 12 ✅ | `App` / structure |  |
 | GTK 4 | ✅ | 4 ✅ | `GtkApplication` / structure |  |
@@ -36,27 +34,27 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Structure/AppContract.sw
 
 ## App's own members
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `alert` | act | `(String, String, String) -> Void` |  | 🔌 | 🔌 | 🔌 | ✅ | · |  | only through the host's own: read a question: the captions the host keeps, not the alert's buttons; UIKit: only through the host's own: read a question: the buttons' captions the host keeps; Android Views: only through the host's own: read a question: what the relay keeps of the dialog it showed; GTK 4: cannot read a question - GTK's driver has no path for it yet |
-| `announce` | act | `(String) -> Void` |  | 🔌 | 🔌 | · | ✅ | · |  | only through the host's own: read what the screen reader said: the host's own list of what it announced; UIKit: only through the host's own: read what the screen reader said: the host's own list of what it announced; Android Views: cannot read what the screen reader said - Android's driver has no path for it yet; GTK 4: cannot read what the screen reader said - GTK's driver has no path for it yet |
-| `chooseAction` | act | `(String, String?, String?, [String]) -> String?` |  | 🔌 | 🔌 | 🔌 | ✅ | · |  | only through the host's own: read a question: the captions the host keeps, not the alert's buttons; UIKit: only through the host's own: read a question: the buttons' captions the host keeps; Android Views: only through the host's own: read a question: what the relay keeps of the dialog it showed; GTK 4: cannot read a question - GTK's driver has no path for it yet |
-| `chooseFiles` | act | `(Bool, [String]) -> [String]` |  |  |  |  |  |  |  |  |
-| `confirm` | act | `(String, String, String, String) -> Bool` |  | 🔌 | 🔌 | 🔌 | ✅ | · |  | only through the host's own: read a question: the captions the host keeps, not the alert's buttons; UIKit: only through the host's own: read a question: the buttons' captions the host keeps; Android Views: only through the host's own: read a question: what the relay keeps of the dialog it showed; GTK 4: cannot read a question - GTK's driver has no path for it yet |
-| `copyText` | act | `(String) -> Void` |  |  |  |  |  |  |  |  |
-| `currentTime` | act | `() -> [Double]` |  | ✅ | ✅ | ✅ | ✅ | ✅ |  |  |
-| `currentTimeZone` | act | `() -> String` |  | ✅ | ✅ | ✅ | ✅ | ✅ |  |  |
-| `handlerFailed` | act | `(String) -> Void` |  | ✅ | ✅ | ✅ | ✅ | · |  | GTK 4: cannot read the log - GTK's driver has no path for it yet |
-| `hideOnScreenKeyboard` | act | `() -> Bool` |  | ✅ | ✅ | · | ✅ | ✅ |  | Android Views: cannot focus on TextField - Android's driver has no path for it yet |
-| `launchFile` | act | `(ChosenFile) -> Bool` |  |  |  |  |  |  |  | not realized; GTK 4: not realized |
-| `launchLink` | act | `(String) -> Bool` |  |  |  |  |  |  |  | not realized; GTK 4: not realized |
-| `localizedString` | act | `(LocalizedStringKey) -> String` |  |  |  |  |  |  |  |  |
-| `openFiles` | act | `([FileType], Bool) -> [ChosenFile]` |  |  |  |  |  |  |  | not realized; GTK 4: not realized |
-| `openFolders` | act | `(Bool) -> [ChosenFile]` |  |  |  |  |  |  |  |  |
-| `persistSceneValue` | act | `(Name, Name, PropValue) -> Void` |  | ✅ |  |  | ✅ |  |  | UIKit: not realized; Android Views: not realized; GTK 4: not realized |
-| `persistValue` | act | `(Name, PropValue) -> Void` |  | ✅ | ✅ | · | ✅ | · |  | Android Views: cannot read what is kept - Android's driver has no path for it yet; GTK 4: cannot read what is kept - GTK's driver has no path for it yet |
-| `prompt` | act | `(String, String, String, String, String?, Int?, InputPurpose, String) -> String?` |  | 🔌 | 🔌 | 🔌 | ✅ | · |  | only through the host's own: read a question: the captions the host keeps, not the alert's buttons; UIKit: only through the host's own: read a question: the buttons' captions the host keeps; Android Views: only through the host's own: read a question: what the relay keeps of the dialog it showed; GTK 4: cannot read a question - GTK's driver has no path for it yet |
-| `readFile` | act | `(ChosenFile) -> [UInt8]` |  |  |  |  |  |  |  | not realized; GTK 4: not realized |
-| `saveFile` | act | `([UInt8], String, [FileType]) -> ChosenFile?` |  |  |  |  |  |  |  | not realized; GTK 4: not realized |
-| `urlOpened` | event | `String` | provider |  |  |  |  |  |  |  |
-| `utcOffset` | act | `(String?, CalendarDate?) -> Int` |  | ✅ | ✅ | ✅ | ✅ | ✅ |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `alert` | act | `(String, String, String) -> Void` |  | 🔌 | ✅ | · |  | only through the host's own: read a question: what the relay keeps of the dialog it showed; GTK 4: cannot read a question - GTK's driver has no path for it yet |
+| `announce` | act | `(String) -> Void` |  | · | ✅ | · |  | cannot read what the screen reader said - Android's driver has no path for it yet; GTK 4: cannot read what the screen reader said - GTK's driver has no path for it yet |
+| `chooseAction` | act | `(String, String?, String?, [String]) -> String?` |  | 🔌 | ✅ | · |  | only through the host's own: read a question: what the relay keeps of the dialog it showed; GTK 4: cannot read a question - GTK's driver has no path for it yet |
+| `chooseFiles` | act | `(Bool, [String]) -> [String]` |  |  |  |  |  |  |
+| `confirm` | act | `(String, String, String, String) -> Bool` |  | 🔌 | ✅ | · |  | only through the host's own: read a question: what the relay keeps of the dialog it showed; GTK 4: cannot read a question - GTK's driver has no path for it yet |
+| `copyText` | act | `(String) -> Void` |  |  |  |  |  |  |
+| `currentTime` | act | `() -> [Double]` |  | ✅ | ✅ | ✅ |  |  |
+| `currentTimeZone` | act | `() -> String` |  | ✅ | ✅ | ✅ |  |  |
+| `handlerFailed` | act | `(String) -> Void` |  | ✅ | ✅ | · |  | GTK 4: cannot read the log - GTK's driver has no path for it yet |
+| `hideOnScreenKeyboard` | act | `() -> Bool` |  | · | ✅ | ✅ |  | cannot focus on TextField - Android's driver has no path for it yet |
+| `launchFile` | act | `(ChosenFile) -> Bool` |  |  |  |  |  | GTK 4: not realized |
+| `launchLink` | act | `(String) -> Bool` |  |  |  |  |  | GTK 4: not realized |
+| `localizedString` | act | `(LocalizedStringKey) -> String` |  |  |  |  |  |  |
+| `openFiles` | act | `([FileType], Bool) -> [ChosenFile]` |  |  |  |  |  | GTK 4: not realized |
+| `openFolders` | act | `(Bool) -> [ChosenFile]` |  |  |  |  |  |  |
+| `persistSceneValue` | act | `(Name, Name, PropValue) -> Void` |  |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `persistValue` | act | `(Name, PropValue) -> Void` |  | · | ✅ | · |  | cannot read what is kept - Android's driver has no path for it yet; GTK 4: cannot read what is kept - GTK's driver has no path for it yet |
+| `prompt` | act | `(String, String, String, String, String?, Int?, InputPurpose, String) -> String?` |  | 🔌 | ✅ | · |  | only through the host's own: read a question: what the relay keeps of the dialog it showed; GTK 4: cannot read a question - GTK's driver has no path for it yet |
+| `readFile` | act | `(ChosenFile) -> [UInt8]` |  |  |  |  |  | GTK 4: not realized |
+| `saveFile` | act | `([UInt8], String, [FileType]) -> ChosenFile?` |  |  |  |  |  | GTK 4: not realized |
+| `urlOpened` | event | `String` | provider |  |  |  |  |  |
+| `utcOffset` | act | `(String?, CalendarDate?) -> Int` |  | ✅ | ✅ | ✅ |  |  |

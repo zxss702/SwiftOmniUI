@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The application's own session as an environment value: write its animation
 /// once and every value without one of its own travels so from then on.

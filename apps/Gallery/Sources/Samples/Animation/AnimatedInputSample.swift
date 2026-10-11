@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A slider's value and a stepper's - the two properties a USER can move,
 /// both carried by the host. Two sliders and a stepper, and what differs is who
@@ -226,7 +226,7 @@ struct AnimatedInputSample: SampleContent, ExampleContent {
     private func button(_ caption: String, _ act: @escaping EventHandler) -> Button {
         Button(caption, action: act)
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(14, 6))
+            .padding(EdgeInsets(14, 6))
             
     }
 }

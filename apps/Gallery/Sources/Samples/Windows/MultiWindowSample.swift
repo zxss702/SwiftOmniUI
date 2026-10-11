@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A gallery is a SCENE: its main window, the windows it opens beside it, and
 /// the state they share - and another gallery is one more scene.
@@ -177,7 +177,7 @@ struct MultiWindowSample: SampleContent, ExampleContent {
 
             Button("Close swatch 2", action: { await closeSwatch(2) })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(14, 6))
+                .padding(EdgeInsets(14, 6))
                 .horizontalAlignment(.center)
                 
 
@@ -187,14 +187,14 @@ struct MultiWindowSample: SampleContent, ExampleContent {
                 .background(style.accent.color)
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 .accessibilityIdentifier("scene.open")
                 
 
             Button("Close this gallery", action: { await closeThis() })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(14, 6))
+                .padding(EdgeInsets(14, 6))
                 .horizontalAlignment(.center)
                 .accessibilityIdentifier("scene.close")
                 
@@ -230,7 +230,7 @@ struct MultiWindowSample: SampleContent, ExampleContent {
             .background(style.accent.color)
             .foregroundStyle(.white)
             .shape(.roundedRectangle(8))
-            .contentPadding(EdgeInsets(20, 8))
+            .padding(EdgeInsets(20, 8))
             .accessibilityIdentifier(handle("window.open", caption))
             
     }
@@ -239,7 +239,7 @@ struct MultiWindowSample: SampleContent, ExampleContent {
     private func closes(_ caption: String, _ type: WindowType) -> any View {
         Button(caption, action: { await close(type, caption) })
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(14, 6))
+            .padding(EdgeInsets(14, 6))
             .accessibilityIdentifier(handle("window.close", caption))
             
     }
@@ -284,7 +284,7 @@ struct MultiWindowSample: SampleContent, ExampleContent {
             .background(SwatchPage.colour(of: number))
             .foregroundStyle(.white)
             .shape(.roundedRectangle(8))
-            .contentPadding(EdgeInsets(16, 8))
+            .padding(EdgeInsets(16, 8))
             .accessibilityIdentifier("window.open.swatch.\(number)")
             
     }

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// What a gallery's main window has said about its life, numbered, newest
 /// last - kept by the gallery's scene, written by `MainWindow` as the window

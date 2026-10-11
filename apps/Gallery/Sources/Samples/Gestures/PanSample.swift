@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A view dragged about under a finger, and the one write that must not travel.
 struct PanSample: SampleContent, ExampleContent {
@@ -159,7 +159,7 @@ struct PanSample: SampleContent, ExampleContent {
                     liveY = 0
                 })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 // A SETPOINT, so the box TRAVELS home from wherever it was
                 // left - the same two states, written the other way.

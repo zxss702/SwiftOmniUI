@@ -14,8 +14,8 @@ runtime](runtime.md) draws where the tree sits in a turn and a frame.
     |   |                             event handlers, layout animation,
     |   |                             drift, leaving, the frame walk
     |   |
-    |   native: NativeElement  ---->  AppKitElement (toolkit half)
-    |                                  NSView, constraints, gestures,
+    |   native: NativeElement  ---->  GTKElement (toolkit half)
+    |                                  GtkWidget, constraints, gestures,
     |                                  accessibility, menus, pages
     MountedElement ...
 ```

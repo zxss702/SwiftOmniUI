@@ -1,4 +1,0 @@
-# revision 1.1
-Ellipse: ✅
-Ellipse.fill: ✅
-Ellipse.frameChanged: ✅

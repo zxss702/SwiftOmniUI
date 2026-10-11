@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A colour, a size, a padding and a font size, each read off a state the host
 /// moves on its own frames.
@@ -37,7 +37,7 @@ struct AnimatedPropertySample: SampleContent, ExampleContent {
             }
             .style("Card")
             .background($panelColor)
-            .contentPadding($panelPadding)
+            .padding($panelPadding)
             .frame(height: $panelHeight)
 
             Button("Colour", action: {
@@ -92,7 +92,7 @@ struct AnimatedPropertySample: SampleContent, ExampleContent {
             }
             .style("Card")
             .background($panelColor)
-            .contentPadding($panelPadding)
+            .padding($panelPadding)
             .frame(height: $panelHeight)
             .stroke(.transparent)
             .shape(.roundedRectangle(12))
@@ -165,7 +165,7 @@ struct AnimatedPropertySample: SampleContent, ExampleContent {
     private func button(_ caption: String, _ act: @escaping EventHandler) -> Button {
         Button(caption, action: act)
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(14, 6))
+            .padding(EdgeInsets(14, 6))
             
     }
 }

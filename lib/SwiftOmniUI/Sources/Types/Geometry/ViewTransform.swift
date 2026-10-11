@@ -3,9 +3,7 @@
 
 // The platform's C maths library, for `sin`, `cos` and `atan2`, not Foundation.
 // Design: docs/design/types/transforms.md#the-arithmetic-is-in-the-core
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Android)
+#if canImport(Android)
 import Android
 #elseif canImport(Glibc)
 import Glibc

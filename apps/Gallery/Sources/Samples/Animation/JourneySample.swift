@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A value that changes TRAVELS - the default, and the three laws it can travel
 /// under.

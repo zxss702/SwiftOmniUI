@@ -23,8 +23,10 @@ body:
         Native toolkits differ, so name every host on which the behavior was
         exercised.
       options:
-        - label: AppKit / macOS
         - label: Android Views / Android
+        - label: WinUI 3 / Windows
+        - label: GTK 4 / Linux
+        - label: Web / WebAssembly
 
   - type: textarea
     id: repro

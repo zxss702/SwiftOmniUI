@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// One level of the drill-down. Every push makes another of these: identity on
 /// a stack is the depth together with the route, so a stack may hold the same
@@ -66,12 +66,12 @@ struct LevelPage: View {
                 .background(Palette.accent)
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
             Button("Back", action: { path.removeLast() })
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
@@ -81,7 +81,7 @@ struct LevelPage: View {
                 .multilineTextAlignment(.center)
         }
         .spacing(16)
-        .contentPadding(24)
+        .padding(24)
         .onAppear {
             page.gallery("Level \(level)", scene: scene, nav: nav)
 

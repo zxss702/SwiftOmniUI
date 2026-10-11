@@ -1,7 +1,7 @@
 {
   "name": "swiftomniui",
   "displayName": "SwiftOmniUI",
-  "description": "Build, run and debug SwiftOmniUI applications on AppKit, UIKit, Android, WinUI, GTK and the Web.",
+  "description": "Build, run and debug SwiftOmniUI applications on Android, WinUI, GTK and the Web.",
   "version": "0.5.2",
   "publisher": "zxss702",
   "license": "Apache-2.0",
@@ -22,8 +22,6 @@
   ],
   "main": "./out/Sources/extension.js",
   "activationEvents": [
-    "workspaceContains:**/Platforms/AppKit/main.swift",
-    "workspaceContains:**/Platforms/UIKit/main.swift",
     "workspaceContains:**/Platforms/Android/build.gradle.kts",
     "workspaceContains:**/Platforms/WinUI/main.swift",
     "workspaceContains:**/Platforms/GTK/main.swift",
@@ -63,11 +61,6 @@
       {
         "command": "swiftomniui.selectAndroidDevice",
         "title": "Select Android Device",
-        "category": "SwiftOmniUI"
-      },
-      {
-        "command": "swiftomniui.selectUIKitDevice",
-        "title": "Select UIKit Device",
         "category": "SwiftOmniUI"
       },
       {

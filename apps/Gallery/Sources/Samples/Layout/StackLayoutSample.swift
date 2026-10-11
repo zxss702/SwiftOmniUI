@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The two non-wrapping stack directions.
 struct StackLayoutSample: SampleContent, ExampleContent {
@@ -44,7 +44,7 @@ struct StackLayoutSample: SampleContent, ExampleContent {
                 Text(text)
                     .foregroundStyle(.white)
                     .background(Palette.accent)
-                    .contentPadding(EdgeInsets(14, 8))
+                    .padding(EdgeInsets(14, 8))
             }
         }
         """
@@ -105,7 +105,7 @@ private struct StackCell: View {
             .font(.system(size: 13))
             .foregroundStyle(.white)
             .background(Palette.accent)
-            .contentPadding(EdgeInsets(14, 8))
+            .padding(EdgeInsets(14, 8))
             .multilineTextAlignment(.center)
     }
 }

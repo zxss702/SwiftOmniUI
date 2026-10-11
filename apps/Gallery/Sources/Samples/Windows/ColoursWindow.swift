@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The window a gallery chooses its accent in - a window OF THE GALLERY that
 /// opened it, painting that gallery's bars and no other's. See
@@ -30,14 +30,14 @@ struct ColoursPage: View {
                     .foregroundStyle(.white)
                     .background(accent.color)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(14, 8))
+                    .padding(EdgeInsets(14, 8))
                     
             }
 
             // The window closes itself, through its own session.
             Button("Done", action: { try await window.close() })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(14, 6))
+                .padding(EdgeInsets(14, 6))
                 .horizontalAlignment(.end)
                 
         }

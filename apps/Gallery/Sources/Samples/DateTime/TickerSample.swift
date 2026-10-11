@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The same countdown as Task.sleep, out of the library's own timer.
 struct TickerSample: SampleContent, ExampleContent {
@@ -66,12 +66,12 @@ struct TickerSample: SampleContent, ExampleContent {
             HStack {
                 Button(ticker.isRunning ? "Stop" : "Start", action: { ticker.isRunning ? ticker.stop() : ticker.start() })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(20, 6))
+                    .padding(EdgeInsets(20, 6))
                     
 
                 Button("Reset", action: { ticker.reset() })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(20, 6))
+                    .padding(EdgeInsets(20, 6))
                     
             }
             .spacing(10)
@@ -84,7 +84,7 @@ struct TickerSample: SampleContent, ExampleContent {
                             ticker.limit = length
                         })
                         .font(.system(size: 12))
-                        .contentPadding(EdgeInsets(14, 4))
+                        .padding(EdgeInsets(14, 4))
                         
                 }
             }

@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (10) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | 🔌 | 2 ✅ | `NSToolbarItem`; `NSMenuToolbarItem` overflow; space for a spacer | only through the host's own: activate on ToolbarItem: the host's toolbar entry called, no toolbar item touched |
-| UIKit | ✅ | 6 ✅ | `UIBarButtonItem`; a spacer maps to the bar's own gap |  |
 | Android Views | · | 1 – | `Toolbar` `MenuItem` | cannot activate on ToolbarItem - Android's driver has no path for it yet |
 | WinUI 3 | ✅ | 7 ✅ | `CommandBar` `AppBarButton`; `AppBarSeparator` for a spacer |  |
 | GTK 4 | · |  | `GtkButton` in `GtkHeaderBar`; a spacer packs a separator | cannot activate on ToolbarItem - GTK's driver has no path for it yet |
@@ -36,29 +34,29 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Menus/ToolbarItemContrac
 
 ## ToolbarItem's own members
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `placement` | property | `ToolbarItemPlacement` | adaptive | · | · | · | ✅ | · |  | cannot read placement of ToolbarItem - AppKit's driver has no path for it yet; UIKit: cannot read placement of ToolbarItem - UIKit's driver has no path for it yet; Android Views: cannot read placement of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read placement of ToolbarItem - GTK's driver has no path for it yet |
-| `priority` | property | `Int` | adaptive | · | · | · | ✅ | · |  | cannot read priority of ToolbarItem - AppKit's driver has no path for it yet; UIKit: cannot read priority of ToolbarItem - UIKit's driver has no path for it yet; Android Views: cannot read priority of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read priority of ToolbarItem - GTK's driver has no path for it yet |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `placement` | property | `ToolbarItemPlacement` | adaptive | · | ✅ | · |  | cannot read placement of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read placement of ToolbarItem - GTK's driver has no path for it yet |
+| `priority` | property | `Int` | adaptive | · | ✅ | · |  | cannot read priority of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read priority of ToolbarItem - GTK's driver has no path for it yet |
 
 ## From [PropertyContainer](tiers/PropertyContainer.md)
 
 What anything carrying values in the tree has - a control, a `Style`, a text run: the name automation finds it by.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `accessibilityIdentifier` | property | `String` | native |  | ✅ | – | ✅ |  |  | not realized; Android Views: An Android bar action is a menu entry, which holds no identifier: automation finds it by its title.; GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `accessibilityIdentifier` | property | `String` | native | – | ✅ |  |  | An Android bar action is a menu entry, which holds no identifier: automation finds it by its title.; GTK 4: not realized |
 
 ## From [MenuItemElement](tiers/MenuItemElement.md)
 
 What every item a user chooses from has - a menu's entry, a toolbar's item: a caption, a picture, and something to run.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `onClicked` (`clicked`) | event |  | native | 🔌 | ✅ | · | ✅ | · |  | only through the host's own: activate on ToolbarItem: the host's toolbar entry called, no toolbar item touched; Android Views: cannot activate on ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot activate on ToolbarItem - GTK's driver has no path for it yet |
-| `icon` | property | `ImageSource` | adaptive | · | ✅ | · | ✅ | · |  | cannot read icon of ToolbarItem - AppKit's driver has no path for it yet; Android Views: cannot read icon of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read icon of ToolbarItem - GTK's driver has no path for it yet |
-| `isDestructive` | property | `Bool` | adaptive |  | ✅ | · |  |  |  | not realized; Android Views: cannot read isDestructive of ToolbarItem - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
-| `isEnabled` | property | `Bool` | native | ✅ | ✅ | · | ✅ | · |  | Android Views: cannot activate on ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot activate on ToolbarItem - GTK's driver has no path for it yet |
-| `shortcut` | property | `KeyboardShortcut` | native |  |  |  |  |  |  |  |
-| `text` | property | `String` | native | ✅ | ✅ | · | ✅ | · |  | Android Views: cannot read text of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read text of ToolbarItem - GTK's driver has no path for it yet |
-| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `onClicked` (`clicked`) | event |  | native | · | ✅ | · |  | cannot activate on ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot activate on ToolbarItem - GTK's driver has no path for it yet |
+| `icon` | property | `ImageSource` | adaptive | · | ✅ | · |  | cannot read icon of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read icon of ToolbarItem - GTK's driver has no path for it yet |
+| `isDestructive` | property | `Bool` | adaptive | · |  |  |  | cannot read isDestructive of ToolbarItem - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
+| `isEnabled` | property | `Bool` | native | · | ✅ | · |  | cannot activate on ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot activate on ToolbarItem - GTK's driver has no path for it yet |
+| `shortcut` | property | `KeyboardShortcut` | native |  |  |  |  |  |
+| `text` | property | `String` | native | · | ✅ | · |  | cannot read text of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read text of ToolbarItem - GTK's driver has no path for it yet |
+| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |

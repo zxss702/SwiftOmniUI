@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The library's own way to tell the time: acts, not Foundation.
 struct HostTimeSample: SampleContent, ExampleContent {
@@ -115,7 +115,7 @@ struct HostTimeSample: SampleContent, ExampleContent {
 
             Button("Read again", action: { try await read() })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 
         }

@@ -145,7 +145,7 @@ host and never calls the core.
              await, inside the event                 v
                                                doorbell thread (the host made it)
   turn    HostBoundary.runJobs: MainActor's jobs  parked in waitForWork
-          (Apple: the main queue's instead)      wakes, counts the work, posts
+                                               wakes, counts the work, posts
           a pending cycle, a render, the acts    ONE turn onto the UI thread
                                                  and parks again
   resume  a continuation's job lands on

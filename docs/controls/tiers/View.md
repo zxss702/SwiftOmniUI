@@ -32,6 +32,7 @@ How each of them realizes these members is on its own page.
 | `gridRow` | property | `Int` | stateUI |
 | `gridRowSpan` | property | `Int` | stateUI |
 | `horizontalAlignment` | property | `AxisAlignment` | native |
+| `horizontalContentAlignment` | property | `AxisAlignment` | native |
 | `horizontalGuide` | property | `[Double]` | stateUI |
 | `layoutPriority` | property | `Double` | stateUI |
 | `namedFramesChanged` | event | `[NamedSpaceFrame]` | native |
@@ -54,4 +55,5 @@ How each of them realizes these members is on its own page.
 | `tapCount` | property | `Int` | structure |
 | `onTapGesture` (`tapGesture`) | event |  | native |
 | `verticalAlignment` | property | `AxisAlignment` | native |
+| `verticalContentAlignment` | property | `AxisAlignment` | native |
 | `verticalGuide` | property | `[Double]` | stateUI |

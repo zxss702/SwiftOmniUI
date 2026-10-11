@@ -19,7 +19,7 @@ and a private channel will be arranged.
 
 ## What makes a report actionable
 
-- The version, and the platform - macOS, iOS, Android, Windows or Linux. Each
+- The version, and the platform - Android, Windows, Linux or the Web. Each
   native host behaves differently, and several of this library's sharpest edges
   are one platform's alone.
 - What an attacker can actually do with it, and what they need first.
@@ -55,7 +55,7 @@ a host, and the build scripts. That is what this project controls.
 
 **Not in scope, and better reported where they belong:** the Swift toolchain
 ([swift.org/security](https://www.swift.org/security/)) and the platform
-toolkits a host drives - AppKit, UIKit, GTK, Android and WinUI - which their own
+toolkits a host drives - GTK, Android, WinUI and the web runtimes - which their own
 vendors fix. A library that drives a toolkit attracts reports about the toolkit;
 its vendor can fix them and this project cannot.
 

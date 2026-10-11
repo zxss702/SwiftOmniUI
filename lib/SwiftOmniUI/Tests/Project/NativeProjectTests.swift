@@ -6,13 +6,13 @@ import XCTest
 
 @MainActor final class NativeProjectTests: XCTestCase {
     /// Every application is one Swift package shared by one head per host: the
-    /// AppKit executable in `Platforms/AppKit` and the Android head in
+    /// GTK executable in `Platforms/GTK` and the Android head in
     /// `Platforms/Android`, both compiling the same `Sources/`.
     func testEveryApplicationSharesItsSourcesBetweenItsHostHeads() throws {
         for name in ["Gallery", "HelloWorld"] {
             let app = SourceTree.repository.appendingPathComponent("apps/\(name)")
             for relative in [
-                "Package.swift", "Sources", "Resources", "Platforms/AppKit/main.swift",
+                "Package.swift", "Sources", "Resources", "Platforms/GTK/main.swift",
                 "Platforms/Android/build.gradle.kts", "Platforms/Android/Swift/\(name)Android.swift",
             ] {
                 XCTAssertTrue(
@@ -25,14 +25,14 @@ import XCTest
                 contentsOf: app.appendingPathComponent("Package.swift"),
                 encoding: .utf8)
             XCTAssertTrue(manifest.contains("name: \"\(name)UI\""))
-            XCTAssertTrue(manifest.contains("name: \"\(name)AppKit\""))
-            XCTAssertTrue(manifest.contains("name: \"SwiftOmniUIAppKit\""))
+            XCTAssertTrue(manifest.contains("name: \"\(name)GTK\""))
+            XCTAssertTrue(manifest.contains("name: \"SwiftOmniUIGTK\""))
 
             let entry = try String(
-                contentsOf: app.appendingPathComponent("Platforms/AppKit/main.swift"),
+                contentsOf: app.appendingPathComponent("Platforms/GTK/main.swift"),
                 encoding: .utf8)
-            XCTAssertTrue(entry.contains("import SwiftOmniUIAppKit"))
-            XCTAssertTrue(entry.contains("SwiftOmniUIAppKit.run("))
+            XCTAssertTrue(entry.contains("import SwiftOmniUIGTK"))
+            XCTAssertTrue(entry.contains("SwiftOmniUIGTK.run("))
 
             let registration = try String(
                 contentsOf: app.appendingPathComponent("Sources/\(name)App.swift"),
@@ -91,12 +91,12 @@ import XCTest
         XCTAssertGreaterThan(read, 100, "the walk read almost nothing")
     }
 
-    /// The Android Views host is a target beside AppKit's, with its Java
+    /// The Android Views host is a target beside the others, with its Java
     /// layer, its test runner in the root package and the scripts under
     /// `.scripts/Android`; and every native method the Java layer declares is
     /// one the host registers, by name - one left out is found only on a
     /// device, as an `UnsatisfiedLinkError`.
-    func testTheAndroidViewsHostIsATargetBesideAppKit() throws {
+    func testTheAndroidViewsHostIsATargetBesideTheOthers() throws {
         let repository = SourceTree.repository
         let host = "lib/SwiftOmniUI.Android"
         for relative in [
@@ -347,7 +347,7 @@ import XCTest
         let files = try SourceTree.files(under: sources, entering: { _ in true }).filter { $0.hasSuffix(".swift") }
         XCTAssertGreaterThan(files.count, 10, "the walk read almost nothing")
         let toolkit = try NSRegularExpression(
-            pattern: #"GTK|WinUI|AppKit|UIKit|Android|\bNS[A-Z]\w+|\bgtk_|\badw_|swiftomniui_winui_|Java\b"#)
+            pattern: #"GTK|WinUI|Android|\bNS[A-Z]\w+|\bgtk_|\badw_|swiftomniui_winui_|Java\b"#)
         for file in files {
             let text = try String(contentsOf: sources.appendingPathComponent(file), encoding: .utf8)
             for match in toolkit.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
@@ -502,9 +502,9 @@ import XCTest
     }
 
     /// The code every host runs names no host. Swift written for one host alone
-    /// stands under the condition named for it - `#if APPKIT`, which every
-    /// AppKit build of an application defines; see the two tests below - and
-    /// Swift for several, under their conditions joined, `#if APPKIT || GTK`.
+    /// stands under the condition named for it - `#if GTK`, which every
+    /// GTK build of an application defines; see the two tests below - and
+    /// Swift for several, under their conditions joined, `#if GTK || WINUI`.
     /// Such a block, up to its `#else` or `#endif`, is the one place the
     /// library and each application's `Sources/` may name those hosts. A host
     /// with no builds any more is named nowhere, under no condition.
@@ -518,7 +518,7 @@ import XCTest
         roots += apps.map { $0.appendingPathComponent("Sources") }
 
         var offenders: [String] = []
-        for (word, conditioned) in [("app" + "kit", true), ("win" + "ui", true), ("gt" + "k", true), ("ma" + "ui", false)] {
+        for (word, conditioned) in [("app" + "kit", false), ("ui" + "kit", false), ("win" + "ui", true), ("gt" + "k", true), ("ma" + "ui", false)] {
             // A block for this host: its condition alone, or joined with other hosts' by `||`.
             func opens(_ directive: String) -> Bool {
                 guard directive.hasPrefix("#if ") else { return false }
@@ -563,16 +563,16 @@ import XCTest
         XCTAssertEqual(offenders, [], "these name a host in code every host runs")
     }
 
-    /// Every application DEFINES THE APPKIT CONDITION IN ITS MANIFEST, for
-    /// every module it compiles, exactly when a build says it is an AppKit one.
+    /// Every application DEFINES EACH HOST CONDITION IN ITS MANIFEST, for
+    /// every module it compiles, exactly when a build says it is that host's.
     ///
-    /// One variable says both things - that the build has an AppKit head, and
-    /// that code under `#if APPKIT` compiles - so a build and an editor that
+    /// One variable says both things - that the build has a GTK head, and
+    /// that code under `#if GTK` compiles - so a build and an editor that
     /// set it agree, and the editor completes that code like any other. The
-    /// flag it replaced, `-Xswiftc -DAPPKIT`, is refused wherever a build is
+    /// flag it replaced, `-Xswiftc -DGTK`, is refused wherever a build is
     /// written down: a second spelling of the same switch is how the two
     /// drift apart.
-    func testEveryApplicationDefinesTheAppKitConditionInItsManifest() throws {
+    func testEveryApplicationDefinesTheHostConditionInItsManifest() throws {
         let repository = SourceTree.repository
         func text(_ relative: String) throws -> String {
             try String(contentsOf: repository.appendingPathComponent(relative), encoding: .utf8)
@@ -583,7 +583,7 @@ import XCTest
 
             XCTAssertTrue(
                 manifest.contains("host.map { [.define($0.uppercased())] }"),
-                "\(relative) does not define APPKIT for an AppKit build")
+                "\(relative) does not define the host's condition for its build")
 
             // No module is left compiling without it.
             let settings = manifest.components(separatedBy: "swiftSettings:").dropFirst()
@@ -596,8 +596,7 @@ import XCTest
         }
 
         for relative in [
-            ".scripts/AppKit/build-gallery-appkit.sh", ".scripts/new-app.sh", ".scripts/test-native.sh",
-            "docs/development.md", "docs/getting-started.md",
+            ".scripts/new-app.sh", "docs/development.md", "docs/getting-started.md",
         ] {
             let commands = try text(relative)
                 .replacingOccurrences(of: "\\\n", with: " ")
@@ -606,20 +605,24 @@ import XCTest
                 .filter { Self.runsSwift($0) }
 
             for command in commands {
-                XCTAssertFalse(
-                    command.contains("-DAPPKIT"),
-                    "\(relative) still gives -DAPPKIT, which the manifest now defines: \(command)")
+                for condition in ["GTK", "WINUI", "ANDROID", "WEB"] {
+                    XCTAssertFalse(
+                        command.contains("-D\(condition)"),
+                        "\(relative) still gives -D\(condition), which the manifest now defines: \(command)")
+                }
             }
         }
 
-        XCTAssertFalse(
-            try text(".vscode/tasks.json").contains("\"-DAPPKIT\""),
-            ".vscode/tasks.json still gives -DAPPKIT, which the manifest now defines")
+        for condition in ["GTK", "WINUI", "ANDROID", "WEB"] {
+            XCTAssertFalse(
+                try text(".vscode/tasks.json").contains("\"-D\(condition)\""),
+                ".vscode/tasks.json still gives -D\(condition), which the manifest now defines")
+        }
     }
 
     /// Whether a line RUNS SwiftPM, read past any variables it sets first.
     ///
-    /// An AppKit head needs one set - see the test below - and a command that
+    /// A GTK head needs one set - see the test below - and a command that
     /// sets it inline is still that command, so the name is looked for after
     /// each leading `NAME=value`. Without this, prefixing a command would drop
     /// it out of the list above and the guard would stop asking anything of it.
@@ -638,46 +641,30 @@ import XCTest
             || rest.contains("$(swift build")
     }
 
-    /// Every build of an application's AppKit head TELLS ITS MANIFEST there is
+    /// Every build of an application's GTK head TELLS ITS MANIFEST there is
     /// one.
     ///
     /// An application declares that target, the product it makes and the
-    /// SwiftOmniUIHead dependency for AppKit only when `SWIFTOMNIUI_HOST=appkit` is set, so that
+    /// SwiftOmniUIHead dependency for GTK only when `SWIFTOMNIUI_HOST=gtk` is set, so that
     /// `swift test` compiles no part of one host's half. A build that leaves
     /// the variable out asks for a product the manifest never declared, and a
     /// page that leaves it out hands a reader a command that cannot work.
     ///
     /// Asked of the FILE rather than of each command, because a script may
     /// export it once above the builds it runs.
-    func testEveryAppKitBuildTellsTheManifestItHasAnAppKitHead() throws {
+    func testEveryGTKBuildTellsTheManifestItHasAGTKHead() throws {
         let repository = SourceTree.repository
         func text(_ relative: String) throws -> String {
             try String(contentsOf: repository.appendingPathComponent(relative), encoding: .utf8)
         }
 
         for relative in [
-            ".scripts/AppKit/build-gallery-appkit.sh", ".scripts/new-app.sh", ".scripts/test-native.sh",
+            ".scripts/GTK/run-app.sh", ".scripts/GTK/test-gtk.sh",
             "docs/development.md", "docs/getting-started.md",
         ] {
             XCTAssertTrue(
-                try text(relative).contains("SWIFTOMNIUI_HOST=appkit"),
-                "\(relative) builds an AppKit head without telling the manifest there is one")
-        }
-
-        // A task sets it in the environment it runs the build in.
-        let tasks = try text(".vscode/tasks.json").components(separatedBy: "\"label\"").filter { task in
-            let lines = task.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
-            guard let product = lines.firstIndex(of: "\"--product\","), product + 1 < lines.count
-            else { return false }
-            return lines[product + 1].hasSuffix("AppKit\"")
-        }
-
-        XCTAssertFalse(tasks.isEmpty, ".vscode/tasks.json builds no AppKit head")
-
-        for task in tasks {
-            XCTAssertTrue(
-                task.contains("\"SWIFTOMNIUI_HOST\": \"appkit\""),
-                ".vscode/tasks.json builds an AppKit head without telling the manifest there is one")
+                try text(relative).contains("SWIFTOMNIUI_HOST=gtk"),
+                "\(relative) builds a GTK head without telling the manifest there is one")
         }
     }
 
@@ -727,51 +714,6 @@ import XCTest
             let manifest = try String(contentsOf: head.appendingPathComponent("AndroidManifest.xml"), encoding: .utf8)
             XCTAssertTrue(manifest.contains(permission), "\(head.path) does not ask for ACCESS_NETWORK_STATE")
         }
-    }
-
-    /// Every application's AppKit head hands the host its icon on macOS's icon
-    /// grid, found from its own source file rather than from the directory it
-    /// was started in.
-    ///
-    /// A macOS icon is a 1024 canvas whose body is an 824-point rounded square
-    /// 100 points in: artwork drawn edge to edge stands larger in the Dock than
-    /// every icon beside it. And a head started by a debugger, a task or a
-    /// terminal elsewhere would find no artwork at all, and show the bare
-    /// executable's icon.
-    func testEveryAppKitHeadShowsAnIconOnTheMacGridWhereverItIsStarted() throws {
-        let applications = try SourceTree.applications()
-        let icon = "Resources/AppIcon/appicon_macos.svg"
-        var heads = 0
-
-        for application in applications {
-            let head = application.appendingPathComponent("Platforms/AppKit/main.swift")
-            guard FileManager.default.fileExists(atPath: head.path) else { continue }
-            heads += 1
-
-            let relative = application.path.replacingOccurrences(of: SourceTree.repository.path + "/", with: "")
-            let text = try String(contentsOf: head, encoding: .utf8)
-
-            XCTAssertTrue(
-                text.contains("applicationIcon:") && text.contains("appicon_macos.svg"),
-                "\(relative)'s AppKit head does not hand the host \(icon)")
-            XCTAssertFalse(
-                text.contains("currentDirectoryPath"),
-                "\(relative)'s AppKit head finds its artwork from the directory it was started in")
-
-            let artwork = try String(contentsOf: application.appendingPathComponent(icon), encoding: .utf8)
-            XCTAssertTrue(
-                artwork.contains("viewBox=\"0 0 1024 1024\"")
-                    && artwork.contains("x=\"100\" y=\"100\" width=\"824\" height=\"824\""),
-                "\(relative)/\(icon) is not on macOS's icon grid: an 824 body, 100 in, on a 1024 canvas")
-        }
-
-        XCTAssertGreaterThan(heads, 1, "no AppKit head found")
-        XCTAssertTrue(
-            try String(
-                contentsOf: SourceTree.repository.appendingPathComponent(".scripts/AppKit/build-gallery-appkit.sh"),
-                encoding: .utf8
-            ).contains("Resources/AppIcon/appicon_macos.svg"),
-            "the Gallery's bundle makes its .icns from artwork off macOS's icon grid")
     }
 
     /// Every application's GTK head has its icon on GNOME's icon grid, which the run script installs, with the

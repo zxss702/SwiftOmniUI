@@ -4,9 +4,9 @@
 // The integration suite, run inside VS Code by Tests/run.ts.
 //
 // The editor's host is asked of the LANGUAGE SERVER, which cannot be faked: a
-// symbol of the AppKit head resolves only while SourceKit-LSP runs with
-// SWIFTOMNIUI_HOST=appkit, and a symbol under no condition resolves in either mode -
-// which is what tells "not this host" from "not ready yet".
+// symbol of a host's head resolves only while SourceKit-LSP runs with
+// SWIFTOMNIUI_HOST=<that host>, and a symbol under no condition resolves in
+// either mode - which is what tells "not this host" from "not ready yet".
 
 import { execSync, spawn } from "child_process";
 import * as fs from "fs";
@@ -15,10 +15,9 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { findApplications, hasHead } from "../Sources/applications";
 import { checkoutNamedBy } from "../Sources/checkouts";
-import { configurations, SwiftOmniUIDebugConfigurationProvider, uiKitAttach, webLaunch } from "../Sources/debug";
+import { configurations, SwiftOmniUIDebugConfigurationProvider, webLaunch } from "../Sources/debug";
 import { parseDevices } from "../Sources/devices";
 import { isChromium, parseBrowsers } from "../Sources/browsers";
-import { parseDevices as parseUIKitDevices, parseSimulators } from "../Sources/uiKitDevices";
 import { otherHostsExcluded, serverConfig, serverSettings, swiftRelease, swiftSDKOf } from "../Sources/editorMode";
 import { findSuites, forDevice } from "../Sources/tests";
 import { availableHosts, describe, environment, Host, hosts } from "../Sources/hosts";
@@ -29,8 +28,8 @@ import { editorCommandLine, reinstallSteps } from "../Sources/reinstall";
 import { rebuildSteps } from "../Sources/conformance";
 import { deployCommand, deployDestination, winUIArchitectures } from "../Sources/deploy";
 import {
-    atLeast, checkedPythonIn, checkToolchain, debuggerFinding, developmentIdentityIn, isSwiftOrgBuild, ndkRevisionIn, newestIOSRuntime, report,
-    svgLoaderIn, lldbDapFailure, lldbDapFinding, svgLoaderInGlycin, xcodeVersion,
+    atLeast, checkedPythonIn, checkToolchain, debuggerFinding, isSwiftOrgBuild, ndkRevisionIn, report,
+    svgLoaderIn, lldbDapFailure, lldbDapFinding, svgLoaderInGlycin,
 } from "../Sources/toolchain";
 
 const started = Date.now();
@@ -84,49 +83,43 @@ export async function run(): Promise<void> {
         const plain = path.join(gallery, "Sources", "Samples", "BasicInput", "SliderSample.swift");
         // A head's own view exists only while the editor works as that host: its target is declared for it alone. A
         // member under an inactive `#if` resolves all the same - the server reads it through its type.
-        const appKitOnly = (): Promise<boolean> =>
-            resolves(path.join(gallery, "Platforms", "AppKit", "Host", "GalleryControls.swift"), "MetalCube3DView.register");
-        const uiKitOnly = (): Promise<boolean> =>
-            resolves(path.join(gallery, "Platforms", "UIKit", "Host", "GalleryControls.swift"), "MetalCube3DView.register");
-        const head = path.join(gallery, "Platforms", "AppKit", "Host", "MetalCube3DView.swift");
-        const uiKitHead = path.join(gallery, "Platforms", "UIKit", "Host", "MetalCube3DView.swift");
+        const gtkOnly = (): Promise<boolean> =>
+            resolves(path.join(gallery, "Platforms", "GTK", "main.swift"), "swiftomniui_app_register");
+        const webOnly = (): Promise<boolean> =>
+            resolves(path.join(gallery, "Platforms", "Web", "main.swift"), "swiftomniui_app_register");
+        const androidOnly = (): Promise<boolean> =>
+            resolves(path.join(gallery, "Platforms", "Android", "Swift", "GalleryAndroid.swift"), "swiftomniui_app_register");
 
         const api = await vscode.extensions.getExtension<SwiftOmniUIApi>("zxss702.swiftomniui")!.activate();
         say(`activated, host ${api.host()}`);
 
-        // 1-3 ask the language server as the hosts only macOS builds.
+        // 1-3 ask the language server as the hosts only macOS builds: Android and the Web.
         if (process.platform === "darwin") {
-            // 1. Android: the plain symbol resolves, the AppKit one does not.
+            // 1. Android: the plain symbol and its own head resolve, no other's does.
             await api.selectHost("android");
             await until("android: a symbol under no condition resolves", () => resolves(plain, "Palette.accent"), 900);
-            await until("android: neither head's own view resolves", async () => !(await appKitOnly()) && !(await uiKitOnly()), 900);
+            await until("android: its head resolves, and no other's does",
+                async () => (await androidOnly()) && !(await gtkOnly()) && !(await webOnly()), 900);
 
-            // 2. AppKit, with no reload: the head's own view and the head resolve.
-            await api.selectHost("appkit");
-            await until("appkit: its head's own view resolves", appKitOnly, 900);
-            // A target the package did not have a moment ago: the server has to
-            // load it, so this is waited for rather than asked once.
-            await until("appkit: Cube3DContract in Platforms/AppKit resolves", () => resolves(head, "Cube3DContract.self"), 900);
-
-            // 2b. UIKit, compiled for the iOS simulator by its triple and SDK: its head resolves, the AppKit symbol not.
-            await api.selectHost("uikit");
-            await until("uikit: Cube3DContract in Platforms/UIKit resolves", () => resolves(uiKitHead, "Cube3DContract.self"), 900);
-            await until("uikit: its head's own view resolves, and AppKit's does not", async () => (await uiKitOnly()) && !(await appKitOnly()), 900);
+            // 2. The Web: its head resolves, Android's and GTK's do not.
+            await api.selectHost("web");
+            await until("web: its head resolves, and the other hosts' do not",
+                async () => (await webOnly()) && !(await androidOnly()) && !(await gtkOnly()), 900);
 
             // 3. And back, still with no reload.
             await api.selectHost("android");
-            await until("android again: the heads' views stop resolving while the plain symbol does", async () =>
-                (await resolves(plain, "Palette.accent")) && !(await appKitOnly()) && !(await uiKitOnly()), 900);
+            await until("android again: the other heads stop resolving while the plain symbol does", async () =>
+                (await resolves(plain, "Palette.accent")) && (await androidOnly()) && !(await gtkOnly()) && !(await webOnly()), 900);
         } else {
-            say("skip the language server as AppKit and Android: only macOS builds those hosts");
+            say("skip the language server as Android and the Web: only macOS builds those hosts");
         }
 
-        // 4. The hosts a machine is offered: AppKit, UIKit and Android on macOS,
-        //    WinUI on Windows, GTK on Linux, the Web on macOS and Linux, and no
-        //    .NET MAUI. A launch on a machine that runs no host resolves to nothing.
+        // 4. The hosts a machine is offered: Android on macOS, WinUI on
+        //    Windows, GTK on Linux, the Web on macOS and Linux, and no .NET
+        //    MAUI. A launch on a machine that runs no host resolves to nothing.
         const gallery_ = findApplications(root.uri.fsPath).find((each) => each.name === "Gallery")!;
-        check("the host picker offers AppKit, UIKit and Android on macOS, WinUI on Windows, GTK on Linux, the Web on macOS and Linux, and never .NET MAUI",
-            JSON.stringify(availableHosts("darwin").map((each) => each.id)) === JSON.stringify(["appkit", "uikit", "android", "web"])
+        check("the host picker offers Android on macOS, WinUI on Windows, GTK on Linux, the Web on macOS and Linux, and never .NET MAUI",
+            JSON.stringify(availableHosts("darwin").map((each) => each.id)) === JSON.stringify(["android", "web"])
             && JSON.stringify(availableHosts("win32").map((each) => each.id)) === JSON.stringify(["winui"])
             && JSON.stringify(availableHosts("linux").map((each) => each.id)) === JSON.stringify(["gtk", "web"])
             && availableHosts("freebsd").length === 0
@@ -139,7 +132,6 @@ export async function run(): Promise<void> {
                 start: async (task) => { ran.push(task.name); },
                 ready: async () => false,
                 device: async () => undefined,
-                uiKitDevice: async () => undefined,
                 browser: async () => undefined,
             });
             const resolved = await provider.resolveDebugConfiguration(root,
@@ -147,22 +139,21 @@ export async function run(): Promise<void> {
             check("with no host a launch runs nothing and opens no session", resolved === undefined && ran.length === 0);
         }
 
-        // 5. The suites, found for each host the way test-native.sh runs them.
-        const appkitSuites = findSuites(root.uri.fsPath, "appkit").map((each) => each.label);
+        // 5. The suites, found for each host the way CI runs them.
+        const gtkSuites = findSuites(root.uri.fsPath, "gtk").map((each) => each.label);
         const plainSuites = findSuites(root.uri.fsPath, undefined);
-        say(`appkit suites: ${appkitSuites.join(", ")}`);
+        say(`gtk suites: ${gtkSuites.join(", ")}`);
         say(`suites with no host: ${plainSuites.map((each) => each.label).join(", ")}`);
-        check("appkit runs the core, SwiftOmniUI.AppKit and the Gallery, and no device",
-            appkitSuites.includes("SwiftOmniUI") && appkitSuites.includes("SwiftOmniUIAppKit")
-            && appkitSuites.includes("apps/Gallery") && !appkitSuites.some((each) => each.endsWith("Tests")));
-        check("HelloWorld's example test runs with the rest - as an AppKit build on its .build/appkit, or as plain Swift",
-            findSuites(root.uri.fsPath, "appkit").some((each) => each.label === "apps/HelloWorld"
-                && each.args.join(" ").endsWith(`--scratch-path ${path.join(root.uri.fsPath, "apps", "HelloWorld", ".build", "appkit")}`))
+        check("gtk runs the core, SwiftOmniUIGTK and the Gallery, and no device",
+            gtkSuites.includes("SwiftOmniUI") && gtkSuites.includes("SwiftOmniUIGTK")
+            && gtkSuites.includes("apps/Gallery") && !gtkSuites.some((each) => each.endsWith("Tests")));
+        check("HelloWorld's example test runs with the rest - as plain Swift",
+            findSuites(root.uri.fsPath, "gtk").some((each) => each.label === "apps/HelloWorld")
             && plainSuites.some((each) => each.label === "apps/HelloWorld"));
         check("with no host the core and the Gallery run as plain Swift, and no host's own package",
             plainSuites.some((each) => each.label === "SwiftOmniUI") && plainSuites.some((each) => each.label === "apps/Gallery")
             && plainSuites.every((each) => each.command === "swift" && each.env.SWIFTOMNIUI_HOST === "" && !each.onDevice)
-            && !plainSuites.some((each) => each.label === "SwiftOmniUIAppKit" || each.label === "lib/SwiftOmniUI.Android/Tests"));
+            && !plainSuites.some((each) => each.label === "SwiftOmniUIGTK" || each.label === "lib/SwiftOmniUI.Android/Tests"));
 
         // 6. Android: the environment, the language server's file, the
         //    devices, and the commands a launch and a suite run - captured,
@@ -184,15 +175,15 @@ export async function run(): Promise<void> {
         {
             const sdk = "swift-6.4.0-RELEASE_android";
             const android = serverConfig(
-                { swiftPM: { scratchPath: ".build/appkit/index-build", configuration: "debug" }, index: { indexStorePath: "x" } },
+                { swiftPM: { scratchPath: ".build/gtk/index-build", configuration: "debug" }, index: { indexStorePath: "x" } },
                 serverSettings("android", sdk));
-            const back = serverConfig(android, serverSettings("appkit", sdk));
+            const back = serverConfig(android, serverSettings("gtk"));
             check("as Android the language server indexes in .build/android/index-build with the Swift SDK and aarch64-unknown-linux-android28, by building",
                 android.swiftPM?.scratchPath === ".build/android/index-build" && android.swiftPM?.swiftSDK === sdk
                 && android.swiftPM?.triple === "aarch64-unknown-linux-android28" && android.backgroundPreparationMode === "build");
-            check("the rest of the file is kept, and back on AppKit the SDK and the triple are gone",
+            check("the rest of the file is kept, and back on GTK the SDK and the triple are gone",
                 android.swiftPM?.configuration === "debug" && JSON.stringify(android.index) === JSON.stringify({ indexStorePath: "x" })
-                && back.swiftPM?.scratchPath === ".build/appkit/index-build" && back.swiftPM?.configuration === "debug"
+                && back.swiftPM?.scratchPath === ".build/gtk/index-build" && back.swiftPM?.configuration === "debug"
                 && !("swiftSDK" in back.swiftPM!) && !("triple" in back.swiftPM!));
             check("with no Swift SDK installed Android indexes for this Mac, and with no host the index is SwiftPM's own, with no SDK",
                 JSON.stringify(serverSettings("android", undefined)) === JSON.stringify({ scratchPath: ".build/android/index-build" })
@@ -245,7 +236,6 @@ export async function run(): Promise<void> {
                     },
                     ready: async (file) => fs.existsSync(file),
                     device: async () => serial,
-                    uiKitDevice: async () => undefined,
                     browser: async () => undefined,
                 });
                 const resolved = await provider.resolveDebugConfiguration(root, {
@@ -297,122 +287,14 @@ export async function run(): Promise<void> {
             say(`android suites: ${androidSuites.map((each) => each.label).join(", ")}`);
             const onDevice = androidSuites.filter((each) => each.onDevice).map((each) => forDevice(each, "emulator-5554"));
             const galleryRun = androidSuites.find((each) => each.label === "apps/Gallery");
-            check("android runs the core and the Gallery as plain Swift, and no AppKit",
+            check("android runs the core and the Gallery as plain Swift, and no other host's",
                 androidSuites.some((each) => each.label === "SwiftOmniUI" && forDevice(each, "emulator-5554") === each)
                 && galleryRun?.args.join(" ") === `test --package-path ${gallery}` && Object.keys(galleryRun.env).length === 0
-                && !androidSuites.some((each) => each.label === "SwiftOmniUIAppKit"));
+                && !androidSuites.some((each) => each.label === "SwiftOmniUIGTK"));
             check("android runs test-android.sh <serial> on the device, and only android does",
                 onDevice.length === 1 && onDevice[0].label === "lib/SwiftOmniUI.Android/Tests"
                 && [onDevice[0].command, ...onDevice[0].args].join(" ") === `bash ${path.join(root.uri.fsPath, ".scripts", "Android", "test-android.sh")} emulator-5554`
-                && !appkitSuites.includes("lib/SwiftOmniUI.Android/Tests"));
-        }
-        // 6a. UIKit: the language server's file, the simulators, and the
-        //     commands a launch and a suite run - captured, not run.
-        {
-            const simulatorSDK = "/Xcode/SDKs/iPhoneSimulator.sdk";
-            const uiKit = serverConfig({ swiftPM: { scratchPath: ".build/appkit/index-build" } }, serverSettings("uikit", undefined, simulatorSDK));
-            const back = serverConfig(uiKit, serverSettings("appkit", undefined));
-            check("as UIKit the language server indexes in .build/uikit/index-build for arm64-apple-ios26.0-simulator against Xcode's simulator SDK - and back on AppKit both are gone",
-                uiKit.swiftPM?.scratchPath === ".build/uikit/index-build" && uiKit.swiftPM?.triple === "arm64-apple-ios26.0-simulator"
-                && uiKit.swiftPM?.sdk === simulatorSDK && !("swiftSDK" in uiKit.swiftPM!)
-                && back.swiftPM?.scratchPath === ".build/appkit/index-build" && !("triple" in back.swiftPM!) && !("sdk" in back.swiftPM!));
-            check("with no simulator SDK found UIKit indexes for this Mac",
-                JSON.stringify(serverSettings("uikit", undefined, undefined)) === JSON.stringify({ scratchPath: ".build/uikit/index-build" }));
-        }
-        check("simctl's list reads as the iOS simulators a head installs on, the newest runtime first",
-            JSON.stringify(parseSimulators(JSON.stringify({ devices: {
-                "com.apple.CoreSimulator.SimRuntime.iOS-18-2": [{ udid: "OLD", name: "iPhone 16", state: "Shutdown" }],
-                "com.apple.CoreSimulator.SimRuntime.iOS-26-0": [{ udid: "A", name: "iPhone 17", state: "Shutdown" }],
-                "com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
-                    { udid: "B", name: "iPhone 18 Pro", state: "Booted" }, { udid: "C", name: "iPad Air 13-inch (M4)", state: "Shutdown" }],
-                "com.apple.CoreSimulator.SimRuntime.watchOS-12-0": [{ udid: "W", name: "Apple Watch", state: "Shutdown" }],
-            } })))
-            === JSON.stringify([
-                { id: "B", name: "iPhone 18 Pro", kind: "simulator", os: "27.0", state: "booted" },
-                { id: "C", name: "iPad Air 13-inch (M4)", kind: "simulator", os: "27.0", state: "" },
-                { id: "A", name: "iPhone 17", kind: "simulator", os: "26.0", state: "" },
-            ]) && parseSimulators("not json").length === 0);
-        {
-            const device = (name: string, os: string, transport: string, reality = "physical", pairing = "paired") => ({
-                identifier: `${name}-ID`, connectionProperties: { pairingState: pairing, transportType: transport },
-                deviceProperties: { name, osVersionNumber: os }, hardwareProperties: { platform: "iOS", reality },
-            });
-            check("devicectl's list reads as the iPhones and iPads paired with this Mac, of an iOS a head installs on",
-                JSON.stringify(parseUIKitDevices(JSON.stringify({ result: { devices: [
-                    device("Phone", "26.6.2", "wired"), device("Tablet", "26.6.1", "localNetwork"),
-                    device("Old Phone", "18.4", "wired"), device("iPhone 17", "26.0", "sameMachine", "virtual"),
-                    device("Stranger", "26.1", "wired", "physical", "unpaired"),
-                ] } })))
-                === JSON.stringify([
-                    { id: "Phone-ID", name: "Phone", kind: "device", os: "26.6.2", state: "USB" },
-                    { id: "Tablet-ID", name: "Tablet", kind: "device", os: "26.6.1", state: "Wi-Fi" },
-                ]) && parseUIKitDevices("not json").length === 0);
-            const onDevice = uiKitAttach("SwiftOmniUI: Debug", { process: 37779, device: "PHONE", symbols: "/b/App.app" });
-            check("on a device lldb-dap selects the device, attaches to the process through it, and reads symbols from the bundle built",
-                onDevice.request === "attach" && onDevice.pid === undefined
-                && JSON.stringify(onDevice.attachCommands) === JSON.stringify(["device select PHONE", "device process attach --pid 37779"])
-                && JSON.stringify(onDevice.initCommands) === JSON.stringify([
-                    "settings append target.exec-search-paths /b/App.app", "settings append target.exec-search-paths /b/App.app/Frameworks"]));
-        }
-        {
-            const helloWorldHere = findApplications(root.uri.fsPath).find((each) => each.name === "HelloWorld")!;
-            check("HelloWorld and the Gallery have UIKit heads", hasHead(helloWorldHere, "uikit") && hasHead(gallery_, "uikit"));
-            const facts = path.join(helloWorldHere.directory, ".build", "uikit", "debugger.json");
-            const launchOnUIKit = async (udid: string | undefined, configuration = "release", starts = true) => {
-                const started: vscode.Task[] = [];
-                const provider = new SwiftOmniUIDebugConfigurationProvider({
-                    host: () => "uikit", application: async () => helloWorldHere,
-                    run: async () => 0,
-                    start: async (task) => {
-                        started.push(task);
-                        if (configuration === "debug" && starts) {
-                            fs.mkdirSync(path.dirname(facts), { recursive: true });
-                            fs.writeFileSync(facts, JSON.stringify({ process: 4343 }));
-                        }
-                    },
-                    ready: async (file) => fs.existsSync(file),
-                    device: async () => undefined,
-                    uiKitDevice: async () => udid,
-                    browser: async () => undefined,
-                });
-                const resolved = await provider.resolveDebugConfiguration(root, {
-                    name: configuration === "debug" ? "SwiftOmniUI: Debug" : "SwiftOmniUI: Release", type: "swiftomniui",
-                    request: "launch", configuration,
-                });
-                fs.rmSync(facts, { force: true });
-                const shell = started[0]?.execution as vscode.ShellExecution | undefined;
-                return { resolved, started, line: shell ? [shell.command, ...(shell.args ?? [])].map(String).join(" ") : "" };
-            };
-            const script = path.join(root.uri.fsPath, ".scripts", "UIKit", "run-app.sh");
-
-            const released = await launchOnUIKit("SIM-1");
-            say(`     uikit started: ${released.line}`);
-            check("UIKit: run-app.sh <HelloWorld> release <udid> started as a task on that simulator, and no session",
-                released.resolved === undefined && released.started.length === 1
-                && released.line === `bash ${script} ${helloWorldHere.directory} release SIM-1`
-                && released.started[0].definition.device === "SIM-1");
-
-            const declined = await launchOnUIKit(undefined);
-            check("UIKit with no device picked starts nothing", declined.resolved === undefined && declined.started.length === 0);
-
-            const debugged = await launchOnUIKit("SIM-1", "debug");
-            say(`     uikit debugged: ${JSON.stringify(debugged.resolved)}`);
-            check("UIKit Debug: run-app.sh ... debug <udid> --debugger, then lldb-dap attached to the process it started",
-                debugged.line === `bash ${script} ${helloWorldHere.directory} debug SIM-1 --debugger`
-                && debugged.resolved?.type === "lldb-dap" && debugged.resolved.request === "attach" && debugged.resolved.pid === 4343);
-
-            const failed = await launchOnUIKit("SIM-1", "debug", false);
-            check("UIKit Debug whose application never starts opens no session", failed.resolved === undefined && failed.started.length === 1);
-        }
-        {
-            const uiKitSuites = findSuites(root.uri.fsPath, "uikit");
-            say(`uikit suites: ${uiKitSuites.map((each) => each.label).join(", ")}`);
-            const onSimulator = uiKitSuites.filter((each) => each.onDevice).map((each) => forDevice(each, "SIM-1"));
-            check("uikit runs the core and the Gallery as plain Swift, and test-uikit.sh <udid> on the simulator",
-                uiKitSuites.some((each) => each.label === "SwiftOmniUI")
-                && onSimulator.length === 1 && onSimulator[0].label === "lib/SwiftOmniUI.UIKit/Tests"
-                && [onSimulator[0].command, ...onSimulator[0].args].join(" ") === `bash ${path.join(root.uri.fsPath, ".scripts", "UIKit", "test-uikit.sh")} SIM-1`
-                && !uiKitSuites.some((each) => each.label === "SwiftOmniUIAppKit" || each.label === "lib/SwiftOmniUI.Android/Tests"));
+                && !gtkSuites.includes("lib/SwiftOmniUI.Android/Tests"));
         }
 
         // 6b. WinUI: HelloWorld's head, built by run-app.ps1 -BuildOnly and
@@ -428,7 +310,6 @@ export async function run(): Promise<void> {
                 start: async () => {},
                 ready: async () => false,
                 device: async () => undefined,
-                uiKitDevice: async () => undefined,
                 browser: async () => undefined,
             });
             const resolved = await provider.resolveDebugConfiguration(root,
@@ -446,10 +327,10 @@ export async function run(): Promise<void> {
             const winUISuites = findSuites(root.uri.fsPath, "winui");
             say(`winui suites: ${winUISuites.map((each) => each.label).join(", ")}`);
             const own = winUISuites.find((each) => each.label === "lib/SwiftOmniUI/SwiftOmniUI.WinUI/Testing");
-            check("winui runs the core and the Gallery as plain Swift, its own package by test-winui.ps1, and no AppKit or Android",
+            check("winui runs the core and the Gallery as plain Swift, its own package by test-winui.ps1, and no other host's",
                 winUISuites.some((each) => each.label === "SwiftOmniUI")
                 && own?.command === "powershell" && own.args[own.args.length - 1].endsWith("test-winui.ps1")
-                && !winUISuites.some((each) => each.label === "SwiftOmniUIAppKit" || each.label === "lib/SwiftOmniUI.Android/Tests"));
+                && !winUISuites.some((each) => each.label === "SwiftOmniUIGTK" || each.label === "lib/SwiftOmniUI.Android/Tests"));
         }
 
         // 6c. GTK: HelloWorld's head, built by run-app.sh --build-only and
@@ -465,7 +346,6 @@ export async function run(): Promise<void> {
                 start: async () => {},
                 ready: async () => false,
                 device: async () => undefined,
-                uiKitDevice: async () => undefined,
                 browser: async () => undefined,
             });
             const resolved = await provider.resolveDebugConfiguration(root,
@@ -487,7 +367,7 @@ export async function run(): Promise<void> {
             check("gtk runs the core and the Gallery as plain Swift, its own tests' package by swift test, and no other host's",
                 gtkSuites.some((each) => each.label === "SwiftOmniUI")
                 && own?.command === "swift" && own.args.join(" ") === `test --package-path ${testing}`
-                && !gtkSuites.some((each) => ["SwiftOmniUIAppKit", "lib/SwiftOmniUI/SwiftOmniUI.WinUI", "lib/SwiftOmniUI.Android/Tests",
+                && !gtkSuites.some((each) => ["lib/SwiftOmniUI/SwiftOmniUI.WinUI", "lib/SwiftOmniUI.Android/Tests",
                     "lib/Backends/WebView.WinUI"].includes(each.label)));
         }
 
@@ -521,7 +401,6 @@ export async function run(): Promise<void> {
                     },
                     ready: async (file) => fs.existsSync(file),
                     device: async () => undefined,
-                    uiKitDevice: async () => undefined,
                     browser: async () => browser,
                 });
                 const resolved = await provider.resolveDebugConfiguration(root,
@@ -558,14 +437,13 @@ export async function run(): Promise<void> {
                 webSuites.some((each) => each.label === "SwiftOmniUI") && webSuites.some((each) => each.label === "apps/Gallery")
                 && own?.command === "bash" && own.args[0] === path.join(root.uri.fsPath, ".scripts", "Web", "test-web.sh")
                 && webSuites.filter((each) => each !== own).every((each) => each.command === "swift" && !each.onDevice)
-                && !webSuites.some((each) => ["SwiftOmniUIAppKit", "lib/SwiftOmniUI/SwiftOmniUI.GTK/Testing"].includes(each.label)));
+                && !webSuites.some((each) => ["lib/SwiftOmniUI/SwiftOmniUI.GTK/Testing"].includes(each.label)));
             check("the Web makes no conformance marks yet", rebuildSteps(root.uri.fsPath, "web", "all") === undefined);
         }
 
         const palette = await vscode.commands.getCommands(true);
-        check("the palette has Select Android Device, Select UIKit Device and Select Browser, and no Select Debugger",
-            palette.includes("swiftomniui.selectAndroidDevice") && palette.includes("swiftomniui.selectUIKitDevice")
-            && palette.includes("swiftomniui.selectBrowser")
+        check("the palette has Select Android Device and Select Browser, and no Select Debugger",
+            palette.includes("swiftomniui.selectAndroidDevice") && palette.includes("swiftomniui.selectBrowser")
             && !palette.includes("swiftomniui.selectDebugger") && !palette.includes("swiftomniui.selectSimulator"));
 
         // 7. A new application is HelloWorld renamed in a checkout's apps/,
@@ -616,14 +494,9 @@ export async function run(): Promise<void> {
             // The system's own spelling: the editor names a Windows folder `c:\…`, a resolved path `C:\…`.
             const same = (a: string | undefined, b: string): boolean => a !== undefined && fs.realpathSync.native(a) === fs.realpathSync.native(b);
             const builds = (application: string): boolean => {
-                const appKit = process.platform === "darwin";
-                const name = path.basename(application);
                 try {
-                    // As an AppKit build on macOS, as plain Swift elsewhere.
-                    const env = Object.fromEntries(Object.entries({ ...process.env, ...environment(appKit ? "appkit" : undefined) })
-                        .filter((entry): entry is [string, string] => entry[1] !== undefined));
-                    execSync(`swift build --package-path "${application}"${appKit ? ` --scratch-path "${path.join(application, ".build", "appkit")}" --product ${name}AppKit` : ""}`,
-                        { env, stdio: "pipe" });
+                    // As plain Swift: an application's shared target builds with no host.
+                    execSync(`swift build --package-path "${application}"`, { stdio: "pipe" });
                     return true;
                 } catch (error) {
                     say(`     ${String((error as { stdout?: Buffer }).stdout ?? error).split("\n").slice(-8).join("\n     ")}`);
@@ -654,7 +527,7 @@ export async function run(): Promise<void> {
                 && same(checkoutNamedBy(tasks), root.uri.fsPath) && wired(tasks));
             check("the local group's application builds", builds(localNotes));
             // SwiftOmniUI: Run Tests in the group: each application's example test, run as the command runs it.
-            const testHost = process.platform === "darwin" ? "appkit" : undefined;
+            const testHost = undefined;
             const groupSuites = findSuites(local!, testHost);
             const notesSuite = groupSuites.find((each) => each.label === "apps/Notes");
             check("Run Tests in a group finds each application's tests",
@@ -689,7 +562,7 @@ export async function run(): Promise<void> {
                 && androidDeploy?.command === "bash"
                 && androidDeploy.args.join(" ") === `${path.join(notes.checkout!, ".scripts", "Android", "deploy.sh")} ${notes.directory} D SERIAL`
                 && fs.readFileSync(path.join(local!, ".gitignore"), "utf8").includes("\n/artifacts/\n"));
-            const own: Record<string, Host> = { darwin: "appkit", win32: "winui", linux: "gtk" };
+            const own: Record<string, Host> = { darwin: "web", win32: "winui", linux: "gtk" };
             await api.selectHost(own[process.platform]);
             for (const architecture of process.platform === "win32" ? winUIArchitectures() : [undefined]) {
                 const laid = await vscode.commands.executeCommand<string>("swiftomniui.deploy", { application: notes.directory, architecture });
@@ -765,7 +638,7 @@ export async function run(): Promise<void> {
             const checkout = root.uri.fsPath;
             const all = rebuildSteps(checkout, "winui", "all");
             const changed = rebuildSteps(checkout, "winui", "changed");
-            const appKit = rebuildSteps(checkout, "appkit", "changed");
+            const gtk = rebuildSteps(checkout, "gtk", "changed");
             const manifest = JSON.parse(fs.readFileSync(path.join(checkout, "lib", "SwiftOmniUI.VSCode", "package.json"), "utf8"));
             const hidden = (command: string): boolean => manifest.contributes.menus.commandPalette
                 .some((each: { command: string; when?: string }) => each.command === command && each.when === "swiftomniui.hasCheckout");
@@ -773,11 +646,11 @@ export async function run(): Promise<void> {
                 commands.includes("swiftomniui.conformanceRebuildAll") && commands.includes("swiftomniui.conformanceRebuildChanged")
                 && all?.length === 2 && all[0].args.slice(-1)[0] === "-Conformance" && all[0].env.SWIFTOMNIUI_UPDATE_EXPORTS === "1"
                 && changed?.[0].args.slice(-1)[0] === "-Stale"
-                && appKit?.[0].args.slice(-2).join(" ") === "--filter AppKitConformanceTests" && appKit[0].env.SWIFTOMNIUI_STALE_ONLY === "1"
+                && gtk?.[0].args.slice(-2).join(" ") === "--filter GTKConformanceTests" && gtk[0].env.SWIFTOMNIUI_STALE_ONLY === "1"
                 && all[1].command === "swift" && all[1].args.join(" ") === "test --filter ControlDictionaryTests"
                 && all[1].env.SWIFTOMNIUI_UPDATE_DOCS === "1"
                 && rebuildSteps(checkout, "android", "changed", "serial") === undefined
-                && rebuildSteps(checkout, "uikit", "all") === undefined);
+                && rebuildSteps(checkout, "web", "all") === undefined);
             check("the conformance rebuilds and the reinstall show in a SwiftOmniUI checkout alone",
                 hidden("swiftomniui.conformanceRebuildAll") && hidden("swiftomniui.conformanceRebuildChanged")
                 && hidden("swiftomniui.reinstallExtension"));
@@ -792,16 +665,12 @@ export async function run(): Promise<void> {
                 ...(svg ? ['"/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-svg.so"',
                     '"svg" 6 "gdk-pixbuf" "Scalable Vector Graphics" "LGPL"', '"image/svg+xml" "image/svg" ""', ""] : []),
             ].join("\n");
-            check("Check Toolchain compares versions part by part, reads Xcode's, simctl's, a toolchain's, an NDK's, the "
-                + "keychain's and gdk-pixbuf's words, and says a version too old",
+            check("Check Toolchain compares versions part by part, reads a toolchain's, an NDK's and gdk-pixbuf's "
+                + "words, and says a version too old",
                 commands.includes("swiftomniui.checkToolchain")
                 && atLeast("6.4.1", "6.4") && atLeast("26", "26.0") && !atLeast("6.3.9", "6.4") && !atLeast("4.13", "4.14")
-                && xcodeVersion("Xcode 27.0\nBuild version 27A123") === "27.0"
                 && isSwiftOrgBuild("Swift version 6.4 (swift-6.4-RELEASE)")
                 && !isSwiftOrgBuild("Apple Swift version 6.4 (swiftlang-6.4.0.1.2 clang-1700.0.1)")
-                && newestIOSRuntime(JSON.stringify({ runtimes: [
-                    { platform: "iOS", version: "26.0", isAvailable: true }, { platform: "iOS", version: "26.2", isAvailable: true },
-                    { platform: "watchOS", version: "27.0", isAvailable: true }] })) === "26.2"
                 && svgLoaderIn(loaders(true)) === "libpixbufloader-svg.so" && svgLoaderIn(loaders(false)) === undefined
                 && svgLoaderInGlycin("[loader:image/png]\nExec = /usr/libexec/glycin-loaders/2+/glycin-image-rs\n\n"
                     + "[loader:image/svg+xml]\nExec = /usr/libexec/glycin-loaders/2+/glycin-svg\n") === "glycin-svg"
@@ -815,16 +684,14 @@ export async function run(): Promise<void> {
                     + " in your Path.\r\n") === undefined
                 && debuggerFinding(["lldb-dap"]).found !== undefined && debuggerFinding(["node"]).found === undefined
                 && ndkRevisionIn("Pkg.Desc = Android NDK\nPkg.Revision = 30.0.16248370\n") === "30.0.16248370"
-                && developmentIdentityIn('  1) 0A1B "Apple Development: Ann Doe (AB12CD34EF)"\n     1 valid identities found\n')
-                    === "Apple Development: Ann Doe (AB12CD34EF)"
-                && developmentIdentityIn("     0 valid identities found\n") === undefined
                 && report([{ component: "Node.js 20 or newer", neededBy: "it", tooOld: "19.4.0", advice: "Install it." }])[0]
                     === "✗ Node.js 20 or newer - 19.4.0 found, too old [it]. Install it.");
             // As the command asks: the components, then whether the lldb-dap a launch takes starts (Linux, Windows).
             const starts = await lldbDapFinding(vscode.workspace.getConfiguration("lldb-dap").get<string>("executable-path"));
             const findings = [...await checkToolchain(), ...(starts ? [starts] : [])];
             report(findings).forEach((line) => say(`     ${line}`));
-            const own: Record<string, string> = { linux: "GTK 4.14 or newer, with its headers", darwin: "Xcode 27 or newer",
+            const own: Record<string, string> = { linux: "GTK 4.14 or newer, with its headers",
+                darwin: "Swift 6.4 from swift.org, with the Swift SDK for Android of the same release",
                 win32: "Visual Studio 2026 with the C++ tools for this machine" };
             const missing = findings.filter((each) => each.found === undefined).map((each) => each.component);
             check(`Check Toolchain looks for Swift, this platform's own, lldb-dap - one that starts, off the Mac - and Git, and finds them all here${
@@ -849,80 +716,10 @@ export async function run(): Promise<void> {
             check(`the package holds the manifest, the readme, the icon and what Sources compile to alone${stray.length > 0 ? ` - not ${stray.slice(0, 3).join(", ")}` : ""}`,
                 stray.length === 0 && packed.includes("out/Sources/extension.js"));
         }
-        // 9. SwiftOmniUI: Debug runs the REMEMBERED application - no question asked - on this machine's host: AppKit
-        //    built and under lldb-dap on macOS, WinUI on Windows and GTK on Linux alike.
+        // 9. SwiftOmniUI: Debug runs the REMEMBERED application - no question asked - on this machine's host: WinUI
+        //    on Windows and GTK on Linux. On macOS no host builds an application for this machine.
         if (process.platform === "darwin") {
-            await api.selectHost("appkit");
-            await api.selectApplication("HelloWorld");
-            check("the chosen application is remembered", api.application() === "HelloWorld");
-            const session = new Promise<vscode.DebugSession>((resolve) => {
-                const listener = vscode.debug.onDidStartDebugSession((each) => {
-                    if (each.type === "lldb-dap") {
-                        listener.dispose();
-                        resolve(each);
-                    }
-                });
-            });
-            check("SwiftOmniUI: Debug starts", await vscode.debug.startDebugging(root,
-                { name: "SwiftOmniUI: Debug", type: "swiftomniui", request: "launch", configuration: "debug" }));
-            const running = await Promise.race([session, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 600_000))]);
-            check("an lldb-dap session starts on HelloWorldAppKit", String(running?.configuration.program ?? "").endsWith("/apps/HelloWorld/.build/appkit/debug/HelloWorldAppKit"));
-            await new Promise((resume) => setTimeout(resume, 4000));
-            const alive = (() => { try { return execSync("pgrep -f apps/HelloWorld/.build/appkit/debug/HelloWorldAppKit").toString().trim().length > 0; } catch { return false; } })();
-            check("the HelloWorldAppKit process is running", alive);
-            await vscode.debug.stopDebugging(running);
-
-            // And on the iOS simulator: run-app.sh starts HelloWorld held, and lldb-dap attaches and lets it run.
-            const iPhone = parseSimulators(execSync("xcrun simctl list devices available -j").toString())
-                .find((each) => each.name.startsWith("iPhone"));
-            check("an iPhone simulator is available", iPhone !== undefined);
-            await api.selectHost("uikit");
-            await api.selectApplication("HelloWorld");
-            check("a simulator chosen by its UDID is named in the status bar by its name",
-                (await api.selectUIKitDevice(iPhone!.id)) === iPhone!.name);
-            const attached = new Promise<vscode.DebugSession>((resolve) => {
-                const listener = vscode.debug.onDidStartDebugSession((each) => {
-                    if (each.type === "lldb-dap") {
-                        listener.dispose();
-                        resolve(each);
-                    }
-                });
-            });
-            check("SwiftOmniUI: Debug starts on UIKit", await vscode.debug.startDebugging(root,
-                { name: "SwiftOmniUI: Debug", type: "swiftomniui", request: "launch", configuration: "debug" }));
-            const onSimulator = await Promise.race([attached, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 900_000))]);
-            check("an lldb-dap session attaches to HelloWorldUIKit's process", typeof onSimulator?.configuration.pid === "number");
-            await new Promise((resume) => setTimeout(resume, 4000));
-            const onDevice = (() => { try { return execSync(`pgrep -f ${iPhone!.id}.*HelloWorldUIKit`).toString().trim().length > 0; } catch { return false; } })();
-            check("the HelloWorldUIKit process runs on the simulator", onDevice);
-            await vscode.debug.stopDebugging(onSimulator);
-            execSync(`xcrun simctl terminate ${iPhone!.id} com.swiftomniui.helloworld || true`);
-
-            // And on a real iPhone or iPad, where SWIFTOMNIUI_UIKIT_DEVICE names one connected: signed, installed, started
-            // held, and attached to through the device.
-            const real = process.env.SWIFTOMNIUI_UIKIT_DEVICE;
-            if (real) {
-                const named = await api.selectUIKitDevice(real);
-                check("the device chosen by its identifier is named by its name", named !== undefined && named !== real);
-                const attachedOnDevice = new Promise<vscode.DebugSession>((resolve) => {
-                    const listener = vscode.debug.onDidStartDebugSession((each) => {
-                        if (each.type === "lldb-dap") {
-                            listener.dispose();
-                            resolve(each);
-                        }
-                    });
-                });
-                check("SwiftOmniUI: Debug starts on the device", await vscode.debug.startDebugging(root,
-                    { name: "SwiftOmniUI: Debug", type: "swiftomniui", request: "launch", configuration: "debug" }));
-                const session = await Promise.race([attachedOnDevice, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 900_000))]);
-                check("an lldb-dap session attaches through the device", JSON.stringify(session?.configuration.attachCommands ?? []).includes(`device select ${real}`));
-                await new Promise((resume) => setTimeout(resume, 8000));
-                const running = (() => { try { return execSync(`xcrun devicectl device info processes --device ${real}`).toString().includes("HelloWorldUIKit"); } catch { return false; } })();
-                check("the HelloWorldUIKit process runs on the device", running);
-                await vscode.debug.stopDebugging(session);
-            } else {
-                say("skip a real device: SWIFTOMNIUI_UIKIT_DEVICE names none");
-            }
+            say("skip Debug on this machine's host: no host builds an application for macOS");
         } else if (process.platform === "win32") {
             await api.selectHost("winui");
             await api.selectApplication("HelloWorld");

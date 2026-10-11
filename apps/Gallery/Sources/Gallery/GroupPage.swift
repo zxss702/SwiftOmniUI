@@ -1,6 +1,6 @@
 // One category, listing what is in it.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The page behind a sidebar entry: every sample in that group, one card each.
 ///
@@ -45,7 +45,7 @@ struct GroupPage: View {
                 }
             }
             .spacing(14)
-            .contentPadding(24)
+            .padding(24)
         }
         .onAppear { page.gallery(group.title, scene: scene, nav: nav) }
     }

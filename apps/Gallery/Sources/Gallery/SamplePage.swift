@@ -1,6 +1,6 @@
 // The frame every sample is shown in.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// One sample on one scroller: the line saying what it is about, then each
 /// example with its notes and its Swift under it.
@@ -63,7 +63,7 @@ struct SamplePage: View {
                 }
             }
             .spacing(24)
-            .contentPadding(24)
+            .padding(24)
         }
     }
 
@@ -89,14 +89,7 @@ struct SamplePage: View {
                 Self.section("Notes", notes)
             }
 
-            Self.section(example.codeHeading, CodeBlock(example.code))
-
-            // The far side of the example, where it has one: a section per
-            // language its host's half is written in.
-            example.hostCode.listings.map { listing -> any View in
-                Self.section(
-                    example.hostCode.heading(of: listing), CodeBlock(listing.code).language(listing.language))
-            }
+            Self.section("In Swift", CodeBlock(example.code))
         }
         .spacing(16)
     }
@@ -129,12 +122,12 @@ struct SamplePage: View {
                 Grid {
                     view
                 }
-                .contentPadding(16)
+                .padding(16)
             } else {
                 VStack {
                     view
                 }
-                .contentPadding(16)
+                .padding(16)
             }
         }
         .style("Card")

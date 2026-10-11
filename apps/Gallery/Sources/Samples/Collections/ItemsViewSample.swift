@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A thousand rows, of which only the ones on screen are built.
 private struct LongList: ExampleContent {
@@ -15,7 +15,7 @@ private struct LongList: ExampleContent {
                     Text("\\(number)").frame(width: 90)
                     Text("\\(number * number)")
                 }
-                .contentPadding(EdgeInsets(14, 10))
+                .padding(EdgeInsets(14, 10))
             }
             .header(Text("N and N², a thousand times"))
             .footer(Text("That is all of them."))
@@ -49,18 +49,18 @@ private struct LongList: ExampleContent {
                         .verticalAlignment(.center)
                 }
                 .spacing(12)
-                .contentPadding(EdgeInsets(14, 10))
+                .padding(EdgeInsets(14, 10))
             }
             .header(Text("N and N², a thousand times")
                 .font(.system(size: 11))
                 .bold()
                 .foregroundStyle(Palette.subtle)
-                .contentPadding(EdgeInsets(14, 8))
+                .padding(EdgeInsets(14, 8))
                 .background(Palette.raised))
             .footer(Text("That is all of them.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
-                .contentPadding(EdgeInsets(14, 8)))
+                .padding(EdgeInsets(14, 8)))
             .selection($chosen)
             .listStyle(.sidebar)
             .gridRow(0)
@@ -83,7 +83,7 @@ private struct LongList: ExampleContent {
                     .font(.system(size: 11))
                     .foregroundStyle(Palette.subtle)
             }
-            .contentPadding(EdgeInsets(8, 4))
+            .padding(EdgeInsets(8, 4))
             .background(Palette.raised)
         }
     }
@@ -121,7 +121,7 @@ private struct AcrossList: ExampleContent {
             // Each tag as wide as its word.
             List(tags) { tag in
                 Text(tag)
-                    .contentPadding(EdgeInsets(14, 0))
+                    .padding(EdgeInsets(14, 0))
                     .verticalTextAlignment(.center)
                     .background(Palette.raised)
             }
@@ -148,7 +148,7 @@ private struct AcrossList: ExampleContent {
             List(Self.tags) { tag in
                 Text(tag)
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(14, 0))
+                    .padding(EdgeInsets(14, 0))
                     .verticalTextAlignment(.center)
                     .background(Palette.raised)
             }
@@ -262,13 +262,13 @@ private struct GroupedList: ExampleContent {
             // A group per shelf, named so two shelves may hold the same item.
             List(groups: shelves.map { shelf in
                 let group = ItemsGroup(shelf.items) { item in
-                    Text(item).contentPadding(EdgeInsets(14, 10))
+                    Text(item).padding(EdgeInsets(14, 10))
                 }
                 .id(shelf.name)
-                .header(Text(shelf.name).bold().contentPadding(EdgeInsets(14, 8)))
+                .header(Text(shelf.name).bold().padding(EdgeInsets(14, 8)))
 
                 return counts
-                    ? group.footer(Text("\\(shelf.items.count) items").contentPadding(EdgeInsets(14, 6)))
+                    ? group.footer(Text("\\(shelf.items.count) items").padding(EdgeInsets(14, 6)))
                     : group
             })
             .gridRow(1)
@@ -288,21 +288,21 @@ private struct GroupedList: ExampleContent {
                 let group = ItemsGroup(shelf.items) { item in
                     Text(item)
                         .font(.system(size: 14))
-                        .contentPadding(EdgeInsets(14, 10))
+                        .padding(EdgeInsets(14, 10))
                 }
                 .id(shelf.name)
                 .header(Text(shelf.name)
                     .font(.system(size: 12))
                     .bold()
                     .foregroundStyle(Palette.subtle)
-                    .contentPadding(EdgeInsets(14, 8))
+                    .padding(EdgeInsets(14, 8))
                     .background(Palette.raised))
 
                 return counts
                     ? group.footer(Text("\(shelf.items.count) items")
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.subtle)
-                        .contentPadding(EdgeInsets(14, 6)))
+                        .padding(EdgeInsets(14, 6)))
                     : group
             })
             .gridRow(1)

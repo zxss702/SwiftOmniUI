@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A column of a thousand rows, only a window's worth of which exist.
 ///
@@ -74,11 +74,11 @@ private struct LazyRows: ExampleContent {
 
                             Button("Delete", action: { gone.insert(row) })
                                 .font(.system(size: 12))
-                                .contentPadding(EdgeInsets(10, 4))
+                                .padding(EdgeInsets(10, 4))
                                 .gridColumn(1)
                         }
                         .columns(.fill, .auto)
-                        .contentPadding(EdgeInsets(14, 4))
+                        .padding(EdgeInsets(14, 4))
                         .background(Palette.raised)
                         .onAppear { standing += 1 }
                         .onDisappear { standing -= 1 }

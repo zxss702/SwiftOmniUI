@@ -4,16 +4,11 @@
 import GalleryUI
 import SwiftOmniUIAndroid
 
-// What Android calls as it loads this library, on the UI thread: the application is named to the host, this head
-// says what it answers for the application - the controls it realizes, the acts it performs, the events it raises,
-// each in Host/ beside this file - and the host registers the native methods its activity calls.
+// What Android calls as it loads this library, on the UI thread: the
+// application is named to the host and the host registers the native methods
+// its activity calls.
 @_cdecl("JNI_OnLoad")
 public func JNI_OnLoad(_ machine: UnsafeMutableRawPointer?, _ reserved: UnsafeMutableRawPointer?) -> Int32 {
     swiftomniui_app_register()
-    MainActor.assumeIsolated {
-        GalleryControls.register()
-        GalleryActs.register()
-        GalleryEventSources.register()
-    }
     return SwiftOmniUIAndroid.load(machine)
 }

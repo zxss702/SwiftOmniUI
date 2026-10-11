@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The extension: a host and an application chosen once - and for Android a
-// device, for UIKit an iPhone, an iPad or a simulator, for the Web a browser - the editor working as that host, one Debug and
-// one Release that run the application on it, and the suites run as it.
+// device, for the Web a browser - the editor working as that host, one Debug
+// and one Release that run the application on it, and the suites run as it.
 
 import * as fs from "fs";
 import * as os from "os";
@@ -16,7 +16,6 @@ import { androidScript, askForDevice, chosenDevice, deviceToRunOn } from "./devi
 import { askForBrowser, Browser, browserToRunOn, chosenBrowser, webScript } from "./browsers";
 import { applyEditorMode, cleanIndex, setHostEnvironment, variablesInSettings } from "./editorMode";
 import { availableHosts, describe, Host } from "./hosts";
-import { askForUIKitDevice, chooseListedUIKitDevice, chosenUIKitDevice, uiKitDeviceToRunOn } from "./uiKitDevices";
 import { readyWhen, runTask, startTask } from "./tasks";
 import { findSuites, forDevice, runSuites } from "./tests";
 import { checkoutOf, makeApplication, nameProblem } from "./newApplication";
@@ -32,8 +31,6 @@ export interface SwiftOmniUIApi {
     selectHost(host: Host): Promise<void>;
     application(): string | undefined;
     selectApplication(name: string): Promise<void>;
-    /** Chooses the iPhone, iPad or simulator listed by `wanted` - its id or its name - and answers its name. */
-    selectUIKitDevice(wanted: string): Promise<string | undefined>;
 }
 
 const hostKey = "swiftomniui.host";
@@ -41,8 +38,6 @@ const applicationKey = "swiftomniui.application";
 
 /** What gives an application each host's head. */
 const heads: Record<Host, string> = {
-    appkit: "an AppKit head (Platforms/AppKit/main.swift)",
-    uikit: "a UIKit head (Platforms/UIKit/main.swift)",
     android: "an Android head (Platforms/Android/build.gradle.kts)",
     winui: "a WinUI head (Platforms/WinUI/main.swift)",
     gtk: "a GTK head (Platforms/GTK/main.swift)",
@@ -177,18 +172,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<SwiftO
             deviceItem.command = "swiftomniui.selectBrowser";
             deviceItem.text = `$(globe) ${browser?.name ?? "Select Browser"}`;
             deviceItem.tooltip = "The browser SwiftOmniUI: Debug and SwiftOmniUI: Release open the application in - one of Chromium's under VS Code's debugger. Click to change.";
-        } else if (described.id === "uikit") {
-            const device = chosenUIKitDevice(state);
-            deviceItem.command = "swiftomniui.selectUIKitDevice";
-            deviceItem.text = `$(device-mobile) ${device?.name ?? "Select UIKit Device"}`;
-            deviceItem.tooltip = `The iPhone, iPad or simulator SwiftOmniUI: Debug, SwiftOmniUI: Release and SwiftOmniUI: Run Tests run on${device ? ` - ${device.id}` : ""}. Click to change.`;
         } else {
             const device = chosenDevice(state);
             deviceItem.command = "swiftomniui.selectAndroidDevice";
             deviceItem.text = `$(device-mobile) ${device?.name ?? "Select Android Device"}`;
             deviceItem.tooltip = `The Android device SwiftOmniUI: Debug, SwiftOmniUI: Release and SwiftOmniUI: Run Tests run on${device ? ` - ${device.serial}` : ""}. Click to change.`;
         }
-        ["android", "uikit", "web"].includes(described.id) ? deviceItem.show() : deviceItem.hide();
+        ["android", "web"].includes(described.id) ? deviceItem.show() : deviceItem.hide();
     };
 
     const selectHost = async (picked: Host): Promise<void> => {
@@ -237,13 +227,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<SwiftO
         return serial;
     };
 
-    /** The iPhone, iPad or simulator a UIKit launch or suite runs on - asked for where none chosen is listed. */
-    const uiKitDevice = async (): Promise<string | undefined> => {
-        const id = await uiKitDeviceToRunOn(state);
-        refresh();
-        return id;
-    };
-
     /** The browser a Web launch opens the page in - asked for where none chosen is installed. */
     const browser = async (checkout: string): Promise<Browser | undefined> => {
         const found = await browserToRunOn(checkout, state);
@@ -267,7 +250,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<SwiftO
             void vscode.window.showInformationMessage("SwiftOmniUI: Android's device reads no repository, so its marks are made again whole - Conformance - Rebuild all.");
             return;
         }
-        const device = chosen === "uikit" ? await uiKitDevice() : chosen === "android" ? await androidDevice(folder.uri.fsPath) : undefined;
+        const device = chosen === "android" ? await androidDevice(folder.uri.fsPath) : undefined;
         const steps = rebuildSteps(folder.uri.fsPath, chosen, rebuild, device);
         if (!steps) {
             return;
@@ -294,8 +277,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<SwiftO
                 return;
             }
             const picked = await vscode.window.showQuickPick(
-                // Android, UIKit and the Web are offered where an application has their head.
-                availableHosts().filter((each) => !["android", "uikit", "web"].includes(each.id) || runnable(each.id).length > 0).map((each) => ({
+                // Android and the Web are offered where an application has their head.
+                availableHosts().filter((each) => !["android", "web"].includes(each.id) || runnable(each.id).length > 0).map((each) => ({
                     label: each.label,
                     description: each.id === host() ? "current" : undefined,
                     detail: each.detail,
@@ -322,10 +305,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<SwiftO
                 return;
             }
             await askForDevice(checkout, state);
-            refresh();
-        }),
-        vscode.commands.registerCommand("swiftomniui.selectUIKitDevice", async () => {
-            await askForUIKitDevice(state);
             refresh();
         }),
         vscode.commands.registerCommand("swiftomniui.selectBrowser", async () => {
@@ -355,7 +334,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<SwiftO
 
             let chosenSuites = picked.map((each) => each.suite);
             if (chosenSuites.some((each) => each.onDevice)) {
-                const serial = host() === "uikit" ? await uiKitDevice() : await androidDevice(folder.uri.fsPath);
+                const serial = await androidDevice(folder.uri.fsPath);
                 if (!serial) {
                     return;
                 }
@@ -582,9 +561,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<SwiftO
             if (forHost === "winui" && !architecture) {
                 return undefined;
             }
-            const device = forHost === "android" && application.checkout ? await androidDevice(application.checkout)
-                : forHost === "uikit" ? await uiKitDevice() : undefined;
-            if ((forHost === "android" || forHost === "uikit") && !device) {
+            const device = forHost === "android" && application.checkout ? await androidDevice(application.checkout) : undefined;
+            if (forHost === "android" && !device) {
                 return undefined;
             }
 
@@ -619,7 +597,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<SwiftO
         start: startTask,
         ready: (file, task) => readyWhen(file, task),
         device: androidDevice,
-        uiKitDevice,
         browser,
         application: async (_folder, forHost, named) => {
             const candidates = runnable(forHost);
@@ -679,13 +656,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<SwiftO
     refresh();
     await applyEditorMode(host(), roots());
 
-    const selectUIKitDevice = async (wanted: string): Promise<string | undefined> => {
-        const name = await chooseListedUIKitDevice(state, wanted);
-        refresh();
-        return name;
-    };
-
-    return { host, selectHost, application: () => state.get<string>(applicationKey), selectApplication, selectUIKitDevice };
+    return { host, selectHost, application: () => state.get<string>(applicationKey), selectApplication };
 }
 
 export function deactivate(): void {}

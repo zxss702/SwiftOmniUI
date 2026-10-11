@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A BINDING CONVERTED ON ITS WAY TO A CONTROL: one state shown in two units,
 /// a caption worked out from it, two states worked into one - all by engines
@@ -246,7 +246,7 @@ struct ConverterSample: SampleContent, ExampleContent {
             .spacing(6)
         }
         .style("Card")
-        .contentPadding(10)
+        .padding(10)
         .shape(.roundedRectangle(8))
         .stroke(Palette.outline)
     }

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A driven rotation, sprung to real time by a plain Swift loop.
 struct AnalogClockSample: SampleContent, ExampleContent {

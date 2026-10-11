@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Gradients along a line and out from a point, on a fill, a stroke and a background.
 struct BrushSample: SampleContent, ExampleContent {
@@ -50,7 +50,7 @@ struct BrushSample: SampleContent, ExampleContent {
 
             ZStack {
                 Text("A stroke is a brush too")
-                    .contentPadding(EdgeInsets(16, 10))
+                    .padding(EdgeInsets(16, 10))
             }
             .style("Card")
             .strokeWidth(4)
@@ -97,7 +97,7 @@ struct BrushSample: SampleContent, ExampleContent {
 
             Button("endPoint: \(Self.ends[end].name)", action: { end = (end + 1) % Self.ends.count })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 
 
@@ -117,7 +117,7 @@ struct BrushSample: SampleContent, ExampleContent {
             ZStack {
                 Text("A stroke is a brush too")
                     .font(.system(size: 14))
-                    .contentPadding(EdgeInsets(16, 10))
+                    .padding(EdgeInsets(16, 10))
             }
             .style("Card")
             .strokeWidth(4)
@@ -130,7 +130,7 @@ struct BrushSample: SampleContent, ExampleContent {
                     .foregroundStyle(Palette.onAccent)
                     .multilineTextAlignment(.center)
             }
-            .contentPadding(16)
+            .padding(16)
             .background(.linearGradient(Self.stops, startPoint: Point(0, 0), endPoint: Point(1, 1)))
         }
         .spacing(12)

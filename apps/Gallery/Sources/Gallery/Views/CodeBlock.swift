@@ -1,6 +1,6 @@
 // The Swift behind an example.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The code that produced an example, in a box of its own.
 ///
@@ -9,20 +9,9 @@
 struct CodeBlock: View {
     private let code: String
 
-    private var spoken: CodeLanguage = .swift
-
     /// - Parameter code: The snippet, as a reader would write it.
     init(_ code: String) {
         self.code = code
-    }
-
-    /// What the snippet is written in - Swift unless a block says otherwise,
-    /// which only a listing beside an example's own code does. Steers the
-    /// highlighter's vocabulary and nothing else.
-    func language(_ value: CodeLanguage) -> Self {
-        var copy = self
-        copy.spoken = value
-        return copy
     }
 
     var body: some View {
@@ -55,7 +44,7 @@ struct CodeBlock: View {
                     // in the same colour, and the snippet never changes, so
                     // the offsets never move.
                     ForEach(
-                        Array(CodeHighlight.runs(in: code, language: spoken).enumerated()),
+                        Array(CodeHighlight.runs(in: code).enumerated()),
                         id: \.offset
                     ) { run in
                         // The size goes on every run rather than on the
@@ -68,7 +57,7 @@ struct CodeBlock: View {
                             .font(.system(size: size))
                     }
                 }
-                .contentPadding(14)
+                .padding(14)
         }
     }
 }

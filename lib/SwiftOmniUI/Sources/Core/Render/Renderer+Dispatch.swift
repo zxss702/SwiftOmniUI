@@ -43,8 +43,6 @@ extension Renderer {
         begin(handler, payload: nil)
     }
 
-    /// Runs a handler on `MainActor` here and now, up to its first suspension.
-    /// Design: docs/design/core/render.md#starting-a-handler
     private func begin(_ handler: @escaping EventHandler, payload: [PropValue]?) {
         let carried = CarriedHandler(run: handler)
 
@@ -60,13 +58,7 @@ extension Renderer {
             }
         }
 
-        if #available(macOS 26, iOS 26, macCatalyst 26, *) {
-            Task.immediate(operation: run)
-        } else {
-            // No `Task.immediate` before macOS 26: the handler starts a main-queue
-            // turn later, still setting its own payload first.
-            Task(operation: run)
-        }
+        Task(operation: run)
 
         stateUIRunJobs()
     }

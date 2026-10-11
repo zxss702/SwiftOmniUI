@@ -101,12 +101,12 @@ import XCTest
             # Slider 9 in a comment says nothing
             Slider 2
             winui Slider 3
-            appkit Button 4
+            gtk Button 4
             """
 
         XCTAssertEqual(HostVerdict.revision(of: "Slider", on: "winui", in: revisions), "2.3")
         XCTAssertEqual(HostVerdict.revision(of: "Slider", on: "gtk", in: revisions), "2.1")
-        XCTAssertEqual(HostVerdict.revision(of: "Button", on: "appkit", in: revisions), "1.4")
+        XCTAssertEqual(HostVerdict.revision(of: "Button", on: "gtk", in: revisions), "1.4")
         XCTAssertEqual(HostVerdict.revision(of: "Text", on: "winui", in: revisions), "1.1")
 
         let held = "# revision 2.1\nSlider: ✅\n"

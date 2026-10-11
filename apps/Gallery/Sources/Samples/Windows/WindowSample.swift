@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Native window identity, geometry, constraints, operations and translucency.
 struct WindowSample: SampleContent, ExampleContent {
@@ -31,9 +31,6 @@ struct WindowSample: SampleContent, ExampleContent {
                         window.maximumHeight = 1200
                         window.isMaximizable = true
                         window.isMinimizable = true
-                        #if APPKIT
-                        window.isTranslucent = true
-                        #endif
                     }
             }
         }
@@ -143,7 +140,7 @@ struct WindowSample: SampleContent, ExampleContent {
     private func action(_ title: String, _ write: @escaping () -> Void) -> any View {
         Button(title, action: { write() })
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(16, 6))
+            .padding(EdgeInsets(16, 6))
             
     }
 

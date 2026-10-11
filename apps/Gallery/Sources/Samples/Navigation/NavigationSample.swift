@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A native navigation stack kept in step with one application array.
 struct NavigationSample: SampleContent, ExampleContent {
@@ -86,7 +86,7 @@ struct NavigationSample: SampleContent, ExampleContent {
                 .background(Palette.accent)
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
@@ -101,7 +101,7 @@ struct NavigationSample: SampleContent, ExampleContent {
                     nav.home()
                     arrivals += 1
                 })
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
@@ -110,7 +110,7 @@ struct NavigationSample: SampleContent, ExampleContent {
                 .multilineTextAlignment(.center)
 
             Button("Empty the stack", action: { nav.path = [] })
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
         }

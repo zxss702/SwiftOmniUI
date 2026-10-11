@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-// The suites a workspace holds, run AS THE CHOSEN HOST - the same runs
-// .scripts/test-native.sh and CI make, one condition at a time.
+// The suites a workspace holds, run AS THE CHOSEN HOST - the same runs CI
+// makes, one condition at a time.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -11,7 +11,6 @@ import { findApplications } from "./applications";
 import { isCheckout } from "./checkouts";
 import { androidScript } from "./devices";
 import { describe, Host } from "./hosts";
-import { uiKitScript } from "./uiKitDevices";
 import { runTask } from "./tasks";
 
 /** One suite, and the command that runs it. */
@@ -23,8 +22,8 @@ export interface Suite {
     readonly env: Record<string, string>;
 
     /**
-     * Whether it runs on the host's device - an Android device, a simulator for UIKit - whose serial or UDID ends
-     * its arguments once one is chosen.
+     * Whether it runs on the host's device - an Android device - whose serial
+     * ends its arguments once one is chosen.
      */
     readonly onDevice?: boolean;
 }
@@ -38,7 +37,7 @@ export function findSuites(root: string, host: Host | undefined): Suite[] {
             suites.push({ label: module, detail: `swift test - ${module}Tests in the root package`, command: "swift",
                 args: ["test", "--package-path", root, "--filter", `${module}Tests`], env: plain });
         }
-        if (host === "appkit" || host === "gtk") {
+        if (host === "gtk") {
             const module = `SwiftOmniUI${describe(host).label}`;
             suites.push({ label: module, detail: `swift test - ${module}Tests in the root package`, command: "swift",
                 args: ["test", "--package-path", root, "--filter", `${module}Tests`], env: { SWIFTOMNIUI_HOST: host } });
@@ -52,10 +51,9 @@ export function findSuites(root: string, host: Host | undefined): Suite[] {
             suites.push({ label: "SwiftOmniUIWeb", detail: "The root Web test target, compiled for WebAssembly",
                 command: "bash", args: [path.join(root, ".scripts", "Web", "test-web.sh")], env: {} });
         }
-        if (host === "android" || host === "uikit") {
-            const script = host === "android" ? androidScript(root, "test-android.sh") : uiKitScript(root, "test-uikit.sh");
+        if (host === "android") {
             suites.push({ label: `lib/SwiftOmniUI.${describe(host).label}/Tests`, detail: "Root test product on the selected device",
-                command: "bash", args: [script], env: {}, onDevice: true });
+                command: "bash", args: [androidScript(root, "test-android.sh")], env: {}, onDevice: true });
         }
     }
     for (const application of findApplications(root)) {
@@ -64,16 +62,12 @@ export function findSuites(root: string, host: Host | undefined): Suite[] {
         if (!fs.existsSync(manifest) || !fs.readFileSync(manifest, "utf8").includes(".testTarget(")) { continue; }
         const label = directory === root ? path.basename(root) : path.relative(root, directory).split(path.sep).join("/");
         const args = ["test", "--package-path", directory];
-        if (host === "appkit") {
-            args.push("--scratch-path", path.join(directory, ".build", "appkit"));
-        }
-        suites.push({ label, detail: "swift test - application", command: "swift", args,
-            env: host === "appkit" ? { SWIFTOMNIUI_HOST: "appkit" } : plain });
+        suites.push({ label, detail: "swift test - application", command: "swift", args, env: plain });
     }
     return suites;
 }
 
-/** `suite` run on the device `serial` - an Android device's serial, a simulator's UDID - where it runs on one. */
+/** `suite` run on the device `serial` - an Android device's serial - where it runs on one. */
 export function forDevice(suite: Suite, serial: string): Suite {
     return suite.onDevice ? { ...suite, args: [...suite.args, serial] } : suite;
 }

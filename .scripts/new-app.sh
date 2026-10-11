@@ -32,8 +32,6 @@
 #     Sources/              the application, its page, and Styles/
 #     Tests/                an example test of the application's own logic
 #     Resources/            the artwork
-#     Platforms/AppKit/     the macOS head
-#     Platforms/UIKit/      the iOS and iPadOS head, run on a simulator
 #     Platforms/Android/    the Android Views head: its Gradle build and Swift/
 #     Platforms/WinUI/      the WinUI 3 head, built on Windows
 #     Platforms/GTK/        the GTK 4 head, built on Linux
@@ -79,7 +77,7 @@ APP="$APPS_DIR/$NAME"
 LOWER="$(echo "$NAME" | tr '[:upper:]' '[:lower:]')"
 
 mkdir -p "$APP/Platforms/Android"
-for item in Package.swift Sources Tests Resources Platforms/AppKit Platforms/UIKit Platforms/WinUI Platforms/GTK Platforms/Web; do
+for item in Package.swift Sources Tests Resources Platforms/WinUI Platforms/GTK Platforms/Web; do
   cp -R "$MODEL/$item" "$APP/$item"
 done
 
@@ -106,8 +104,6 @@ cat <<DONE
 Created $APP
 
 Next, from the repository root:
-  SWIFTOMNIUI_HOST=appkit swift run --package-path apps/$NAME --scratch-path apps/$NAME/.build/appkit ${NAME}AppKit   # the AppKit head
-  .scripts/UIKit/run-app.sh apps/$NAME                                      # the UIKit head, on a simulator
   .scripts/Android/run-app.sh apps/$NAME                                    # the Android head
   .scripts\\WinUI\\run-app.ps1 -App apps\\$NAME                                # the WinUI head, on Windows
   .scripts/GTK/run-app.sh apps/$NAME                                        # the GTK head, on Linux

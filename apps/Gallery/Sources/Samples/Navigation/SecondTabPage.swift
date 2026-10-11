@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The other tab: a plain page, and the one that writes the selection.
 ///
@@ -28,19 +28,19 @@ struct SecondTabPage: View {
                     .background(Palette.accent)
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .horizontalAlignment(.center)
                     
 
                 TabsControls(nav: nav, thisTab: .second)
 
                 Button("Back to the Navigation samples", action: { nav.openGroup("navigation") })
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .horizontalAlignment(.center)
                     
             }
             .spacing(14)
-            .contentPadding(24)
+            .padding(24)
         }
         .onAppear {
             page.gallery("Second", scene: scene, nav: nav)

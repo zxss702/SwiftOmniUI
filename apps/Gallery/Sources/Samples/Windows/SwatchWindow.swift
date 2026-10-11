@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A window FOR A VALUE: one per swatch number, the number lent to the window
 /// as its own - so writing it makes the same window about another swatch, and
@@ -38,12 +38,12 @@ struct SwatchPage: View {
             HStack {
                 Button("Next", action: { number += 1 })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(14, 6))
+                    .padding(EdgeInsets(14, 6))
                     
 
                 Button("Done", action: { try await window.close() })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(14, 6))
+                    .padding(EdgeInsets(14, 6))
                     
             }
             .spacing(10)

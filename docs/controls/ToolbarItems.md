@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (0) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ |  | `NSToolbarItem`; `NSMenuToolbarItem` overflow; space for a spacer |  |
-| UIKit | ✅ |  | `UIBarButtonItem`; a spacer maps to the bar's own gap |  |
 | Android Views | · |  | `Toolbar` `MenuItem` | cannot activate on ToolbarItem - Android's driver has no path for it yet |
 | WinUI 3 | ✅ |  | `CommandBar` `AppBarButton`; `AppBarSeparator` for a spacer |  |
 | GTK 4 | · |  | `GtkButton` in `GtkHeaderBar`; a spacer packs a separator | cannot activate on ToolbarItem - GTK's driver has no path for it yet |

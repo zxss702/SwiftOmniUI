@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// `.onAppear` and `.onDisappear`: what runs as an element comes into the
 /// tree and as it leaves, once each.
@@ -88,12 +88,12 @@ struct LifetimeSample: SampleContent, ExampleContent {
             HStack {
                 Button("A new card", action: { identity += 1 })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
 
                 Button("Build this again · \(builds)", action: { builds += 1 })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
             }
             .spacing(10)
@@ -155,7 +155,7 @@ private struct LifetimeCard: View {
             .foregroundStyle(.white)
             .background(Palette.accent)
             .shape(.roundedRectangle(10))
-            .contentPadding(EdgeInsets(20, 12))
+            .padding(EdgeInsets(20, 12))
             .horizontalAlignment(.center)
             
             .onAppear {

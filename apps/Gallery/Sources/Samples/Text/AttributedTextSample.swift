@@ -34,21 +34,14 @@ struct AttributedTextSample: SampleContent, ExampleContent {
         .spacing(12)
     }
 
-    /// The attributed string the page draws. A markdown parse is Apple's
-    /// Foundation scope; the free-standing Foundation names the link
-    /// attribute alone, so there the runs are composed instead - what the
-    /// sample shows either way is runs keeping the look the string wrote.
+    /// The attributed string the page draws: the free-standing Foundation
+    /// names the link attribute alone, so the runs are composed - keeping the
+    /// look the string wrote.
     private static var rich: AttributedString? {
-        #if APPKIT || UIKIT
-        return try? AttributedString(
-            markdown: "**SwiftOmniUI** shows _attributed_ runs - "
-                + "~~crossed out~~ words and `code` too.")
-        #else
         var link = AttributeContainer()
         link.link = URL(string: "https://swiftomniui.dev")
         return AttributedString("SwiftOmniUI shows attributed runs - ")
             + AttributedString("a link", attributes: link)
             + AttributedString(" beside plain words.")
-        #endif
     }
 }

@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (6) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ | 6 ✅ | `MKMapView` / `MKAnnotation` |  |
-| UIKit | ✅ | 6 ✅ | `MKMapView` / `MKAnnotation` |  |
 | Android Views |  |  | Google Play services `MapView` / `Marker` (?) | not realized |
 | WinUI 3 |  |  | `MapControl` (?) | not realized |
 | GTK 4 |  |  | libshumate `ShumateMap` / `ShumateMarker` | not realized |
@@ -36,11 +34,11 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Controls/PinContract.swi
 
 ## Pin's own members
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `address` | property | `String` | provider | ✅ | ✅ |  |  |  |  | Android Views: not realized; WinUI 3: not realized; GTK 4: not realized |
-| `label` | property | `String` | provider | ✅ | ✅ |  |  |  |  | Android Views: not realized; WinUI 3: not realized; GTK 4: not realized |
-| `location` | property | `Location` | provider | ✅ | ✅ |  |  |  |  | Android Views: not realized; WinUI 3: not realized; GTK 4: not realized |
-| `onPinClicked` (`pinClicked`) | event |  | provider | ✅ | ✅ |  |  |  |  | Android Views: not realized; WinUI 3: not realized; GTK 4: not realized |
-| `onPinDetailsClicked` (`pinDetailsClicked`) | event |  | provider | ✅ | ✅ |  |  |  |  | Android Views: not realized; WinUI 3: not realized; GTK 4: not realized |
-| `type` | property | `PinType` | provider | ✅ | ✅ |  |  |  |  | Android Views: not realized; WinUI 3: not realized; GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `address` | property | `String` | provider |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
+| `label` | property | `String` | provider |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
+| `location` | property | `Location` | provider |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
+| `onPinClicked` (`pinClicked`) | event |  | provider |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
+| `onPinDetailsClicked` (`pinDetailsClicked`) | event |  | provider |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
+| `type` | property | `PinType` | provider |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |

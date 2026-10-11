@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A layout's own box: its background and its outline on the shape it names, and what it holds cut to that shape.
 struct OutlineSample: SampleContent, ExampleContent {
@@ -16,7 +16,7 @@ struct OutlineSample: SampleContent, ExampleContent {
                 Text("A column")
                 Text("rounded, with a hairline")
             }
-            .contentPadding(16)
+            .padding(16)
             .stroke(Palette.outline)
             .strokeWidth(1)
             .shape(.roundedRectangle(12))
@@ -26,7 +26,7 @@ struct OutlineSample: SampleContent, ExampleContent {
                 Text("square and thicker")
             }
             .spacing(6)
-            .contentPadding(16)
+            .padding(16)
             .stroke(Palette.accent)
             .strokeWidth(3)
             .shape(.rectangle)
@@ -34,7 +34,7 @@ struct OutlineSample: SampleContent, ExampleContent {
             ZStack {
                 Text("An ellipse")
             }
-            .contentPadding(24)
+            .padding(24)
             .stroke(Palette.accent)
             .shape(.ellipse)
 
@@ -61,7 +61,7 @@ struct OutlineSample: SampleContent, ExampleContent {
                     .foregroundStyle(Palette.subtle)
             }
             .spacing(2)
-            .contentPadding(16)
+            .padding(16)
             .stroke(Palette.outline)
             .strokeWidth(1)
             .shape(.roundedRectangle(12))
@@ -73,7 +73,7 @@ struct OutlineSample: SampleContent, ExampleContent {
                     .font(.system(size: 15))
             }
             .spacing(6)
-            .contentPadding(16)
+            .padding(16)
             .stroke(Palette.accent)
             .strokeWidth(3)
             .shape(.rectangle)
@@ -84,7 +84,7 @@ struct OutlineSample: SampleContent, ExampleContent {
                     .horizontalAlignment(.center)
                     .verticalAlignment(.center)
             }
-            .contentPadding(24)
+            .padding(24)
             .stroke(Palette.accent)
             .shape(.ellipse)
 

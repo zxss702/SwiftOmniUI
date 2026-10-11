@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Text of several lines, in an editor of a stated height and one that grows.
 struct TextEditorSample: SampleContent, ExampleContent {
@@ -91,7 +91,7 @@ struct TextEditorSample: SampleContent, ExampleContent {
 
             Button("Clear", action: { draft = "" })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 .disabled(draft.isEmpty)
                 

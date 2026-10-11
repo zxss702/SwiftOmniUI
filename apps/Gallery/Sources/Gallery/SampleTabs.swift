@@ -1,6 +1,6 @@
 // A sample that holds its page still, shown as tabs.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// One tab of a sample whose examples hold the page still.
 enum SampleTab: Hashable {
@@ -113,7 +113,7 @@ struct SampleTabPage: View {
         }
         .rows(.auto, .fill)
         .rowSpacing(16)
-        .contentPadding(24)
+        .padding(24)
     }
 
     /// One example's notes and Swift, under "Notes" and "In Swift" - and,
@@ -128,12 +128,7 @@ struct SampleTabPage: View {
                 SamplePage.section("Notes", notes)
             }
 
-            SamplePage.section(example.codeHeading, CodeBlock(example.code))
-
-            example.hostCode.listings.map { listing -> any View in
-                SamplePage.section(
-                    example.hostCode.heading(of: listing), CodeBlock(listing.code).language(listing.language))
-            }
+            SamplePage.section("In Swift", CodeBlock(example.code))
         }
         .spacing(16)
     }

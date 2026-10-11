@@ -5,21 +5,19 @@ platform-neutral Swift module. A small native executable imports that module
 and the selected host module. The same application module can therefore be
 started by another host without changing its view tree.
 
-Five native hosts are active - AppKit, UIKit, Android Views, WinUI 3 and
-GTK 4 - each Swift, in the application's own process. The supported setup is a
+Four native hosts are active - Android Views, WinUI 3, GTK 4 and Web - each
+Swift, in the application's own process. The supported setup is a
 SwiftOmniUI checkout: one root package declares the core and all host targets.
 Applications select its products, and `SWIFTOMNIUI_HOST` selects the platform
 targets without changing module names or imports.
 
 ## Requirements
 
-- macOS 15 or newer, with Xcode 27 and its Swift 6.4, for the AppKit host;
 - a checkout of this repository;
 - VS Code and Node.js 20 or newer, for the SwiftOmniUI extension.
 
-[UIKit host](hosts/uikit.md#requirements) lists what the UIKit host needs for
-the iOS simulator, [Android Views host](hosts/android.md#requirements) what the
-Android Views host needs as well, [WinUI host](hosts/winui.md#requirements) what the
+[Android Views host](hosts/android.md#requirements) lists what the
+Android Views host needs, [WinUI host](hosts/winui.md#requirements) what the
 WinUI host needs on Windows, and [GTK host](hosts/gtk.md#requirements) what
 the GTK host needs on Linux.
 
@@ -58,13 +56,11 @@ The extension installs the **Swift** extension (swiftlang) with it. Install
 
 Open the repository folder. The status bar shows two SwiftOmniUI items:
 
-- **the host** - AppKit or Android. The editor works as that host: code under
-  `#if APPKIT` is completed only while AppKit is chosen, and as Android the
-  language server compiles for Android with the Swift SDK for Android.
-  Switching restarts the Swift language server without reloading the window.
-  Android is offered for an application with an Android head. Both run on
-  macOS; on Windows and Linux the item says **no host**, and the editor and
-  the suites work as plain Swift.
+- **the host** - GTK on Linux, WinUI on Windows, Android or the Web on macOS.
+  The editor works as that host: code under `#if GTK` is completed only while
+  GTK is chosen, and as Android the language server compiles for Android with
+  the Swift SDK for Android. Switching restarts the Swift language server
+  without reloading the window.
 - **the application** - Gallery, HelloWorld, or any other under `apps/`. It is
   remembered for the workspace.
 
@@ -72,7 +68,7 @@ While the host is Android a third item shows the device: an attached phone or
 a running emulator, or an emulator started when it is picked.
 
 Press **F5** to run **SwiftOmniUI: Debug**, or choose **SwiftOmniUI: Release** in Run
-and Debug. On AppKit the application's head is built and started under
+and Debug. On GTK and WinUI the application's head is built and started under
 `lldb-dap`. On Android it is built, installed and started on the chosen device,
 and its terminal follows the application's log; a Debug launch then attaches
 `lldb-dap` to it, and a Release one runs without a debugger.
@@ -86,7 +82,7 @@ The Command Palette offers the rest under **SwiftOmniUI:**
 
 | Command | What it does |
 | --- | --- |
-| Select Host | AppKit or Android, as the status bar item does |
+| Select Host | the hosts this machine offers, as the status bar item does |
 | Select Android Device | the device or emulator an Android head runs on |
 | Select App | the application F5 runs |
 | Run Tests | the workspace's suites, run as the chosen host |
@@ -99,15 +95,15 @@ them in detail.
 
 ### From the command line
 
-Every launch has a command-line equivalent. Build HelloWorld's AppKit head from
+Every launch has a command-line equivalent. Build HelloWorld's GTK head from
 the repository root:
 
 ```bash
-SWIFTOMNIUI_HOST=appkit swift build --package-path apps/HelloWorld --product HelloWorldAppKit
+SWIFTOMNIUI_HOST=gtk swift build --package-path apps/HelloWorld --product HelloWorldGTK
 ```
 
-The variable is what makes it an AppKit build: the manifest then declares the
-AppKit head and defines `APPKIT`, and without it `swift test` compiles no part
+The variable is what makes it a GTK build: the manifest then declares the
+GTK head and defines `GTK`, and without it `swift test` compiles no part
 of one host's half; see
 [Project structure and development](development.md).
 
@@ -116,12 +112,6 @@ names the devices:
 
 ```bash
 .scripts/Android/run-app.sh apps/HelloWorld debug emulator-5554
-```
-
-Build the signed Gallery bundle with its resources and icon:
-
-```bash
-.scripts/AppKit/build-gallery-appkit.sh debug
 ```
 
 A new application is HelloWorld under another name, with every head
@@ -180,12 +170,12 @@ in full.
 An application has two concerns:
 
 ```text
-NotesUI                     NotesAppKit
+NotesUI                     NotesGTK
 ------------------------    ---------------------------
 imports SwiftOmniUI             imports NotesUI
-App and scenes      imports SwiftOmniUIAppKit
+App and scenes      imports SwiftOmniUIGTK
 windows and pages           locates native resources
-state and styles            starts the AppKit host
+state and styles            starts the GTK host
 no toolkit imports          contains no application UI
 ```
 
@@ -211,37 +201,22 @@ public func swiftomniui_app_register() {
 }
 ```
 
-The AppKit executable registers the module and starts the host:
+The GTK executable registers the module and starts the host:
 
 ```swift quote
-import Foundation
 import NotesUI
-import SwiftOmniUIAppKit
+import SwiftOmniUIGTK
 
 swiftomniui_app_register()
-
-let application = URL(fileURLWithPath: #filePath)
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-    .deletingLastPathComponent()
-let resources = application.appendingPathComponent("Resources/Images", isDirectory: true)
-
-SwiftOmniUIAppKit.run(
-    resourceDirectory: resources,
-    applicationIcon: application.appendingPathComponent("Resources/AppIcon/appicon_macos.svg"))
+SwiftOmniUIGTK.run(applicationID: "com.swiftomniui.notes")
 ```
-
-The head finds its artwork from its own source file, so it runs from any
-directory. Its icon is drawn on macOS's icon grid; see
-[AppKit host](hosts/appkit.md).
 
 Registration and `run` happen once per process. All scenes and windows then
 belong to one application tree, renderer generation, and native host. Opening a
 new scene does not start another host; it asks that host to materialize another
-native scene session.
+native scene session. [GTK host](hosts/gtk.md) describes that head.
 
-The UIKit head calls the same `swiftomniui_app_register` before `SwiftOmniUIUIKit.run`;
-[UIKit host](hosts/uikit.md) describes that head. The Android head calls it
+The Android head calls the same `swiftomniui_app_register`
 when Android loads its library; [Android Views host](hosts/android.md)
 describes that head.
 
@@ -255,7 +230,7 @@ apps/Notes/
     NotesPage.swift
     Styles/
   Platforms/
-    AppKit/
+    GTK/
       main.swift
     Android/
       build.gradle.kts
@@ -268,7 +243,7 @@ apps/Notes/
 ```
 
 The application target depends only on the `SwiftOmniUI` product. The executable
-target depends on the application target and `SwiftOmniUIAppKit`. Both targets
+target depends on the application target and `SwiftOmniUIGTK`. Both targets
 enable `NonisolatedNonsendingByDefault`; [Concurrency](interface/concurrency.md) explains
 why that module-wide setting is part of the application contract.
 
@@ -317,7 +292,7 @@ Image("swiftomniui_tile.png")
     .horizontalAlignment(.center)
 ```
 
-The AppKit head reads `Resources/` beside its own sources, and the Android
+The GTK head reads `Resources/` beside its own sources, and the Android
 head's build draws `Resources/Images` into the application's assets and its
 icon from `Resources/AppIcon`. SwiftOmniUI's core does not read a filesystem or
 choose a platform image class.

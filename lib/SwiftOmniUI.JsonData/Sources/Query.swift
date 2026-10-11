@@ -7,9 +7,7 @@
 // and drives rebuilds through `@Observable` tracking: a build that read
 // `items` is rebuilt when the store changes them.
 //
-// The context observation is the one genuine platform difference: SwiftData
-// reports a save through `ModelContext.didSave`, while JsonDataCore follows
-// the store with `startObservation`.
+// JsonDataCore follows the store with `startObservation`.
 
 import Foundation
 import JsonData
@@ -53,10 +51,9 @@ final class QueryResult<Element: PersistentModel> {
     /// The context the query follows, once the environment answers.
     private(set) weak var context: ModelContext?
 
-    /// The store's observation - a GRDB cancellable under JsonDataCore, a
-    /// notification token under SwiftData. Written only on the main actor;
-    /// `nonisolated` so `deinit` can release it wherever the object dies.
-    nonisolated(unsafe) private var observation: Any?
+    /// The store's observation - a GRDB cancellable under JsonDataCore,
+    /// released with the object.
+    private var observation: Any?
 
     nonisolated init(descriptor: FetchDescriptor<Element>, animation: Animation? = nil) {
         self.descriptor = descriptor
@@ -69,19 +66,11 @@ final class QueryResult<Element: PersistentModel> {
         self.context = context
         refetch()
 
-        #if canImport(SwiftData)
-        observation = NotificationCenter.default.addObserver(
-            forName: ModelContext.didSave, object: context, queue: nil
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refetch() }
-        }
-        #else
         observation = context.startObservation(
             descriptor,
             onChange: { [weak self] newItems in
                 self?.items = newItems
             })
-        #endif
     }
 
     /// Fetches again and reports the rows.
@@ -89,21 +78,10 @@ final class QueryResult<Element: PersistentModel> {
         guard let context else { return }
         items = (try? context.fetch(descriptor)) ?? []
     }
-
-    deinit {
-        #if canImport(SwiftData)
-        if let token = observation as? NSObjectProtocol {
-            NotificationCenter.default.removeObserver(token)
-        }
-        #endif
-    }
 }
 
-/// The `filter:` a `Query` takes: Foundation's `Predicate` where SwiftData
-/// stands, `JsonDataCore.Predicate` elsewhere - `#Predicate` spells into
-/// whichever is in scope, so the filter source is platform-neutral. The
-/// two `QueryPredicate` spellings below keep each platform's public
-/// signature in its own vocabulary.
+/// The `filter:` a `Query` takes: `JsonDataCore.Predicate` - `#Predicate`
+/// spells into it, so the filter source is platform-neutral.
 /// A view's handle on the model layer's rows:
 ///
 ///     @Query private var records: [Record]
@@ -145,36 +123,6 @@ public struct Query<Element: PersistentModel> {
     }
 
     /// The rows `filter` matches.
-    #if canImport(SwiftData)
-    public init(filter: Foundation.Predicate<Element>, animation: Animation? = nil) {
-        self.init(FetchDescriptor(predicate: filter), animation: animation)
-    }
-
-    /// The rows `filter` matches, ordered by one key - SwiftData's
-    /// `Query(filter:sort:order:animation:)`.
-    public init<Value: Comparable>(
-        filter: Foundation.Predicate<Element>,
-        sort keyPath: KeyPath<Element, Value>,
-        order: SortOrder = .forward,
-        animation: Animation? = nil
-    ) {
-        self.init(
-            FetchDescriptor(
-                predicate: filter,
-                sortBy: [SortDescriptor(sendable(keyPath), order: order)]),
-            animation: animation)
-    }
-
-    /// The rows `filter` matches, ordered by descriptors - SwiftData's
-    /// `Query(filter:sort:animation:)` with a sort list.
-    public init(
-        filter: Foundation.Predicate<Element>,
-        sort descriptors: [SortDescriptor<Element>],
-        animation: Animation? = nil
-    ) {
-        self.init(FetchDescriptor(predicate: filter, sortBy: descriptors), animation: animation)
-    }
-    #else
     public init(filter: JsonDataCore.Predicate<Element>, animation: Animation? = nil) {
         self.init(FetchDescriptor(predicate: filter), animation: animation)
     }
@@ -203,21 +151,12 @@ public struct Query<Element: PersistentModel> {
     ) {
         self.init(FetchDescriptor(predicate: filter, sortBy: descriptors), animation: animation)
     }
-    #endif
 
-    /// The rows ordered by descriptors. Qualified off SwiftData's platforms:
-    /// Foundation's own `SortDescriptor` otherwise shadows the model layer's.
-    #if canImport(SwiftData)
-    public init(sort descriptors: [SortDescriptor<Element>], animation: Animation? = nil) {
-        _result = State(wrappedValue: QueryResult(
-            descriptor: FetchDescriptor(sortBy: descriptors), animation: animation))
-    }
-    #else
+    /// The rows ordered by descriptors.
     public init(sort descriptors: [JsonDataCore.SortDescriptor<Element>], animation: Animation? = nil) {
         _result = State(wrappedValue: QueryResult(
             descriptor: FetchDescriptor(sortBy: descriptors), animation: animation))
     }
-    #endif
 
     /// The matching rows.
     public var wrappedValue: [Element] {

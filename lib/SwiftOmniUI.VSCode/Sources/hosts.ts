@@ -5,7 +5,7 @@
 // editor - one host's.
 
 /** A host an application is built for and run on. */
-export type Host = "appkit" | "uikit" | "android" | "winui" | "gtk" | "web";
+export type Host = "android" | "winui" | "gtk" | "web";
 
 /** What the extension knows about one host. */
 export interface HostDescription {
@@ -34,9 +34,6 @@ export interface HostDescription {
 
         /** Where that Swift SDK is installed from. */
         readonly swiftSDKGuide?: string;
-
-        /** Or the SDK Xcode ships for the platform, by its name for `xcrun --sdk`: `iphonesimulator`. */
-        readonly xcodeSDK?: string;
     };
 
     /** The machines that build and run this host's heads. */
@@ -45,12 +42,6 @@ export interface HostDescription {
 
 /** Every host, in the order the picker offers them. */
 export const hosts: readonly HostDescription[] = [
-    { id: "appkit", label: "AppKit", detail: "macOS, in the application's own process", indexPath: ".build/appkit/index-build", platforms: ["darwin"] },
-    {
-        id: "uikit", label: "UIKit", detail: "iOS and iPadOS on a simulator, in the application's own process",
-        indexPath: ".build/uikit/index-build", platforms: ["darwin"],
-        target: { triple: "arm64-apple-ios26.0-simulator", xcodeSDK: "iphonesimulator" },
-    },
     {
         id: "android", label: "Android", detail: "Android Views, in the application's own process",
         indexPath: ".build/android/index-build", platforms: ["darwin"],
@@ -77,7 +68,7 @@ export const hosts: readonly HostDescription[] = [
  */
 export const plainIndexPath = ".build/index-build";
 
-/** The hosts this machine builds and runs - AppKit, UIKit and Android on macOS, WinUI on Windows, GTK on Linux, Web on macOS and Linux. */
+/** The hosts this machine builds and runs - Android on macOS, WinUI on Windows, GTK on Linux, Web on macOS and Linux. */
 export function availableHosts(platform: NodeJS.Platform = process.platform): HostDescription[] {
     return hosts.filter((each) => each.platforms.includes(platform));
 }
@@ -88,7 +79,7 @@ export function describe(host: Host): HostDescription {
 }
 
 /**
- * The variable a build names its host by - `SWIFTOMNIUI_HOST=appkit` - which an
+ * The variable a build names its host by - `SWIFTOMNIUI_HOST=gtk` - which an
  * application's manifest reads to declare that host's head and define its
  * condition. One variable holds one host, so no build is two hosts' at once.
  */

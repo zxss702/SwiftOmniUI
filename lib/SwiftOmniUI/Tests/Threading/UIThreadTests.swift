@@ -343,6 +343,7 @@ private struct Shows: View {
 
         let id = try XCTUnwrap(patch.events?["clicked"])
         XCTAssertTrue(renders.fire(id))
+        _ = await settle()
 
         XCTAssertFalse(reached, "the handler is suspended, waiting for the host")
 
@@ -378,6 +379,7 @@ private struct Shows: View {
 
         let id = try XCTUnwrap(patch.events?["clicked"])
         XCTAssertTrue(renders.fire(id))
+        _ = await settle()
 
         let acts = drainedActs()
         XCTAssertEqual(acts.first?.name, "handlerFailed")

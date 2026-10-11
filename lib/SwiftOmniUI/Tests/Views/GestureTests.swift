@@ -108,12 +108,12 @@ import XCTest
     /// The payload a platform really sends, kept as a case of its own because
     /// the refusals above are invented and this one is a measurement.
     ///
-    /// UIKit's swipe recognizer reports the directions it was CONFIGURED for
-    /// rather than the one the finger went, so a view listening every way
+    /// A host's swipe recognizer may report the directions it was CONFIGURED
+    /// for rather than the one the finger went, so a view listening every way
     /// sends exactly this - a true report of a message that says nothing, and
-    /// refusing it is what leaves such a view silent on Apple platforms while
-    /// Android works. A host that attaches one recognizer per direction never
-    /// assembles a mask in the first place.
+    /// refusing it is what leaves such a view silent on that host. A host
+    /// that attaches one recognizer per direction never assembles a mask in
+    /// the first place.
     func testASetOfDirectionsIsNotADirection() {
         let renders = Renders()
         var swipes: [SwipeDirection] = []

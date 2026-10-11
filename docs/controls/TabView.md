@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (18) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ | 2 ✅ | `NSTabView`: tabless under a full-width select-one `NSSegmentedControl` beneath the toolbar - the split view detail's `NSSplitViewItemAccessoryViewController` on macOS 26 and later, else the title bar's bottom accessory - with top tabs where no window serves it |  |
-| UIKit | ✅ | 6 ✅ | `UITabBarController` |  |
 | Android Views | ✅ | 1 ✅ | custom `LinearLayout` tab row |  |
 | WinUI 3 | ✅ | 4 ✅ | `NavigationView` with a top pane |  |
 | GTK 4 | ✅ |  | `GtkStack` + `GtkStackSwitcher`; libadwaita `AdwViewStack` |  |
@@ -36,44 +34,44 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Navigation/TabViewContra
 
 ## TabView's own members
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `currentPage` | property | `Int` | structure | 🔌 | ✅ | · | ✅ | · |  | only through the host's own: read currentPage of TabView: the host's tab choice, not the tab view's; Android Views: cannot choose on TabView - Android's driver has no path for it yet; GTK 4: cannot read currentPage of TabView - GTK's driver has no path for it yet |
-| `currentPageChanged` | event | `Int` | adaptive | ✅ | ✅ | · | ✅ |  |  | Android Views: cannot choose on TabView - Android's driver has no path for it yet; GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `currentPage` | property | `Int` | structure | · | ✅ | · |  | cannot choose on TabView - Android's driver has no path for it yet; GTK 4: cannot read currentPage of TabView - GTK's driver has no path for it yet |
+| `currentPageChanged` | event | `Int` | adaptive | · | ✅ |  |  | cannot choose on TabView - Android's driver has no path for it yet; GTK 4: not realized |
 
 ## From [PropertyContainer](tiers/PropertyContainer.md)
 
 What anything carrying values in the tree has - a control, a `Style`, a text run: the name automation finds it by.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `accessibilityIdentifier` | property | `String` | native | ✅ | ✅ | ✅ | ✅ |  |  | GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `accessibilityIdentifier` | property | `String` | native | ✅ | ✅ |  |  | GTK 4: not realized |
 
 ## From [BarElement](tiers/BarElement.md)
 
 The bar a page arrangement draws: its colour.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `barBackgroundColor` | property | `Color` | adaptive | · | ✅ | · |  |  |  | cannot read barBackgroundColor of TabView - AppKit's driver has no path for it yet; Android Views: cannot read barBackgroundColor of TabView - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `barBackgroundColor` | property | `Color` | adaptive | · |  |  |  | cannot read barBackgroundColor of TabView - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
 
 ## From [PageElement](tiers/PageElement.md)
 
 What a page shows about itself where another container presents it as an item - a title and a picture.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `badge` | property | `String` | native |  |  |  |  |  |  |  |
-| `document` | property | `String` | adaptive |  |  |  |  |  |  |  |
-| `icon` | property | `ImageSource` | adaptive | · | ✅ | · |  |  |  | cannot read icon of TabView - AppKit's driver has no path for it yet; Android Views: cannot read icon of TabView - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
-| `interactiveDismissDisabled` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `preferredColumnWidth` | property | `[Double]` | adaptive |  |  |  |  |  |  |  |
-| `presentationDetents` | property | `[PresentationDetent]` | native |  |  |  |  |  |  |  |
-| `presentationDragIndicator` | property | `Visibility` | native |  |  |  |  |  |  |  |
-| `subtitle` | property | `String` | adaptive |  |  |  |  |  |  |  |
-| `subtitleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |  |  |
-| `title` | property | `String` | native | · | ✅ | · | ✅ | · |  | cannot read title of TabView - AppKit's driver has no path for it yet; Android Views: cannot read title of TabView - Android's driver has no path for it yet; GTK 4: cannot read title of TabView - GTK's driver has no path for it yet |
-| `titleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |  |  |
-| `toolbarBackground` | property | `Visibility` | adaptive |  |  |  |  |  |  |  |
-| `toolbarVisibility` | property | `Visibility` | adaptive |  |  |  |  |  |  |  |
-| `windowBackground` | property | `Color` | adaptive |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `badge` | property | `String` | native |  |  |  |  |  |
+| `document` | property | `String` | adaptive |  |  |  |  |  |
+| `icon` | property | `ImageSource` | adaptive | · |  |  |  | cannot read icon of TabView - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
+| `interactiveDismissDisabled` | property | `Bool` | native |  |  |  |  |  |
+| `preferredColumnWidth` | property | `[Double]` | adaptive |  |  |  |  |  |
+| `presentationDetents` | property | `[PresentationDetent]` | native |  |  |  |  |  |
+| `presentationDragIndicator` | property | `Visibility` | native |  |  |  |  |  |
+| `subtitle` | property | `String` | adaptive |  |  |  |  |  |
+| `subtitleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `title` | property | `String` | native | · | ✅ | · |  | cannot read title of TabView - Android's driver has no path for it yet; GTK 4: cannot read title of TabView - GTK's driver has no path for it yet |
+| `titleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `toolbarBackground` | property | `Visibility` | adaptive |  |  |  |  |  |
+| `toolbarVisibility` | property | `Visibility` | adaptive |  |  |  |  |  |
+| `windowBackground` | property | `Color` | adaptive |  |  |  |  |  |

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// How dark the gallery's own demonstration paints - kept as the text it is
 /// spelled with, which is what makes conformance one line.
@@ -130,7 +130,7 @@ struct PersistentStateSample: SampleContent, ExampleContent {
                 Button("Press", action: { visits += 1 })
                     .background(Palette.accent)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     
 
                 Button("Start over", action: { visits = 0 })
@@ -139,7 +139,7 @@ struct PersistentStateSample: SampleContent, ExampleContent {
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .disabled(visits == 0)
                     
             }
@@ -167,7 +167,7 @@ struct PersistentStateSample: SampleContent, ExampleContent {
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(16, 8))
+                    .padding(EdgeInsets(16, 8))
                     
             }
             .spacing(12)

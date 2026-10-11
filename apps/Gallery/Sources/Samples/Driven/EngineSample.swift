@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// An ENGINE: arithmetic the host runs on its own frames, keeping what it
 /// remembers in `@State` nobody reads.
@@ -106,7 +106,7 @@ struct EngineSample: SampleContent, ExampleContent {
                     .horizontalAlignment(.center)
             }
             .style("Card")
-            .contentPadding(EdgeInsets(24, 16))
+            .padding(EdgeInsets(24, 16))
             .background(Palette.surface)
             .stroke(.transparent)
             .shape(.roundedRectangle(12))
@@ -125,7 +125,7 @@ struct EngineSample: SampleContent, ExampleContent {
                         Text($caption)
                     }
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(14, 6))
+                    .padding(EdgeInsets(14, 6))
                     
 
                 button("Lap") { lap = reading }
@@ -202,7 +202,7 @@ struct EngineSample: SampleContent, ExampleContent {
     private func button(_ caption: String, _ act: @escaping EventHandler) -> Button {
         Button(caption, action: act)
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(14, 6))
+            .padding(EdgeInsets(14, 6))
             
     }
 }

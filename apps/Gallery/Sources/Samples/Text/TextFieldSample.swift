@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Single-line text fields, with focus, caret, selection and keyboard choices.
 struct TextFieldSample: SampleContent, ExampleContent {
@@ -126,7 +126,7 @@ struct TextFieldSample: SampleContent, ExampleContent {
             // for the selection the field already has says nothing at all.
             Button(selectAll ? "Clear the selection" : "Select the lot", action: { selectAll.toggle() })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 
 

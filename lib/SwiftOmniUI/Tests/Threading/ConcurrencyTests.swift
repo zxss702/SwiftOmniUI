@@ -162,6 +162,7 @@ private struct PressCard: Element {
 
         let id = try XCTUnwrap(patch.events?["clicked"])
         XCTAssertTrue(renders.fire(id))
+        _ = await settle()
 
         let first = try XCTUnwrap(completionIds(in: drainedActs()).first)
         ReplyBuffer.current = .finished([.bool(true)])
@@ -204,6 +205,7 @@ private struct PressCard: Element {
 
         let id = try XCTUnwrap(patch.events?["clicked"])
         XCTAssertTrue(renders.fire(id))
+        _ = await settle()
 
         let first = try XCTUnwrap(completionIds(in: drainedActs()).first)
         ReplyBuffer.current = .finished([.bool(true)])
@@ -292,6 +294,7 @@ private struct PressCard: Element {
 
         let id = try XCTUnwrap(patch.events?["clicked"])
         XCTAssertTrue(renders.fire(id))
+        _ = await settle()
 
         let completion = try XCTUnwrap(completionIds(in: drainedActs()).first)
 

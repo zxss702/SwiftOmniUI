@@ -11,7 +11,7 @@
 // containers and bindings and no router at all - a second one under a library
 // name would be the second way to do something, which this library refuses.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A place the menu can choose: one row, one page under it.
 ///

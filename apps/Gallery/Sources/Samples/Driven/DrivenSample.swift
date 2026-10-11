@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A value both sides hold, moved by the host and read by arithmetic that
 /// describes nothing.
@@ -110,7 +110,7 @@ struct DrivenSample: SampleContent, ExampleContent {
                 .frame(height: 28)
             }
             .style("Card")
-            .contentPadding(16)
+            .padding(16)
             .background(Palette.surface)
             .stroke(.transparent)
             .shape(.roundedRectangle(12))
@@ -199,7 +199,7 @@ struct DrivenSample: SampleContent, ExampleContent {
     private func button(_ caption: String, _ act: @escaping EventHandler) -> Button {
         Button(caption, action: act)
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(14, 6))
+            .padding(EdgeInsets(14, 6))
             
     }
 }

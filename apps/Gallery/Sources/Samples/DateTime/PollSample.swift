@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A ticker that does not repeat, restarted by the work it started.
 struct PollSample: SampleContent, ExampleContent {
@@ -102,7 +102,7 @@ struct PollSample: SampleContent, ExampleContent {
                     poll.start()
                 })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(20, 6))
+                .padding(EdgeInsets(20, 6))
                 .horizontalAlignment(.center)
                 
         }

@@ -162,9 +162,9 @@ Focus is an act with two forms: `field.focus()` on a known view, and
 `OnScreenKeyboard.hide()` for whatever has the keyboard. The focused control is
 whichever one the user touched last, so the host asks its native focus system,
 and SwiftOmniUI does not mirror that identity as state. The second form lets a Done
-button close a keyboard it did not open. On iOS a search field on the
-navigation bar takes the whole bar while it has focus, the back button with it;
-`hide()` is what gives the bar back, which is why the keyboard sample offers it.
+button close a keyboard it did not open. A host whose search field takes the
+navigation bar while it has focus needs `hide()` to give the bar back, which
+is why the keyboard sample offers it.
 
 ## Dialogs
 

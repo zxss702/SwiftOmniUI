@@ -10,17 +10,7 @@
       "command": "swift",
       "args": ["test", "--package-path", "${workspaceFolder}"],
       "problemMatcher": [],
-      "group": "test",
-      "presentation": { "reveal": "always", "panel": "dedicated" }
-    },
-    {
-      "label": "Test SwiftOmniUI.AppKit",
-      "type": "shell",
-      "command": "swift",
-      "args": ["test", "--package-path", "${workspaceFolder}", "--filter", "SwiftOmniUIAppKitTests"],
-      "options": { "env": { "SWIFTOMNIUI_HOST": "appkit" } },
-      "problemMatcher": [],
-      "group": "test",
+      "group": { "kind": "test", "isDefault": true },
       "presentation": { "reveal": "always", "panel": "dedicated" }
     },
     {
@@ -30,66 +20,6 @@
       "args": ["test", "--package-path", "${workspaceFolder}/apps/Gallery"],
       "problemMatcher": [],
       "group": "test",
-      "presentation": { "reveal": "always", "panel": "dedicated" }
-    },
-    {
-      "label": "Test native",
-      "type": "shell",
-      "command": "${workspaceFolder}/.scripts/test-native.sh",
-      "problemMatcher": [],
-      "group": { "kind": "test", "isDefault": true },
-      "presentation": { "reveal": "always", "panel": "dedicated" }
-    },
-    {
-      "label": "Build Gallery (AppKit, Debug)",
-      "type": "shell",
-      "command": "${workspaceFolder}/.scripts/AppKit/build-gallery-appkit.sh",
-      "args": ["debug"],
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "dedicated" }
-    },
-    {
-      "label": "Build Gallery (AppKit, Release)",
-      "type": "shell",
-      "command": "${workspaceFolder}/.scripts/AppKit/build-gallery-appkit.sh",
-      "args": ["release"],
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "dedicated" }
-    },
-    {
-      "label": "Build HelloWorld (AppKit, Debug)",
-      "type": "shell",
-      "command": "swift",
-      "args": [
-        "build",
-        "--package-path",
-        "${workspaceFolder}/apps/HelloWorld",
-        "--configuration",
-        "debug",
-        "--product",
-        "HelloWorldAppKit"
-      ],
-      // What makes this an AppKit build: the manifest declares the head and
-      // defines APPKIT only then - see apps/Gallery/Package.swift.
-      "options": { "env": { "SWIFTOMNIUI_HOST": "appkit" } },
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "dedicated" }
-    },
-    {
-      "label": "Build HelloWorld (AppKit, Release)",
-      "type": "shell",
-      "command": "swift",
-      "args": [
-        "build",
-        "--package-path",
-        "${workspaceFolder}/apps/HelloWorld",
-        "--configuration",
-        "release",
-        "--product",
-        "HelloWorldAppKit"
-      ],
-      "options": { "env": { "SWIFTOMNIUI_HOST": "appkit" } },
-      "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated" }
     }
   ]

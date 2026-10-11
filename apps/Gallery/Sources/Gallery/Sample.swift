@@ -5,7 +5,7 @@
 // page around it, the card that links to it and the route that reaches it are
 // the same for all of them.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// What a sample is called and the examples it shows.
 ///
@@ -16,7 +16,7 @@
 /// A sample of one example IS that example: it conforms to `ExampleContent` as
 /// well, and its `examples` are itself. A sample of several lists them, each
 /// an `ExampleContent` of its own.
-protocol SampleContent {
+@MainActor protocol SampleContent {
     /// The route parameter and the row's identity. Unique across the catalog.
     static var id: String { get }
 
@@ -107,78 +107,6 @@ protocol ExampleContent: View {
     /// other view here is. Required with no default, so a `notes` of any other
     /// type is a compile error rather than a property nothing reads.
     var notes: (any View)? { get }
-
-    /// What heads the example's own code.
-    ///
-    /// "In Swift" for almost every example, which is all a user needs where
-    /// the example is Swift alone. An example whose far side is ALSO Swift -
-    /// a host in the same process - says "In SwiftOmniUI" instead, so the two
-    /// listings are told apart by what they ARE rather than by their language.
-    static var codeHeading: String { get }
-
-    /// The far side of the example, where it has one: the code that answers
-    /// this example on the host, a listing per language it is written in.
-    ///
-    /// `.nothing` where the example is Swift alone, which is almost every one,
-    /// and the page then draws no second section.
-    ///
-    /// NOT an optional, and that is the point: `static let hostCode =
-    /// HostCode(…)` does not satisfy an optional requirement at all - the two
-    /// types differ - so the default below would answer for it in silence,
-    /// and the example would show one half while reading as if it showed two.
-    static var hostCode: HostCode { get }
-}
-
-extension ExampleContent {
-    /// Swift alone, which is what almost every example is.
-    static var hostCode: HostCode { .nothing }
-
-    /// What heads an example written in Swift alone.
-    static var codeHeading: String { "In Swift" }
-}
-
-/// What answers an example on the other side of the boundary: its host's
-/// code, a listing per language - the host's Swift first, then what stands
-/// beneath it - each headed "In <host> - <language>".
-///
-/// The host belongs to the EXAMPLE. A sample compiled for one host alone
-/// names that host in its own words; this file, which every host compiles,
-/// names none.
-struct HostCode {
-    /// The host whose half it is, as the headings name it.
-    let host: String
-
-    /// Its listings, in the order the page shows them.
-    let listings: [HostListing]
-
-    /// `host`'s half, written in `listings`.
-    init(in host: String, _ listings: HostListing...) {
-        self.host = host
-        self.listings = listings
-    }
-
-    /// No far side at all - what an example written in Swift alone has, and
-    /// what the page draws nothing for.
-    static let nothing = HostCode(in: "")
-
-    /// The heading over `listing`: "In Android - Java".
-    func heading(of listing: HostListing) -> String {
-        "In \(host) - \(listing.language.name)"
-    }
-}
-
-/// One listing of a host's half: its language and its code, as its author
-/// wrote it.
-struct HostListing {
-    let language: CodeLanguage
-    let code: String
-
-    static func swift(_ code: String) -> Self { Self(language: .swift, code: code) }
-    static func java(_ code: String) -> Self { Self(language: .java, code: code) }
-    static func cpp(_ code: String) -> Self { Self(language: .cpp, code: code) }
-    static func metal(_ code: String) -> Self { Self(language: .metal, code: code) }
-    static func glsl(_ code: String) -> Self { Self(language: .glsl, code: code) }
-    static func hlsl(_ code: String) -> Self { Self(language: .hlsl, code: code) }
 }
 
 /// One example as its page shows it: the view, the words about it, and its
@@ -193,18 +121,10 @@ struct Example {
     /// The Swift that wrote it.
     let code: String
 
-    /// What heads that code.
-    let codeHeading: String
-
-    /// What answers it on the host, where the example has such a half.
-    let hostCode: HostCode
-
     init<Content: ExampleContent>(_ content: Content) {
         view = content
         notes = content.notes
         code = Content.code
-        codeHeading = Content.codeHeading
-        hostCode = Content.hostCode
     }
 }
 

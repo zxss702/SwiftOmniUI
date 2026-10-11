@@ -43,10 +43,10 @@ equivalent - `ItemsView`, `SplitView`, `Dialogs.openFiles` - lands internal or
 
 Code under `lib/SwiftOmniUI/Sources` and `lib/SwiftOmniUI.Host/Sources` does not
 import Foundation or a platform UI framework. Each host is a sibling package of
-its own - `lib/SwiftOmniUI.AppKit`, `lib/SwiftOmniUI.Android`, `lib/SwiftOmniUI.WinUI`,
-`lib/SwiftOmniUI.GTK` - standing on the host layer, with its build in
+its own - `lib/SwiftOmniUI.Android`, `lib/SwiftOmniUI.WinUI`,
+`lib/SwiftOmniUI.GTK`, `lib/SwiftOmniUI.Web` - standing on the host layer, with its build in
 `.scripts/<Platform>`. Swift written for one host alone stands under that
-host's condition - `#if APPKIT`, `#if ANDROID`, `#if WINUI`, `#if GTK` - which
+host's condition - `#if ANDROID`, `#if WINUI`, `#if GTK`, `#if WEB` - which
 its builds define.
 
 The core schedules nothing on Foundation's `Timer` or `RunLoop`, or on
@@ -75,12 +75,13 @@ they need to try.
 
 Run the suite owned by the area while iterating, then every suite before
 handing off a complete vertical change. In VS Code, run **SwiftOmniUI: Run Tests**
-once with AppKit and once with Android chosen. From a terminal,
-`.scripts/test-native.sh` runs every Swift suite on this Mac, and
+once per host the change reaches. From a terminal, `swift test` runs the core
+suite on Linux, `xvfb-run` the GTK host's on a screen with no monitor, and
 `.scripts/Android/test-android.sh <serial>` the Android host's on a device:
 
 ```bash
-.scripts/test-native.sh
+swift test
+xvfb-run -a swift test --filter SwiftOmniUIGTKTests
 .scripts/Android/test-android.sh emulator-5554
 ```
 
@@ -91,7 +92,7 @@ Run the Gallery with **SwiftOmniUI: Debug** on each host the change reaches. Fro
 terminal:
 
 ```bash
-.scripts/AppKit/build-gallery-appkit.sh debug
+.scripts/GTK/run-app.sh apps/Gallery debug
 .scripts/Android/run-app.sh apps/Gallery debug emulator-5554
 ```
 
@@ -99,8 +100,8 @@ Run one application build at a time. Concurrent application builds share Swift
 object directories and can silently execute stale output.
 
 Open every pull request against `dev`, never `main`: `main` takes only the
-releases merged from `dev`. A pull request runs the `Tests` workflow on macOS
-and the suites on `Windows` and `Linux`.
+releases merged from `dev`. A pull request runs the suites on `Windows` and
+`Linux` - macOS serves development only; no suite runs on it.
 
 ## Keep changes reviewable
 

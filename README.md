@@ -1,8 +1,5 @@
-[![Core macOS](https://github.com/zxss702/SwiftOmniUI/actions/workflows/build-mac.yml/badge.svg?branch=main)](https://github.com/zxss702/SwiftOmniUI/actions/workflows/build-mac.yml?query=branch%3Amain)
 [![Core Linux](https://github.com/zxss702/SwiftOmniUI/actions/workflows/build-linux.yml/badge.svg?branch=main)](https://github.com/zxss702/SwiftOmniUI/actions/workflows/build-linux.yml?query=branch%3Amain)
 [![Core Windows](https://github.com/zxss702/SwiftOmniUI/actions/workflows/build-windows.yml/badge.svg?branch=main)](https://github.com/zxss702/SwiftOmniUI/actions/workflows/build-windows.yml?query=branch%3Amain)\
-[![AppKit](https://github.com/zxss702/SwiftOmniUI/actions/workflows/appkit.yml/badge.svg?branch=main)](https://github.com/zxss702/SwiftOmniUI/actions/workflows/appkit.yml?query=branch%3Amain)
-[![UIKit](https://github.com/zxss702/SwiftOmniUI/actions/workflows/uikit.yml/badge.svg?branch=main)](https://github.com/zxss702/SwiftOmniUI/actions/workflows/uikit.yml?query=branch%3Amain)
 [![Android](https://github.com/zxss702/SwiftOmniUI/actions/workflows/android.yml/badge.svg?branch=main)](https://github.com/zxss702/SwiftOmniUI/actions/workflows/android.yml?query=branch%3Amain)
 [![WinUI](https://github.com/zxss702/SwiftOmniUI/actions/workflows/winui.yml/badge.svg?branch=main)](https://github.com/zxss702/SwiftOmniUI/actions/workflows/winui.yml?query=branch%3Amain)
 [![GTK](https://github.com/zxss702/SwiftOmniUI/actions/workflows/gtk.yml/badge.svg?branch=main)](https://github.com/zxss702/SwiftOmniUI/actions/workflows/gtk.yml?query=branch%3Amain)
@@ -13,16 +10,16 @@
 identity, state, diffing, and motion; a thin host applies sparse patches to
 controls from its platform toolkit.
 
-Every host is Swift, in the application's own process, and all six hosts are
-active on the same host contract: AppKit, UIKit, Android Views, WinUI 3, GTK 4
+Every host is Swift, in the application's own process, and all four hosts are
+active on the same host contract: Android Views, WinUI 3, GTK 4
 with libadwaita, and Web (DOM/CSS over WebAssembly). What each realizes,
 element by element and member by member, is the
 [platform contract](docs/platform-contract.md), rendered from each host's own
 test run.
 
-| AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| ☑️ | ☑️ | ☑️ | ☑️ | ☑️ | ☑️ |
+| Android Views | WinUI 3 | GTK 4 | Web |
+| :---: | :---: | :---: | :---: |
+| ☑️ | ☑️ | ☑️ | ☑️ |
 
 The public Swift API is a **SwiftUI-compatible subset**: anything SwiftUI has
 a model for keeps SwiftUI's name and semantics. Where a platform-neutral
@@ -30,6 +27,11 @@ application needs what SwiftUI does not model - window sessions, environment
 keys such as `application.persistentKeys`, host registration - the addition
 extends the same conceptual model rather than inventing a dialect, and
 vocabulary that has no SwiftUI equivalent stays internal or `@_spi(Host)`.
+
+On Apple platforms `import SwiftOmniUI` is exactly `import SwiftUI` plus
+`import Foundation`: the platform's own SwiftUI provides the implementation
+and nothing else is linked. On every other platform the same import brings
+SwiftOmniUI's own implementation of the subset.
 SwiftOmniUI is proposed by
 [Huaxia Xufu (Beijing) Technology Co., Ltd.](https://github.com/zxss702/SwiftOmniUI)
 (华夏旭府（北京）科技有限公司), and is derived from upstream
@@ -41,27 +43,16 @@ wholesale merge.
 
 <p>
   <img src="docs/assets/winui.jpg" alt="The Gallery's home page on WinUI 3" width="75.7%"
-  ><img src="docs/assets/uikit.jpg" alt="The Gallery's home page on UIKit, on an iPhone" width="24.1%">
+  ><img src="docs/assets/android.jpg" alt="The Gallery's Grid sample on Android Views" width="24.1%">
 </p>
 <p>
   <img src="docs/assets/gtk.jpg" alt="The Gallery's Grid sample on GTK 4 with libadwaita" width="74.3%"
-  ><img src="docs/assets/android.jpg" alt="The Gallery's Grid sample on Android Views" width="25.5%">
-</p>
+  ></p>
 
-The same Gallery - one Swift module - on WinUI 3, UIKit, GTK 4 and Android
+The same Gallery - one Swift module - on WinUI 3, GTK 4 and Android
 Views: each host draws it with its own toolkit's controls, its window chrome
 and its navigation, while the pages, the state and the samples are the
 application's, written once.
-
-The AppKit host draws it with macOS controls, in the same process as the
-application module - here the Gallery's Metal sample: the cube
-is an `MTKView` the application registers with the host, and its size, colour
-and spin are described from SwiftOmniUI. The edge is handed over as a state, so
-dragging the slider rebuilds nothing:
-
-<video src="https://github.com/user-attachments/assets/05ef0718-b3b5-4f67-8c66-7a9c9b1d2ba2" controls muted loop width="960" height="540" poster="docs/assets/appkit-poster.png">
-  <a href="docs/assets/appkit.mp4"><img src="docs/assets/appkit-poster.png" alt="The Gallery's Metal sample on the AppKit host" width="960" height="540"></a>
-</video>
 
 ## In Code
 
@@ -110,7 +101,7 @@ that is usable now.
   links, folder by folder, and the typed boundary a host reads.
 - [Host layer](docs/internals/host-layer.md) — the Swift every host runs on, module by
   module, and what each host provides.
-- [AppKit host](docs/hosts/appkit.md), [UIKit host](docs/hosts/uikit.md), [Android Views host](docs/hosts/android.md), [WinUI host](docs/hosts/winui.md) and [GTK host](docs/hosts/gtk.md)
+- [Android Views host](docs/hosts/android.md), [WinUI host](docs/hosts/winui.md) and [GTK host](docs/hosts/gtk.md)
   — each host's heads, builds, debugging, and registrations.
 - [Project structure and development](docs/development.md) — packages, Gallery,
   build, F5, and test commands.
@@ -131,26 +122,26 @@ npm run package
 code --install-extension ../../artifacts/swiftomniui-*.vsix
 ```
 
-The AppKit host needs only Xcode 27, on macOS 15 or newer. SwiftOmniUI builds
-with one Swift release everywhere, Swift 6.4: Xcode 27's on macOS and the
-swift.org 6.4.0 toolchain on the other platforms.
+SwiftOmniUI builds with one Swift release everywhere, Swift 6.4, from
+swift.org. The GTK host builds on Linux, WinUI on Windows, Android on macOS
+and the Web on either.
 
 Android asks for more, and builds on macOS only:
 
 - the Android SDK with NDK 30, for Android 9 (API 28) or newer; an NDK
   outside the Android SDK is named by `ANDROID_NDK_HOME`;
 - the Swift SDK for Android 6.4.0, installed with `swift sdk install`;
-- the swift.org toolchain of that SDK's build, `swift-6.4.0-RELEASE`, beside
-  Xcode. Xcode's own Swift 6.4 is a different build and cannot read the SDK's
-  modules; the build picks the matching toolchain by itself and names the one
-  to install when none is there.
+- the swift.org toolchain of that SDK's build, `swift-6.4.0-RELEASE`. Another
+  build of Swift 6.4 cannot read the SDK's modules; the build picks the
+  matching toolchain by itself and names the one to install when none is
+  there.
 
 Then open the repository in VS Code:
 
 1. Run **SwiftOmniUI: Check Toolchain** from the Command Palette. It lists what
    this machine has of the above, and what to install for the rest.
-2. Choose the host in the status bar - **AppKit** or **Android** - and the
-   application, **Gallery**.
+2. Choose the host in the status bar - **Android**, **GTK**, **WinUI** or
+   **Web**, as the machine offers - and the application, **Gallery**.
 3. Press **F5**. **SwiftOmniUI: Debug** builds the Gallery for that host and starts
    it under the debugger; **SwiftOmniUI: Release** runs the optimized build.
 4. Run **SwiftOmniUI: Run Tests** from the Command Palette for every suite of that
@@ -162,9 +153,8 @@ extension's hosts and commands, including **SwiftOmniUI: New Application**.
 From a terminal, the same builds are:
 
 ```bash
-.scripts/AppKit/build-gallery-appkit.sh debug                  # the AppKit Gallery bundle
+.scripts/GTK/run-app.sh apps/Gallery debug                     # the GTK Gallery
 .scripts/Android/run-app.sh apps/Gallery debug emulator-5554   # the Android Gallery
-.scripts/test-native.sh                                        # the Swift suites
 ```
 
 ## Continuous integration
@@ -172,8 +162,7 @@ From a terminal, the same builds are:
 Every workflow runs on pushes and pull requests to `main` and `dev`; a pull
 request targets `dev`.
 
-`Tests` runs the SwiftOmniUI, SwiftOmniUI.Host, SwiftOmniUI.AppKit, and Gallery suites on
-macOS. The Windows and Linux workflows run the SwiftOmniUI and SwiftOmniUI.Host suites
+The Windows and Linux workflows run the SwiftOmniUI and SwiftOmniUI.Host suites
 on those machines, Linux the conformance runner too, and Windows the WinUI
 host with every verdict held.
 

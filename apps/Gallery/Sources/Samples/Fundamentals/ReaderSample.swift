@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// WHO IS THE READER: one state, written by a slider and a button, and seven
 /// places it is used - each wearing its own build count, so the rule is on the
@@ -162,7 +162,7 @@ struct ReaderSample: SampleContent, ExampleContent {
                     .spacing(4)
                 }
                 .style("Card")
-                .contentPadding(8)
+                .padding(8)
                 .shape(.roundedRectangle(6))
                 .stroke(Palette.outline)
             }
@@ -228,7 +228,7 @@ struct ReaderSample: SampleContent, ExampleContent {
             .spacing(6)
         }
         .style("Card")
-        .contentPadding(10)
+        .padding(10)
         .shape(.roundedRectangle(8))
         .stroke(Palette.outline)
     }
@@ -242,7 +242,7 @@ struct ReaderSample: SampleContent, ExampleContent {
     private func button(_ caption: String, _ act: @escaping EventHandler) -> Button {
         Button(caption, action: act)
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(14, 6))
+            .padding(EdgeInsets(14, 6))
             
     }
 }
@@ -265,7 +265,7 @@ private struct Reading: View {
             .spacing(4)
         }
         .style("Card")
-        .contentPadding(10)
+        .padding(10)
         .shape(.roundedRectangle(8))
         .stroke(Palette.outline)
     }
@@ -294,7 +294,7 @@ private struct Holding: View {
             .spacing(4)
         }
         .style("Card")
-        .contentPadding(10)
+        .padding(10)
         .shape(.roundedRectangle(8))
         .stroke(Palette.outline)
     }
@@ -321,7 +321,7 @@ private struct Pulsed: View {
             .spacing(4)
         }
         .style("Card")
-        .contentPadding(10)
+        .padding(10)
         .shape(.roundedRectangle(8))
         .stroke(Palette.outline)
         .engine(following: $pulses) { _ in

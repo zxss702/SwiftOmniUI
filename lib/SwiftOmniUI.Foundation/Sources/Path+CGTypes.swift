@@ -6,9 +6,6 @@
 // live in Foundation's CoreGraphics on every platform, so the bridge lives
 // here where Foundation is allowed.
 
-#if canImport(CoreGraphics)
-import CoreGraphics
-#endif
 import Foundation
 import SwiftOmniUICore
 

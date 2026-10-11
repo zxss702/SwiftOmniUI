@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Three roads to the same walking number, and what each one costs.
 struct PacedStateSample: SampleContent, ExampleContent {
@@ -70,7 +70,7 @@ struct PacedStateSample: SampleContent, ExampleContent {
                     .font(.system(size: 17))
             }
             .spacing(4)
-            .contentPadding(14)
+            .padding(14)
             .background(Palette.surface)
 
             // THE JOURNEY. This closure reads where the value IS, and the host
@@ -83,7 +83,7 @@ struct PacedStateSample: SampleContent, ExampleContent {
                     .font(.system(size: 17))
             }
             .spacing(4)
-            .contentPadding(14)
+            .padding(14)
             .background(Palette.surface)
 
             // A READING, ten times a second, into an ordinary state. Same
@@ -95,7 +95,7 @@ struct PacedStateSample: SampleContent, ExampleContent {
                     .font(.system(size: 17))
             }
             .spacing(4)
-            .contentPadding(14)
+            .padding(14)
             .background(Palette.surface)
             .samples($fade, into: $shown, .every(100))
 
@@ -113,7 +113,7 @@ struct PacedStateSample: SampleContent, ExampleContent {
                     .background(Palette.accent)
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     
 
                 Button("Back", action: { try await $fade.journey.move(to: 1, .easeOut(duration: 2.0)) })
@@ -125,7 +125,7 @@ struct PacedStateSample: SampleContent, ExampleContent {
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     
             }
             .spacing(12)

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Two properties of one model, read in two different closures.
 ///
@@ -72,7 +72,7 @@ struct PropertyReadsSample: SampleContent, ExampleContent {
                     .background(Palette.accent)
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .horizontalAlignment(.center)
                     
             }
@@ -84,7 +84,7 @@ struct PropertyReadsSample: SampleContent, ExampleContent {
                     .font(.system(size: 17))
             }
             .spacing(4)
-            .contentPadding(14)
+            .padding(14)
             .background(Palette.surface)
 
             VStack {
@@ -102,7 +102,7 @@ struct PropertyReadsSample: SampleContent, ExampleContent {
                     .lineBreak(.tailTruncation)
             }
             .spacing(4)
-            .contentPadding(14)
+            .padding(14)
             .background(Palette.surface)
         }
         .spacing(14)

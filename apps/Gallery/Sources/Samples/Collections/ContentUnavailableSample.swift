@@ -58,9 +58,7 @@ struct ContentUnavailableSample: SampleContent, ExampleContent {
                     ContentUnavailableView(
                         "No Notes",
                         systemImage: {
-                            #if os(macOS) || os(iOS)
-                            return "note.text"
-                            #elseif os(Windows)
+                            #if os(Windows)
                             return "\u{E70B}"
                             #else
                             return "notebook-symbolic"

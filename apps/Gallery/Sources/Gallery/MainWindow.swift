@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A gallery's main window: what it is called, how big it opens, what is
 /// presented over it - and THE ARRANGEMENT, which is the reason this is a type
@@ -76,11 +76,6 @@ struct MainWindow: WindowScene {
             window.title = "SwiftOmniUI Gallery"
             window.width = 1100
             window.height = 800
-            #if APPKIT
-            // The AppKit window shows the desktop through it from the start, in
-            // the accent's tint.
-            window.isTranslucent = true
-            #endif
             window.minimumWidth = 700
             window.minimumHeight = 500
             window.maximumWidth = 1600

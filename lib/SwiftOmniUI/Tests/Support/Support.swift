@@ -403,7 +403,7 @@ enum SourceTree {
     }
 
     /// Whether a walk of sources enters a directory: never build output - a
-    /// directory named with a leading dot (`.build`, `.build-appkit`), `bin` or
+    /// directory named with a leading dot (`.build`, `.build-gtk`), `bin` or
     /// `obj`. Under `apps/` build output is 99 files in 100, and walking it
     /// costs a guard a minute and more on Windows.
     static func entersSources(_ relative: String) -> Bool {
@@ -654,7 +654,7 @@ enum SourceTree {
     static func runtimeSources() throws -> [(path: String, text: String)] {
         let lib = repository.appendingPathComponent("lib")
         let roots = [
-            "SwiftOmniUI.Host/Sources", "SwiftOmniUI.AppKit/Sources", "SwiftOmniUI.UIKit/Sources", "SwiftOmniUI.Android/Sources",
+            "SwiftOmniUI.Host/Sources", "SwiftOmniUI.Android/Sources",
             "SwiftOmniUI.WinUI/Sources", "SwiftOmniUI.GTK/Sources",
         ]
         var found: [(path: String, text: String)] = []
@@ -671,7 +671,7 @@ enum SourceTree {
     }
 
     /// Every active test source, so a guard can ask whether some test names a
-    /// thing across the core, Gallery, AppKit, UIKit, Android, WinUI and GTK host suites
+    /// thing across the core, Gallery, Android, WinUI and GTK host suites
     /// and the conformance suite they share.
     static func testSources() throws -> [(path: String, text: String)] {
         var found: [(path: String, text: String)] = []
@@ -679,8 +679,6 @@ enum SourceTree {
         let targets = [
             ("SwiftOmniUITests", repository.appendingPathComponent("lib/SwiftOmniUI/Tests")),
             ("GalleryTests", repository.appendingPathComponent("apps/Gallery/Tests/GalleryTests")),
-            ("SwiftOmniUIAppKitTests", repository.appendingPathComponent("lib/SwiftOmniUI.AppKit/Tests")),
-            ("SwiftOmniUIUIKitTests", repository.appendingPathComponent("lib/SwiftOmniUI.UIKit/Tests/Sources")),
             ("SwiftOmniUIAndroidTests", repository.appendingPathComponent("lib/SwiftOmniUI.Android/Tests/Sources")),
             ("SwiftOmniUIWinUITests", repository.appendingPathComponent("lib/SwiftOmniUI.WinUI/Tests")),
             ("SwiftOmniUIGTKTests", repository.appendingPathComponent("lib/SwiftOmniUI.GTK/Tests")),

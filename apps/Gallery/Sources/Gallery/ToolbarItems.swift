@@ -6,7 +6,7 @@
 // puts none on the bar: the native navigation surface owns a leading sidebar
 // toggle on the root and gives that slot to the back button on pushed pages.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The gallery's home button - the SwiftOmniUI type, given one more way to make
 /// itself. It is declared here rather than in the library because there is
@@ -30,9 +30,7 @@ extension ToolbarItem {
     /// was looking at does not linger under the group it came from.
     static func home(_ nav: Navigation) -> ToolbarItem {
         ToolbarItem("Home", systemImage: {
-            #if os(macOS) || os(iOS)
-            return "house"
-            #elseif os(Windows)
+            #if os(Windows)
             return "\u{E80F}"
             #else
             return "go-home-symbolic"

@@ -24,13 +24,14 @@ import XCTest
     }
 
     /// Starts an act and lets it reach its suspension - see ActCallTests.
+    /// The task's body runs a main-queue turn later: the yield gives the run
+    /// loop that drains the queue its turn, so the act is queued by the time
+    /// this returns. Deterministic, not a race.
     @MainActor
-    private static func begin<Value>(_ body: sending @escaping Act<Value>) -> Task<Value, Error> {
-        if #available(macOS 26, iOS 26, macCatalyst 26, *) {
-            return Task.immediate { @MainActor in try await body() }
-        }
-        // No inline start before macOS 26: the body runs a main-queue turn later.
-        return Task { @MainActor in try await body() }
+    private static func begin<Value>(_ body: sending @escaping Act<Value>) async -> Task<Value, Error> {
+        let task = Task { @MainActor in try await body() }
+        await Task.yield()
+        return task
     }
 
     /// Reports an act as done, so no test leaves a continuation suspended.

@@ -1,24 +1,19 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-// The UI thread's executor: `MainActor`'s on every platform but Apple's, drained
-// by the host through `HostBoundary.runJobs`, and the doorbell that tells the host
-// to ask.
+// The UI thread's executor, `MainActor`'s, drained by the host through
+// `HostBoundary.runJobs`, and the doorbell that tells the host to ask.
 // Design: docs/design/core/concurrency.md#mainactor-on-every-platform
 
 import Dispatch
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Android)
+#if canImport(Android)
 import Android
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(WinSDK)
 import WinSDK
 #endif
-#if !canImport(Darwin)
 @_spi(ExperimentalCustomExecutors) import _Concurrency
-#endif
 
 /// Which thread this is, as a number to compare - spelled per platform.
 private func currentThread() -> UInt64 {
@@ -43,9 +38,7 @@ final class UIThreadExecutor: SerialExecutor, @unchecked Sendable {
     }
 
     private static let installed: Void = {
-        #if !canImport(Darwin)
         _createExecutors(factory: UIThreadExecutorFactory.self)
-        #endif
     }()
 
     /// Guards the queue, the doorbell's flag and the flags below.
@@ -215,7 +208,6 @@ final class UIThreadExecutor: SerialExecutor, @unchecked Sendable {
     }
 }
 
-#if !canImport(Darwin)
 extension UIThreadExecutor: MainExecutor {
     func run() throws {
         runTheLoop()
@@ -232,11 +224,9 @@ private struct UIThreadExecutorFactory: ExecutorFactory {
     static var mainExecutor: any MainExecutor { UIThreadExecutor.shared }
     static var defaultExecutor: any TaskExecutor { PlatformExecutorFactory.defaultExecutor }
 }
-#endif
 
 /// Runs whatever the Swift side has waiting, on the caller's thread - what the
-/// host calls at the start of every turn. Answers 0 when there is nothing, which
-/// on Apple is almost always.
+/// host calls at the start of every turn. Answers 0 when there is nothing.
 @discardableResult
 func stateUIRunJobs() -> Int {
     UIThreadExecutor.shared.drain()

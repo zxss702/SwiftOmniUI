@@ -1,3 +1,0 @@
-# revision 1.1
-Span.textDecorations: not realized
-Text.textDecorations: ✅

@@ -30,7 +30,7 @@ enum WinUITestHost {
     }
 
     /// The room a test's window stands in whatever the screen - Windows gives a window three quarters of it -
-    /// as AppKit's and GTK's windows open.
+    /// as GTK's windows open.
     static let room = LayoutSize(width: 560, height: 440)
 
     /// A room where a split view's sidebar stands beside its detail, which a screen of 1024 x 768 holds.

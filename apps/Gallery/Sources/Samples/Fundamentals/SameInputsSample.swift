@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A composed view is built again when what it was built with changed, or
 /// when a state it read changed - and not otherwise.
@@ -85,7 +85,7 @@ struct SameInputsSample: SampleContent, ExampleContent {
             DebugInfoLabel()
 
             Button("Count \(counter)", action: { counter += 1 })
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
 
@@ -173,7 +173,7 @@ private struct Block: View {
             DebugInfoLabel()
         }
         .spacing(4)
-        .contentPadding(14)
+        .padding(14)
     }
 }
 
@@ -196,7 +196,7 @@ private struct Reads: View {
             DebugInfoLabel()
         }
         .spacing(4)
-        .contentPadding(14)
+        .padding(14)
     }
 }
 
@@ -212,6 +212,6 @@ private struct Row: View {
             DebugInfoLabel()
         }
         .spacing(2)
-        .contentPadding(EdgeInsets(12, 8))
+        .padding(EdgeInsets(12, 8))
     }
 }

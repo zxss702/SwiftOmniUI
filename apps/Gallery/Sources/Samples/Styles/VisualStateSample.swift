@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// States written on the control itself, and the list of them being the
 /// control's own.

@@ -168,7 +168,7 @@ public enum VisualElementContract: Contract {
         "compositingGroup", layer: .native)
 
     /// Whether the element draws offscreen first - `.drawingGroup` writes
-    /// it, the platform's own rasterizer standing in for Metal where there
+    /// it, the platform's own rasterizer standing in for a GPU where there
     /// is none.
     public static let drawingGroup = ElementProperty<Self, Bool>(
         "drawingGroup", layer: .native)

@@ -5,11 +5,11 @@ import PackageDescription
 // build is for. SourceKit understands only code a SwiftPM package holds, so the
 // editor completes the application through this manifest as well.
 
-// The host a build is for: SWIFTOMNIUI_HOST - appkit, uikit, android, winui, gtk or web -
+// The host a build is for: SWIFTOMNIUI_HOST - android, winui, gtk or web -
 // which its script or the editor sets, or none for plain Swift. The
 // application's Swift for that host alone stands under its condition -
-// `#if APPKIT` - and the root package brings the host itself to the head.
-let host = ["AppKit", "UIKit", "Android", "WinUI", "GTK", "Web"]
+// `#if GTK` - and the root package brings the host itself to the head.
+let host = ["Android", "WinUI", "GTK", "Web"]
     .first { $0.lowercased() == Context.environment["SWIFTOMNIUI_HOST"] }
 
 // NonisolatedNonsendingByDefault is the one setting an application must not
@@ -37,6 +37,16 @@ case "Android"?:
     products.append(.library(name: "HelloWorldAndroid", type: .dynamic, targets: ["HelloWorldAndroid"]))
     targets.append(.target(
         name: "HelloWorldAndroid", dependencies: head, path: "Platforms/Android/Swift", swiftSettings: settings))
+case "WinUI"?:
+    targets.append(.executableTarget(
+        name: "HelloWorldWinUI",
+        dependencies: head + [.product(name: "SwiftOmniUIWinUI", package: "SwiftOmniUIRoot")],
+        path: "Platforms/WinUI", swiftSettings: settings))
+case "GTK"?:
+    targets.append(.executableTarget(
+        name: "HelloWorldGTK",
+        dependencies: head + [.product(name: "SwiftOmniUIGTK", package: "SwiftOmniUIRoot")],
+        path: "Platforms/GTK", swiftSettings: settings))
 case let host?:
     targets.append(.executableTarget(
         name: "HelloWorld\(host)", dependencies: head, path: "Platforms/\(host)", swiftSettings: settings))

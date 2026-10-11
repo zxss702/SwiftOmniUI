@@ -23,10 +23,8 @@ Inherits: [PropertyContainer](tiers/PropertyContainer.md) · [VisualElement](tie
 
 See [the dictionary](README.md) for how a mark is given.
 
-| Host | Created | Members (101) | Realization | Notes |
+| Host | Created | Members (103) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit |  | 28 ✅ · 3 – | custom `NSView` measured and placed by the `Layout` object | no run of it on these sources |
-| UIKit |  |  | custom `UIView` driven the same | no run of it on these sources |
 | Android Views |  |  | custom `ViewGroup` driven the same | no run of it on these sources |
 | WinUI 3 |  |  | custom `Panel` driven the same | no run of it on these sources |
 | GTK 4 |  | 20 ✅ · 3 – | `GtkLayoutManager` on a `GtkWidget` | no run of it on these sources |
@@ -42,141 +40,143 @@ CustomLayout declares no members of its own.
 
 What anything carrying values in the tree has - a control, a `Style`, a text run: the name automation finds it by.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `accessibilityIdentifier` | property | `String` | native | ✅ |  |  |  |  |  | UIKit: not realized; GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `accessibilityIdentifier` | property | `String` | native |  |  |  |  | GTK 4: not realized |
 
 ## From [VisualElement](tiers/VisualElement.md)
 
 What every drawn element has: its size and its bounds, how it is shown and turned, whether it answers input and holds the keyboard focus, the visual states it enters, and what a screen reader says about it.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `blendMode` | property | `BlendMode` | native |  |  |  |  |  |  |  |
-| `accessibilityChildBehavior` | property | `AccessibilityChildBehavior` | native |  |  |  |  |  |  |  |
-| `accessibilityHeadingLevel` | property | `HeadingLevel` | native | · |  |  |  | · |  | cannot read a heading's level - AppKit marks a heading, not its level; UIKit: not realized; GTK 4: cannot read accessibilityHeadingLevel of CustomLayout - GTK's driver has no path for it yet |
-| `accessibilityHint` | property | `String` | native | ✅ |  |  |  | · |  | UIKit: not realized; GTK 4: cannot read accessibilityHint of CustomLayout - GTK's driver has no path for it yet |
-| `accessibilityLabel` | property | `String` | native | ✅ |  |  |  | · |  | UIKit: not realized; GTK 4: cannot read accessibilityLabel of CustomLayout - GTK's driver has no path for it yet |
-| `accessibilityTraits` | property | `AccessibilityTraits` | native |  |  |  |  |  |  |  |
-| `automationExcludedWithChildren` | property | `Bool` | native | ✅ |  |  |  | · |  | UIKit: not realized; GTK 4: cannot read automationExcludedWithChildren of CustomLayout - GTK's driver has no path for it yet |
-| `background` | property | `Background` | native | ✅ |  |  |  | · |  | UIKit: not realized; GTK 4: cannot read background of CustomLayout - GTK's driver has no path for it yet |
-| `blur` | property | `Double` | native |  |  |  |  |  |  |  |
-| `contentTransition` | property | `String` | native |  |  |  |  |  |  |  |
-| `compositingGroup` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `drawingGroup` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `focus` | act | `() -> Bool` |  | – |  |  |  | – |  | CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard; UIKit: not realized; GTK 4: CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard |
-| `frame` | property | `Rect` | structure | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `height` | property | `Double` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `hint` | property | `String` | native |  |  |  |  |  |  |  |
-| `hintKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |  |  |
-| `ignoresInput` | property | `Bool` | native | ✅ |  |  |  | · |  | UIKit: not realized; GTK 4: cannot read what reaches CustomLayout - GTK's driver has no path for it yet |
-| `isAccessibilityHidden` | property | `Bool` | native | ✅ |  |  |  | · |  | UIKit: not realized; GTK 4: cannot read isAccessibilityHidden of CustomLayout - GTK's driver has no path for it yet |
-| `isEnabled` | property | `Bool` | native |  |  |  |  | ✅ |  | not realized; UIKit: not realized |
-| `isFocusedChanged` | event | `Bool` | native | – |  |  |  | – |  | CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard; UIKit: not realized; GTK 4: CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard |
-| `isVisible` | property | `Bool` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `layoutDirection` | property | `LayoutDirection` | native |  |  |  |  | · |  | not realized; UIKit: not realized; GTK 4: cannot read layoutDirection of CustomLayout - GTK's driver has no path for it yet |
-| `matchedGeometry` | property | `String` | native |  |  |  |  |  |  |  |
-| `matchedGeometrySource` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `maximumHeight` | property | `Double` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `maximumWidth` | property | `Double` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `minimumHeight` | property | `Double` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `minimumWidth` | property | `Double` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `opacity` | property | `Double` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `pivotX` | property | `Double` | native | 🔌 |  |  |  | · |  | only through the host's own: read pivotX of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read pivotX of CustomLayout - GTK's driver has no path for it yet |
-| `pivotY` | property | `Double` | native | 🔌 |  |  |  | · |  | only through the host's own: read pivotY of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read pivotY of CustomLayout - GTK's driver has no path for it yet |
-| `rotation` | property | `Angle` | native | 🔌 |  |  |  | · |  | only through the host's own: read rotation of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read rotation of CustomLayout - GTK's driver has no path for it yet |
-| `rotationX` | property | `Angle` | native | 🔌 |  |  |  | · |  | only through the host's own: read rotationX of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read rotationX of CustomLayout - GTK's driver has no path for it yet |
-| `rotationY` | property | `Angle` | native | 🔌 |  |  |  | · |  | only through the host's own: read rotationY of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read rotationY of CustomLayout - GTK's driver has no path for it yet |
-| `scale` | property | `Double` | native | 🔌 |  |  |  | · |  | only through the host's own: read scale of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read scale of CustomLayout - GTK's driver has no path for it yet |
-| `scaleX` | property | `Double` | native | 🔌 |  |  |  | · |  | only through the host's own: read scaleX of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read scaleX of CustomLayout - GTK's driver has no path for it yet |
-| `scaleY` | property | `Double` | native | 🔌 |  |  |  | · |  | only through the host's own: read scaleY of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read scaleY of CustomLayout - GTK's driver has no path for it yet |
-| `shadow` | property | `DropShadow` | native |  |  |  |  |  |  |  |
-| `style` | property | `Name` | structure | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `symbolEffect` | property | `String` | native |  |  |  |  |  |  |  |
-| `symbolEffectActive` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `symbolEffectOptions` | property | `Int` | native |  |  |  |  |  |  |  |
-| `symbolEffectValue` | property | `String` | native |  |  |  |  |  |  |  |
-| `transition` | property | `AnyTransition` | native |  |  |  |  |  |  |  |
-| `translationX` | property | `Double` | native | 🔌 |  |  |  | · |  | only through the host's own: read translationX of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read translationX of CustomLayout - GTK's driver has no path for it yet |
-| `translationY` | property | `Double` | native | 🔌 |  |  |  | · |  | only through the host's own: read translationY of CustomLayout: the host's own transform, checked against the layer it composed itself; UIKit: not realized; GTK 4: cannot read translationY of CustomLayout - GTK's driver has no path for it yet |
-| `unfocus` | act | `() -> Void` |  | – |  |  |  | – |  | CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard; UIKit: not realized; GTK 4: CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard |
-| `width` | property | `Double` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `zIndex` | property | `Double` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `blendMode` | property | `BlendMode` | native |  |  |  |  |  |
+| `accessibilityChildBehavior` | property | `AccessibilityChildBehavior` | native |  |  |  |  |  |
+| `accessibilityHeadingLevel` | property | `HeadingLevel` | native |  |  | · |  | GTK 4: cannot read accessibilityHeadingLevel of CustomLayout - GTK's driver has no path for it yet |
+| `accessibilityHint` | property | `String` | native |  |  | · |  | GTK 4: cannot read accessibilityHint of CustomLayout - GTK's driver has no path for it yet |
+| `accessibilityLabel` | property | `String` | native |  |  | · |  | GTK 4: cannot read accessibilityLabel of CustomLayout - GTK's driver has no path for it yet |
+| `accessibilityTraits` | property | `AccessibilityTraits` | native |  |  |  |  |  |
+| `automationExcludedWithChildren` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read automationExcludedWithChildren of CustomLayout - GTK's driver has no path for it yet |
+| `background` | property | `Background` | native |  |  | · |  | GTK 4: cannot read background of CustomLayout - GTK's driver has no path for it yet |
+| `blur` | property | `Double` | native |  |  |  |  |  |
+| `contentTransition` | property | `String` | native |  |  |  |  |  |
+| `compositingGroup` | property | `Bool` | native |  |  |  |  |  |
+| `drawingGroup` | property | `Bool` | native |  |  |  |  |  |
+| `focus` | act | `() -> Bool` |  |  |  | – |  | GTK 4: CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard |
+| `frame` | property | `Rect` | structure |  |  | ✅ |  |  |
+| `height` | property | `Double` | native |  |  | ✅ |  |  |
+| `hint` | property | `String` | native |  |  |  |  |  |
+| `hintKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `ignoresInput` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read what reaches CustomLayout - GTK's driver has no path for it yet |
+| `isAccessibilityHidden` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read isAccessibilityHidden of CustomLayout - GTK's driver has no path for it yet |
+| `isEnabled` | property | `Bool` | native |  |  | ✅ |  |  |
+| `isFocusedChanged` | event | `Bool` | native |  |  | – |  | GTK 4: CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard |
+| `isVisible` | property | `Bool` | native |  |  | ✅ |  |  |
+| `layoutDirection` | property | `LayoutDirection` | native |  |  | · |  | GTK 4: cannot read layoutDirection of CustomLayout - GTK's driver has no path for it yet |
+| `matchedGeometry` | property | `String` | native |  |  |  |  |  |
+| `matchedGeometrySource` | property | `Bool` | native |  |  |  |  |  |
+| `maximumHeight` | property | `Double` | native |  |  | ✅ |  |  |
+| `maximumWidth` | property | `Double` | native |  |  | ✅ |  |  |
+| `minimumHeight` | property | `Double` | native |  |  | ✅ |  |  |
+| `minimumWidth` | property | `Double` | native |  |  | ✅ |  |  |
+| `opacity` | property | `Double` | native |  |  | ✅ |  |  |
+| `pivotX` | property | `Double` | native |  |  | · |  | GTK 4: cannot read pivotX of CustomLayout - GTK's driver has no path for it yet |
+| `pivotY` | property | `Double` | native |  |  | · |  | GTK 4: cannot read pivotY of CustomLayout - GTK's driver has no path for it yet |
+| `rotation` | property | `Angle` | native |  |  | · |  | GTK 4: cannot read rotation of CustomLayout - GTK's driver has no path for it yet |
+| `rotationX` | property | `Angle` | native |  |  | · |  | GTK 4: cannot read rotationX of CustomLayout - GTK's driver has no path for it yet |
+| `rotationY` | property | `Angle` | native |  |  | · |  | GTK 4: cannot read rotationY of CustomLayout - GTK's driver has no path for it yet |
+| `scale` | property | `Double` | native |  |  | · |  | GTK 4: cannot read scale of CustomLayout - GTK's driver has no path for it yet |
+| `scaleX` | property | `Double` | native |  |  | · |  | GTK 4: cannot read scaleX of CustomLayout - GTK's driver has no path for it yet |
+| `scaleY` | property | `Double` | native |  |  | · |  | GTK 4: cannot read scaleY of CustomLayout - GTK's driver has no path for it yet |
+| `shadow` | property | `DropShadow` | native |  |  |  |  |  |
+| `style` | property | `Name` | structure |  |  | ✅ |  |  |
+| `symbolEffect` | property | `String` | native |  |  |  |  |  |
+| `symbolEffectActive` | property | `Bool` | native |  |  |  |  |  |
+| `symbolEffectOptions` | property | `Int` | native |  |  |  |  |  |
+| `symbolEffectValue` | property | `String` | native |  |  |  |  |  |
+| `transition` | property | `AnyTransition` | native |  |  |  |  |  |
+| `translationX` | property | `Double` | native |  |  | · |  | GTK 4: cannot read translationX of CustomLayout - GTK's driver has no path for it yet |
+| `translationY` | property | `Double` | native |  |  | · |  | GTK 4: cannot read translationY of CustomLayout - GTK's driver has no path for it yet |
+| `unfocus` | act | `() -> Void` |  |  |  | – |  | GTK 4: CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard |
+| `width` | property | `Double` | native |  |  | ✅ |  |  |
+| `zIndex` | property | `Double` | native |  |  |  |  | GTK 4: not realized |
 
 ## From [View](tiers/View.md)
 
 What every view a layout positions has: where it sits in its layout, the space kept around it, and the gestures, drags and frame reports it answers.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `allowDrop` | property | `Bool` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `area` | property | `Area` | structure | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `canDrag` | property | `Bool` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `coordinateSpaceName` | property | `String` | stateUI |  |  |  |  |  |  |  |
-| `dragLeave` | event |  | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dragOver` | event |  | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dragStarting` | event |  | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dragText` | property | `String` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `onDrop` (`drop`) | event | `String` | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dropCompleted` | event |  | native |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `dropPaths` | event | `([String], Point)` | native |  |  |  |  |  |  |  |
-| `flex` | property | `Double` | stateUI |  |  |  |  |  |  |  |
-| `frameChanged` | event | `[Double]` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `gridColumn` | property | `Int` | stateUI | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `gridColumnSpan` | property | `Int` | stateUI | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `gridRow` | property | `Int` | stateUI | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `gridRowSpan` | property | `Int` | stateUI | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `horizontalAlignment` | property | `AxisAlignment` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `horizontalGuide` | property | `[Double]` | stateUI |  |  |  |  |  |  |  |
-| `layoutPriority` | property | `Double` | stateUI |  |  |  |  |  |  |  |
-| `namedFramesChanged` | event | `[NamedSpaceFrame]` | native |  |  |  |  |  |  |  |
-| `padding` | property | `EdgeInsets` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `panTouchCount` | property | `Int` | structure | 🔌 |  |  |  | · |  | only through the host's own: pan on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
-| `onPanUpdated` (`panUpdated`) | event | `(GesturePhase, Double, Double, Point?, Point?)` | native | 🔌 |  |  |  | · |  | only through the host's own: pan on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
-| `panXChannel` | property | `Int` | structure | 🔌 |  |  |  | · |  | only through the host's own: pan on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
-| `panYChannel` | property | `Int` | structure | 🔌 |  |  |  | · |  | only through the host's own: pan on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
-| `pinchUpdated` | event | `(GesturePhase, Double, Point)` | native | 🔌 |  |  |  | · |  | only through the host's own: pinch on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot pinch on CustomLayout - GTK's driver has no path for it yet |
-| `pointerEntered` | event |  | native | 🔌 |  |  |  | · |  | only through the host's own: hover on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
-| `pointerExited` | event |  | native | 🔌 |  |  |  | · |  | only through the host's own: hover on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
-| `pointerMoved` | event | `Point?` | native | 🔌 |  |  |  | · |  | only through the host's own: hover on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
-| `pointerPressed` | event | `Point?` | native | 🔌 |  |  |  | · |  | only through the host's own: hover on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
-| `pointerReleased` | event | `Point?` | native | 🔌 |  |  |  | · |  | only through the host's own: hover on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
-| `pointerStyle` | property | `PointerStyle` | native |  |  |  |  |  |  |  |
-| `swipeDirection` | property | `SwipeDirection` | structure | 🔌 |  |  |  | · |  | only through the host's own: pan on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
-| `swipeThreshold` | property | `Double` | structure | 🔌 |  |  |  | · |  | only through the host's own: pan on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
-| `onSwiped` (`swiped`) | event | `SwipeDirection` | native | 🔌 |  |  |  | · |  | only through the host's own: pan on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
-| `tag` | property | `PropValue` | stateUI |  |  |  |  |  |  |  |
-| `tapCount` | property | `Int` | structure | 🔌 |  |  |  | · |  | only through the host's own: tap on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot tap on CustomLayout - GTK's driver has no path for it yet |
-| `onTapGesture` (`tapGesture`) | event |  | native | 🔌 |  |  |  | · |  | only through the host's own: tap on CustomLayout: handed to the host's recognizer or handler, no NSEvent sent; UIKit: not realized; GTK 4: cannot tap on CustomLayout - GTK's driver has no path for it yet |
-| `verticalAlignment` | property | `AxisAlignment` | native | ✅ |  |  |  | ✅ |  | UIKit: not realized |
-| `verticalGuide` | property | `[Double]` | stateUI |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `allowDrop` | property | `Bool` | native |  |  |  |  | GTK 4: not realized |
+| `area` | property | `Area` | structure |  |  | ✅ |  |  |
+| `canDrag` | property | `Bool` | native |  |  |  |  | GTK 4: not realized |
+| `coordinateSpaceName` | property | `String` | stateUI |  |  |  |  |  |
+| `dragLeave` | event |  | native |  |  |  |  | GTK 4: not realized |
+| `dragOver` | event |  | native |  |  |  |  | GTK 4: not realized |
+| `dragStarting` | event |  | native |  |  |  |  | GTK 4: not realized |
+| `dragText` | property | `String` | native |  |  |  |  | GTK 4: not realized |
+| `onDrop` (`drop`) | event | `String` | native |  |  |  |  | GTK 4: not realized |
+| `dropCompleted` | event |  | native |  |  |  |  | GTK 4: not realized |
+| `dropPaths` | event | `([String], Point)` | native |  |  |  |  |  |
+| `flex` | property | `Double` | stateUI |  |  |  |  |  |
+| `frameChanged` | event | `[Double]` | native |  |  | ✅ |  |  |
+| `gridColumn` | property | `Int` | stateUI |  |  | ✅ |  |  |
+| `gridColumnSpan` | property | `Int` | stateUI |  |  | ✅ |  |  |
+| `gridRow` | property | `Int` | stateUI |  |  | ✅ |  |  |
+| `gridRowSpan` | property | `Int` | stateUI |  |  | ✅ |  |  |
+| `horizontalAlignment` | property | `AxisAlignment` | native |  |  | ✅ |  |  |
+| `horizontalContentAlignment` | property | `AxisAlignment` | native |  |  |  |  |  |
+| `horizontalGuide` | property | `[Double]` | stateUI |  |  |  |  |  |
+| `layoutPriority` | property | `Double` | stateUI |  |  |  |  |  |
+| `namedFramesChanged` | event | `[NamedSpaceFrame]` | native |  |  |  |  |  |
+| `padding` | property | `EdgeInsets` | native |  |  | ✅ |  |  |
+| `panTouchCount` | property | `Int` | structure |  |  | · |  | GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
+| `onPanUpdated` (`panUpdated`) | event | `(GesturePhase, Double, Double, Point?, Point?)` | native |  |  | · |  | GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
+| `panXChannel` | property | `Int` | structure |  |  | · |  | GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
+| `panYChannel` | property | `Int` | structure |  |  | · |  | GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
+| `pinchUpdated` | event | `(GesturePhase, Double, Point)` | native |  |  | · |  | GTK 4: cannot pinch on CustomLayout - GTK's driver has no path for it yet |
+| `pointerEntered` | event |  | native |  |  | · |  | GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
+| `pointerExited` | event |  | native |  |  | · |  | GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
+| `pointerMoved` | event | `Point?` | native |  |  | · |  | GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
+| `pointerPressed` | event | `Point?` | native |  |  | · |  | GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
+| `pointerReleased` | event | `Point?` | native |  |  | · |  | GTK 4: cannot hover on CustomLayout - GTK's driver has no path for it yet |
+| `pointerStyle` | property | `PointerStyle` | native |  |  |  |  |  |
+| `swipeDirection` | property | `SwipeDirection` | structure |  |  | · |  | GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
+| `swipeThreshold` | property | `Double` | structure |  |  | · |  | GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
+| `onSwiped` (`swiped`) | event | `SwipeDirection` | native |  |  | · |  | GTK 4: cannot pan on CustomLayout - GTK's driver has no path for it yet |
+| `tag` | property | `PropValue` | stateUI |  |  |  |  |  |
+| `tapCount` | property | `Int` | structure |  |  | · |  | GTK 4: cannot tap on CustomLayout - GTK's driver has no path for it yet |
+| `onTapGesture` (`tapGesture`) | event |  | native |  |  | · |  | GTK 4: cannot tap on CustomLayout - GTK's driver has no path for it yet |
+| `verticalAlignment` | property | `AxisAlignment` | native |  |  | ✅ |  |  |
+| `verticalContentAlignment` | property | `AxisAlignment` | native |  |  |  |  |  |
+| `verticalGuide` | property | `[Double]` | stateUI |  |  |  |  |  |
 
 ## From [Layout](tiers/Layout.md)
 
 What every layout has: the screen's unsafe strips it keeps clear of, and whether its children are clipped or let input through.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `ignoresSafeArea` | property | `SafeAreaEdges` | adaptive |  |  |  |  |  |  | not realized; UIKit: not realized; GTK 4: not realized |
-| `clipsContent` | property | `Bool` | native | ✅ |  |  |  | · |  | UIKit: not realized; GTK 4: cannot read clipsContent of CustomLayout - GTK's driver has no path for it yet |
-| `letsInputThrough` | property | `Bool` | native | ◐ |  |  |  | · |  | cannot read letsInputThrough of CustomLayout - AppKit's driver has no path for it yet; UIKit: not realized; GTK 4: cannot read letsInputThrough of CustomLayout - GTK's driver has no path for it yet |
-| `hitShape` | property | `ContainerShape` | native | ✅ |  |  |  | · |  | UIKit: not realized; GTK 4: cannot read hitShape of CustomLayout - GTK's driver has no path for it yet |
-| `scrollTargetLayout` | property | `Bool` | adaptive |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `ignoresSafeArea` | property | `SafeAreaEdges` | adaptive |  |  |  |  | GTK 4: not realized |
+| `clipsContent` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read clipsContent of CustomLayout - GTK's driver has no path for it yet |
+| `letsInputThrough` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read letsInputThrough of CustomLayout - GTK's driver has no path for it yet |
+| `hitShape` | property | `ContainerShape` | native |  |  | · |  | GTK 4: cannot read hitShape of CustomLayout - GTK's driver has no path for it yet |
+| `scrollTargetLayout` | property | `Bool` | adaptive |  |  |  |  |  |
 
 ## From [PaddingElement](tiers/PaddingElement.md)
 
 The space kept inside an element, around what it holds.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `contentPadding` | property | `EdgeInsets` | native |  |  |  |  | · |  | not realized; UIKit: not realized; GTK 4: cannot read contentPadding of CustomLayout - GTK's driver has no path for it yet |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `contentPadding` | property | `EdgeInsets` | native |  |  | · |  | GTK 4: cannot read contentPadding of CustomLayout - GTK's driver has no path for it yet |
 
 ## From [BorderElement](tiers/BorderElement.md)
 
 What an element draws of its own box: the shape its background, its outline and its cut follow, and the outline.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `shape` | property | `ContainerShape` | stateUI | · |  |  |  | · |  | cannot read shape of CustomLayout - AppKit's driver has no path for it yet; UIKit: not realized; GTK 4: cannot read shape of CustomLayout - GTK's driver has no path for it yet |
-| `stroke` | property | `Brush` | stateUI |  |  |  |  | · |  | not realized; UIKit: not realized; GTK 4: cannot read stroke of CustomLayout - GTK's driver has no path for it yet |
-| `strokeWidth` | property | `Double` | stateUI | · |  |  |  | · |  | cannot read strokeWidth of CustomLayout - AppKit's driver has no path for it yet; UIKit: not realized; GTK 4: cannot read strokeWidth of CustomLayout - GTK's driver has no path for it yet |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `shape` | property | `ContainerShape` | stateUI |  |  | · |  | GTK 4: cannot read shape of CustomLayout - GTK's driver has no path for it yet |
+| `stroke` | property | `Brush` | stateUI |  |  | · |  | GTK 4: cannot read stroke of CustomLayout - GTK's driver has no path for it yet |
+| `strokeWidth` | property | `Double` | stateUI |  |  | · |  | GTK 4: cannot read strokeWidth of CustomLayout - GTK's driver has no path for it yet |

@@ -5,8 +5,6 @@
 @_spi(Host) import SwiftOmniUIHost
 #if canImport(WASILibc)
 import WASILibc
-#elseif canImport(Darwin)
-import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(CRT)

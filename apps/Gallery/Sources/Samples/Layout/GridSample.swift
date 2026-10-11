@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Rows and columns with each child's place written on the child.
 struct GridSample: SampleContent {
@@ -59,7 +59,7 @@ private struct GridPlacement: ExampleContent {
                 Text(text)
                     .foregroundStyle(.white)
                     .background(Color(color))
-                    .contentPadding(8)
+                    .padding(8)
             }
         }
         """
@@ -133,7 +133,7 @@ private struct GridCell: View {
             .font(.system(size: 12))
             .foregroundStyle(.white)
             .background(Color(color))
-            .contentPadding(8)
+            .padding(8)
             .multilineTextAlignment(.center)
             .verticalTextAlignment(.center)
     }

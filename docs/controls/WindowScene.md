@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (25) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ | 15 ✅ | `NSWindow` |  |
-| UIKit | ✅ | 4 ✅ · 9 – | `UIWindow` |  |
 | Android Views | ✅ | 2 ✅ | `Activity` |  |
 | WinUI 3 | ✅ | 23 ✅ | `Window` |  |
 | GTK 4 | ⏸ |  | `GtkApplicationWindow` | waits on WindowScene.created, not realized yet |
@@ -36,30 +34,30 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Structure/WindowSceneCon
 
 ## WindowScene's own members
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `activated` | event |  | adaptive | ✅ | ✅ | ✅ | ✅ |  |  | GTK 4: not realized |
-| `created` | event |  | adaptive | ✅ | ✅ | ✅ | ✅ |  |  | GTK 4: not realized |
-| `deactivated` | event |  | adaptive | 🔌 | 🔌 | 🔌 | ✅ |  |  | only through the host's own: switchAway on WindowScene: the notification AppKit would post, posted by the driver; the window does not move; UIKit: only through the host's own: switchAway on WindowScene: the host told the scene's phase, no scene moved; Android Views: only through the host's own: switchAway on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
-| `destroying` | event |  | adaptive | ✅ | 🔌 | 🔌 | ✅ |  |  | UIKit: only through the host's own: close on WindowScene: the host told the scene's phase, no scene moved; Android Views: only through the host's own: close on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
-| `floatsOnTop` | property | `Bool` | adaptive | 🔌 | – |  | ✅ |  |  | only through the host's own: bringToFront on WindowScene: the notification AppKit would post, posted by the driver; the window does not move; UIKit: iPadOS stacks its windows itself: UIKit keeps none above the others.; Android Views: not realized; GTK 4: not realized |
-| `height` | property | `Double` | native | ✅ | – |  | ✅ |  |  | UIKit: iPadOS sizes its windows itself - the user drags a corner: a UIKit scene asks for no size.; Android Views: not realized; GTK 4: not realized |
-| `hidesWhenInactive` | property | `Bool` | adaptive | · | – |  | ✅ |  |  | cannot read isVisible of WindowScene - AppKit's driver has no path for it yet; UIKit: iPadOS shows an application's windows itself: UIKit hides none while another is in front.; Android Views: not realized; GTK 4: not realized |
-| `isMaximizable` | property | `Bool` | adaptive | ✅ | – |  | ✅ |  |  | UIKit: Any iPadOS window may fill the screen: UIKit keeps none from it.; Android Views: not realized; GTK 4: not realized |
-| `isMinimizable` | property | `Bool` | adaptive | ✅ | – |  | ✅ |  |  | UIKit: Any iPadOS window may be put away: UIKit keeps none from it.; Android Views: not realized; GTK 4: not realized |
-| `isTranslucent` | property | `Bool` | adaptive | ✅ | – |  | ✅ |  |  | UIKit: iPadOS draws an application's window opaque: no material shows through one.; Android Views: not realized; GTK 4: not realized |
-| `maximumHeight` | property | `Double` | native | ✅ |  |  | ✅ |  |  | UIKit: not realized; Android Views: not realized; GTK 4: not realized |
-| `maximumWidth` | property | `Double` | native | ✅ |  |  | ✅ |  |  | UIKit: not realized; Android Views: not realized; GTK 4: not realized |
-| `minimumHeight` | property | `Double` | native | ✅ |  |  | ✅ |  |  | UIKit: not realized; Android Views: not realized; GTK 4: not realized |
-| `minimumWidth` | property | `Double` | native | ✅ |  |  | ✅ |  |  | UIKit: not realized; Android Views: not realized; GTK 4: not realized |
-| `modalPopped` | event | `Int` | adaptive | 🔌 | ✅ | · | ✅ |  |  | only through the host's own: goBack on WindowScene: the host's toolbar or sheet entry called, no toolbar item or sheet touched; Android Views: cannot goBack on WindowScene - Android's driver has no path for it yet; GTK 4: not realized |
-| `resizability` | property | `WindowResizability` | adaptive |  |  |  |  |  |  |  |
-| `resumed` | event |  | adaptive | 🔌 | 🔌 | 🔌 | ✅ |  |  | only through the host's own: minimize on WindowScene: the notification AppKit would post, posted by the driver; the window does not move; UIKit: only through the host's own: minimize on WindowScene: the host told the scene's phase, no scene moved; Android Views: only through the host's own: minimize on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
-| `stopped` | event |  | adaptive | 🔌 | 🔌 | 🔌 | ✅ |  |  | only through the host's own: minimize on WindowScene: the notification AppKit would post, posted by the driver; the window does not move; UIKit: only through the host's own: minimize on WindowScene: the host told the scene's phase, no scene moved; Android Views: only through the host's own: minimize on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
-| `title` | property | `String` | native | ✅ | ✅ | · | ✅ |  |  | Android Views: cannot read title of WindowScene - Android's driver has no path for it yet; GTK 4: not realized |
-| `width` | property | `Double` | native | ✅ | – |  | ✅ |  |  | UIKit: iPadOS sizes its windows itself - the user drags a corner: a UIKit scene asks for no size.; Android Views: not realized; GTK 4: not realized |
-| `windowType` | property | `WindowType` | structure | 🔌 |  |  | ✅ |  |  | only through the host's own: read windowType of WindowScene: the host's restoration record; UIKit: not realized; Android Views: not realized; GTK 4: not realized |
-| `windowValue` | property | `String` | structure | 🔌 |  |  | ✅ |  |  | only through the host's own: read windowValue of WindowScene: the host's restoration record; UIKit: not realized; Android Views: not realized; GTK 4: not realized |
-| `x` | property | `Double` | structure | ✅ | – |  | ✅ |  |  | UIKit: iPadOS places its windows itself: a UIKit scene asks for no place.; Android Views: not realized; GTK 4: not realized |
-| `y` | property | `Double` | structure | ✅ | – |  | ✅ |  |  | UIKit: iPadOS places its windows itself: a UIKit scene asks for no place.; Android Views: not realized; GTK 4: not realized |
-| `defaultPosition` | property | `UnitPoint` | adaptive |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `activated` | event |  | adaptive | ✅ | ✅ |  |  | GTK 4: not realized |
+| `created` | event |  | adaptive | ✅ | ✅ |  |  | GTK 4: not realized |
+| `deactivated` | event |  | adaptive | 🔌 | ✅ |  |  | only through the host's own: switchAway on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
+| `destroying` | event |  | adaptive | 🔌 | ✅ |  |  | only through the host's own: close on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
+| `floatsOnTop` | property | `Bool` | adaptive |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `height` | property | `Double` | native |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `hidesWhenInactive` | property | `Bool` | adaptive |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `isMaximizable` | property | `Bool` | adaptive |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `isMinimizable` | property | `Bool` | adaptive |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `isTranslucent` | property | `Bool` | adaptive |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `maximumHeight` | property | `Double` | native |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `maximumWidth` | property | `Double` | native |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `minimumHeight` | property | `Double` | native |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `minimumWidth` | property | `Double` | native |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `modalPopped` | event | `Int` | adaptive | · | ✅ |  |  | cannot goBack on WindowScene - Android's driver has no path for it yet; GTK 4: not realized |
+| `resizability` | property | `WindowResizability` | adaptive |  |  |  |  |  |
+| `resumed` | event |  | adaptive | 🔌 | ✅ |  |  | only through the host's own: minimize on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
+| `stopped` | event |  | adaptive | 🔌 | ✅ |  |  | only through the host's own: minimize on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
+| `title` | property | `String` | native | · | ✅ |  |  | cannot read title of WindowScene - Android's driver has no path for it yet; GTK 4: not realized |
+| `width` | property | `Double` | native |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `windowType` | property | `WindowType` | structure |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `windowValue` | property | `String` | structure |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `x` | property | `Double` | structure |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `y` | property | `Double` | structure |  | ✅ |  |  | not realized; GTK 4: not realized |
+| `defaultPosition` | property | `UnitPoint` | adaptive |  |  |  |  |  |

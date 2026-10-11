@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// `if`, `if/else` and `ForEach` inside a builder - and what stays put across them.
 struct BuilderSample: SampleContent, ExampleContent {
@@ -106,7 +106,7 @@ struct BuilderSample: SampleContent, ExampleContent {
                 } else {
                     Button("turn \(turn)", action: { chosen = turn })
                         .font(.system(size: 13))
-                        .contentPadding(EdgeInsets(16, 6))
+                        .padding(EdgeInsets(16, 6))
                         .horizontalAlignment(.start)
                         
                 }

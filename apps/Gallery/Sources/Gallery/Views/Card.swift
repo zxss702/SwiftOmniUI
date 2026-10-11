@@ -1,6 +1,6 @@
 // One tappable row: a title, a line about it, and where it goes.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The gallery's one navigational shape - a row on a group's page.
 ///
@@ -108,7 +108,7 @@ struct Card: View {
             // column is given what the others left, and a Text given a width
             // wraps to it.
             .columns(.auto, .fill, .auto)
-            .contentPadding(EdgeInsets(16, 14))
+            .padding(EdgeInsets(16, 14))
         }
         .style("Card")
         // A CARD IS A ZSTACK WITH A TAP ON IT, which no platform reads as a

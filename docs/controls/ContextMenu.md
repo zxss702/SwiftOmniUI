@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (0) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ |  | `NSMenu` / `NSMenuItem` |  |
-| UIKit | ✅ |  | `UIMenu` / `UIAction` |  |
 | Android Views | · |  | `PopupMenu` / `MenuItem`; no menu bar | cannot read the menu of Text - Android's driver has no path for it yet |
 | WinUI 3 | ✅ |  | `MenuFlyout` / `MenuBar` |  |
 | GTK 4 | ✅ |  | `GMenu` in `GtkPopoverMenu` / `GtkPopoverMenuBar` |  |

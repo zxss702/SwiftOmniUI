@@ -65,16 +65,16 @@ git clone --depth 1 --branch <release> https://github.com/zxss702/SwiftOmniUI.gi
 
 ## The host
 
-The status bar shows the host - **AppKit**, **UIKit**, **Android**, **WinUI**,
-**GTK** or **Web**. Click it, or run **SwiftOmniUI: Select Host**. AppKit, UIKit and Android are
-offered on macOS, UIKit and Android where an application has their head
-(`Platforms/UIKit`, `Platforms/Android`); WinUI on Windows; GTK on Linux; the
+The status bar shows the host - **Android**, **WinUI**,
+**GTK** or **Web**. Click it, or run **SwiftOmniUI: Select Host**. Android is
+offered on macOS, where an application has its head
+(`Platforms/Android`); WinUI on Windows; GTK on Linux; the
 Web on macOS and Linux, where an application has its head (`Platforms/Web`). On a machine that runs no host the status bar
 says **no host**, a launch says why it runs nothing, and the editor and
 **SwiftOmniUI: Run Tests** work as plain Swift.
 
-- **The editor works as that host.** Code under `#if APPKIT` is compiled and
-  completed while AppKit is chosen, and an application's `Platforms/AppKit`
+- **The editor works as that host.** Code under `#if ANDROID` is compiled and
+  completed while Android is chosen, and an application's `Platforms/Android`
   head belongs to its package only then. Switching restarts the Swift language
   server; the window does not reload. From the editor's next start the Swift
   extension loads no other host's packages - `lib/SwiftOmniUI/SwiftOmniUI.<Host>` and
@@ -86,13 +86,8 @@ says **no host**, a launch says why it runs nothing, and the editor and
   installed it compiles for this Mac, and a warning says so. As the Web it
   compiles for WebAssembly - the Swift SDK for WebAssembly of the toolchain's
   release, `wasm32-unknown-wasip1` - so code under `#if WEB` and
-  `Platforms/Web` resolve. As UIKit it
-  compiles for the iOS simulator - `arm64-apple-ios26.0-simulator` against
-  Xcode's simulator SDK - so code under `#if UIKIT` and `Platforms/UIKit`
-  resolve.
-- **SwiftOmniUI: Debug and SwiftOmniUI: Release run on it.** On AppKit the application's
-  head is built - with its bundling script where it has one, with SwiftPM
-  otherwise - and started under `lldb-dap`. On Android
+  `Platforms/Web` resolve.
+- **SwiftOmniUI: Debug and SwiftOmniUI: Release run on it.** On Android
   `.scripts/Android/run-app.sh` builds the head, installs it on the device
   chosen below and starts it, and its terminal then follows the application's
   log, in colour, until the task is stopped. SwiftOmniUI:
@@ -100,12 +95,7 @@ says **no host**, a launch says why it runs nothing, and the editor and
   `lldb-server`, which the script starts in the application's sandbox: a
   breakpoint is reached from the moment it attaches. SwiftOmniUI: Release, and Run
   Without Debugging, run it without a debugger. A second launch stops the first
-  one's log before it starts again. On UIKit `.scripts/UIKit/run-app.sh`
-  builds the head, installs it on the iPhone, iPad or simulator chosen below -
-  a simulator booted first, a device's build signed for it - and starts it, and
-  its terminal follows what the application prints. SwiftOmniUI: Debug starts it
-  held until `lldb-dap` attaches - to a simulator's process, one of this Mac's,
-  or through the device - and a breakpoint holds from the first line. On WinUI `.scripts/WinUI/run-app.ps1`
+  one's log before it starts again. On WinUI `.scripts/WinUI/run-app.ps1`
   builds the head, stopping a running copy first, and lays the Windows App SDK
   beside it, and `lldb-dap` starts it: a breakpoint holds from the first line.
   On GTK `.scripts/GTK/run-app.sh` builds the head, stopping a running copy
@@ -124,18 +114,6 @@ or run **SwiftOmniUI: Select Android Device**. It offers the devices attached an
 the emulators set up; picking an emulator starts it and waits until it has
 booted. The device is remembered for the workspace, so a launch or a run of the
 tests asks only when none is chosen or the one chosen is no longer attached.
-
-## The UIKit device
-
-While the host is UIKit, the third status bar item shows the iPhone or iPad a
-launch runs on - click it, or run **SwiftOmniUI: Select UIKit Device**. It offers
-the devices paired with this Mac, over USB or Wi-Fi, and the simulators, each
-of iOS 26 or later, the newest runtime first. It is remembered for the
-workspace, so a launch or a run of the tests asks only when none is chosen or
-the one chosen is gone. A device runs with Developer Mode on, and its build is
-signed with a development profile of this Mac's that provisions it - Xcode
-makes one for a team once the device is added. The host's own tests run on a
-simulator.
 
 ## The browser
 
@@ -159,11 +137,6 @@ configuration naming `"application": "Gallery"` runs that one instead.
 **SwiftOmniUI: Run Tests** offers the workspace's suites, every one ticked, and runs
 them AS THE HOST, one after another, each in a terminal of its own:
 
-- **AppKit**: the library, `lib/SwiftOmniUI/SwiftOmniUI.AppKit`, and each application as an
-  AppKit build (`SWIFTOMNIUI_HOST=appkit`, on `.build/appkit`).
-- **UIKit**: the library and each application as plain Swift, and the UIKit
-  host's own tests, `lib/SwiftOmniUI/SwiftOmniUI.UIKit/Tests` - an application of tests - run
-  on the simulator chosen by `.scripts/UIKit/test-uikit.sh`.
 - **Android**: the library and each application as plain Swift - an Android
   build runs only on a device - and the Android host's own tests,
   `lib/SwiftOmniUI/SwiftOmniUI.Android/Tests`, built into a test APK and run on the device
@@ -196,9 +169,6 @@ The host's own `deploy` script of the application's checkout does it:
   `artifacts/<application>/WinUI/arm64` or `.../x64`; an x64 machine builds x64
   without asking.
 - **GTK**: the head, the SwiftOmniUI libraries it links and the pictures.
-- **AppKit**: the application bundle where the checkout bundles the
-  application, else the head and the SwiftOmniUI libraries it links.
-- **UIKit**: the application bundle, for the simulator or device chosen.
 - **Android**: the APK, for the ABI of the device chosen.
 - **Web**: the page - `index.html`, the relay, the module and the pictures -
   a folder any web server serves as it is.
@@ -211,15 +181,15 @@ conformance family as the host chosen, writing its verdicts into
 `docs/platform-contract.md` from them again. **SwiftOmniUI: Conformance - Rebuild
 changed** does the same for the families whose verdicts stand at another
 revision than `lib/SwiftOmniUI/SwiftOmniUI.Conformance/revisions.txt` says, or have none;
-every other family's run ends at once. UIKit runs on the simulator chosen and Android on
-the device chosen, where Android rebuilds all only, its device reading no
+every other family's run ends at once. Android runs on
+the device chosen, rebuilding all only, its device reading no
 repository. Neither command shows outside a checkout: an application's
 workspace holds no marks.
 
 ## The index
 
 The Swift language server indexes each application in a directory of the host's
-own, `.build/appkit/index-build`, `.build/uikit/index-build`, `.build/android/index-build`,
+own, `.build/android/index-build`,
 `.build/winui/index-build`, `.build/gtk/index-build` or `.build/web/index-build` - with no
 host SwiftPM's own `.build/index-build` - set in the application's
 `.sourcekit-lsp/config.json`. **SwiftOmniUI: Clean Index** removes
@@ -229,7 +199,7 @@ them and restarts the server, for an index a failed build left inconsistent.
 
 **SwiftOmniUI: Check Toolchain** looks for what this machine needs to build and run
 the hosts it runs, as [Requirements](#requirements) and the handbook's host pages
-say - Swift 6.4; Xcode 27, an iOS simulator runtime and the Android SDK, NDK,
+say - Swift 6.4; the Android SDK, NDK,
 JDK and Swift SDK on macOS; Visual Studio's C++ tools, the Windows SDK and the
 WebView2 runtime on Windows; GTK, libadwaita, WebKitGTK, gdk-pixbuf's SVG
 loader and a desktop session on Linux; the Swift SDK for WebAssembly and Python 3 for the Web on macOS and
@@ -262,11 +232,6 @@ launch file at all:
 
 - The [Swift extension](https://marketplace.visualstudio.com/items?itemName=swiftlang.swift-vscode),
   installed with SwiftOmniUI.
-- For AppKit: macOS 26 or newer and the `lldb-dap` extension.
-- For UIKit: macOS with Xcode, a SwiftOmniUI checkout, whose `.scripts/UIKit`
-  builds and runs the head, the `lldb-dap` extension, and an iOS 26 or newer
-  simulator or device - a device with Developer Mode on and a development
-  profile of this Mac's that provisions it.
 - For Android: macOS and a SwiftOmniUI checkout, whose `.scripts/Android` builds
   and runs the head; Swift 6.4 from swift.org with the
   [Swift SDK for Android](https://www.swift.org/documentation/articles/swift-sdk-for-android-getting-started.html)

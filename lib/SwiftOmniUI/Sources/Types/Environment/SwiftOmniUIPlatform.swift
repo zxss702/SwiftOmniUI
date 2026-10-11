@@ -7,16 +7,6 @@
         let name = "Windows"
     #elseif os(Android)
         let name = "Android"
-    #elseif targetEnvironment(macCatalyst)
-        let name = "Mac Catalyst"
-    #elseif os(iOS)
-        #if targetEnvironment(simulator)
-            let name = "iOS Simulator"
-        #else
-            let name = "iOS"
-        #endif
-    #elseif os(macOS)
-        let name = "macOS"
     #elseif os(Linux)
         let name = "Linux"
     #else

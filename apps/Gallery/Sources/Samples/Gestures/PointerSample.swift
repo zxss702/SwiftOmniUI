@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A pointer's hover, movement and button over one view.
 struct PointerSample: SampleContent, ExampleContent {
@@ -37,7 +37,7 @@ struct PointerSample: SampleContent, ExampleContent {
                 // all, and moved's is the line above.
                 Text("last: \\(last)")
             }
-            .contentPadding(40)
+            .padding(40)
         }
         .style("Card")
         // The box reacts, so its look is part of what it says: the outline is
@@ -86,7 +86,7 @@ struct PointerSample: SampleContent, ExampleContent {
                     .multilineTextAlignment(.center)
             }
             .spacing(6)
-            .contentPadding(EdgeInsets(40, 100))
+            .padding(EdgeInsets(40, 100))
         }
         .style("Card")
         // The box reacts, so its look is part of what it says: the outline is

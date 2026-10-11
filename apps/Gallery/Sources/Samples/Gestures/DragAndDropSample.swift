@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Text dragged from one view and dropped on another.
 struct DragAndDropSample: SampleContent, ExampleContent {
@@ -31,7 +31,7 @@ struct DragAndDropSample: SampleContent, ExampleContent {
                 ForEach(items) { item in
                     ZStack {
                         Text(item)
-                            .contentPadding(EdgeInsets(12, 8))
+                            .padding(EdgeInsets(12, 8))
                     }
                     .style("Card")
                     .stroke(Palette.accent)
@@ -58,7 +58,7 @@ struct DragAndDropSample: SampleContent, ExampleContent {
                         Text(pair.element)
                     }
                 }
-                .contentPadding(24)
+                .padding(24)
             }
             .style("Card")
             // Lit while something is over it and dark again once it leaves,
@@ -92,7 +92,7 @@ struct DragAndDropSample: SampleContent, ExampleContent {
                     ZStack {
                         Text(item)
                             .font(.system(size: 14))
-                            .contentPadding(EdgeInsets(12, 8))
+                            .padding(EdgeInsets(12, 8))
                     }
                     .style("Card")
                     .stroke(Palette.accent)
@@ -130,7 +130,7 @@ struct DragAndDropSample: SampleContent, ExampleContent {
                     }
                 }
                 .spacing(4)
-                .contentPadding(24)
+                .padding(24)
             }
             .style("Card")
             // Lit while something is over it and dark again once it leaves,
@@ -149,7 +149,7 @@ struct DragAndDropSample: SampleContent, ExampleContent {
 
             Button("Empty it", action: { basket = [] })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 .disabled(basket.isEmpty)
                 

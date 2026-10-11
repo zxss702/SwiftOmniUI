@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The three lifecycle scopes available to every view in a window.
 struct WindowPhaseSample: SampleContent, ExampleContent {

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The build reading for the closure this call sits in, drawn in its top right
 /// corner.

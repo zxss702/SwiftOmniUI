@@ -45,7 +45,7 @@ extension ElementAct: ActShape {
 /// docs/controls as the contracts and the hosts' declarations say it is.
 struct ControlDictionary {
     /// Every host the matrix has a column for, in the columns' order.
-    static let platforms = ["AppKit", "UIKit", "Android Views", "WinUI 3", "GTK 4", "Web"]
+    static let platforms = ["Android Views", "WinUI 3", "GTK 4", "Web"]
 
     /// What each mark means, in the legend's order.
     static let legend: [(mark: String, meaning: String)] = [
@@ -640,7 +640,7 @@ struct ControlDictionary {
 
     /// The folder each host's runs write their verdicts in under `exports/marks`, by the host's column.
     static let folders = [
-        "AppKit": "appkit", "UIKit": "uikit", "Android Views": "android", "WinUI 3": "winui", "GTK 4": "gtk",
+        "Android Views": "android", "WinUI 3": "winui", "GTK 4": "gtk",
     ]
 
     /// Every host's column: what its runs' verdicts said, each subject once, the worst its cases gave; stale where a
@@ -746,7 +746,7 @@ struct ControlDictionary {
 
     /// Each surface's native counterpart on each host, from the platform
     /// contract's "Native control mapping", read by its header:
-    /// `mapping["Button"]?["AppKit"] == "`NSButton`"`.
+    /// `mapping["Button"]?["GTK 4"] == "`GtkButton`"`.
     static func nativeMapping() throws -> [String: [String: String]] {
         let lines = try String(
             contentsOf: SourceTree.repository.appendingPathComponent("docs/platform-contract.md"), encoding: .utf8
@@ -925,13 +925,13 @@ struct ControlDictionary {
         return items
     }
 
-    /// A row's one Notes cell: AppKit's note as written, then each other
-    /// host's as "<host>: <note>", in the columns' order, joined by "; ".
+    /// A row's one Notes cell: the first host's note as written, then each
+    /// other host's as "<host>: <note>", in the columns' order, joined by "; ".
     static func notes(_ notes: [String: String]) -> String {
-        (["AppKit"] + platforms.filter { $0 != "AppKit" })
+        platforms
             .compactMap { host in
                 guard let note = notes[host], !note.isEmpty else { return nil }
-                return host == "AppKit" ? note : "\(host): \(note)"
+                return host == platforms.first ? note : "\(host): \(note)"
             }
             .joined(separator: "; ")
     }

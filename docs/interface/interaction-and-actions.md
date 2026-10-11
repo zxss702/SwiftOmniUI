@@ -212,7 +212,7 @@ A batch of actions is not a transaction. Use ordinary Swift control flow and
 Both halves are always needed: a declaration alone reaches nothing, and a host
 refuses by name an act nobody registered.
 
-The AppKit host registers them in Swift, typed by the same contract the call
+The host registers them in Swift, typed by the same contract the call
 is written against:
 
 ```swift quote
@@ -263,7 +263,7 @@ handler. An ordinary control or gesture event always belongs on its element
 instead. Use an application's events only for provider-owned notifications
 that genuinely have no element identity.
 
-The AppKit host raises such an event in Swift, typed by the same contract the
+The host raises such an event in Swift, typed by the same contract the
 subscription is written against, and from any thread - so a source is wired
 where the platform reports it:
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Draws an application's pictures for a head whose toolkit draws no SVG - its
-// Android and its UIKit head: every SVG three times over, in sRGB, as
+// Android head: every SVG three times over, in sRGB, as
 // <name>@3x.png, and every other picture copied as it is. A picture three
 // times over is what the densest common screens show at one pixel a pixel.
 // Only what changed is drawn again, and a picture whose file went away goes

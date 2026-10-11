@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A countdown written by hand: a loop, a sleep and a flag.
 struct TaskSleepSample: SampleContent, ExampleContent {
@@ -126,7 +126,7 @@ struct TaskSleepSample: SampleContent, ExampleContent {
                         running = false
                     })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(20, 6))
+                    .padding(EdgeInsets(20, 6))
                     
 
                 Button("Reset", action: {
@@ -134,7 +134,7 @@ struct TaskSleepSample: SampleContent, ExampleContent {
                         remaining = total
                     })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(20, 6))
+                    .padding(EdgeInsets(20, 6))
                     
             }
             .spacing(10)
@@ -148,7 +148,7 @@ struct TaskSleepSample: SampleContent, ExampleContent {
                             remaining = length
                         })
                         .font(.system(size: 12))
-                        .contentPadding(EdgeInsets(14, 4))
+                        .padding(EdgeInsets(14, 4))
                         
                 }
             }

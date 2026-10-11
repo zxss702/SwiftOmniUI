@@ -1,5 +1,0 @@
-# revision 1.1
-HStack.spacing: ✅
-LazyHStack.spacing: ◐ cannot read spacing of LazyHStack - AppKit's driver has no path for it yet
-LazyVStack.spacing: ◐ cannot read spacing of LazyVStack - AppKit's driver has no path for it yet
-VStack.spacing: ✅

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Running something when a value is not what it was last render.
 struct OnChangedSample: SampleContent, ExampleContent {

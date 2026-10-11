@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (8) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ | 3 ✅ · 1 ☑️ | `NSMenu` / `NSMenuItem` |  |
-| UIKit | ✅ | 6 ✅ | `UIMenu` / `UIAction` |  |
 | Android Views | · | 1 – | `PopupMenu` / `MenuItem`; no menu bar | cannot activate on MenuItem - Android's driver has no path for it yet |
 | WinUI 3 | ✅ | 4 ✅ | `MenuFlyout` / `MenuBar` |  |
 | GTK 4 | ✅ | 3 ✅ · 2 – | `GMenu` in `GtkPopoverMenu` / `GtkPopoverMenuBar` |  |
@@ -42,20 +40,20 @@ MenuItem declares no members of its own.
 
 What anything carrying values in the tree has - a control, a `Style`, a text run: the name automation finds it by.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `accessibilityIdentifier` | property | `String` | native | ☑️ | ✅ | – | ✅ |  |  | Only an entry of a context menu carries it; an entry the page puts in the menu bar does not.; Android Views: An Android menu entry holds no identifier: automation finds it by its title.; GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `accessibilityIdentifier` | property | `String` | native | – | ✅ |  |  | An Android menu entry holds no identifier: automation finds it by its title.; GTK 4: not realized |
 
 ## From [MenuItemElement](tiers/MenuItemElement.md)
 
 What every item a user chooses from has - a menu's entry, a toolbar's item: a caption, a picture, and something to run.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `onClicked` (`clicked`) | event |  | native | ✅ | ✅ | · | ✅ | ✅ |  | Android Views: cannot activate on MenuItem - Android's driver has no path for it yet |
-| `icon` | property | `ImageSource` | adaptive | · | ✅ |  |  | – |  | cannot read icon of MenuItem - AppKit's driver has no path for it yet; Android Views: not realized; WinUI 3: not realized; GTK 4: GNOME's menus show words alone, no picture beside them. |
-| `isDestructive` | property | `Bool` | adaptive | · | ✅ | · |  | – |  | cannot read isDestructive of MenuItem - AppKit's driver has no path for it yet; Android Views: cannot read isDestructive of MenuItem - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: GNOME's menus mark no entry as destroying something. |
-| `isEnabled` | property | `Bool` | native | ✅ | ✅ | · | ✅ | ✅ |  | Android Views: cannot activate on MenuItem - Android's driver has no path for it yet |
-| `shortcut` | property | `KeyboardShortcut` | native |  |  |  |  |  |  |  |
-| `text` | property | `String` | native | ✅ | ✅ | · | ✅ | ✅ |  | Android Views: cannot read text of MenuItem - Android's driver has no path for it yet |
-| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `onClicked` (`clicked`) | event |  | native | · | ✅ | ✅ |  | cannot activate on MenuItem - Android's driver has no path for it yet |
+| `icon` | property | `ImageSource` | adaptive |  |  | – |  | not realized; WinUI 3: not realized; GTK 4: GNOME's menus show words alone, no picture beside them. |
+| `isDestructive` | property | `Bool` | adaptive | · |  | – |  | cannot read isDestructive of MenuItem - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: GNOME's menus mark no entry as destroying something. |
+| `isEnabled` | property | `Bool` | native | · | ✅ | ✅ |  | cannot activate on MenuItem - Android's driver has no path for it yet |
+| `shortcut` | property | `KeyboardShortcut` | native |  |  |  |  |  |
+| `text` | property | `String` | native | · | ✅ | ✅ |  | cannot read text of MenuItem - Android's driver has no path for it yet |
+| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |

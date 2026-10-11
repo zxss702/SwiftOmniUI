@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// What a basket holds, as a class rather than a pile of `@State` in the view.
 ///
@@ -131,7 +131,7 @@ struct StateClassSample: SampleContent, ExampleContent {
                     .background(Palette.accent)
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     
 
                 Button("Remove", action: { basket.items.removeLast() })
@@ -140,7 +140,7 @@ struct StateClassSample: SampleContent, ExampleContent {
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .disabled(basket.items.isEmpty)
                     
             }
@@ -155,7 +155,7 @@ struct StateClassSample: SampleContent, ExampleContent {
                 .background(.transparent)
                 .foregroundStyle(Palette.subtle)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 
 
         }

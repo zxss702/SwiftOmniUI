@@ -29,7 +29,7 @@ export function deployDestination(application: Application, host: Host, architec
 
 /**
  * The command that builds `application` for release on `host` and lays it at `destination`: its checkout's
- * .scripts/<Host>/deploy.ps1 or deploy.sh - for WinUI with the architecture, for Android and UIKit with the device
+ * .scripts/<Host>/deploy.ps1 or deploy.sh - for WinUI with the architecture, for Android with the device
  * it is built for. Undefined where the application names no checkout.
  */
 export function deployCommand(

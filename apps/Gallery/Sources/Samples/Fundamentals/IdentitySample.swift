@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The item is a row's identity - what keeps a control across a change to
 /// the list around it, and what a written `.id()` overrides.
@@ -79,7 +79,7 @@ struct IdentitySample: SampleContent, ExampleContent {
                         nextItem += 1
                     })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
 
                 Button("Insert at the top", action: {
@@ -87,14 +87,14 @@ struct IdentitySample: SampleContent, ExampleContent {
                         nextItem += 1
                     })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     
 
                 Button("Rotate", action: {
                         items = Array(items.dropFirst()) + [items[0]]
                     })
                     .font(.system(size: 13))
-                    .contentPadding(EdgeInsets(16, 6))
+                    .padding(EdgeInsets(16, 6))
                     .disabled(items.count <= 1)
                     
             }
@@ -157,7 +157,7 @@ private struct IdentityRow: View {
                     items = items.filter { $0 != item }
                 })
                 .font(.system(size: 12))
-                .contentPadding(EdgeInsets(12, 6))
+                .padding(EdgeInsets(12, 6))
                 
         }
         .spacing(10)

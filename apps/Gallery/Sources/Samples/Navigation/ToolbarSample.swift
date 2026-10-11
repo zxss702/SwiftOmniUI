@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Page-owned native toolbar and menu items.
 struct ToolbarSample: SampleContent, ExampleContent {

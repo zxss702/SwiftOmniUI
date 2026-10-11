@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A page's actions coming and going with the page: a pushed page's own stand nearer the title, the gallery's keep
 /// their place, and back the bar stands as it stood.
@@ -61,7 +61,7 @@ struct ToolbarLayersSample: SampleContent, ExampleContent {
 
             Button("Open a page with its own actions")
                 .accessibilityIdentifier("layers.open")
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .onClicked { nav.push(.layer(1)) }
         }
         .spacing(12)

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A day picked from a calendar: a binding, and the event that answers a pick.
 struct DatePickerSample: SampleContent, ExampleContent {
@@ -69,7 +69,7 @@ struct DatePickerSample: SampleContent, ExampleContent {
 
             Button("Push it to New Year", action: { due = CalendarDate(year: 2027, month: 1, day: 1) })
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 
         }

@@ -8,9 +8,9 @@ import XCTest
     /// Every place that names the release names the one the editor
     /// extension's `package.json` states, the release's only home: the
     /// published-package line in the root's and each application's
-    /// Package.swift, each Android head's version, the Gallery's AppKit
-    /// bundle and the bug report's example. A reader copying any of them gets
-    /// this release, not the one before.
+    /// Package.swift, each Android head's version and the bug report's
+    /// example. A reader copying any of them gets this release, not the one
+    /// before.
     func testEveryMentionOfTheReleaseNamesThisOne() throws {
         let manifest = try JSONSerialization.jsonObject(
             with: Data(contentsOf: SourceTree.repository.appendingPathComponent("lib/SwiftOmniUI.VSCode/package.json")))
@@ -20,7 +20,6 @@ import XCTest
         var mentions: [(file: String, before: String, after: String)] = [
             ("Package.swift", "exact: \"", "\""),
             (".github/ISSUE_TEMPLATE/bug.yml", "placeholder: SwiftOmniUI ", ","),
-            (".scripts/AppKit/build-gallery-appkit.sh", "CFBundleShortVersionString -string ", " "),
             ("lib/SwiftOmniUI.Android/Tests/Platforms/Android/build.gradle.kts", "versionName = \"", "\""),
         ]
 

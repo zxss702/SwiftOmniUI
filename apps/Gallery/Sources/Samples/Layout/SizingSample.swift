@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// How big a view asks to be, the bounds on that request, and clipping.
 struct SizingSample: SampleContent, ExampleContent {

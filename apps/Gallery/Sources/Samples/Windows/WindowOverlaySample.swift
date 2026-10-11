@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 extension OverlayKey {
     /// The sample's notice.
@@ -75,7 +75,7 @@ private struct WindowNotice: View {
                 
         }
         .spacing(12)
-        .contentPadding(EdgeInsets(16, 8))
+        .padding(EdgeInsets(16, 8))
         .background(Palette.accent)
         .shape(.roundedRectangle(10))
         .padding(12)

@@ -1,8 +1,8 @@
 # Concurrency
 
 SwiftOmniUI handlers may suspend without leaving the platform UI thread. That
-thread is Swift's `MainActor` on every platform: on Apple it is the main queue
-UIKit and AppKit drain, and on Android, Windows, and Linux SwiftOmniUI makes it a
+thread is Swift's `MainActor` on every platform: on Android, Windows, and
+Linux SwiftOmniUI makes it a
 queue the host drains on its UI thread. App code uses ordinary Swift
 concurrency while the host remains the owner of its native event loop.
 

@@ -17,7 +17,7 @@
 //     NavigationStack and TabView are written on the arrangement itself -
 //     see MainWindow.detail.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The application's styles, as the sheet the differ resolves against.
 enum AppStyles {
@@ -62,16 +62,6 @@ enum AppStyles {
 
             // MARK: Buttons
 
-            // A style for a control the application registers with its host: a
-            // style resolves on THIS side by the node type `RatingBar()`
-            // makes, and `rating` comes from the protocol the control and its
-            // style both wear - so the host receives a control with the values
-            // already on it. Keyed, so only the bar that asks wears it; the
-            // control is Samples/Interop/RatingBar.swift.
-            Style<RatingBar>("FourStars")
-                .rating(4)
-                .background(Palette.selected)
-
             Style<Button>()
                 .foregroundStyle(Palette.onAccent)
                 .background(Palette.accent)
@@ -79,7 +69,7 @@ enum AppStyles {
                 .bold()
                 .strokeWidth(0)
                 .shape(.roundedRectangle(10))                
-                .contentPadding(EdgeInsets(16, 11))
+                .padding(EdgeInsets(16, 11))
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
                 .visualState(.disabled) { $0
@@ -121,7 +111,7 @@ enum AppStyles {
                 .font(.system(size: 13))
                 .bold()
                 .strokeWidth(0)
-                .contentPadding(EdgeInsets(5, 0))
+                .padding(EdgeInsets(5, 0))
                 .frame(height: 26)
                 .visualState(.normal) { $0
                     .opacity(1)
@@ -149,7 +139,7 @@ enum AppStyles {
                 .bold()
                 .strokeWidth(0)
                 .shape(.roundedRectangle(10))
-                .contentPadding(EdgeInsets(14, 4))
+                .padding(EdgeInsets(14, 4))
                 .frame(minHeight: 0)
                 .frame(minWidth: 0)
                 .visualState(.disabled) { $0
@@ -300,7 +290,7 @@ enum AppStyles {
 
             Style<HStack>("MenuRow")
                 .spacing(14)
-                .contentPadding(EdgeInsets(18, 13))
+                .padding(EdgeInsets(18, 13))
                 .background(.transparent)
 
             Style<Text>("MenuRowText")

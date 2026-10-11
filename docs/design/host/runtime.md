@@ -27,10 +27,10 @@ its parts; [the host layer](../../internals/host-layer.md) maps them.
        v
   toolkit half             frame signal, each element's native half,
   one target per host     realizations, layout views, scrolling, gestures,
-  (lib/SwiftOmniUI.AppKit,     focus, accessibility, windows and menus
-  lib/SwiftOmniUI.Android,
+  (lib/SwiftOmniUI.Android,    focus, accessibility, windows and menus
   lib/SwiftOmniUI.WinUI,
-  lib/SwiftOmniUI.GTK)
+  lib/SwiftOmniUI.GTK,
+  lib/SwiftOmniUI.Web)
        |
        v
   native views
@@ -128,7 +128,7 @@ before what comes after it, and the turn goes round again; only then the acts.
 The core rings when it has work a turn must take - a handler resumed off the
 UI thread, a state an engine wrote. A host parks a thread of its own on the
 core (`CoreLink.ringForever`) and posts a turn onto its UI thread each time the
-core rings: AppKit onto the main queue, WinUI through its relay, GTK through
+core rings: WinUI through its relay, GTK through
 GLib, Android onto its looper. The turn itself is the `Pump`'s.
 
 ## The handlers' order
@@ -408,7 +408,7 @@ kept as the words its key's kind reads back, and a value of another kind is
 not kept. A key the application does not list still saves, as its value's
 own kind - true or false, a number, words - which its key's kind reads back
 once it is listed, as the application's session promises. The words stand in
-the platform's own store where it has one - the preferences on a Mac and on
+the platform's own store where it has one - the preferences on
 Android.
 
 A host whose platform keeps no store an application can use keeps them in a
@@ -499,8 +499,8 @@ already holds, and stay the SPI's.
 
 An element's name is its stem: `Animator`, `StateChannels`, `PatchIntake`. The
 host layer uses the stem; a host prefixes its toolkit to what only it has
-(`AppKitFrameClock`). A native subclass keeps its toolkit's class word
-(`AppKitScrollView`). Some words are reserved: an **engine** is only
+(`GTKFrameClock`). A native subclass keeps its toolkit's class word
+(`GTKScrollView`). Some words are reserved: an **engine** is only
 application frame code, a **channel** only a state's, an **animation** one
 animated value, a **cycle** only the display cycle, a **report** only the
 user's change on its way to the core, and an **act** is a call the

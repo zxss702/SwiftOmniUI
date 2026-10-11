@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The page the menu does not always list - see `MenuPage`, where the row is
 /// written inside an `if`.
@@ -34,12 +34,12 @@ struct HiddenPage: View {
                     .background(Palette.accent)
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .horizontalAlignment(.center)
                     
             }
             .spacing(14)
-            .contentPadding(24)
+            .padding(24)
         }
         .onAppear { page.gallery("Not in the list", scene: scene, nav: nav) }
     }

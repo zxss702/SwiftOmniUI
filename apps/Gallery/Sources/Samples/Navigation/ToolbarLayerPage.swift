@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A page the toolbar's layers push: its own actions on the bar while it is shown, and a way one page deeper.
 ///
@@ -38,7 +38,7 @@ struct ToolbarLayerPage: View {
                 .foregroundStyle(Palette.subtle)
         }
         .spacing(12)
-        .contentPadding(24)
+        .padding(24)
         .toolbar {
             ToolbarItem("Share")
                 .id("layer.share")

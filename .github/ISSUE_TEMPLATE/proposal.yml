@@ -29,7 +29,7 @@ body:
       description: >
         Name the equivalent capability in the applicable native host families,
         including any semantic mismatch SwiftOmniUI must resolve.
-      placeholder: AppKit NSTextField, UIKit UILabel, Android TextView...
+      placeholder: GtkTextView, Android TextView, Windows TextBox...
     validations:
       required: true
 

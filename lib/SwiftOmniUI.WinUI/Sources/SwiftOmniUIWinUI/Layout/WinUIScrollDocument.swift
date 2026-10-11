@@ -27,6 +27,18 @@ final class WinUIScrollDocument: WinUILayoutView {
         ScrollArithmetic.contentSize(of: items.first, padding: padding, orientation: orientation, width: width)
     }
 
+    /// The scroller's presenter asks this size as it arranges - inside the pass, where a layout answers only
+    /// what it last measured: the run's size is arithmetic already counted, safe to answer inside a pass, and
+    /// the extent the presenter reads is the run's, not the room it stood in last.
+    override func measure(width: Double, height: Double) -> LayoutSize {
+        guard WinUIView.arranging == 0 else {
+            guard placingLayout == nil else { return .zero }
+            let size = naturalSize(width: width.isFinite ? width : nil)
+            return LayoutSize(width: min(size.width, width), height: min(size.height, height))
+        }
+        return super.measure(width: width, height: height)
+    }
+
     /// Its own size is the document's: never smaller than the viewport, which the scroller sees to.
     override func arrange(in bounds: Rect) {
         guard let item = items.first, item.isShown else { return }

@@ -1,6 +1,6 @@
 // Where the gallery opens.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// What this is, and every group there is.
 ///
@@ -155,7 +155,7 @@ struct HomePage: View {
                             .opacity(0.85)
                     }
                     .spacing(10)
-                    .contentPadding(22)
+                    .padding(22)
                 }
                 .style("Card")
                 .background(Palette.identity)
@@ -259,7 +259,7 @@ struct HomePage: View {
         .rowSpacing(Self.gap)
         // The margin is the rows' own to lose: the frame below is this grid's
         // outer one, so the arithmetic takes the margin off explicitly.
-        .contentPadding(Self.margin, Self.margin)
+        .padding(Self.margin, Self.margin)
         // THE PAGE'S OWN ROOM, written by the host and read by the arithmetic
         // that sizes the run. Nothing is built for it, which is the whole
         // difference between this and measuring a page with a `GeometryReader`:
@@ -551,7 +551,7 @@ private struct Steps: View {
             .stroke(Palette.outline)
             .strokeWidth(1)
             .shape(.roundedRectangle(8))
-            .contentPadding(EdgeInsets(18, 2))
+            .padding(EdgeInsets(18, 2))
             .disabled(to < 0 || to >= count)
             
     }
@@ -581,7 +581,7 @@ private struct GroupFace: View {
                         .bold()
                         .foregroundStyle(Palette.onBrand)
                         .lineBreak(.tailTruncation)
-                        .contentPadding(EdgeInsets(12, 10))
+                        .padding(EdgeInsets(12, 10))
                 }
                 .background(Color("#B3000000"))
                 .verticalAlignment(.end)

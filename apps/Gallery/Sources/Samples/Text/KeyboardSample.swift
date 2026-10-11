@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Explicit native focus and soft-input actions.
 struct KeyboardSample: SampleContent, ExampleContent {

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A tap and a double tap on a whole view.
 struct TapSample: SampleContent, ExampleContent {
@@ -22,7 +22,7 @@ struct TapSample: SampleContent, ExampleContent {
 
             ZStack {
                 Text("Tap anywhere on this box")
-                    .contentPadding(24)
+                    .padding(24)
             }
             .style("Card")
             .stroke(Palette.accent)
@@ -31,7 +31,7 @@ struct TapSample: SampleContent, ExampleContent {
 
             ZStack {
                 Text("Double-tap this one to reset")
-                    .contentPadding(24)
+                    .padding(24)
             }
             .style("Card")
             .stroke(Palette.outline)
@@ -49,7 +49,7 @@ struct TapSample: SampleContent, ExampleContent {
             ZStack {
                 Text("Tap anywhere on this box")
                     .font(.system(size: 15))
-                    .contentPadding(24)
+                    .padding(24)
                     .multilineTextAlignment(.center)
             }
             .style("Card")
@@ -61,7 +61,7 @@ struct TapSample: SampleContent, ExampleContent {
             ZStack {
                 Text("Double-tap this one to reset")
                     .font(.system(size: 15))
-                    .contentPadding(24)
+                    .padding(24)
                     .multilineTextAlignment(.center)
             }
             .style("Card")

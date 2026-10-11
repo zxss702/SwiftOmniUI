@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Where a value is GOING and where it HAS GOT TO are two readings, and a
 /// walked state holds both: the state itself is the destination from the first
@@ -105,7 +105,7 @@ struct DrivenReadingSample: SampleContent, ExampleContent {
                     })
                     .background(Palette.accent)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(16, 8))
+                    .padding(EdgeInsets(16, 8))
                     
 
                 Button("Shrink", action: {
@@ -113,7 +113,7 @@ struct DrivenReadingSample: SampleContent, ExampleContent {
                     })
                     .background(Palette.accent)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(16, 8))
+                    .padding(EdgeInsets(16, 8))
                     
 
                 Button("Stop", action: { width = $width.journey.value })
@@ -122,7 +122,7 @@ struct DrivenReadingSample: SampleContent, ExampleContent {
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(16, 8))
+                    .padding(EdgeInsets(16, 8))
                     
             }
             .spacing(10)

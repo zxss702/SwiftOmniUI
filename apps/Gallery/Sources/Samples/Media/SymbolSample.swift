@@ -1,37 +1,18 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
-/// `Image(systemName:)` names a symbol in the PLATFORM's own set - an SF
-/// Symbol on macOS, a Segoe Fluent glyph on Windows, an icon-theme name on
-/// Linux. There is no shared table: the caller names its own platform.
+/// `Image(systemName:)` names a symbol in the PLATFORM's own set - a Segoe
+/// Fluent glyph on Windows, an icon-theme name on Linux. There is no shared
+/// table: the caller names its own platform.
 struct SymbolSample: SampleContent, ExampleContent {
     static let id = "symbol"
     static let title = "Symbols"
     static let summary = "The platform's own symbol, asked for by its own name - "
-        + "SF Symbol, Fluent glyph or icon theme."
+        + "Fluent glyph or icon theme."
 
     /// (caption, systemName) pairs - the caption is what a reader of the row
     /// sees; the name is what `Image(systemName:)` is handed. Each platform
     /// speaks its own vocabulary, so each names every symbol its own way.
-    #if os(macOS) || os(iOS)
-    private static let symbols: [(String, String)] = [
-        ("star.fill", "star.fill"),
-        ("heart.fill", "heart.fill"),
-        ("house", "house"),
-        ("gearshape", "gearshape"),
-        ("magnifyingglass", "magnifyingglass"),
-        ("bookmark", "bookmark"),
-        ("link", "link"),
-        ("bold", "bold"),
-        ("wifi", "wifi"),
-        ("trash", "trash"),
-        ("pencil", "pencil"),
-        ("folder", "folder"),
-        ("calendar", "calendar"),
-        ("info.circle", "info.circle"),
-        ("play.fill", "play.fill"),
-        ("lock.fill", "lock.fill"),
-    ]
-    #elseif os(Windows)
+    #if os(Windows)
     private static let symbols: [(String, String)] = [
         ("E734", "\u{E734}"),
         ("EB51", "\u{EB51}"),
@@ -73,11 +54,9 @@ struct SymbolSample: SampleContent, ExampleContent {
 
     static let code = """
         // A symbol is named in the platform's own vocabulary. Pick it at the
-        // call site with #if - three spellings, one Image:
+        // call site with #if - the host's spelling, one Image:
         Image(systemName: {
-            #if os(macOS) || os(iOS)
-            return "wifi"
-            #elseif os(Windows)
+            #if os(Windows)
             return "\\u{E701}"
             #else
             return "radiowaves-3-symbolic"

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The accessible meaning and stable external identity of a SwiftOmniUI view.
 struct SemanticsSample: SampleContent, ExampleContent {
@@ -180,7 +180,7 @@ struct SemanticsSample: SampleContent, ExampleContent {
                 })
                 .accessibilityIdentifier("semantics.announce")
                 .font(.system(size: 13))
-                .contentPadding(EdgeInsets(16, 6))
+                .padding(EdgeInsets(16, 6))
                 .horizontalAlignment(.center)
                 
 
@@ -203,7 +203,7 @@ struct SemanticsSample: SampleContent, ExampleContent {
                             .foregroundStyle(Palette.subtle)
                     }
                     .spacing(2)
-                    .contentPadding(12)
+                    .padding(12)
                 }
                 .style("Card")
 
@@ -220,7 +220,7 @@ struct SemanticsSample: SampleContent, ExampleContent {
                             .foregroundStyle(Palette.subtle)
                     }
                     .spacing(2)
-                    .contentPadding(12)
+                    .padding(12)
                 }
                 .style("Card")
                 .automationExcludedWithChildren(true)

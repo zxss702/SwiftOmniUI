@@ -10,10 +10,10 @@ the package and its targets, what crosses between them, and where each part of t
 ```text
   apps/<App>                              one Swift package per application
     Sources/                              views, @State, handlers, engines
-    Platforms/AppKit                      the AppKit head: an executable
     Platforms/Android                     the Android head: Gradle and a Swift library
     Platforms/WinUI                       the WinUI head: an executable
     Platforms/GTK                         the GTK head: an executable
+    Platforms/Web                         the Web head: a WebAssembly build and a page
         |
         |  depends on
         v
@@ -28,12 +28,12 @@ the package and its targets, what crosses between them, and where each part of t
         |
         |  typed HostRender / HostPatch
         v
-  SwiftOmniUI.AppKit (lib/SwiftOmniUI.AppKit)          SwiftOmniUI.Android (lib/SwiftOmniUI.Android)
-    Swift, in the application's process          Swift, in the application's process,
-    over AppKit                                  Java beneath it through JNI
+  SwiftOmniUI.Web (lib/SwiftOmniUI.Web)                SwiftOmniUI.Android (lib/SwiftOmniUI.Android)
+    Swift, compiled to WebAssembly, in the       Swift, in the application's process,
+    page's own process                           Java beneath it through JNI
         |                                             |
         v                                             v
-    AppKit views                                  Android views
+    DOM elements                                Android views
 
   SwiftOmniUI.WinUI (lib/SwiftOmniUI.WinUI)            SwiftOmniUI.GTK (lib/SwiftOmniUI.GTK)
     Swift, in the application's process,         Swift, in the application's process,
@@ -86,8 +86,8 @@ frame, and never computes again what the core decides.
 
 ```text
   UI thread                            MainActor: handlers, renders, the host's work
-    runs jobs the core queues          main queue on Apple; UIThreadExecutor elsewhere,
-                                       drained by the host (CoreLink.runJobs())
+    runs jobs the core queues          UIThreadExecutor, drained by the host
+                                       (CoreLink.runJobs())
   doorbell thread                      parked in CoreLink.waitForWork();
                                        wakes the UI thread when work arrives
   cooperative pool                     an application's own async work, off MainActor

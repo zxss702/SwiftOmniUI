@@ -25,8 +25,6 @@ See [the dictionary](README.md) for how a mark is given.
 
 | Host | Created | Members (24) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| AppKit | ✅ | 7 ✅ | custom `NSView` |  |
-| UIKit | ✅ | 12 ✅ | `UIViewController` |  |
 | Android Views | ✅ | 6 ✅ | custom `ViewGroup` |  |
 | WinUI 3 | ✅ | 9 ✅ | `Page` |  |
 | GTK 4 | ✅ | 4 ✅ | custom `GtkWidget` |  |
@@ -36,36 +34,36 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Structure/PageContract.s
 
 ## Page's own members
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `appearing` | event |  | adaptive | ✅ | ✅ | ◐ | ✅ | ◐ |  | Android Views: cannot goBack on WindowScene - Android's driver has no path for it yet; GTK 4: waits on WindowScene.modalPopped |
-| `backButtonTitle` | property | `String` | adaptive | · | ✅ |  |  |  |  | cannot read backButtonTitle of Page - AppKit's driver has no path for it yet; Android Views: not realized; WinUI 3: not realized; GTK 4: not realized |
-| `background` | property | `Color` | native | ✅ | ✅ | ✅ | ✅ |  |  | GTK 4: not realized |
-| `disappearing` | event |  | adaptive | ✅ | ✅ | ✅ | ✅ | ✅ |  |  |
-| `hasBackButton` | property | `Bool` | adaptive | · | ✅ | · |  |  |  | cannot read hasBackButton of Page - AppKit's driver has no path for it yet; Android Views: cannot read hasBackButton of Page - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
-| `hasNavigationBar` | property | `Bool` | adaptive | · | ✅ | · | ✅ | · |  | cannot read hasNavigationBar of Page - AppKit's driver has no path for it yet; Android Views: cannot read hasNavigationBar of Page - Android's driver has no path for it yet; GTK 4: cannot read hasNavigationBar of Page - GTK's driver has no path for it yet |
-| `navigatedFrom` | event |  | adaptive | ✅ | ✅ | ✅ | ✅ | ✅ |  |  |
-| `navigatedTo` | event |  | adaptive | ✅ | ✅ | ✅ | ✅ | ✅ |  |  |
-| `navigatingFrom` | event |  | adaptive | ✅ | ✅ | ✅ | ✅ | ✅ |  |  |
-| `contentPadding` | property | `EdgeInsets` | native | ✅ | ✅ | ✅ | ✅ |  |  | GTK 4: not realized |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `appearing` | event |  | adaptive | ◐ | ✅ | ◐ |  | cannot goBack on WindowScene - Android's driver has no path for it yet; GTK 4: waits on WindowScene.modalPopped |
+| `backButtonTitle` | property | `String` | adaptive |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
+| `background` | property | `Color` | native | ✅ | ✅ |  |  | GTK 4: not realized |
+| `disappearing` | event |  | adaptive | ✅ | ✅ | ✅ |  |  |
+| `hasBackButton` | property | `Bool` | adaptive | · |  |  |  | cannot read hasBackButton of Page - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
+| `hasNavigationBar` | property | `Bool` | adaptive | · | ✅ | · |  | cannot read hasNavigationBar of Page - Android's driver has no path for it yet; GTK 4: cannot read hasNavigationBar of Page - GTK's driver has no path for it yet |
+| `navigatedFrom` | event |  | adaptive | ✅ | ✅ | ✅ |  |  |
+| `navigatedTo` | event |  | adaptive | ✅ | ✅ | ✅ |  |  |
+| `navigatingFrom` | event |  | adaptive | ✅ | ✅ | ✅ |  |  |
+| `contentPadding` | property | `EdgeInsets` | native | ✅ | ✅ |  |  | GTK 4: not realized |
 
 ## From [PageElement](tiers/PageElement.md)
 
 What a page shows about itself where another container presents it as an item - a title and a picture.
 
-| Member | Kind | Value | Layer | AppKit | UIKit | Android Views | WinUI 3 | GTK 4 | Web | Notes |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | :---: | :---: | --- |
-| `badge` | property | `String` | native |  |  |  |  |  |  |  |
-| `document` | property | `String` | adaptive |  |  |  |  |  |  |  |
-| `icon` | property | `ImageSource` | adaptive | · | ✅ | · |  |  |  | cannot read icon of Page - AppKit's driver has no path for it yet; Android Views: cannot read icon of Page - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
-| `interactiveDismissDisabled` | property | `Bool` | native |  |  |  |  |  |  |  |
-| `preferredColumnWidth` | property | `[Double]` | adaptive |  |  |  |  |  |  |  |
-| `presentationDetents` | property | `[PresentationDetent]` | native |  |  |  |  |  |  |  |
-| `presentationDragIndicator` | property | `Visibility` | native |  |  |  |  |  |  |  |
-| `subtitle` | property | `String` | adaptive |  |  |  |  |  |  |  |
-| `subtitleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |  |  |
-| `title` | property | `String` | native | ◐ | ✅ | · | ✅ | · |  | cannot read title of Page - AppKit's driver has no path for it yet; Android Views: cannot read title of Page - Android's driver has no path for it yet; GTK 4: cannot read title of Page - GTK's driver has no path for it yet |
-| `titleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |  |  |
-| `toolbarBackground` | property | `Visibility` | adaptive |  |  |  |  |  |  |  |
-| `toolbarVisibility` | property | `Visibility` | adaptive |  |  |  |  |  |  |  |
-| `windowBackground` | property | `Color` | adaptive |  |  |  |  |  |  |  |
+| Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
+| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
+| `badge` | property | `String` | native |  |  |  |  |  |
+| `document` | property | `String` | adaptive |  |  |  |  |  |
+| `icon` | property | `ImageSource` | adaptive | · |  |  |  | cannot read icon of Page - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
+| `interactiveDismissDisabled` | property | `Bool` | native |  |  |  |  |  |
+| `preferredColumnWidth` | property | `[Double]` | adaptive |  |  |  |  |  |
+| `presentationDetents` | property | `[PresentationDetent]` | native |  |  |  |  |  |
+| `presentationDragIndicator` | property | `Visibility` | native |  |  |  |  |  |
+| `subtitle` | property | `String` | adaptive |  |  |  |  |  |
+| `subtitleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `title` | property | `String` | native | · | ✅ | · |  | cannot read title of Page - Android's driver has no path for it yet; GTK 4: cannot read title of Page - GTK's driver has no path for it yet |
+| `titleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `toolbarBackground` | property | `Visibility` | adaptive |  |  |  |  |  |
+| `toolbarVisibility` | property | `Visibility` | adaptive |  |  |  |  |  |
+| `windowBackground` | property | `Color` | adaptive |  |  |  |  |  |

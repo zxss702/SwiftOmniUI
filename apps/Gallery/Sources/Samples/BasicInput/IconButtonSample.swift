@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Two buttons whose content is an icon, each drawn once per color scheme.
 struct IconButtonSample: SampleContent, ExampleContent {
@@ -53,7 +53,7 @@ struct IconButtonSample: SampleContent, ExampleContent {
                     .aspect(.fit)
                     .frame(width: 64)
                     .frame(height: 64)
-                    .contentPadding(12)
+                    .padding(12)
                     .stroke(Palette.outline)
                     .strokeWidth(1)
                     .shape(.roundedRectangle(12))
@@ -66,7 +66,7 @@ struct IconButtonSample: SampleContent, ExampleContent {
                     .aspect(.fit)
                     .frame(width: 64)
                     .frame(height: 64)
-                    .contentPadding(12)
+                    .padding(12)
                     .background(Palette.accent)
                     .shape(.roundedRectangle(32))
                     

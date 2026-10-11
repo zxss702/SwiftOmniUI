@@ -1,6 +1,6 @@
 // One on/off option: what it is called, and the switch that answers it.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// An option a user turns on and off, written as the control that means
 /// exactly that: a caption beside a `Switch`.

@@ -69,7 +69,6 @@ left wondering why the constant they wrote does nothing.
 Each message is said once per process, because the places that complain are
 modifiers, and a modifier runs on every render: an author who wrote 1.4 where a
 fraction belongs would otherwise be told so as fast as the interface is
-described. It goes to standard output, outside the lock: a terminal on macOS,
-the console on iOS, a shell on Windows and Linux, and nowhere on Android, whose
-process output is not routed. So a complaint is a development aid and may never
+described. It goes to standard output, outside the lock: a shell on Windows
+and Linux, and nowhere on Android, whose process output is not routed. So a complaint is a development aid and may never
 be the only thing between an application and working.

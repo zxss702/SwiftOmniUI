@@ -306,6 +306,7 @@ import XCTest
                 let isPackage = line.contains(".package(")
                 return String(line).occurrences(between: "path: \"", and: "\"")
                     .map { (path: $0, isPackage: isPackage) }
+                    .filter { !$0.path.contains(#"\("#) }
             }
     }
 

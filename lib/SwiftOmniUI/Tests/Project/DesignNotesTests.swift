@@ -11,7 +11,7 @@ import XCTest
     private static let held = [
         "lib/SwiftOmniUI.Host/Sources", "lib/SwiftOmniUI/Sources/Types", "lib/SwiftOmniUI/Sources/Contracts",
         "lib/SwiftOmniUI/Sources/Core", "lib/SwiftOmniUI/Sources/Views",
-        "lib/SwiftOmniUI.AppKit/Sources", "lib/SwiftOmniUI.UIKit/Sources", "lib/SwiftOmniUI.Android/Sources",
+        "lib/SwiftOmniUI.Android/Sources",
         "lib/SwiftOmniUI.WinUI/Sources", "lib/SwiftOmniUI.GTK/Sources", "lib/SwiftOmniUI.Conformance/Sources",
     ]
 

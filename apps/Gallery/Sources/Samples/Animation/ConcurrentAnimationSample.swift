@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Several movements in the air at once, which is what `async let` buys.
 struct ConcurrentAnimationSample: SampleContent, ExampleContent {
@@ -164,7 +164,7 @@ struct ConcurrentAnimationSample: SampleContent, ExampleContent {
                         .multilineTextAlignment(.center)
                 }
                 .spacing(4)
-                .contentPadding(16)
+                .padding(16)
             }
             .style("Card")
             .background($wash)
@@ -294,7 +294,7 @@ struct ConcurrentAnimationSample: SampleContent, ExampleContent {
     private func button(_ caption: String, _ act: @escaping EventHandler) -> Button {
         Button(caption, action: act)
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(14, 6))
+            .padding(EdgeInsets(14, 6))
             
     }
 }

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Whether the internet is reachable, and by what.
 struct ConnectivitySample: SampleContent, ExampleContent {
@@ -62,7 +62,7 @@ struct ConnectivitySample: SampleContent, ExampleContent {
                 .background(Palette.accent)
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
         }
         .spacing(10)

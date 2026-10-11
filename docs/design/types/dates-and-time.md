@@ -65,8 +65,8 @@ a clock sleep to the next whole second instead of drifting past it.
 
 ## Time zones come from the host
 
-Foundation's time zones do not answer the same way on every platform. Apple
-platforms answer everything themselves. Android detects no zone until `TZ`
+Foundation's time zones do not answer the same way on every platform.
+Android detects no zone until `TZ`
 names one: its time zone database is packed in a format Foundation does not
 read, so `TimeZone.current` comes up GMT, while a named zone resolves from
 ICU's own copy. Windows links only FoundationEssentials, which carries no

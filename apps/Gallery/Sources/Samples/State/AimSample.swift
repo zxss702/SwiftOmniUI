@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// An author holds a CONTROL as well as values, and declares it with `@Aim`:
 /// on a value you write, on a control you call.
@@ -96,7 +96,7 @@ struct AimSample: SampleContent, ExampleContent {
                     })
                     .background(Palette.accent)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(14, 8))
+                    .padding(EdgeInsets(14, 8))
                     
 
                 Button("Focus the second", action: {
@@ -105,7 +105,7 @@ struct AimSample: SampleContent, ExampleContent {
                     })
                     .background(Palette.accent)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(14, 8))
+                    .padding(EdgeInsets(14, 8))
                     
 
                 Button("Let go", action: {
@@ -117,7 +117,7 @@ struct AimSample: SampleContent, ExampleContent {
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(14, 8))
+                    .padding(EdgeInsets(14, 8))
                     
             }
             .spacing(10)

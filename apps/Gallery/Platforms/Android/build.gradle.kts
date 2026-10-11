@@ -31,7 +31,6 @@ android {
         getByName("main") {
             manifest.srcFile("AndroidManifest.xml")
             java.srcDir(stated("swiftomniui.java"))
-            java.srcDir("Java")
             jniLibs.srcDir(stated("swiftomniui.libraries"))
             assets.srcDir(stated("swiftomniui.assets"))
             res.srcDir(stated("swiftomniui.res"))

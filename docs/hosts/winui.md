@@ -126,10 +126,8 @@ reports - measuring it by the element's own measure. A registered control is
 a leaf. The application's relay tells its Swift half what the user did by a
 number the control gave its element, through a table of C callbacks the head
 hands it before it runs. A control that draws with the GPU is an element
-like any other: the Gallery's `Cube3D` is a `SwapChainPanel` its relay draws
-into with Direct3D 11.1, following WinUI's frames only while it spins and
-stands on screen - the same declaration Metal draws on AppKit and OpenGL on
-GTK.
+like any other: a `SwapChainPanel` the application's relay draws into
+follows WinUI's frames only while it stands on screen.
 
 ### An act
 

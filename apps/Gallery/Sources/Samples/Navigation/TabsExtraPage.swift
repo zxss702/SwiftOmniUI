@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A tab the USER added - the reason the tab list is something that changes
 /// rather than a fixed set.
@@ -38,12 +38,12 @@ struct TabsExtraPage: View {
                 TabsControls(nav: nav, thisTab: .extra(number))
 
                 Button("Back to the Navigation samples", action: { nav.openGroup("navigation") })
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .horizontalAlignment(.center)
                     
             }
             .spacing(14)
-            .contentPadding(24)
+            .padding(24)
         }
         .onAppear {
             page.gallery("Extra \(number)", scene: scene, nav: nav)

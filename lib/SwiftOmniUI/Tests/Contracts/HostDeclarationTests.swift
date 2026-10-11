@@ -122,7 +122,7 @@ import XCTest
 
     /// Where each host's suite writes what its runtime realizes, by the host's name.
     private static let exports = [
-        "AppKit": "exports/appkit.txt", "UIKit": "exports/uikit.txt", "Android Views": "exports/android.txt",
+        "Android Views": "exports/android.txt",
         "WinUI 3": "exports/winui.txt", "GTK 4": "exports/gtk.txt",
     ]
 

@@ -1,4 +1,4 @@
-// Colouring a listing, in the language it is written in.
+// Colouring a Swift listing.
 //
 // A Text has one text colour, so text in six colours is six spans - which is
 // what `Text.spans` is for. This file turns a snippet into those runs.
@@ -10,7 +10,7 @@
 // keyword and every type name in a listing is ASCII, and anything else
 // falls through as plain text, which is the right answer for it anyway.
 
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// One run of source that is all the same colour.
 struct CodeRun {
@@ -55,9 +55,22 @@ enum CodeHighlight {
         static let plain = Palette.text
     }
 
+    /// The words drawn as keywords - the vocabulary a Swift listing uses.
+    private static let keywords: Set<String> = [
+        "as", "associatedtype", "async", "await", "break", "case", "catch",
+        "class", "continue", "default", "defer", "deinit", "do", "else", "enum",
+        "extension", "false", "fileprivate", "final", "for", "func", "get",
+        "guard", "if", "import", "in", "indirect", "init", "inout", "internal",
+        "is", "lazy", "let", "mutating", "nil", "nonisolated", "nonmutating",
+        "open", "operator", "package", "private", "protocol", "public", "repeat",
+        "required", "return", "self", "set", "some", "static", "struct",
+        "subscript", "super", "switch", "throw", "throws", "true", "try",
+        "typealias", "unowned", "var", "weak", "where", "while", "willSet",
+        "didSet",
+    ]
+
     /// The snippet, split into runs in the order it was written.
-    static func runs(in source: String, language: CodeLanguage = .swift) -> [CodeRun] {
-        let keywords = language.keywords
+    static func runs(in source: String) -> [CodeRun] {
         let characters = Array(source)
         var runs: [CodeRun] = []
         var plain = ""

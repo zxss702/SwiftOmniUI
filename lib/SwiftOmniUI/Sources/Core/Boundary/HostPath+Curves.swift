@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The platform's C maths library, for an arc's angles.
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Android)
+#if canImport(Android)
 import Android
 #elseif canImport(Glibc)
 import Glibc

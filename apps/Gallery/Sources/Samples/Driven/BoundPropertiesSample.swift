@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// EVERY PROPERTY CAN BE HANDED A BINDING: a font size, a colour, a flag, a
 /// placeholder, a choice, a toggle - each a plain `@State` handed on as `$x`,
@@ -235,7 +235,7 @@ struct BoundPropertiesSample: SampleContent, ExampleContent {
             .spacing(6)
         }
         .style("Card")
-        .contentPadding(10)
+        .padding(10)
         .shape(.roundedRectangle(8))
         .stroke(Palette.outline)
     }
@@ -244,7 +244,7 @@ struct BoundPropertiesSample: SampleContent, ExampleContent {
     private func button(_ caption: String, _ act: @escaping EventHandler) -> Button {
         Button(caption, action: act)
             .font(.system(size: 13))
-            .contentPadding(EdgeInsets(14, 6))
+            .padding(EdgeInsets(14, 6))
             
     }
 }

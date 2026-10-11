@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// One choice out of a list, opened by the user or by a button.
 struct PickerSample: SampleContent, ExampleContent {

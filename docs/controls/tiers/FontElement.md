@@ -6,7 +6,7 @@ The font text is drawn in: its family, its size, its weight and slant, and wheth
 
 Wears: [PropertyContainer](PropertyContainer.md)
 
-Worn by: [Button](../Button.md) · [DatePicker](../DatePicker.md) · [Picker](../Picker.md) · [RadioButton](../RadioButton.md) · [SearchField](../SearchField.md) · [Span](../Span.md) · [Text](../Text.md) · [TextEditor](../TextEditor.md) · [TextField](../TextField.md) · [TimePicker](../TimePicker.md)
+Worn by: [Button](../Button.md) · [DatePicker](../DatePicker.md) · [Image](../Image.md) · [Picker](../Picker.md) · [RadioButton](../RadioButton.md) · [SearchField](../SearchField.md) · [Span](../Span.md) · [Text](../Text.md) · [TextEditor](../TextEditor.md) · [TextField](../TextField.md) · [TimePicker](../TimePicker.md)
 
 Declared in `lib/SwiftOmniUI/Sources/Contracts/Mixins/FontElementContract.swift`.
 

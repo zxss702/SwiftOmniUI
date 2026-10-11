@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A page pushed for one thing chosen from the search box.
 ///
@@ -36,14 +36,14 @@ struct ItemPage: View {
                     .multilineTextAlignment(.center)
 
                 Button("Back", action: { path.removeLast() })
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .horizontalAlignment(.center)
                     
             }
             .spacing(16)
         }
         .style("Card")
-        .contentPadding(24)
+        .padding(24)
         .padding(24)
         .background(Palette.surface)
         .stroke(.transparent)

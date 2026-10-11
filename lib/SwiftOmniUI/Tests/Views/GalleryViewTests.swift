@@ -218,9 +218,9 @@ private final class Built {
     /// THE MESSAGE CANNOT SAY THIS: the differ finds the cards unchanged and
     /// sends nothing either way, so what is counted here is the DESCRIBING.
     /// It is what the round of 2026-09-10 was chasing - a card crossed
-    /// re-described the whole deck, the message re-measured the page, and on a
-    /// Mac a measure invalidates UIKit's focus, whose walk over the view tree
-    /// then holds the thread for ~90 ms. notes/driven-state.md.
+    /// re-described the whole deck, the message re-measured the page, and a
+    /// host whose measure invalidates its focus then walks the view tree and
+    /// holds the thread for ~90 ms. notes/driven-state.md.
     func testAChangeOfPositionDoesNotDescribeTheCards() {
         let renders = Renders()
         let standing = State(0)

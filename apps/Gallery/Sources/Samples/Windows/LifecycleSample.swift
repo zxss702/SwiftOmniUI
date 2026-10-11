@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The native window lifecycle recorded through `WindowSession.phase`.
 struct LifecycleSample: SampleContent, ExampleContent {

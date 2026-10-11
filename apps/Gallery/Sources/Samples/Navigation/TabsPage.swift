@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// The first tab of the tabs demonstration - the one holding a stack of its own.
 ///
@@ -36,7 +36,7 @@ struct TabsPage: View {
                     .background(Palette.accent)
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .horizontalAlignment(.center)
                     
 
@@ -51,12 +51,12 @@ struct TabsPage: View {
                 // and the group is pushed onto it, so the back button leads
                 // home from there.
                 Button("Back to the Navigation samples", action: { nav.openGroup("navigation") })
-                    .contentPadding(EdgeInsets(20, 10))
+                    .padding(EdgeInsets(20, 10))
                     .horizontalAlignment(.center)
                     
             }
             .spacing(14)
-            .contentPadding(24)
+            .padding(24)
         }
         .onAppear { page.gallery("Tabs", scene: scene, nav: nav) }
     }

@@ -1,5 +1,0 @@
-# revision 1.1
-TabView: ✅
-TabView.currentPage: ✅
-TabView.currentPageChanged: ✅
-Text.frameChanged: ✅

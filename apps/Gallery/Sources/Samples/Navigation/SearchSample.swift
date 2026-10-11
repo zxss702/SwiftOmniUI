@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A `SearchField` on the navigation bar in place of the title, and the rows it filters.
 struct SearchSample: SampleContent, ExampleContent {
@@ -83,7 +83,7 @@ struct SearchSample: SampleContent, ExampleContent {
 
             Button("Clear the box", action: { query = "" })
                 .disabled(query.isEmpty)
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
         }
@@ -118,8 +118,8 @@ struct SearchSample: SampleContent, ExampleContent {
                 .foregroundStyle(Palette.subtle)
 
             Text("`OnScreenKeyboard.hide()` takes the focus off whatever holds it - the box on "
-                + "the bar included. On iOS a focused search box takes over the bar, back "
-                + "button and all, and unfocusing it gives the bar back.")
+                + "the bar included. Where the host lets a focused search box take over "
+                + "the bar, unfocusing it gives the bar back.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
         }

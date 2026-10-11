@@ -4,8 +4,8 @@
 // ONE Debug and ONE Release, whatever the host.
 //
 // A `swiftomniui` configuration is never debugged itself: it is resolved into the
-// configuration the chosen host's own debugger takes - lldb-dap for an AppKit
-// head, which is built first. Resolved in the FIRST hook, so the new type's
+// configuration the chosen host's own debugger takes - lldb-dap for a head,
+// which is built first. Resolved in the FIRST hook, so the new type's
 // resolvers still run over it. On a machine that runs no host, nothing is
 // resolved and the launch says so.
 //
@@ -15,13 +15,6 @@
 // NDK's lldb-server in the application's sandbox and writes where it listens to
 // .build/android/debugger.json. A Release build cannot be debugged, and
 // resolves to no session.
-//
-// A UIKit head is run by .scripts/UIKit/run-app.sh on the iPhone, iPad or
-// simulator chosen, in a task whose terminal follows what it prints. A Debug
-// launch starts it held until a debugger attaches, and the script writes where
-// to .build/uikit/debugger.json: a simulator's process is one of this Mac's, a
-// device's is reached through the device. lldb-dap attaches, which lets it run.
-// A Release launch has no session.
 //
 // A GTK head is built by .scripts/GTK/run-app.sh --build-only, as a task, and
 // launched by lldb-dap: the debugger is the application's parent, which is what
@@ -44,12 +37,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { Application, appKitProgram, gtkProgram, webSite, winUIProgram } from "./applications";
+import { Application, gtkProgram, webSite, winUIProgram } from "./applications";
 import { Browser, isChromium, webScript } from "./browsers";
 import { lldbDapFinding } from "./toolchain";
 import { androidScript } from "./devices";
-import { environment, Host } from "./hosts";
-import { uiKitScript } from "./uiKitDevices";
+import { Host } from "./hosts";
 
 /** Which build a launch runs. */
 export type Configuration = "debug" | "release";
@@ -85,12 +77,6 @@ export interface Choices {
     device(checkout: string): Promise<string | undefined>;
 
     /**
-     * The iPhone, iPad or simulator a UIKit launch runs on - the one chosen
-     * while it is listed, else asked for - or nothing, where none is picked.
-     */
-    uiKitDevice(): Promise<string | undefined>;
-
-    /**
      * The browser a Web launch opens the page in - the one chosen while it is installed, else asked for, as
      * `checkout`'s browsers.sh lists them - or nothing, where none is picked.
      */
@@ -98,7 +84,7 @@ export interface Choices {
 }
 
 /** What a machine that runs no host is told, wherever a host is asked for. */
-export const noHost = "no SwiftOmniUI host runs on this machine yet - AppKit, UIKit and Android are built and run on macOS, WinUI on Windows, GTK on Linux, Web on macOS and Linux.";
+export const noHost = "no SwiftOmniUI host runs on this machine yet - Android is built and run on macOS, WinUI on Windows, GTK on Linux, Web on macOS and Linux.";
 
 /** A script of the SwiftOmniUI checkout's .scripts/WinUI, the checkout at `checkout`. */
 export function winUIScript(checkout: string, name: string): string {
@@ -167,10 +153,6 @@ export class SwiftOmniUIDebugConfigurationProvider implements vscode.DebugConfig
             return this.android(root, application, configuration, name);
         }
 
-        if (host === "uikit") {
-            return this.uiKit(root, application, configuration, name);
-        }
-
         if (host === "winui") {
             return this.winUI(root, application, configuration, name);
         }
@@ -179,20 +161,7 @@ export class SwiftOmniUIDebugConfigurationProvider implements vscode.DebugConfig
             return this.gtk(root, application, configuration, name);
         }
 
-        if (!(await buildAppKitHead(root, application, configuration, (task) => this.choices.run(task)))) {
-            void vscode.window.showErrorMessage(
-                `SwiftOmniUI: the AppKit build of ${application.name} failed - its output is in the terminal.`);
-            return undefined;
-        }
-
-        return {
-            type: "lldb-dap",
-            request: "launch",
-            name,
-            program: appKitProgram(application, configuration),
-            cwd: root.uri.fsPath,
-            stopOnEntry: false,
-        };
+        return undefined;
     }
 
     /**
@@ -240,52 +209,6 @@ export class SwiftOmniUIDebugConfigurationProvider implements vscode.DebugConfig
             return undefined;
         }
         return androidAttach(name, serial, JSON.parse(fs.readFileSync(facts, "utf8")));
-    }
-
-    /**
-     * A UIKit head, started by run-app.sh on the device chosen in a task that
-     * follows what it prints; a Debug build started held and attached to by
-     * lldb-dap - a Release build has no session.
-     */
-    private async uiKit(
-        root: vscode.WorkspaceFolder,
-        application: Application,
-        configuration: Configuration,
-        name: string,
-    ): Promise<vscode.DebugConfiguration | undefined> {
-        const script = application.checkout && uiKitScript(application.checkout, "run-app.sh");
-        if (!script || !fs.existsSync(script)) {
-            void vscode.window.showErrorMessage(
-                `SwiftOmniUI: a UIKit head runs through a SwiftOmniUI checkout's .scripts/UIKit/run-app.sh, and ${application.name} has no SwiftOmniUI checkout - its Package.swift names none by path, and none is resolved under .build/checkouts.`);
-            return undefined;
-        }
-
-        const device = await this.choices.uiKitDevice();
-        if (!device) {
-            return undefined;
-        }
-
-        const debug = configuration === "debug";
-        const facts = path.join(application.directory, ".build", "uikit", "debugger.json");
-        fs.rmSync(facts, { force: true });
-        const task = new vscode.Task(
-            { type: "swiftomniui", application: application.name, configuration, device }, root,
-            `Run ${application.name} (UIKit, ${configuration})`, "SwiftOmniUI",
-            new vscode.ShellExecution("bash",
-                [script, application.directory, configuration, device, ...(debug ? ["--debugger"] : [])],
-                { cwd: root.uri.fsPath }), []);
-        task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated };
-        await this.choices.start(task);
-        if (!debug) {
-            return undefined;
-        }
-
-        if (!(await this.choices.ready(facts, task))) {
-            void vscode.window.showErrorMessage(
-                `SwiftOmniUI: ${application.name} did not start for the debugger on ${device} - the terminal says why.`);
-            return undefined;
-        }
-        return uiKitAttach(name, JSON.parse(fs.readFileSync(facts, "utf8")));
     }
 
     /**
@@ -458,67 +381,4 @@ export function androidAttach(name: string, serial: string, server: AndroidDebug
             "process handle SIGBUS --pass true --stop false --notify false",
         ],
     };
-}
-
-/**
- * Where run-app.sh --debugger left a UIKit head: its process, held until a
- * debugger attaches, and on a device the device and the bundle built.
- */
-export interface UIKitDebugger {
-    process: number;
-    device?: string;
-    symbols?: string;
-}
-
-/**
- * lldb-dap attached to a UIKit head's process, which lets it run: on a
- * simulator a process of this Mac, found by its number; on a device through
- * the device, its symbols read from the bundle built rather than copied back.
- */
-export function uiKitAttach(name: string, facts: UIKitDebugger): vscode.DebugConfiguration {
-    if (!facts.device) {
-        return { type: "lldb-dap", request: "attach", name, pid: facts.process, stopOnEntry: false };
-    }
-    return {
-        type: "lldb-dap",
-        request: "attach",
-        name,
-        stopOnEntry: false,
-        initCommands: facts.symbols
-            ? [`settings append target.exec-search-paths ${facts.symbols}`,
-                `settings append target.exec-search-paths ${facts.symbols}/Frameworks`]
-            : [],
-        attachCommands: [`device select ${facts.device}`, `device process attach --pid ${facts.process}`],
-    };
-}
-
-/**
- * Builds an application's AppKit head the way the command line does - its
- * bundling script where it has one, SwiftPM otherwise - as a task whose output
- * shows in the terminal.
- *
- * @returns whether the build succeeded.
- */
-export async function buildAppKitHead(
-    folder: vscode.WorkspaceFolder,
-    application: Application,
-    configuration: Configuration,
-    run: (task: vscode.Task) => Promise<number | undefined>,
-): Promise<boolean> {
-    const env = Object.fromEntries(
-        Object.entries(environment("appkit")).filter((entry): entry is [string, string] => entry[1] !== undefined));
-    const execution = application.bundleScript
-        ? new vscode.ShellExecution(application.bundleScript, [configuration], { cwd: folder.uri.fsPath, env })
-        : new vscode.ShellExecution(
-            "swift",
-            ["build", "--package-path", application.directory, "--scratch-path", path.join(application.directory, ".build", "appkit"),
-                "--configuration", configuration, "--product", `${application.name}AppKit`],
-            { cwd: folder.uri.fsPath, env });
-
-    const definition = { type: "swiftomniui", application: application.name, configuration };
-    const task = new vscode.Task(
-        definition, folder, `Build ${application.name} (AppKit, ${configuration})`, "SwiftOmniUI", execution, []);
-    task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated };
-
-    return (await run(task)) === 0;
 }

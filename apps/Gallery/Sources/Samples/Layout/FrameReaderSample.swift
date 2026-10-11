@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Content built from the space it was given, and frames reported on request.
 struct FrameReaderSample: SampleContent, ExampleContent {
@@ -51,7 +51,7 @@ struct FrameReaderSample: SampleContent, ExampleContent {
                 .onFrameChanged(in: .global) { window = $0 }
                 .onFrameChanged(in: .safeArea) { safe = $0 }
             }
-            .contentPadding(16)
+            .padding(16)
             .background(Palette.selected)
 
             Slider($width, in: 140...340)
@@ -114,7 +114,7 @@ struct FrameReaderSample: SampleContent, ExampleContent {
                 .onFrameChanged(in: .safeArea) { safe = $0 }
             }
             .spacing(8)
-            .contentPadding(16)
+            .padding(16)
             .background(Palette.selected)
 
             Slider($width, in: 140...340)
@@ -142,7 +142,7 @@ struct FrameReaderSample: SampleContent, ExampleContent {
                     // say where the panel actually got to.
                     try await $width.journey.move(to: $width.journey.value < 240 ? 340 : 140)
                 })
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
         }

@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Input that goes through a view to the one below - past the view alone, or
 /// past its children too.
@@ -37,12 +37,12 @@ struct TouchThroughSample: SampleContent, ExampleContent {
                     Text("tap the child")
                         .foregroundStyle(Palette.onBrand)
                         .background(Palette.brand)
-                        .contentPadding(EdgeInsets(14, 8))
+                        .padding(EdgeInsets(14, 8))
                         .horizontalAlignment(.center)
                         .verticalAlignment(.center)
                         .onTapGesture { child += 1 }
                 }
-                .contentPadding(16)
+                .padding(16)
                 .letsInputThrough(!childrenToo)
                 .allowsHitTesting(!childrenToo)
             }
@@ -74,12 +74,12 @@ struct TouchThroughSample: SampleContent, ExampleContent {
                     Text("tap the child")
                         .foregroundStyle(Palette.onBrand)
                         .background(Palette.brand)
-                        .contentPadding(EdgeInsets(24, 12))
+                        .padding(EdgeInsets(24, 12))
                         .horizontalAlignment(.center)
                         .verticalAlignment(.center)
                         .onTapGesture { child += 1 }
                 }
-                .contentPadding(16)
+                .padding(16)
                 .letsInputThrough(!childrenToo)
                 .allowsHitTesting(!childrenToo)
             }

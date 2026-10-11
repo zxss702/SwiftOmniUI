@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// Where the gallery's appearance actually comes from.
 struct StyleSample: SampleContent, ExampleContent {
@@ -26,7 +26,7 @@ struct StyleSample: SampleContent, ExampleContent {
                 .foregroundStyle(Palette.onAccent)
                 .background(Palette.accent)
                 .shape(.roundedRectangle(10))
-                .contentPadding(EdgeInsets(16, 11))
+                .padding(EdgeInsets(16, 11))
                 .visualState(.disabled) { $0
                     .foregroundStyle(Palette.disabled)
                     .background(Palette.outline)

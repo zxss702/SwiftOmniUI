@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A row taken away, and the stack closing over it.
 struct RemovingRowSample: SampleContent, ExampleContent {
@@ -82,12 +82,12 @@ struct RemovingRowSample: SampleContent, ExampleContent {
 
                         Button("Delete", action: { remove(row) })
                             .font(.system(size: 12))
-                            .contentPadding(EdgeInsets(10, 4))
+                            .padding(EdgeInsets(10, 4))
                             .gridColumn(1)
                             
                     }
                     .columns(.fill, .auto)
-                    .contentPadding(EdgeInsets(14, 6))
+                    .padding(EdgeInsets(14, 6))
                     .background(Palette.raised)
                     .frame(height: 46)
                     .hidden(gone.contains(row) || atOnce.contains(row))

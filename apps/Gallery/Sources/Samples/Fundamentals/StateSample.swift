@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// `@State` owns a value, `@Binding` borrows one - the whole of how this library
 /// remembers anything.
@@ -81,7 +81,7 @@ struct StateSample: SampleContent, ExampleContent {
                     Button("Increment", action: { counter += 1 })
                         .background(Palette.accent)
                         .shape(.roundedRectangle(8))
-                        .contentPadding(EdgeInsets(20, 10))
+                        .padding(EdgeInsets(20, 10))
                         
 
                     Button("Reset", action: { counter = 0 })
@@ -90,7 +90,7 @@ struct StateSample: SampleContent, ExampleContent {
                         .background(.transparent)
                         .foregroundStyle(Palette.subtle)
                         .shape(.roundedRectangle(8))
-                        .contentPadding(EdgeInsets(20, 10))
+                        .padding(EdgeInsets(20, 10))
                         .disabled(counter == 0)
                         
                 }
@@ -118,7 +118,7 @@ struct StateSample: SampleContent, ExampleContent {
                     .spacing(14)
                 }
                 .style("Card")
-                .contentPadding(14)
+                .padding(14)
                 .stroke(Palette.accent)
                 .strokeWidth(1)
                 .shape(.roundedRectangle(10))
@@ -126,7 +126,7 @@ struct StateSample: SampleContent, ExampleContent {
             .spacing(14)
         }
         .style("Card")
-        .contentPadding(14)
+        .padding(14)
         .stroke(Palette.accent)
         .strokeWidth(1)
         .shape(.roundedRectangle(12))

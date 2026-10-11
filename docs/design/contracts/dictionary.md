@@ -83,7 +83,7 @@ both.
 A tier's record reaches every element wearing the tier, and what the
 host's shared machinery realizes becomes one: it serves each view the host
 makes. Where an element wearing the tier does not take such a member - a
-toolbar item AppKit holds as no view - the element's own record says so,
+toolbar item a host holds as no view - the element's own record says so,
 `.unrealized("ToolbarItem", "accessibilityIdentifier", why:)`, and stands
 over the tier's: the member's case does not run there and its cell stays
 empty. An element's record is the only one that says unrealized.

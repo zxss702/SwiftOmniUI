@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// A native split view whose sidebar is an ordinary SwiftOmniUI page.
 struct SplitViewSample: SampleContent, ExampleContent {
@@ -99,7 +99,7 @@ struct SplitViewSample: SampleContent, ExampleContent {
             .spacing(10)
 
             Button("Go there anyway", action: { nav.open(.hidden) })
-                .contentPadding(EdgeInsets(20, 10))
+                .padding(EdgeInsets(20, 10))
                 .horizontalAlignment(.center)
                 
         }

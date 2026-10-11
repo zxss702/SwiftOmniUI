@@ -33,11 +33,7 @@
 // Android the same file names the Swift SDK of the toolchain's release and the
 // triple, found as .scripts/Android/build-swift.sh finds them. With no such SDK
 // installed the editor still works as the host, compiling for this Mac, and
-// says so. For UIKit it names the triple and the iOS simulator's SDK, which
-// Xcode ships - found as .scripts/UIKit/tools.sh finds it. SwiftPM's own
-// command infers that SDK from the triple, but the server's SwiftPM does not:
-// measured, it compiled for the simulator against the macOS SDK, and nothing
-// in a UIKit head resolved.
+// says so.
 
 import { execFile } from "child_process";
 import * as fs from "fs";
@@ -65,8 +61,7 @@ export function applyEditorMode(host: Host | undefined, roots: readonly string[]
 
 async function apply(host: Host | undefined, roots: readonly string[]): Promise<boolean> {
     let changed = setHostEnvironment(host);
-    const settings = serverSettings(host, roots.length > 0 ? await installedSwiftSDK(host) : undefined,
-        roots.length > 0 ? await xcodeSDKPath(host) : undefined);
+    const settings = serverSettings(host, roots.length > 0 ? await installedSwiftSDK(host) : undefined);
 
     for (const root of roots) {
         changed = writeServerConfig(root, settings) || changed;
@@ -181,7 +176,6 @@ export function variablesInSettings(): string[] {
 export interface ServerSettings {
     readonly scratchPath: string;
     readonly swiftSDK?: string;
-    readonly sdk?: string;
     readonly triple?: string;
 }
 
@@ -194,19 +188,15 @@ export interface ServerConfig {
 
 /**
  * What the language server is told while the editor works as `host`: the
- * host's index directory and - for a host compiled for another platform, where
- * its Swift SDK `swiftSDK` is installed, or Xcode's SDK is found at `sdk` -
- * that SDK and the triple. With no host, SwiftPM's own index directory and no
- * SDK.
+ * host's index directory and - for a host compiled for another platform,
+ * where its Swift SDK `swiftSDK` is installed - that SDK and the triple.
+ * With no host, SwiftPM's own index directory and no SDK.
  */
-export function serverSettings(host: Host | undefined, swiftSDK?: string, sdk?: string): ServerSettings {
+export function serverSettings(host: Host | undefined, swiftSDK?: string): ServerSettings {
     if (!host) {
         return { scratchPath: plainIndexPath };
     }
     const { indexPath, target } = describe(host);
-    if (target?.xcodeSDK) {
-        return sdk ? { scratchPath: indexPath, sdk, triple: target.triple } : { scratchPath: indexPath };
-    }
     return target && swiftSDK ? { scratchPath: indexPath, swiftSDK, triple: target.triple } : { scratchPath: indexPath };
 }
 
@@ -259,26 +249,6 @@ async function installedSwiftSDK(host: Host | undefined): Promise<string | undef
         void vscode.window.showWarningMessage(
             `SwiftOmniUI: no Swift SDK for ${label} of ${release ? `Swift ${release}` : "this toolchain's release"} is installed, `
             + `so the editor compiles the code for this Mac rather than for ${label}. [Install the Swift SDK for ${label}](${target.swiftSDKGuide}).`);
-    }
-    return found;
-}
-
-/**
- * Where Xcode's SDK for `host` is - or nothing, for a host with none and, said in a warning, where Xcode has not
- * got it.
- */
-async function xcodeSDKPath(host: Host | undefined): Promise<string | undefined> {
-    const { label, target } = host ? describe(host) : { label: "", target: undefined };
-    if (!target?.xcodeSDK) {
-        return undefined;
-    }
-
-    const found = await new Promise<string | undefined>((resolve) =>
-        execFile("xcrun", ["--sdk", target.xcodeSDK!, "--show-sdk-path"], (error, stdout) =>
-            resolve(error ? undefined : stdout.trim() || undefined)));
-    if (!found) {
-        void vscode.window.showWarningMessage(
-            `SwiftOmniUI: Xcode's ${target.xcodeSDK} SDK was not found, so the editor compiles the code for this Mac rather than for ${label}.`);
     }
     return found;
 }

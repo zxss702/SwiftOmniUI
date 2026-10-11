@@ -1,4 +1,4 @@
-@_spi(Host) import SwiftOmniUI
+import SwiftOmniUI
 
 /// What a view answers when it is asked why it is being described.
 struct RebuildSample: SampleContent, ExampleContent {
@@ -123,7 +123,7 @@ private struct RebuildPanel: View {
                 RebuildPassenger()
             }
             .spacing(4)
-            .contentPadding(EdgeInsets(14, 12))
+            .padding(EdgeInsets(14, 12))
         }
         .style("Card")
         .stroke(Palette.outline)
