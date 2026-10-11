@@ -77,5 +77,5 @@ struct GalleryApp: App {
 /// find it whatever the module is called.
 @_cdecl("swiftomniui_app_register")
 public func swiftomniui_app_register() {
-    stateUIUseApp(GalleryApp())
+    GalleryApp.main()
 }

@@ -324,6 +324,21 @@ extern "C" void swiftomniui_winui_scroller_move(SwiftOmniUIObjectRef handle, dou
                     scrollDiag("scroll.island enabled=%d size=(%g,%g)", island.IsSiteEnabled(), sz.x, sz.y);
                 } else scrollDiag("scroll.island=0");
             }
+            // A documented islands host beside xaml::Window: if its island wakes the
+            // compositor where Window's does not, the same thread's probe springs to life.
+            static winrt::Microsoft::UI::Xaml::Hosting::DesktopWindowXamlSource xamlSource{nullptr};
+            static winrt::Microsoft::UI::Xaml::Controls::Grid islandContent{nullptr};
+            if (!xamlSource) {
+                auto islandHwnd = CreateWindowExW(0, L"STATIC", L"probe",
+                    WS_OVERLAPPEDWINDOW | WS_VISIBLE, 40, 40, 320, 240,
+                    nullptr, nullptr, nullptr, nullptr);
+                xamlSource = winrt::Microsoft::UI::Xaml::Hosting::DesktopWindowXamlSource();
+                xamlSource.Initialize(winrt::Microsoft::UI::GetWindowIdFromWindow(islandHwnd));
+                islandContent = winrt::Microsoft::UI::Xaml::Controls::Grid();
+                xamlSource.Content(islandContent);
+                ShowWindow(islandHwnd, SW_SHOW);
+                scrollDiag("scroll.xamlsource hwnd=%p visible=%d", islandHwnd, IsWindowVisible(islandHwnd));
+            }
             *batch = compositor.CreateScopedBatch(winrt::Microsoft::UI::Composition::CompositionBatchTypes::AllAnimations);
             probe->StartAnimation(L"w", compositor.CreateExpressionAnimation(L"3.0"));
             batch->End();

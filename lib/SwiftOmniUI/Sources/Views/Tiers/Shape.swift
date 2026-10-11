@@ -55,7 +55,7 @@ extension ShapeProperties {
 
     /// How thick the outline is, in device units - 1 unless said. A thickness
     /// with no `.stroke` draws nothing.
-    @_spi(Host) public func strokeWidth(_ value: Double) -> Modified {
+    public func strokeWidth(_ value: Double) -> Modified {
         setValue(ShapeContract.strokeWidth, value)
     }
 
@@ -66,35 +66,35 @@ extension ShapeProperties {
     ///         .stroke(.lightGray)
     ///         .strokeWidth(2)
     ///         .strokeDashPattern([4, 2])   // 8 units of dash, 4 of gap
-    @_spi(Host) public func strokeDashPattern(_ value: [Double]) -> Modified {
+    public func strokeDashPattern(_ value: [Double]) -> Modified {
         setValue(ShapeContract.strokeDashPattern, value)
     }
 
     /// How far into the dash pattern the line starts.
-    @_spi(Host) public func strokeDashOffset(_ value: Double) -> Modified {
+    public func strokeDashOffset(_ value: Double) -> Modified {
         setValue(ShapeContract.strokeDashOffset, value)
     }
 
     /// How the ends of an open line are drawn.
-    @_spi(Host) public func strokeLineCap(_ value: LineCap) -> Modified {
+    public func strokeLineCap(_ value: LineCap) -> Modified {
         setValue(ShapeContract.strokeLineCap, value)
     }
 
     /// How two segments meet at a corner.
-    @_spi(Host) public func strokeLineJoin(_ value: LineJoin) -> Modified {
+    public func strokeLineJoin(_ value: LineJoin) -> Modified {
         setValue(ShapeContract.strokeLineJoin, value)
     }
 
     /// How far a sharp corner may reach before it is cut off, in multiples of
     /// the stroke thickness.
-    @_spi(Host) public func strokeMiterLimit(_ value: Double) -> Modified {
+    public func strokeMiterLimit(_ value: Double) -> Modified {
         setValue(ShapeContract.strokeMiterLimit, value)
     }
 
     /// What the shape does with the room it is given - the `ContentMode` an Image
     /// takes too. `.fit`, the default, scales the drawing to fit and keeps its
     /// proportions; `.center` keeps the size its own numbers say.
-    @_spi(Host) public func aspect(_ value: ContentMode) -> Modified { setValue(ShapeContract.aspect, value) }
+    public func aspect(_ value: ContentMode) -> Modified { setValue(ShapeContract.aspect, value) }
 }
 
 extension Shape {

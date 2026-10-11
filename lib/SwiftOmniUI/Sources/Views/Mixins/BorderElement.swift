@@ -27,7 +27,7 @@ extension BorderElement {
     }
 
     /// How wide the outline is, in device units; one where none is said.
-    @_spi(Host) public func strokeWidth(_ value: Double) -> Modified {
+    public func strokeWidth(_ value: Double) -> Modified {
         setValue(BorderElementContract.strokeWidth, value)
     }
 }
