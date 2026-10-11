@@ -233,17 +233,11 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
                 commands.Append(controls::AppBarSeparator());
                 continue;
             }
-            // A view the item carries stands in the button's place: the bar's own button as a command, any other in
-            // a container.
+            // A view the item carries stands in the button's place, in a container the bar knows.
             if (contents[index]) {
-                auto content = borrow<xaml::UIElement>(contents[index]);
-                if (auto command = content.try_as<controls::ICommandBarElement>()) {
-                    commands.Append(command);
-                    continue;
-                }
                 controls::AppBarElementContainer container;
                 container.VerticalContentAlignment(xaml::VerticalAlignment::Center);
-                container.Content(content);
+                container.Content(borrow<xaml::UIElement>(contents[index]));
                 commands.Append(container);
                 continue;
             }

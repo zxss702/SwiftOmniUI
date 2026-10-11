@@ -172,9 +172,9 @@ What every element showing words has: the words, and the case they are drawn in.
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
 | `text` | property | `String` | native | ◐ | ✅ | ✅ |  | cannot slide on Slider - Android's driver has no path for it yet |
-| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |
+| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 | `textCase` | property | `TextCase` | native | ✅ | ✅ | ✅ |  |  |
-| `baselineOffset` | property | `Double` | native |  |  |  |  | GTK 4: not realized |
+| `baselineOffset` | property | `Double` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 
 ## From [TextStyleElement](tiers/TextStyleElement.md)
 
@@ -195,9 +195,9 @@ The font text is drawn in: its family, its size, its weight and slant, and wheth
 | `fontAutoScalingEnabled` | property | `Bool` | adaptive |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
 | `fontFamily` | property | `Name` | native | · | ✅ | · |  | cannot read a family - Android's typeface keeps no family's name; GTK 4: cannot read fontFamily of Text - GTK's driver has no path for it yet |
 | `fontSize` | property | `Double` | native | ✅ | ✅ | · |  | GTK 4: cannot read fontSize of Text - GTK's driver has no path for it yet |
-| `fontTextStyle` | property | `FontTextStyle` | native |  |  | · |  | GTK 4: cannot read fontTextStyle of Text - GTK's driver has no path for it yet |
-| `fontWeight` | property | `Weight` | native |  |  | · |  | GTK 4: cannot read fontWeight of Text - GTK's driver has no path for it yet |
-| `fontDesign` | property | `FontDesign` | native |  |  | · |  | GTK 4: cannot read fontDesign of Text - GTK's driver has no path for it yet |
+| `fontTextStyle` | property | `FontTextStyle` | native |  | ❌ | · |  | WinUI 3: the driver cannot read fontTextStyle of Text, and says nothing of why; GTK 4: cannot read fontTextStyle of Text - GTK's driver has no path for it yet |
+| `fontWeight` | property | `Weight` | native |  | ❌ | · |  | WinUI 3: the driver cannot read fontWeight of Text, and says nothing of why; GTK 4: cannot read fontWeight of Text - GTK's driver has no path for it yet |
+| `fontDesign` | property | `FontDesign` | native |  | ❌ | · |  | WinUI 3: the driver cannot read fontDesign of Text, and says nothing of why; GTK 4: cannot read fontDesign of Text - GTK's driver has no path for it yet |
 
 ## From [TextAlignmentElement](tiers/TextAlignmentElement.md)
 

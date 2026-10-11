@@ -19,7 +19,8 @@ final class WinUIButtonView: WinUIView {
     /// worn on the element at all makes it one.
     var onToggled: ((Bool) -> Void)?
 
-    /// The platform's button, or - `toolbar` - the bar's own trigger, whose look WinUI owns.
+    /// The platform's button, or - `toolbar` - the same button dressed as the bar's: no ground of its own, the
+    /// bar's faint fill under the pointer.
     init(toolbar: Bool = false) {
         super.init { number in toolbar ? swiftomniui_winui_toolbar_button_make(number) : swiftomniui_winui_button_make(number) }
         isToolbarControl = toolbar
@@ -47,7 +48,7 @@ final class WinUIButtonView: WinUIView {
         let (fill, outline) = (WinUIBrush(background), WinUIBrush(stroke))
         let width = BoxArithmetic.outlineWidth(stroke: stroke, width: strokeWidth)
         paint("look", followsSize: fill.followsSize || outline.followsSize) { [weak self, handle] size in
-            // The bar's button keeps the look WinUI gives it.
+            // The bar's button keeps the look the bar dressed it in.
             if self?.isToolbarControl == true { return }
             fill.withRelayBrush(over: size) { fill in
                 outline.withRelayBrush(over: size) { outline in

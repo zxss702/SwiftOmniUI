@@ -1203,10 +1203,8 @@ final class WinUILazyTests: XCTestCase {
             let thread = try XCTUnwrap(CreateThread(nil, 0, WinUILazyScreenProbe.entry, rawProbe, 0, nil))
             let spot = screen(cross - 20, frame.height / 2)
             @MainActor func wheel(_ delta: Int32, horizontal: Bool = false) {
-                let wp = WPARAM(UInt32(UInt16(truncatingIfNeeded: delta)) << 16)
-                let lp = LPARAM(Int32(bitPattern: (UInt32(UInt16(truncatingIfNeeded: spot.y)) << 16)
-                    | UInt32(UInt16(truncatingIfNeeded: spot.x))))
-                _ = PostMessageW(hwnd, UINT(horizontal ? 0x020E : 0x020A), wp, lp)
+                _ = SetCursorPos(spot.x, spot.y)
+                mouse_event(horizontal ? 0x1000 : 0x0800, 0, 0, UInt32(bitPattern: delta), 0)
             }
             let t0 = WinUIFrameClock.monotonic()
             var trace: [String] = []
@@ -1223,6 +1221,14 @@ final class WinUILazyTests: XCTestCase {
                 host.step(); note("hwheel")
             }
             note("hwheel-done")
+            // A pause: the window contracts. Then a fast resume must not
+            // expose the rows the contraction let go.
+            for _ in 0..<90 { host.step(); note("pause") }
+            for _ in 0..<10 {
+                wheel(-120)
+                host.step(); note("resume")
+            }
+            for _ in 0..<60 { host.step(); note("settle") }
             probe.lock.lock(); probe.stopped = true; probe.lock.unlock()
             _ = WaitForSingleObject(thread, 2_000); _ = CloseHandle(thread)
             let samples = probe.samples
@@ -1258,10 +1264,8 @@ final class WinUILazyTests: XCTestCase {
             }
             let spot = screen(frame.width / 2, frame.height / 2)
             @MainActor func wheel(_ delta: Int32, horizontal: Bool = false) {
-                let wp = WPARAM(UInt32(UInt16(truncatingIfNeeded: delta)) << 16)
-                let lp = LPARAM(Int32(bitPattern: (UInt32(UInt16(truncatingIfNeeded: spot.y)) << 16)
-                    | UInt32(UInt16(truncatingIfNeeded: spot.x))))
-                _ = PostMessageW(hwnd, UINT(horizontal ? 0x020E : 0x020A), wp, lp)
+                _ = SetCursorPos(spot.x, spot.y)
+                mouse_event(horizontal ? 0x1000 : 0x0800, 0, 0, UInt32(bitPattern: delta), 0)
             }
             var peak = (x: 0.0, y: 0.0)
             for _ in 0..<15 {

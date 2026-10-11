@@ -1,15 +1,22 @@
 # revision 1.1
+Button.baselineOffset: not realized
 Button.text: ✅
 Button.textCase: ✅
+RadioButton.baselineOffset: not realized
 RadioButton.text: ✅
 RadioButton.textCase: ✅
+SearchField.baselineOffset: not realized
 SearchField.text: ✅
 SearchField.textCase: ✅
+Span.baselineOffset: not realized
 Span.text: ✅
 Span.textCase: ✅
+Text.baselineOffset: not realized
 Text.text: ✅
 Text.textCase: ✅
+TextEditor.baselineOffset: not realized
 TextEditor.text: ✅
 TextEditor.textCase: ✅
+TextField.baselineOffset: not realized
 TextField.text: ✅
 TextField.textCase: ✅

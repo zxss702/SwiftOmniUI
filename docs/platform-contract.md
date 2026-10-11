@@ -502,19 +502,19 @@ Every control, and every part an application, its windows and its pages are made
 | [RadioButton](controls/RadioButton.md) | 121 | 59 ✅ · 1 ☑️ · 3 – | 63 ✅ | 24 ✅ · 11 – |  |
 | [Rectangle](controls/Rectangle.md) | 112 | 50 ✅ · 1 ☑️ · 3 – | 59 ✅ · 3 – | 17 ✅ · 14 – |  |
 | [ScrollView](controls/ScrollView.md) | 123 | 52 ✅ · 1 ☑️ · 3 – | 60 ✅ · 3 – | 22 ✅ · 11 – |  |
-| [SearchField](controls/SearchField.md) | 130 | 62 ✅ · 1 ☑️ | 63 ✅ | 24 ✅ · 11 – |  |
+| [SearchField](controls/SearchField.md) | 130 | 62 ✅ · 1 ☑️ | 60 ✅ | 24 ✅ · 11 – |  |
 | [Slider](controls/Slider.md) | 108 | 55 ✅ · 1 ☑️ · 3 – | 57 ✅ | 23 ✅ · 13 – |  |
 | [Stepper](controls/Stepper.md) | 106 | 50 ✅ · 1 ☑️ · 3 – | 57 ✅ | 19 ✅ · 11 – |  |
 | [Switch](controls/Switch.md) | 104 | 52 ✅ · 1 ☑️ · 3 – | 56 ✅ | 21 ✅ · 11 – |  |
 | [Text](controls/Text.md) | 126 | 61 ✅ · 1 ☑️ · 3 – | 63 ✅ · 3 – | 18 ✅ · 15 – |  |
-| [TextEditor](controls/TextEditor.md) | 130 | 62 ✅ · 1 ☑️ | 70 ✅ | 24 ✅ · 11 – |  |
-| [TextField](controls/TextField.md) | 132 | 63 ✅ · 1 ☑️ | 68 ✅ | 23 ✅ · 11 – |  |
+| [TextEditor](controls/TextEditor.md) | 130 | 62 ✅ · 1 ☑️ | 62 ✅ | 24 ✅ · 11 – |  |
+| [TextField](controls/TextField.md) | 132 | 63 ✅ · 1 ☑️ | 58 ✅ | 23 ✅ · 11 – |  |
 | [TimePicker](controls/TimePicker.md) | 116 | 53 ✅ · 1 ☑️ · 3 – | 58 ✅ | 24 ✅ · 11 – |  |
 | [TitleBar](controls/TitleBar.md) | 104 |  |  |  |  |
 | [VStack](controls/VStack.md) | 110 | 52 ✅ · 1 ☑️ · 3 – | 56 ✅ · 3 – | 17 ✅ · 14 – |  |
 | [WebView](controls/WebView.md) | 111 | 54 ✅ · 1 ☑️ · 3 – |  | 20 ✅ · 11 – |  |
 | [ZStack](controls/ZStack.md) | 109 | 51 ✅ · 1 ☑️ · 3 – | 55 ✅ · 3 – | 16 ✅ · 14 – |  |
-| **Met** - ✅ and – | 4746 | 1751 of 4746 met | 1822 of 4746 met | 1207 of 4746 met |  |
+| **Met** - ✅ and – | 4746 | 1751 of 4746 met | 1801 of 4746 met | 1207 of 4746 met |  |
 
 ### App structure
 

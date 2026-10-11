@@ -4,8 +4,6 @@
 // The platform's C maths library, for an arc's angles.
 #if canImport(Android)
 import Android
-#elseif canImport(Darwin)
-import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(CRT)

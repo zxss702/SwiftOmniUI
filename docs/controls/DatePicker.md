@@ -185,9 +185,9 @@ The font text is drawn in: its family, its size, its weight and slant, and wheth
 | `fontAutoScalingEnabled` | property | `Bool` | adaptive |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
 | `fontFamily` | property | `Name` | native | · | ✅ | · |  | cannot read a family - Android's typeface keeps no family's name; GTK 4: cannot read fontFamily of DatePicker - GTK's driver has no path for it yet |
 | `fontSize` | property | `Double` | native | ✅ | ✅ | · |  | GTK 4: cannot read fontSize of DatePicker - GTK's driver has no path for it yet |
-| `fontTextStyle` | property | `FontTextStyle` | native |  |  |  |  | GTK 4: not realized |
-| `fontWeight` | property | `Weight` | native |  |  |  |  | GTK 4: not realized |
-| `fontDesign` | property | `FontDesign` | native |  |  |  |  | GTK 4: not realized |
+| `fontTextStyle` | property | `FontTextStyle` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontWeight` | property | `Weight` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontDesign` | property | `FontDesign` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 
 ## From [ControlSizeElement](tiers/ControlSizeElement.md)
 

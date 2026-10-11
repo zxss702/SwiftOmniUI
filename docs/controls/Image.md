@@ -168,13 +168,13 @@ The font text is drawn in: its family, its size, its weight and slant, and wheth
 
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| `fontAttributes` | property | `FontAttributes` | native |  |  |  |  | GTK 4: not realized |
-| `fontAutoScalingEnabled` | property | `Bool` | adaptive |  |  |  |  | GTK 4: not realized |
-| `fontFamily` | property | `Name` | native |  |  |  |  | GTK 4: not realized |
-| `fontSize` | property | `Double` | native |  |  | · |  | GTK 4: cannot read fontSize of Image - GTK's driver has no path for it yet |
-| `fontTextStyle` | property | `FontTextStyle` | native |  |  | · |  | GTK 4: cannot read fontTextStyle of Image - GTK's driver has no path for it yet |
-| `fontWeight` | property | `Weight` | native |  |  |  |  | GTK 4: not realized |
-| `fontDesign` | property | `FontDesign` | native |  |  |  |  | GTK 4: not realized |
+| `fontAttributes` | property | `FontAttributes` | native |  | ❌ |  |  | WinUI 3: the driver cannot read fontWeight of a WinUIImageView, and says nothing of why; GTK 4: not realized |
+| `fontAutoScalingEnabled` | property | `Bool` | adaptive |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontFamily` | property | `Name` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontSize` | property | `Double` | native |  | ❌ | · |  | WinUI 3: the driver cannot read fontSize of a WinUIImageView, and says nothing of why; GTK 4: cannot read fontSize of Image - GTK's driver has no path for it yet |
+| `fontTextStyle` | property | `FontTextStyle` | native |  | ❌ | · |  | WinUI 3: the driver cannot read fontTextStyle of Image, and says nothing of why; GTK 4: cannot read fontTextStyle of Image - GTK's driver has no path for it yet |
+| `fontWeight` | property | `Weight` | native |  | ❌ |  |  | WinUI 3: the driver cannot read fontWeight of Image, and says nothing of why; GTK 4: not realized |
+| `fontDesign` | property | `FontDesign` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 
 ## From [ImageElement](tiers/ImageElement.md)
 

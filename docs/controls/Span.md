@@ -54,9 +54,9 @@ What every element showing words has: the words, and the case they are drawn in.
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
 | `text` | property | `String` | native | ◐ | ✅ | ◐ |  | cannot read text of Span - Android's driver has no path for it yet; GTK 4: cannot read text of Span - GTK's driver has no path for it yet |
-| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |
+| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 | `textCase` | property | `TextCase` | native | · | ✅ |  |  | cannot read text of Span - Android's driver has no path for it yet; GTK 4: not realized |
-| `baselineOffset` | property | `Double` | native |  |  |  |  | GTK 4: not realized |
+| `baselineOffset` | property | `Double` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 
 ## From [TextStyleElement](tiers/TextStyleElement.md)
 
@@ -77,9 +77,9 @@ The font text is drawn in: its family, its size, its weight and slant, and wheth
 | `fontAutoScalingEnabled` | property | `Bool` | adaptive |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
 | `fontFamily` | property | `Name` | native |  | ✅ |  |  | not realized; GTK 4: not realized |
 | `fontSize` | property | `Double` | native | · | ✅ | · |  | cannot read fontSize of Span - Android's driver has no path for it yet; GTK 4: cannot read fontSize of Span - GTK's driver has no path for it yet |
-| `fontTextStyle` | property | `FontTextStyle` | native |  |  |  |  | GTK 4: not realized |
-| `fontWeight` | property | `Weight` | native |  |  |  |  | GTK 4: not realized |
-| `fontDesign` | property | `FontDesign` | native |  |  |  |  | GTK 4: not realized |
+| `fontTextStyle` | property | `FontTextStyle` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontWeight` | property | `Weight` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontDesign` | property | `FontDesign` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 
 ## From [LineHeightElement](tiers/LineHeightElement.md)
 

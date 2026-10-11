@@ -50,6 +50,28 @@ namespace {
     xaml::Media::SolidColorBrush clearGround() {
         return xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0});
     }
+
+    /// Dresses a control standing on the bar: no ground of its own - the bar shows through - and the bar's own
+    /// faint fill under the pointer and pressed. A toggle reads the `ToggleButton*` keys, any other control the
+    /// `Button*` ones.
+    void barLook(controls::Control const &control) {
+        auto resources = control.Resources();
+        auto transparent = clearGround();
+        auto theme = xaml::Application::Current().Resources();
+        auto pointed = theme.Lookup(winrt::box_value(L"SubtleFillColorSecondaryBrush")).as<xaml::Media::Brush>();
+        auto pressed = theme.Lookup(winrt::box_value(L"SubtleFillColorTertiaryBrush")).as<xaml::Media::Brush>();
+        control.Background(transparent);
+        control.BorderThickness({0, 0, 0, 0});
+        control.CornerRadius({4, 4, 4, 4});
+        keepToggleKeys(resources, L"Background", transparent, pointed, pressed);
+        keepToggleKeys(resources, L"BorderBrush", transparent, transparent, transparent);
+        struct State { wchar_t const *suffix; xaml::Media::Brush fill; };
+        for (auto const &state : {State{L"", transparent}, State{L"PointerOver", pointed},
+                                  State{L"Pressed", pressed}, State{L"Disabled", transparent}}) {
+            resources.Insert(winrt::box_value(winrt::hstring(std::wstring(L"ButtonBackground") + state.suffix)), state.fill);
+            resources.Insert(winrt::box_value(winrt::hstring(std::wstring(L"ButtonBorderBrush") + state.suffix)), transparent);
+        }
+    }
 }
 
 controls::TextBlock swiftomniui::wordsOf(IInspectable const &element) {
@@ -155,10 +177,11 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view) {
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_toolbar_button_make(int64_t view) {
     try {
-        // The bar's own trigger, the same button at heart: its content is its icon's slot, its words its label.
-        controls::AppBarToggleButton button;
-        button.LabelPosition(controls::CommandBarLabelPosition::Collapsed);
+        // The bar's own button: the platform's momentary button at heart - a press on one that keeps nothing is
+        // taken back at once - wearing no ground of its own, so the bar shows through it.
+        primitives::ToggleButton button;
         wireButton(button, view);
+        barLook(button);
         return detach(button);
     } catch (...) {
         report("making a toolbar button");
@@ -225,19 +248,6 @@ extern "C" void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef handle, char 
     try {
         auto control = as<controls::ContentControl>(handle);
         auto words = text(utf8);
-        // A bar's button is named by its label - its content is its icon's slot - and shows none where it has none.
-        auto position = words.empty() ? controls::CommandBarLabelPosition::Collapsed
-                                      : controls::CommandBarLabelPosition::Default;
-        if (auto toggle = control.try_as<controls::AppBarToggleButton>()) {
-            toggle.Label(words);
-            toggle.LabelPosition(position);
-            return;
-        }
-        if (auto command = control.try_as<controls::AppBarButton>()) {
-            command.Label(words);
-            command.LabelPosition(position);
-            return;
-        }
         control.Content(winrt::box_value(words));
     } catch (...) {
         report("setting a caption");
@@ -245,24 +255,9 @@ extern "C" void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef handle, char 
 }
 
 extern "C" void swiftomniui_winui_toolbar_button_set_look(SwiftOmniUIObjectRef handle) {
+    // The app menu's trigger on the bar.
     try {
-        auto button = borrow<controls::Control>(handle);
-        auto resources = button.Resources();
-        auto transparent = clearGround();
-        auto theme = xaml::Application::Current().Resources();
-        auto pointed = theme.Lookup(winrt::box_value(L"SubtleFillColorSecondaryBrush")).as<xaml::Media::Brush>();
-        auto pressed = theme.Lookup(winrt::box_value(L"SubtleFillColorTertiaryBrush")).as<xaml::Media::Brush>();
-        button.Background(transparent);
-        button.BorderThickness({0, 0, 0, 0});
-        button.CornerRadius({4, 4, 4, 4});
-        keepToggleKeys(resources, L"Background", transparent, pointed, pressed);
-        keepToggleKeys(resources, L"BorderBrush", transparent, transparent, transparent);
-        struct State { wchar_t const *suffix; xaml::Media::Brush fill; };
-        for (auto const &state : {State{L"", transparent}, State{L"PointerOver", pointed},
-                                  State{L"Pressed", pressed}, State{L"Disabled", transparent}}) {
-            resources.Insert(winrt::box_value(winrt::hstring(std::wstring(L"ButtonBackground") + state.suffix)), state.fill);
-            resources.Insert(winrt::box_value(winrt::hstring(std::wstring(L"ButtonBorderBrush") + state.suffix)), transparent);
-        }
+        barLook(borrow<controls::Control>(handle));
     } catch (...) { report("styling a toolbar button"); }
 }
 

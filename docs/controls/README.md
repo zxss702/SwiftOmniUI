@@ -58,19 +58,19 @@ The elements a layout positions - every one wears [View](tiers/View.md).
 | [RadioButton](RadioButton.md) | 121 | 59 ✅ · 1 ☑️ · 3 – | 63 ✅ | 24 ✅ · 11 – |  |
 | [Rectangle](Rectangle.md) | 112 | 50 ✅ · 1 ☑️ · 3 – | 59 ✅ · 3 – | 17 ✅ · 14 – |  |
 | [ScrollView](ScrollView.md) | 123 | 52 ✅ · 1 ☑️ · 3 – | 60 ✅ · 3 – | 22 ✅ · 11 – |  |
-| [SearchField](SearchField.md) | 130 | 62 ✅ · 1 ☑️ | 63 ✅ | 24 ✅ · 11 – |  |
+| [SearchField](SearchField.md) | 130 | 62 ✅ · 1 ☑️ | 60 ✅ | 24 ✅ · 11 – |  |
 | [Slider](Slider.md) | 108 | 55 ✅ · 1 ☑️ · 3 – | 57 ✅ | 23 ✅ · 13 – |  |
 | [Stepper](Stepper.md) | 106 | 50 ✅ · 1 ☑️ · 3 – | 57 ✅ | 19 ✅ · 11 – |  |
 | [Switch](Switch.md) | 104 | 52 ✅ · 1 ☑️ · 3 – | 56 ✅ | 21 ✅ · 11 – |  |
 | [Text](Text.md) | 126 | 61 ✅ · 1 ☑️ · 3 – | 63 ✅ · 3 – | 18 ✅ · 15 – |  |
-| [TextEditor](TextEditor.md) | 130 | 62 ✅ · 1 ☑️ | 70 ✅ | 24 ✅ · 11 – |  |
-| [TextField](TextField.md) | 132 | 63 ✅ · 1 ☑️ | 68 ✅ | 23 ✅ · 11 – |  |
+| [TextEditor](TextEditor.md) | 130 | 62 ✅ · 1 ☑️ | 62 ✅ | 24 ✅ · 11 – |  |
+| [TextField](TextField.md) | 132 | 63 ✅ · 1 ☑️ | 58 ✅ | 23 ✅ · 11 – |  |
 | [TimePicker](TimePicker.md) | 116 | 53 ✅ · 1 ☑️ · 3 – | 58 ✅ | 24 ✅ · 11 – |  |
 | [TitleBar](TitleBar.md) | 104 |  |  |  |  |
 | [VStack](VStack.md) | 110 | 52 ✅ · 1 ☑️ · 3 – | 56 ✅ · 3 – | 17 ✅ · 14 – |  |
 | [WebView](WebView.md) | 111 | 54 ✅ · 1 ☑️ · 3 – |  | 20 ✅ · 11 – |  |
 | [ZStack](ZStack.md) | 109 | 51 ✅ · 1 ☑️ · 3 – | 55 ✅ · 3 – | 16 ✅ · 14 – |  |
-| **Met** - ✅ and – | 4746 | 1751 of 4746 met | 1822 of 4746 met | 1207 of 4746 met |  |
+| **Met** - ✅ and – | 4746 | 1751 of 4746 met | 1801 of 4746 met | 1207 of 4746 met |  |
 <!-- controls:end -->
 
 ## App structure

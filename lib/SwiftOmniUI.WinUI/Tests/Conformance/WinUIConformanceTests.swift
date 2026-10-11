@@ -96,11 +96,15 @@ final class WinUIConformanceTests: XCTestCase {
     func testView5() { conform(ViewTests.self, part: Conformance.Part(5, of: 5)) }
     func testLayout() { conform(LayoutTests.self) }
     func testStackBase() { conform(StackBaseTests.self) }
-    func testInputView() { conform(InputViewTests.self) }
+    func testInputView1() { conform(InputViewTests.self, part: Conformance.Part(1, of: 2)) }
+    func testInputView2() { conform(InputViewTests.self, part: Conformance.Part(2, of: 2)) }
     func testShape() { conform(ShapeTests.self) }
-    func testTextElement() { conform(TextElementTests.self) }
+    func testTextElement1() { conform(TextElementTests.self, part: Conformance.Part(1, of: 2)) }
+    func testTextElement2() { conform(TextElementTests.self, part: Conformance.Part(2, of: 2)) }
     func testTextStyleElement() { conform(TextStyleElementTests.self) }
-    func testFontElement() { conform(FontElementTests.self) }
+    func testFontElement1() { conform(FontElementTests.self, part: Conformance.Part(1, of: 3)) }
+    func testFontElement2() { conform(FontElementTests.self, part: Conformance.Part(2, of: 3)) }
+    func testFontElement3() { conform(FontElementTests.self, part: Conformance.Part(3, of: 3)) }
     func testTextAlignmentElement() { conform(TextAlignmentElementTests.self) }
     func testLineHeightElement() { conform(LineHeightElementTests.self) }
     func testDecorableTextElement() { conform(DecorableTextElementTests.self) }

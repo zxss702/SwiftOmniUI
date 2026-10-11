@@ -445,7 +445,8 @@ void swiftomniui_winui_text_set_decorations(SwiftOmniUIObjectRef text, bool unde
 
 SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view);
 
-/// A toolbar's own button - WinUI's AppBarToggleButton, momentary until `button_set_on` has it keep a state.
+/// A toolbar's own button - the platform's own at heart, dressed as the bar's: no ground at rest, the system's
+/// subtle fills under the pointer and pressed. `button_set_on` gives it a state to keep.
 SwiftOmniUIObjectRef swiftomniui_winui_toolbar_button_make(int64_t view);
 
 /// The words a button or a radio button shows.
@@ -506,7 +507,7 @@ void swiftomniui_winui_set_context_menu(SwiftOmniUIObjectRef element, int64_t vi
 /// chevron the indicator setting shows or hides.
 SwiftOmniUIObjectRef swiftomniui_winui_menu_button_make(int64_t view);
 
-/// A menu on a toolbar: WinUI's AppBarButton, whose flyout `menu_button_set_menu` writes.
+/// A menu on a toolbar: the view's own menu button dressed as the bar's, whose flyout `menu_button_set_menu` writes.
 SwiftOmniUIObjectRef swiftomniui_winui_toolbar_menu_button_make(int64_t view);
 
 /// The label child's element the button's face shows before its chevron; none for the chevron alone.

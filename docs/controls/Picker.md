@@ -186,9 +186,9 @@ The font text is drawn in: its family, its size, its weight and slant, and wheth
 | `fontAutoScalingEnabled` | property | `Bool` | adaptive |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
 | `fontFamily` | property | `Name` | native | · | ✅ |  |  | cannot read fontFamily of Picker - Android's driver has no path for it yet; GTK 4: not realized |
 | `fontSize` | property | `Double` | native | · | ✅ |  |  | cannot read fontSize of Picker - Android's driver has no path for it yet; GTK 4: not realized |
-| `fontTextStyle` | property | `FontTextStyle` | native |  |  |  |  | GTK 4: not realized |
-| `fontWeight` | property | `Weight` | native |  |  |  |  | GTK 4: not realized |
-| `fontDesign` | property | `FontDesign` | native |  |  |  |  | GTK 4: not realized |
+| `fontTextStyle` | property | `FontTextStyle` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontWeight` | property | `Weight` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontDesign` | property | `FontDesign` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 
 ## From [TextAlignmentElement](tiers/TextAlignmentElement.md)
 

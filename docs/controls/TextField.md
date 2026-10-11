@@ -26,7 +26,7 @@ See [the dictionary](README.md) for how a mark is given.
 | Host | Created | Members (132) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
 | Android Views | ✅ | 63 ✅ · 1 ☑️ | `EditText` |  |
-| WinUI 3 | ✅ | 68 ✅ | `TextBox` / `PasswordBox` |  |
+| WinUI 3 | ✅ | 58 ✅ | `TextBox` / `PasswordBox` |  |
 | GTK 4 | ✅ | 23 ✅ · 11 – | `GtkEntry` / `GtkPasswordEntry` |  |
 | Web |  |  | `<input>` | no host yet |
 
@@ -169,17 +169,17 @@ What every field a user types into has: the text's limits and caret, the keyboar
 
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| `cursorPosition` | property | `Int` | native | ✅ | ✅ | · |  | GTK 4: cannot read cursorPosition of TextField - GTK's driver has no path for it yet |
-| `textContentType` | property | `InputPurpose` | adaptive |  | ✅ | · |  | not realized; GTK 4: cannot read textContentType of TextField - GTK's driver has no path for it yet |
-| `isReadOnly` | property | `Bool` | native |  | ✅ | ◐ |  | not realized; GTK 4: cannot read isReadOnly of TextField - GTK's driver has no path for it yet |
-| `isSpellCheckEnabled` | property | `Bool` | native |  | ✅ | · |  | not realized; GTK 4: cannot read isSpellCheckEnabled of TextField - GTK's driver has no path for it yet |
-| `isTextPredictionEnabled` | property | `Bool` | native |  | ✅ | · |  | not realized; GTK 4: cannot read isTextPredictionEnabled of TextField - GTK's driver has no path for it yet |
-| `maximumLength` | property | `Int` | native | ◐ | ✅ | ✅ |  | cannot read maximumLength of TextField - Android's field keeps no bound of SwiftOmniUI's: the host cuts what is typed, and typing proves it |
-| `placeholder` | property | `String` | native | ✅ | ✅ | · |  | GTK 4: cannot read placeholder of TextField - GTK's driver has no path for it yet |
+| `cursorPosition` | property | `Int` | native | ✅ |  | · |  | GTK 4: cannot read cursorPosition of TextField - GTK's driver has no path for it yet |
+| `textContentType` | property | `InputPurpose` | adaptive |  |  | · |  | not realized; GTK 4: cannot read textContentType of TextField - GTK's driver has no path for it yet |
+| `isReadOnly` | property | `Bool` | native |  |  | ◐ |  | not realized; GTK 4: cannot read isReadOnly of TextField - GTK's driver has no path for it yet |
+| `isSpellCheckEnabled` | property | `Bool` | native |  |  | · |  | not realized; GTK 4: cannot read isSpellCheckEnabled of TextField - GTK's driver has no path for it yet |
+| `isTextPredictionEnabled` | property | `Bool` | native |  |  | · |  | not realized; GTK 4: cannot read isTextPredictionEnabled of TextField - GTK's driver has no path for it yet |
+| `maximumLength` | property | `Int` | native | ◐ |  | ✅ |  | cannot read maximumLength of TextField - Android's field keeps no bound of SwiftOmniUI's: the host cuts what is typed, and typing proves it |
+| `placeholder` | property | `String` | native | ✅ |  | · |  | GTK 4: cannot read placeholder of TextField - GTK's driver has no path for it yet |
 | `placeholderKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |
-| `placeholderColor` | property | `Color` | native | ✅ | ✅ | · |  | GTK 4: cannot read placeholderColor of TextField - GTK's driver has no path for it yet |
-| `selectionLength` | property | `Int` | native | ✅ | ✅ | · |  | GTK 4: cannot read selectionLength of TextField - GTK's driver has no path for it yet |
-| `onTextChanged` (`textChanged`) | event | `String` | native | ✅ | ✅ | ✅ |  |  |
+| `placeholderColor` | property | `Color` | native | ✅ |  | · |  | GTK 4: cannot read placeholderColor of TextField - GTK's driver has no path for it yet |
+| `selectionLength` | property | `Int` | native | ✅ |  | · |  | GTK 4: cannot read selectionLength of TextField - GTK's driver has no path for it yet |
+| `onTextChanged` (`textChanged`) | event | `String` | native | ✅ |  | ✅ |  |  |
 
 ## From [TextElement](tiers/TextElement.md)
 
@@ -188,9 +188,9 @@ What every element showing words has: the words, and the case they are drawn in.
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
 | `text` | property | `String` | native | ◐ | ◐ | ◐ |  | waits on TextField.isReadOnly; WinUI 3: waits on TextField.isPassword; GTK 4: cannot read isPassword of TextField - GTK's driver has no path for it yet |
-| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |
+| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 | `textCase` | property | `TextCase` | native | ✅ | ✅ | ✅ |  |  |
-| `baselineOffset` | property | `Double` | native |  |  |  |  | GTK 4: not realized |
+| `baselineOffset` | property | `Double` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 
 ## From [TextStyleElement](tiers/TextStyleElement.md)
 
@@ -211,9 +211,9 @@ The font text is drawn in: its family, its size, its weight and slant, and wheth
 | `fontAutoScalingEnabled` | property | `Bool` | adaptive |  |  |  |  | not realized; WinUI 3: not realized; GTK 4: not realized |
 | `fontFamily` | property | `Name` | native | · | ✅ | · |  | cannot read a family - Android's typeface keeps no family's name; GTK 4: cannot read fontFamily of TextField - GTK's driver has no path for it yet |
 | `fontSize` | property | `Double` | native | ✅ | ✅ | · |  | GTK 4: cannot read fontSize of TextField - GTK's driver has no path for it yet |
-| `fontTextStyle` | property | `FontTextStyle` | native |  |  |  |  | GTK 4: not realized |
-| `fontWeight` | property | `Weight` | native |  |  |  |  | GTK 4: not realized |
-| `fontDesign` | property | `FontDesign` | native |  |  |  |  | GTK 4: not realized |
+| `fontTextStyle` | property | `FontTextStyle` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontWeight` | property | `Weight` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `fontDesign` | property | `FontDesign` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
 
 ## From [TextAlignmentElement](tiers/TextAlignmentElement.md)
 

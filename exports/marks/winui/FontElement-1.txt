@@ -1,0 +1,27 @@
+# revision 1.1
+Button.fontAutoScalingEnabled: not realized
+Button.fontDesign: ❌ the driver cannot read fontDesign of Button, and says nothing of why
+Button.fontSize: ✅
+DatePicker.fontFamily: ✅
+DatePicker.fontWeight: not realized
+Image.fontAttributes: ❌ the driver cannot read fontWeight of a WinUIImageView, and says nothing of why
+Image.fontTextStyle: ❌ the driver cannot read fontTextStyle of Image, and says nothing of why
+Picker.fontFamily: ✅
+Picker.fontWeight: not realized
+RadioButton.fontAttributes: ✅
+RadioButton.fontTextStyle: ❌ the driver cannot read fontTextStyle of RadioButton, and says nothing of why
+SearchField.fontAutoScalingEnabled: not realized
+SearchField.fontDesign: not realized
+SearchField.fontSize: ✅
+Span.fontFamily: ✅
+Span.fontWeight: not realized
+Text.fontAutoScalingEnabled: not realized
+Text.fontDesign: ❌ the driver cannot read fontDesign of Text, and says nothing of why
+Text.fontSize: ✅
+TextEditor.fontAttributes: ✅
+TextEditor.fontTextStyle: not realized
+TextField.fontAutoScalingEnabled: not realized
+TextField.fontDesign: not realized
+TextField.fontSize: ✅
+TimePicker.fontFamily: ✅
+TimePicker.fontWeight: not realized

@@ -1,0 +1,15 @@
+# revision 1.1
+Button.text: ✅
+Button.textKey: not realized
+RadioButton.text: ✅
+RadioButton.textKey: not realized
+SearchField.text: ✅
+SearchField.textKey: not realized
+Span.text: ✅
+Span.textKey: not realized
+Text.text: ✅
+Text.textKey: not realized
+TextEditor.text: ✅
+TextEditor.textKey: not realized
+TextField.text: ✅
+TextField.textKey: not realized

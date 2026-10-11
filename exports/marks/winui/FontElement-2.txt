@@ -1,0 +1,27 @@
+# revision 1.1
+Button.fontAttributes: ✅
+Button.fontTextStyle: ❌ the driver cannot read fontTextStyle of Button, and says nothing of why
+DatePicker.fontAutoScalingEnabled: not realized
+DatePicker.fontDesign: not realized
+DatePicker.fontSize: ✅
+Image.fontFamily: not realized
+Image.fontWeight: ❌ the driver cannot read fontWeight of Image, and says nothing of why
+Picker.fontAutoScalingEnabled: not realized
+Picker.fontDesign: not realized
+Picker.fontSize: ✅
+RadioButton.fontFamily: ✅
+RadioButton.fontWeight: ❌ the driver cannot read fontWeight of RadioButton, and says nothing of why
+SearchField.fontAttributes: ✅
+SearchField.fontTextStyle: not realized
+Span.fontAutoScalingEnabled: not realized
+Span.fontDesign: not realized
+Span.fontSize: ✅
+Text.fontAttributes: ✅
+Text.fontTextStyle: ❌ the driver cannot read fontTextStyle of Text, and says nothing of why
+TextEditor.fontFamily: ✅
+TextEditor.fontWeight: not realized
+TextField.fontAttributes: ✅
+TextField.fontTextStyle: not realized
+TimePicker.fontAutoScalingEnabled: not realized
+TimePicker.fontDesign: not realized
+TimePicker.fontSize: ✅
