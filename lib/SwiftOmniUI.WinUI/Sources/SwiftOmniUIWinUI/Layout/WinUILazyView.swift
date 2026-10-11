@@ -73,16 +73,9 @@ class WinUILazyView: WinUITravellingLayout {
         if now.contains(where: { identity, item in
             mounted[identity].map { $0.values != item.values } ?? false
         }) {
-            #if DEBUG
-            WinUIDebugLog.log("lazy[\(ObjectIdentifier(self).hashValue)] valuesChanged -> extents.reset")
-            #endif
             cells.extents.reset()
             cells.runs.reset()
         }
-        #if DEBUG
-        let churned = mounted.keys.filter { now[$0]?.view !== mounted[$0]?.view }.count
-        WinUIDebugLog.log("lazy[\(ObjectIdentifier(self).hashValue)] setItems now=\(now.count) churnedViews=\(churned)")
-        #endif
         for (identity, previous) in mounted {
             if now[identity]?.view !== previous.view {
                 swiftomniui_winui_scroller_anchor(previous.view.handle, false)
@@ -202,16 +195,6 @@ class WinUILazyView: WinUITravellingLayout {
                 return
             }
         }
-        #if DEBUG
-        if abs(rect.x - (-16)) > 1 {
-            var raw = [Double](repeating: 0, count: 6)
-            if let scroll = watching {
-                swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
-            }
-            WinUIDebugLog.log("lazy[\(ObjectIdentifier(self).hashValue)].drift rect=\(rect) eff=\(effective) placed=\(String(describing: placed)) held=\(held) built=\(cells.built) raw=(\(raw[0]),\(raw[1])) displayed=(\(raw[4]),\(raw[5]))")
-        }
-        WinUIDebugLog.log("lazy[\(ObjectIdentifier(self).hashValue)].viewport rect=\(rect) eff=\(effective) span=\(String(describing: span)) realize=\(String(describing: realize)) held=\(held) built=\(cells.built) bring=\(bring)")
-        #endif
         let built = cells.built
         invalidateMeasure()
         tellWindow(span ?? 0..<0, realize: realize ?? 0..<0)
@@ -223,10 +206,6 @@ class WinUILazyView: WinUITravellingLayout {
             _ = contentSize(width: standsAt ?? placed.width)
             arrange(width: placed.width, height: placed.height)
         }
-        #if DEBUG
-        WinUIDebugLog.log("lazy[\(ObjectIdentifier(self).hashValue)].window built=\(built) -> \(cells.built) total=\(cells.total) est=\(cells.extents.estimate) ids=\(cells.identities.count) shift=\(cells.anchorShift)")
-        WinUIDebugLog.flush()
-        #endif
     }
 
     /// The window `rect` shows of the run, clipped to its document extent.
@@ -290,9 +269,6 @@ class WinUILazyView: WinUITravellingLayout {
     /// The ScrollViewer owns the physical scroll adjustment through its native anchor.
     func commitAnchor(perRun: Int = 1, grid: Bool = false) {
         guard let origin = cells.correctedOrigin(perRun: perRun, grid: grid) else { return }
-        #if DEBUG
-        WinUIDebugLog.log("lazy.commitAnchor origin=\(origin) shift=\(cells.anchorShift)")
-        #endif
         if axis == .vertical { effectiveViewport?.y = origin }
         else { effectiveViewport?.x = origin }
     }
@@ -333,9 +309,6 @@ class WinUILazyView: WinUITravellingLayout {
         rect.height = effectiveViewport?.height ?? raw[3]
         if axis == .vertical { rect.y += next.y - standing.y } else { rect.x += next.x - standing.x }
         announcedRect = rect
-        #if DEBUG
-        WinUIDebugLog.log("lazy.moved standing=(\(standing.x),\(standing.y)) next=(\(next.x),\(next.y)) raw=(\(raw[0]),\(raw[1]),\(raw[2])x\(raw[3])) -> \(rect)")
-        #endif
         viewportChanged(rect, effective: effectiveViewport == nil, target: rect)
     }
 
@@ -374,11 +347,6 @@ class WinUILazyView: WinUITravellingLayout {
 
 /// A lazy stack: one child a place.
 final class WinUILazyStackView: WinUILazyView {
-    #if DEBUG
-    /// Each identity's last placed cross-axis origin, for drift tracing.
-    private var lastX: [String: Double] = [:]
-    #endif
-
     /// The room between two children.
     var spacing: Double? {
         didSet { cells.extents.spacing = spacing; if spacing != oldValue { invalidateMeasurements() } }
@@ -493,12 +461,6 @@ final class WinUILazyStackView: WinUILazyView {
             var placed = item
             if cells.inserting.remove(identity) == nil { placed.fadeIn = nil }
             self.place(placed, at: direction.places(frame, in: bounds))
-            #if DEBUG
-            if abs(frame.x - (lastX[identity] ?? frame.x)) > 0.5 {
-                WinUIDebugLog.log("lazy[\(ObjectIdentifier(self).hashValue)].rowx \(identity) x=\(frame.x) w=\(frame.width) natural=\(size.width)")
-            }
-            lastX[identity] = frame.x
-            #endif
         }
     }
 

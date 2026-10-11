@@ -90,6 +90,63 @@ private final class LastFrame: @unchecked Sendable {
     var rect: Rect?
 }
 
+/// What an `onGeometryChange` handler last answered with - the same book as
+/// `LastFrame`, on the transformed value rather than on the rectangle.
+private final class LastGeometry<T: Equatable>: @unchecked Sendable {
+    /// The last numbers report.
+    var report: FrameReport?
+
+    /// The named spaces the last report travelled with.
+    var named: [NamedSpaceFrame] = []
+
+    /// The value the handler last ran with.
+    var value: T?
+}
+
+extension View {
+    /// Runs `action` with a value drawn from this view's geometry every time
+    /// that value settles somewhere new, the first layout included - the
+    /// SwiftUI spelling.
+    ///
+    ///     .onGeometryChange(for: Rect.self) { proxy in
+    ///         proxy.frame(in: .global)
+    ///     } action: { frame in
+    ///         anchor = frame
+    ///     }
+    ///
+    /// - Parameters:
+    ///   - type: what `transform` answers.
+    ///   - transform: the part of the proxy to watch - the view's size, or its
+    ///     frame in a coordinate space.
+    ///   - action: run with each new settled value.
+    public func onGeometryChange<T: Equatable>(
+        for type: T.Type,
+        of transform: @escaping (GeometryProxy) -> T,
+        action: @escaping (T) -> Void
+    ) -> ModifiedContent {
+        let last = LastGeometry<T>()
+
+        nonisolated(nonsending) func report() async throws {
+            guard var report = last.report else { return }
+            report.named = last.named
+            let value = transform(GeometryProxy(report: report))
+            guard value != last.value else { return }
+            last.value = value
+            action(value)
+        }
+
+        return hearing(ViewContract.frameChanged) { numbers in
+            guard let arrived = FrameReport(numbers) else { return }
+            last.report = arrived
+            try await report()
+        }
+        .hearing(ViewContract.namedFramesChanged) { frames in
+            last.named = frames
+            try await report()
+        }
+    }
+}
+
 /// What a `GeometryReader` hands its content: the view's size, where the safe
 /// area cuts into it, and its frame in the space asked for.
 public struct GeometryProxy: Sendable {

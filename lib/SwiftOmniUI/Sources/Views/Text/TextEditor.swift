@@ -58,6 +58,20 @@ public struct TextEditor: InputView, TextElement, FontElement, TextAlignmentElem
         self = TextEditor().text(text)
     }
 
+    /// An editor captioned `title` while it is empty, two-way on `text` - the
+    /// SwiftUI spelling of `TextEditor(text).placeholder(title)`.
+    ///
+    ///     TextEditor("Notes", text: $draft)
+    @_disfavoredOverload public init<S: StringProtocol>(_ title: S, text: Binding<String>) {
+        self = TextEditor(text).placeholder(String(title))
+    }
+
+    /// The same, its caption looked up - `TextEditor("Notes", text: $draft)`
+    /// looks "Notes" up, as SwiftUI's does.
+    public init(_ titleKey: LocalizedStringKey, text: Binding<String>) {
+        self = TextEditor(text).placeholder(titleKey)
+    }
+
     /// The same two-way text as `TextEditor($text)`, written as a modifier.
     /// Design: docs/design/views/bindings.md#two-way-controls
     @_spi(Host) public func text(_ value: Binding<String>) -> Modified {

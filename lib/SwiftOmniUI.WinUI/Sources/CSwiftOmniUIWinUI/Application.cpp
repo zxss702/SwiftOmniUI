@@ -10,10 +10,8 @@
 // A debug tree update needs the same 8 MiB stack budget as the other desktop
 // hosts. Keep this on the startup object so every consuming EXE receives it.
 #pragma comment(linker, "/STACK:8388608")
-#pragma comment(lib, "CoreMessaging.lib")
 
 #include <chrono>
-#include <dispatcherqueue.h>
 #include <io.h>
 
 #include <winrt/Windows.UI.Xaml.Interop.h>
@@ -187,18 +185,6 @@ extern "C" int32_t swiftomniui_winui_embed(SwiftOmniUIWinUICallbacks const *give
         // The thread's WinUI itself: destroyed as the process exits, in the reverse of the order it stood up in,
         // which is WinUI's own shutdown - kept past it, the process ends in an access violation.
         static auto controller = winrt::Microsoft::UI::Dispatching::DispatcherQueueController::CreateOnCurrentThread();
-        // The compositor's own queue too, beside the framework's: the visual layer pumps its work - an
-        // InteractionTracker's requests among them - through the thread's Windows.System dispatcher queue,
-        // which Application::Start makes on a full launch but nothing on an embedded thread does without it.
-        static winrt::com_ptr<ABI::Windows::System::IDispatcherQueueController> systemQueue = [] {
-            DispatcherQueueOptions options{};
-            options.dwSize = sizeof(options);
-            options.threadType = DQTYPE_THREAD_CURRENT;
-            options.apartmentType = DQTAT_COM_STA;
-            winrt::com_ptr<ABI::Windows::System::IDispatcherQueueController> made;
-            winrt::check_hresult(CreateDispatcherQueueController(options, made.put()));
-            return made;
-        }();
         // The application first: InitializeForCurrentThread takes its type information, and calls its OnLaunched.
         static auto application = winrt::make<SwiftOmniUIApplication>(true);
         static auto manager = xaml::Hosting::WindowsXamlManager::InitializeForCurrentThread();

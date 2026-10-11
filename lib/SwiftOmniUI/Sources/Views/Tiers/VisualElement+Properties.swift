@@ -615,6 +615,18 @@ extension View {
         }
     }
 
+    /// Turns the view about the axis given, in the screen's plane when the
+    /// axis is `z` and out of it when `x` or `y` - the SwiftUI spelling.
+    public func rotation3DEffect(
+        _ angle: Angle, axis: (x: Double, y: Double, z: Double)
+    ) -> ModifiedContent {
+        revised { node in
+            if axis.x != 0 { node.write(VisualElementContract.rotationX, Angle(degrees: angle.degrees * axis.x)) }
+            if axis.y != 0 { node.write(VisualElementContract.rotationY, Angle(degrees: angle.degrees * axis.y)) }
+            if axis.z != 0 { node.write(VisualElementContract.rotation, Angle(degrees: angle.degrees * axis.z)) }
+        }
+    }
+
     /// How this view is moved, turned and sized: one transform about the view's
     /// own centre.
     @_disfavoredOverload

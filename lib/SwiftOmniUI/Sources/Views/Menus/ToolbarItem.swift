@@ -11,13 +11,8 @@
 ///                 .onAppear {
 ///                     page.title = "Notes"
 ///                     page.toolbarItems = [
-///                         ToolbarItem("Save")
-///                             .onClicked { save() },
-///
-///                         ToolbarItem("Delete")
-///                             .placement(.overflow)
-///                             .isDestructive(true)
-///                             .onClicked { delete() },
+///                         ToolbarItem("Save") { save() },
+///                         ToolbarItem("Delete", placement: .overflow) { delete() },
 ///                     ]
 ///                 }
 ///         }

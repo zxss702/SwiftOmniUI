@@ -12,7 +12,7 @@
 ///
 /// Each group names itself with `.id`, so two groups may hold equal items; a
 /// group given none is named by its place.
-public struct ItemsGroup<Items: RandomAccessCollection, Id: Hashable> {
+@_spi(Host) public struct ItemsGroup<Items: RandomAccessCollection, Id: Hashable> {
     /// The items.
     let items: Items
 

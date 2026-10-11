@@ -124,9 +124,7 @@ extension Menu {
 
 /// One entry in a menu.
 ///
-///     MenuItem("Save")
-///         .icon("nav_media.png")
-///         .onClicked { save() }
+///     MenuItem("Save") { save() }
 public struct MenuItem: View, MenuItemElement {
     /// The node this entry describes.
     public var node: Node
@@ -146,6 +144,24 @@ public struct MenuItem: View, MenuItemElement {
         node.write(MenuItemElementContract.textKey, key)
     }
 
+    /// An entry captioned `title`, running `action` when chosen - the SwiftUI
+    /// spelling of `MenuItem(title).onClicked(action)`.
+    ///
+    ///     MenuItem("Save") { save() }
+    @_disfavoredOverload public init<S: StringProtocol>(_ title: S, action: @escaping EventHandler) {
+        self = MenuItem(title).onClicked(action)
+    }
+
+    /// An entry captioned what `key` looks up, running `action` when chosen.
+    public init(_ key: LocalizedStringKey, action: @escaping EventHandler) {
+        self = MenuItem(key).onClicked(action)
+    }
+
+    /// The same, marked as a destructive action where the platform marks one.
+    public init(_ key: LocalizedStringKey, role: ButtonRole, action: @escaping EventHandler) {
+        self = MenuItem(key).onClicked(action).isDestructive(role == .destructive)
+    }
+
     /// The node, as every element answers it.
 
     /// Who this entry is among the menu's others, so it stays matched to itself
@@ -160,9 +176,9 @@ public struct MenuItem: View, MenuItemElement {
 /// below.
 ///
 ///     Menu("File") {
-///         MenuItem("New").onClicked { create() }
+///         MenuItem("New") { create() }
 ///         Divider()
-///         MenuItem("Close").onClicked { close() }
+///         MenuItem("Close") { close() }
 ///     }
 ///
 /// It has no caption and nothing to click; the platform draws whatever a

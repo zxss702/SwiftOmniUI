@@ -79,9 +79,6 @@ enum WinUICallbacks {
             },
             scrolling: { view, x, y, fx, fy in
                 MainActor.assumeIsolated {
-                    #if DEBUG
-                    WinUIDebugLog.log("scroll.changing v=\(view) next=(\(x),\(y)) final=(\(fx),\(fy))")
-                    #endif
                     guard let scroller = WinUIView.find(view) as? WinUIScrollerView else { return }
                     scroller.nextOffset = Point(x: x, y: y)
                     scroller.finalOffset = Point(x: fx, y: fy)
@@ -91,10 +88,6 @@ enum WinUICallbacks {
             },
             scrolled: { view, x, y in
                 MainActor.assumeIsolated {
-                    #if DEBUG
-                    WinUIDebugLog.log("scroll.changed v=\(view) at=(\(x),\(y))")
-                    WinUIDebugLog.flush()
-                    #endif
                     guard let scroller = WinUIView.find(view) as? WinUIScrollerView else { return }
                     scroller.nextOffset = nil
                     scroller.finalOffset = nil
@@ -106,9 +99,6 @@ enum WinUICallbacks {
             },
             held: { view, holding in
                 MainActor.assumeIsolated {
-                    #if DEBUG
-                    WinUIDebugLog.log("scroll.held v=\(view) \(holding)")
-                    #endif
                     WinUIView.find(view)?.held(holding)
                 }
             },

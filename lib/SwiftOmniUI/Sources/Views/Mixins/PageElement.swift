@@ -85,6 +85,27 @@ extension View {
     public func navigationTitle(_ state: Binding<String>) -> ModifiedContent {
         revised { $0.driveWords(PageElementContract.title, by: state) }
     }
+
+    /// The item the page holding this view is tabbed under - caption and
+    /// icon as the label states them:
+    ///
+    ///     StackPage()
+    ///         .tabItem(Label("Stack", image: "tab_bar.png"))
+    ///
+    /// Written on a page's root view it names the page's tab, as `page.icon`
+    /// does from inside. A label composed of custom views rather than the
+    /// `Label(_:image:)` and `Label(_:systemImage:)` initializers keeps its
+    /// look inside the page and names no item.
+    public func tabItem(_ label: Label) -> ModifiedContent {
+        var made = label.iconSource.map { setting(PageElementContract.icon, $0) }
+            ?? revised { _ in }
+        if let title = label.titleText {
+            made = made
+                .setting(PageElementContract.title, title.display)
+                .setting(PageElementContract.titleKey, title.key)
+        }
+        return made
+    }
 }
 
 extension View {

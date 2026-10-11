@@ -123,4 +123,10 @@ extension View {
     public func gridColumnAlignment(_ alignment: HorizontalAlignment) -> ModifiedContent {
         setting(ViewContract.horizontalAlignment, alignment.axis)
     }
+
+    /// How many columns this grid cell covers, counting from its own -
+    /// SwiftUI's `.gridCellColumns(2)`.
+    public func gridCellColumns(_ count: Int) -> ModifiedContent {
+        setting(ViewContract.gridColumnSpan, count)
+    }
 }

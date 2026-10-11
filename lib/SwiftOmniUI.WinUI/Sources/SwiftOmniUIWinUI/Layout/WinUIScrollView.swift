@@ -106,9 +106,6 @@ final class WinUIScrollView: WinUILayoutView {
             bars = (verticalBar, horizontalBar)
             configure()
         } else {
-            #if DEBUG
-            WinUIDebugLog.log("scroll.modes v=\(modes.vertical) h=\(modes.horizontal)")
-            #endif
             scroller.setModes(vertical: modes.vertical, horizontal: modes.horizontal)
         }
         document.padding = padding
@@ -158,9 +155,6 @@ final class WinUIScrollView: WinUILayoutView {
         }
         let previous = offset
         offset = standing
-        #if DEBUG
-        WinUIDebugLog.log("scroll.userMoved \(previous.x),\(previous.y) -> \(standing.x),\(standing.y)")
-        #endif
         movement.userMoved(from: previous, to: standing)
     }
 
@@ -229,9 +223,6 @@ final class WinUIScrollView: WinUILayoutView {
             return
         }
 
-        #if DEBUG
-        WinUIDebugLog.log("scroll.move to=(\(kept.x),\(kept.y)) standing=(\(standing.offset.x),\(standing.offset.y)) reach=(\(standing.reach.x),\(standing.reach.y))")
-        #endif
         programTarget = kept
         scroller.move(to: kept)
     }

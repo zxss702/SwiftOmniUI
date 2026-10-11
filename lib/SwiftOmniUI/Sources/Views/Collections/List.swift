@@ -48,7 +48,7 @@ public struct List<Items: RandomAccessCollection, Id: Hashable>: View {
     }
 
     /// A list of groups, each under its header and over its footer.
-    public init(groups: [ItemsGroup<Items, Id>]) {
+    @_spi(Host) public init(groups: [ItemsGroup<Items, Id>]) {
         source = ItemsSource(groups: groups, grouped: true)
     }
 

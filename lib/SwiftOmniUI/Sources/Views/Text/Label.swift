@@ -20,6 +20,14 @@ public struct Label: View {
     /// The picture - a symbol or a file, or `EmptyView` for a title-only one.
     let icon: any View
 
+    /// The title's key and fallback text, where the label was made from one -
+    /// what `.tabItem` names a page's item with.
+    var titleText: (key: LocalizedStringKey, display: String)? = nil
+
+    /// The icon as a source, where the label was made from one - a custom
+    /// `icon:` view draws in the label but names no item.
+    var iconSource: ImageSource? = nil
+
     /// Which halves draw - `.labelsHidden` above writes it.
     @Environment private var style: LabelStyle
 
@@ -39,21 +47,29 @@ public struct Label: View {
     /// `Label("Star", systemImage: "star")`.
     @_disfavoredOverload public init<S: StringProtocol>(_ title: S, systemImage: String) {
         self.init(title: { Text(title) }, icon: { Image(systemName: systemImage) })
+        titleText = (LocalizedStringKey(pattern: String(title)), String(title))
+        iconSource = .symbol(systemImage)
     }
 
     /// A label with its words looked up and a platform symbol.
     public init(_ titleKey: LocalizedStringKey, systemImage: String) {
         self.init(title: { Text(titleKey) }, icon: { Image(systemName: systemImage) })
+        titleText = (titleKey, titleKey.displayString)
+        iconSource = .symbol(systemImage)
     }
 
     /// A label with its words and a picture's file.
     @_disfavoredOverload public init<S: StringProtocol>(_ title: S, image: ImageSource) {
         self.init(title: { Text(title) }, icon: { Image(image) })
+        titleText = (LocalizedStringKey(pattern: String(title)), String(title))
+        iconSource = image
     }
 
     /// A label with its words looked up and a picture's file.
     public init(_ titleKey: LocalizedStringKey, image: ImageSource) {
         self.init(title: { Text(titleKey) }, icon: { Image(image) })
+        titleText = (titleKey, titleKey.displayString)
+        iconSource = image
     }
 
     /// The row itself.

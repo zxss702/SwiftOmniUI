@@ -17,11 +17,7 @@ extension WinUIElement {
     func arrangeChildren() {
         if let items = view as? WinUIItemsView { return items.childrenChanged() }
         if let lazy = view as? WinUILazyView {
-            let before = lazy.cells.identities
             if lazy.cells.takeItems() {
-                #if DEBUG
-                WinUIDebugLog.log("lazy[\(ObjectIdentifier(lazy).hashValue)] takeItems ids=\(lazy.cells.identities.count) sameIDs=\(before == lazy.cells.identities)")
-                #endif
                 lazy.measured = [:]
                 lazy.invalidateMeasurements()
             }

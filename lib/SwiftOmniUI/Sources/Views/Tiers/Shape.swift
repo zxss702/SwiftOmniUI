@@ -53,9 +53,20 @@ extension ShapeProperties {
         }
     }
 
+    /// `style` stroked as `strokeStyle` says - the SwiftUI spelling carrying
+    /// width, cap and join together.
+    public func stroke(_ style: some ShapeStyle, style strokeStyle: StrokeStyle) -> Modified {
+        modified {
+            $0.props[ShapeContract.stroke.token] = style.brush.propValue
+            $0.write(ShapeContract.strokeWidth, strokeStyle.lineWidth)
+            $0.write(ShapeContract.strokeLineCap, strokeStyle.lineCap)
+            $0.write(ShapeContract.strokeLineJoin, strokeStyle.lineJoin)
+        }
+    }
+
     /// How thick the outline is, in device units - 1 unless said. A thickness
     /// with no `.stroke` draws nothing.
-    public func strokeWidth(_ value: Double) -> Modified {
+    @_spi(Host) public func strokeWidth(_ value: Double) -> Modified {
         setValue(ShapeContract.strokeWidth, value)
     }
 
@@ -66,35 +77,35 @@ extension ShapeProperties {
     ///         .stroke(.lightGray)
     ///         .strokeWidth(2)
     ///         .strokeDashPattern([4, 2])   // 8 units of dash, 4 of gap
-    public func strokeDashPattern(_ value: [Double]) -> Modified {
+    @_spi(Host) public func strokeDashPattern(_ value: [Double]) -> Modified {
         setValue(ShapeContract.strokeDashPattern, value)
     }
 
     /// How far into the dash pattern the line starts.
-    public func strokeDashOffset(_ value: Double) -> Modified {
+    @_spi(Host) public func strokeDashOffset(_ value: Double) -> Modified {
         setValue(ShapeContract.strokeDashOffset, value)
     }
 
     /// How the ends of an open line are drawn.
-    public func strokeLineCap(_ value: LineCap) -> Modified {
+    @_spi(Host) public func strokeLineCap(_ value: LineCap) -> Modified {
         setValue(ShapeContract.strokeLineCap, value)
     }
 
     /// How two segments meet at a corner.
-    public func strokeLineJoin(_ value: LineJoin) -> Modified {
+    @_spi(Host) public func strokeLineJoin(_ value: LineJoin) -> Modified {
         setValue(ShapeContract.strokeLineJoin, value)
     }
 
     /// How far a sharp corner may reach before it is cut off, in multiples of
     /// the stroke thickness.
-    public func strokeMiterLimit(_ value: Double) -> Modified {
+    @_spi(Host) public func strokeMiterLimit(_ value: Double) -> Modified {
         setValue(ShapeContract.strokeMiterLimit, value)
     }
 
     /// What the shape does with the room it is given - the `ContentMode` an Image
     /// takes too. `.fit`, the default, scales the drawing to fit and keeps its
     /// proportions; `.center` keeps the size its own numbers say.
-    public func aspect(_ value: ContentMode) -> Modified { setValue(ShapeContract.aspect, value) }
+    @_spi(Host) public func aspect(_ value: ContentMode) -> Modified { setValue(ShapeContract.aspect, value) }
 }
 
 extension Shape {

@@ -26,8 +26,21 @@ extension BorderElement {
         stroke(.solidColor(value))
     }
 
+    /// The same, `width` wide - colour and thickness said together.
+    public func stroke(_ value: Brush, width: Double) -> Modified {
+        modified {
+            $0.props[BorderElementContract.stroke.token] = value.propValue
+            $0.write(BorderElementContract.strokeWidth, width)
+        }
+    }
+
+    /// The same, in one colour.
+    public func stroke(_ value: Color, width: Double) -> Modified {
+        stroke(.solidColor(value), width: width)
+    }
+
     /// How wide the outline is, in device units; one where none is said.
-    public func strokeWidth(_ value: Double) -> Modified {
+    @_spi(Host) public func strokeWidth(_ value: Double) -> Modified {
         setValue(BorderElementContract.strokeWidth, value)
     }
 }

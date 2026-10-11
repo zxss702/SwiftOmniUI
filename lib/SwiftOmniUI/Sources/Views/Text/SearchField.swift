@@ -44,6 +44,20 @@ public struct SearchField: InputView, TextElement, FontElement, TextAlignmentEle
         self = SearchField().text(text)
     }
 
+    /// A search box captioned `title` while it is empty, two-way on `text` -
+    /// the SwiftUI spelling of `SearchField(text).placeholder(title)`.
+    ///
+    ///     SearchField("Search", text: $query)
+    @_disfavoredOverload public init<S: StringProtocol>(_ title: S, text: Binding<String>) {
+        self = SearchField(text).placeholder(String(title))
+    }
+
+    /// The same, its caption looked up - `SearchField("Search", text: $query)`
+    /// looks "Search" up, as SwiftUI's does.
+    public init(_ titleKey: LocalizedStringKey, text: Binding<String>) {
+        self = SearchField(text).placeholder(titleKey)
+    }
+
     /// The same two-way text as `SearchField($text)`, written as a modifier.
     /// Design: docs/design/views/bindings.md#two-way-controls
     @_spi(Host) public func text(_ value: Binding<String>) -> Modified {
