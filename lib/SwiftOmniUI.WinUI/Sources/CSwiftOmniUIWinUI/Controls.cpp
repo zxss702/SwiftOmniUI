@@ -268,7 +268,7 @@ extern "C" void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef handle, char 
 extern "C" void swiftomniui_winui_toolbar_button_set_look(SwiftOmniUIObjectRef handle) {
     // The app menu's trigger on the bar.
     try {
-        barLook(borrow<controls::Control>(handle));
+        barLook(as<controls::Control>(handle));
     } catch (...) { report("styling a toolbar button"); }
 }
 

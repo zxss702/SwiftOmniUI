@@ -169,14 +169,22 @@ public enum ViewBuilder {
         if let elements = (view as? TupleView)?.lazyElements {
             return elements.map { TupleView.keyed(segment, $0) }
         }
+        return leaf(segment, view)
+    }
 
+    /// One statement's views as elements: the view itself where it stands as
+    /// one node - a control reading the statement (a button's `Label`) finds
+    /// the view, not just its node - its nodes otherwise, each keyed by its
+    /// own number.
+    @MainActor private static func leaf(_ segment: String, _ view: any View) -> [Element] {
         let nodes = view.node.asChildren
-
-        guard nodes.count > 1 else {
-            return nodes.map { Keyed(segment: String(index), raw: $0) }
+        if view.node.type != .fragment || nodes.isEmpty {
+            return [Keyed(segment: segment, raw: view)]
         }
-
-        return nodes.enumerated().map { Keyed(segment: "\(index).\($0.offset)", raw: $0.element) }
+        guard nodes.count > 1 else {
+            return nodes.map { Keyed(segment: segment, raw: $0) }
+        }
+        return nodes.enumerated().map { Keyed(segment: "\(segment).\($0.offset)", raw: $0.element) }
     }
 }
 
@@ -195,4 +203,15 @@ struct Keyed: Element {
         node.key = node.key.map { "\(segment).\($0)" } ?? segment
         return node
     }
+}
+
+/// The view a builder closure's lone statement kept, where it kept one - the
+/// statement itself, so a control reading it (a button's `Label`) finds the
+/// view - or the closure's result where the statement was several views or
+/// its node alone.
+@MainActor func unwrappedStatement(_ view: any View) -> any View {
+    guard let elements = (view as? TupleView)?.lazyElements, elements.count == 1,
+          let keyed = elements[0] as? Keyed, let kept = keyed.raw as? any View
+    else { return view }
+    return kept
 }

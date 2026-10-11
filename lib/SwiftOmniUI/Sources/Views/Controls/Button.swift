@@ -246,13 +246,14 @@ struct ContentButton: View {
     /// The label, answering a tap.
     var body: any View {
         if isToolbarContent {
-            if let label = label as? Label, let source = (label.icon as? Image)?.imageSource {
-                let title = label.title.node.props[.text]?.string ?? ""
+            let face = unwrappedStatement(label)
+            if let label = face as? Label, let source = label.semanticParts.icon {
+                let title = label.semanticParts.title?.display ?? ""
                 var button = Button(icon: source).onClicked(action)
                 button.node.children = [label.icon.node]
                 return button.help(title)
             }
-            if let image = label as? Image, let source = image.imageSource {
+            if let image = face as? Image, let source = image.imageSource {
                 var button = Button(icon: source).onClicked(action)
                 button.node.children = [image.node]
                 return button

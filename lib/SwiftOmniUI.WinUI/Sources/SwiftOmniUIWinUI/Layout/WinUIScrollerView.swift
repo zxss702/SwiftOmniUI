@@ -58,7 +58,10 @@ final class WinUIScrollerView: WinUIView {
     }
 
     /// Moves the view to `target` at once; the scroller says where it stands once it has moved.
+    /// Each ear hears the landing first, so a lazy run can realize its window
+    /// before the compositor shows the new offset.
     func move(to target: Point) {
+        for ear in ears { ear.announce?(target) }
         swiftomniui_winui_scroller_move(handle, target.x, target.y, false)
     }
 
@@ -96,6 +99,9 @@ final class WinUIScrollEar {
 
     /// What the move says.
     let moved: () -> Void
+
+    /// What a program's move to a target says before the scroller moves: the landing to prepare for.
+    var announce: ((Point) -> Void)?
 
     init(owner: AnyObject, moved: @escaping () -> Void) {
         self.owner = owner

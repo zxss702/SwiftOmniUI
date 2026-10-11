@@ -173,7 +173,11 @@ class WinUILazyView: WinUITravellingLayout {
         // painted. While the scroller is held the window only widens, built a stretch
         // at a time; at rest it follows the viewport, a look-ahead either way.
         if let realized = realize {
-            let room = axis == .vertical ? rect.height : rect.width
+            // The look-ahead must stand on the same sixty-fourth grid the
+            // window's own bounds snap to, or a float's worth of room lands a
+            // boundary row on one side of the window and not the other.
+            let raw = axis == .vertical ? rect.height : rect.width
+            let room = (raw * 64).rounded() / 64
             if held, let kept = cells.window?.realize, kept.lowerBound <= max(0, realized.lowerBound - room / 2),
                kept.upperBound >= realized.upperBound + room / 2 {
                 realize = kept
@@ -293,6 +297,7 @@ class WinUILazyView: WinUITravellingLayout {
         scrollEar = nil
         if let scroll {
             let ear = WinUIScrollEar(owner: self) { [weak self] in self?.scrollerMoved() }
+            ear.announce = { [weak self] target in self?.prepareFor(target) }
             scroll.scroller.ears.append(ear)
             scrollEar = ear
         }
@@ -318,6 +323,20 @@ class WinUILazyView: WinUITravellingLayout {
         if axis == .vertical { rect.y += next.y - standing.y } else { rect.x += next.x - standing.x }
         announcedRect = rect
         viewportChanged(rect, effective: effectiveViewport == nil, target: rect)
+    }
+
+    /// A jump the program makes: realize the window it lands in before the
+    /// scroller moves, so the compositor's first frame at the new offset
+    /// already shows rows rather than the bare document behind them.
+    func prepareFor(_ target: Point) {
+        guard let scroll = watching else { return }
+        var raw = [Double](repeating: 0, count: 6)
+        swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
+        var rect = Rect(x: raw[0], y: raw[1], width: effectiveViewport?.width ?? raw[2],
+                        height: effectiveViewport?.height ?? raw[3])
+        if axis == .vertical { rect.y = target.y } else { rect.x = target.x }
+        announcedRect = rect
+        viewportChanged(rect, effective: false, target: rect)
     }
 
     /// Every pass re-asks the window: a place in the air lands in the one it

@@ -175,11 +175,18 @@ private struct ToggleButton: View {
             if let icon { button = button.icon(icon) }
             label = EmptyView()
         }
-        return HStack {
-            button.onEvent(ButtonContract.toggled) { isOn?.wrappedValue = $0 }
-            label
+        let toggling = button.onEvent(ButtonContract.toggled) { isOn?.wrappedValue = $0 }
+        return Group {
+            if unwrappedStatement(label) is EmptyView {
+                toggling
+            } else {
+                HStack {
+                    toggling
+                    label
+                }
+                .spacing(8)
+            }
         }
-        .spacing(8)
     }
 }
 
@@ -188,18 +195,17 @@ extension View {
     /// their lookup key, an `Image`'s picture, a `Label`'s all three - or
     /// `nil` where nothing carries, the view drawing beside the button then.
     fileprivate var buttonCaption: (text: String?, key: LocalizedStringKey?, icon: ImageSource?)? {
-        if let text = self as? Text {
+        let view = unwrappedStatement(self)
+        if let text = view as? Text {
             return (text.node.props[.text]?.string, text.wordsKey, nil)
         }
-        if let image = self as? Image {
+        if let image = view as? Image {
             return (nil, nil, image.node.props[.source].flatMap(ImageSource.init(propValue:)))
         }
-        if let label = self as? Label {
-            let title = label.title as? Text
-            let icon = (label.icon as? Image)?.node.props[.source]
-                .flatMap(ImageSource.init(propValue:))
-            let text = title?.node.props[.text]?.string
-            return text != nil || icon != nil ? (text, title?.wordsKey, icon) : nil
+        if let label = view as? Label {
+            let parts = label.semanticParts
+            return parts.title != nil || parts.icon != nil
+                ? (parts.title?.display, parts.title?.key, parts.icon) : nil
         }
         return nil
     }
