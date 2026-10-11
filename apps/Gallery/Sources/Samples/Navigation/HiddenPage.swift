@@ -35,7 +35,6 @@ struct HiddenPage: View {
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
                     .padding(EdgeInsets(20, 10))
-                    .horizontalAlignment(.center)
                     
             }
             .spacing(14)

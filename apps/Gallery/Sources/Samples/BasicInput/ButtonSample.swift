@@ -15,7 +15,6 @@ struct ButtonSample: SampleContent, ExampleContent {
 
         VStack {
             // The count is read here, so a click builds this closure again.
-            DebugInfoLabel()
 
             Button("Increment", action: { counter += 1 })
                 
@@ -24,8 +23,7 @@ struct ButtonSample: SampleContent, ExampleContent {
 
             Button("Outlined", action: { counter += 1 })
                 .background(.transparent)
-                .stroke(Palette.accent)
-                .strokeWidth(1)
+                .stroke(Palette.accent, width: 1)
                 
 
             Button("Disabled")
@@ -42,14 +40,12 @@ struct ButtonSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Button("Increment", action: { counter += 1 })
                 .background(Palette.accent)
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             Text("Clicked \(counter) time(s)")
@@ -59,17 +55,14 @@ struct ButtonSample: SampleContent, ExampleContent {
             Button("Outlined", action: { counter += 1 })
                 .background(.transparent)
                 .foregroundStyle(Palette.accent)
-                .stroke(Palette.accent)
-                .strokeWidth(1)
+                .stroke(Palette.accent, width: 1)
                 .shape(.roundedRectangle(8))
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             Button("Disabled")
                 .disabled(true)
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
 
             // `.buttonStyle` is a logical look, not a platform widget: each
             // host maps it to its own native control.
@@ -98,9 +91,8 @@ struct ButtonSample: SampleContent, ExampleContent {
     }
 
     var notes: (any View)? {
-        Text("Also `.onPressed` and `.onReleased`, for the moment the button goes "
-            + "down and comes up. `.buttonStyle` maps to the platform's own "
-            + "button kinds; `.help` is its tooltip.")
+        Text("`.buttonStyle` maps to the platform's own button kinds; `.help` is "
+            + "its tooltip.")
             .font(.system(size: 12))
             .foregroundStyle(Palette.subtle)
     }

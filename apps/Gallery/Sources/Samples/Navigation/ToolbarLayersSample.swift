@@ -20,15 +20,13 @@ struct ToolbarLayersSample: SampleContent, ExampleContent {
         var body: some View {
             VStack {
                 // The count is read here, so Refresh builds this closure.
-                DebugInfoLabel()
 
                 Text("Refreshed \\(refreshed) time(s)")
 
-                Button("Open a page with its own actions")
-                    .onClicked { nav.push(.layer(1)) }
+                Button("Open a page with its own actions") { nav.push(.layer(1)) }
             }
             .toolbar {
-                ToolbarItem("Refresh").onClicked { refreshed += 1 }
+                ToolbarItem("Refresh") { refreshed += 1 }
             }
         }
 
@@ -41,8 +39,8 @@ struct ToolbarLayersSample: SampleContent, ExampleContent {
             var body: some View {
                 Text("Layer \\(depth)")
                     .toolbar {
-                        ToolbarItem("Share").onClicked { shared += 1 }
-                        ToolbarItem("Deeper").onClicked { path.append(.layer(depth + 1)) }
+                        ToolbarItem("Share") { shared += 1 }
+                        ToolbarItem("Deeper") { path.append(.layer(depth + 1)) }
                     }
             }
         }
@@ -50,7 +48,6 @@ struct ToolbarLayersSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("Refreshed \(refreshed) time(s)")
                 .font(.system(size: 17))
@@ -59,17 +56,15 @@ struct ToolbarLayersSample: SampleContent, ExampleContent {
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Button("Open a page with its own actions")
+            Button("Open a page with its own actions") { nav.push(.layer(1)) }
                 .accessibilityIdentifier("layers.open")
                 .padding(EdgeInsets(20, 10))
-                .onClicked { nav.push(.layer(1)) }
         }
         .spacing(12)
         .toolbar {
-            ToolbarItem("Refresh")
+            ToolbarItem("Refresh") { refreshed += 1 }
                 .id("layers.refresh")
                 .accessibilityIdentifier("layers.refresh")
-                .onClicked { refreshed += 1 }
         }
     }
 

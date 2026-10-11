@@ -37,7 +37,6 @@ struct ItemPage: View {
 
                 Button("Back", action: { path.removeLast() })
                     .padding(EdgeInsets(20, 10))
-                    .horizontalAlignment(.center)
                     
             }
             .spacing(16)
@@ -48,7 +47,6 @@ struct ItemPage: View {
         .background(Palette.surface)
         .stroke(.transparent)
         .shape(.roundedRectangle(12))
-        .verticalAlignment(.center)
         .onAppear {
             page.gallery(item.isEmpty ? "Item" : item, scene: scene, nav: nav)
         }

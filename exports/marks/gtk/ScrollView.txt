@@ -1,10 +1,16 @@
 # revision 1.1
 ScrollView: ✅
+ScrollView.defaultScrollAnchor: cannot read defaultScrollAnchor of ScrollView - GTK's driver has no path for it yet
 ScrollView.frameChanged: ✅
 ScrollView.horizontalScrollIndicators: ✅
-ScrollView.orientation: ✅
-ScrollView.scrollOffset: ✅
-ScrollView.scrollStopped: ✅
-ScrollView.scrollXChanged: ✅
-ScrollView.scrollYChanged: ✅
+ScrollView.isScrollDisabled: not realized
+ScrollView.orientation: ◐ cannot scroll on Grid - GTK's driver has no path for it yet
+ScrollView.scrollBounceAxes: not realized
+ScrollView.scrollBounceBehavior: not realized
+ScrollView.scrollOffset: cannot read scrollOffset of Grid - GTK's driver has no path for it yet
+ScrollView.scrollStopped: cannot scroll on Grid - GTK's driver has no path for it yet
+ScrollView.scrollTargetBehavior: not realized
+ScrollView.scrollToDescendant: ❌ true expected, false came - the far child moved into view
+ScrollView.scrollXChanged: cannot scroll on Grid - GTK's driver has no path for it yet
+ScrollView.scrollYChanged: cannot read scrollOffset of Grid - GTK's driver has no path for it yet
 ScrollView.verticalScrollIndicators: ✅

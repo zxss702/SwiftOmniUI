@@ -17,7 +17,28 @@ extension WinUIElement {
         view.setContextMenu(WinUIMenu(menu))
     }
 
+    /// Whether the element stands on the window's chrome - under a toolbar's items or a title view - where a
+    /// control is the bar's own.
+    var standsInToolbar: Bool {
+        var ancestor = element.parent
+        while let each = ancestor {
+            if each.type == .toolbarItems || each.type == .titleView { return true }
+            ancestor = each.parent
+        }
+        return false
+    }
+
     func makeView() -> WinUIView? {
+        if type == .button, standsInToolbar {
+            // The bar's own button, made here as the list is: the registration's members still reach it.
+            let button = WinUIButtonView(toolbar: true)
+            button.onClicked = { [weak self] in self?.send(.clicked, []) }
+            button.onToggled = { [weak self] on in self?.report(.isOn, .toggled, .bool(on)) }
+            button.onPressed = { [weak self] in self?.send(.pressed, []) }
+            button.onReleased = { [weak self] in self?.send(.released, []) }
+            return button
+        }
+        if type == .menuButton, standsInToolbar { return WinUIMenuButtonView(toolbar: true) }
         if element.isLayoutDivider {
             let line = WinUIPathView()
             line.paint(fill: WinUIBrush(Color.gray.opacity(0.3).propValue), stroke: .none,
@@ -76,15 +97,7 @@ extension WinUIElement {
             return
         }
 
-        var ancestor = element.parent
-        view.isToolbarControl = false
-        while let each = ancestor {
-            if each.type == .toolbarItems || each.type == .titleView {
-                view.isToolbarControl = true
-                break
-            }
-            ancestor = each.parent
-        }
+        view.isToolbarControl = standsInToolbar
 
         let taken = WinUIRegistrations.registry.apply(
             changed, to: view, of: type,

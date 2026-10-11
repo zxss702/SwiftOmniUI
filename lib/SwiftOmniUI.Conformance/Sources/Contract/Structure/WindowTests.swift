@@ -13,6 +13,8 @@
 
     public static var cases: [ConformanceCase] {
         [
+            Aspects.holds(WindowSceneContract.defaultPosition, on: "WindowScene", .center, then: .topLeading),
+            Aspects.holds(WindowSceneContract.resizability, on: "WindowScene", .contentMinSize, then: .contentSize),
             ConformanceCase("aWindowIsMadeAndComesToTheFront", proves: [
                 Covered(WindowSceneContract.self), Covered(WindowSceneContract.created), Covered(WindowSceneContract.activated),
             ]) { s in

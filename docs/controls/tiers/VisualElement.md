@@ -31,10 +31,14 @@ How each of them realizes these members is on its own page.
 | `height` | property | `Double` | native |
 | `hint` | property | `String` | native |
 | `hintKey` | property | `LocalizedStringKey` | native |
+| `horizontalAlignmentDefault` | property | `AxisAlignment` | structure |
 | `ignoresInput` | property | `Bool` | native |
 | `isAccessibilityHidden` | property | `Bool` | native |
 | `isEnabled` | property | `Bool` | native |
 | `isFocusedChanged` | event | `Bool` | native |
+| `isFrameContent` | property | `Bool` | structure |
+| `isGeometryReader` | property | `Bool` | structure |
+| `isLayoutDecoration` | property | `Bool` | structure |
 | `isVisible` | property | `Bool` | native |
 | `layoutDirection` | property | `LayoutDirection` | native |
 | `matchedGeometry` | property | `String` | native |
@@ -49,6 +53,7 @@ How each of them realizes these members is on its own page.
 | `rotation` | property | `Angle` | native |
 | `rotationX` | property | `Angle` | native |
 | `rotationY` | property | `Angle` | native |
+| `safeAreaInsetEdge` | property | `Edge` | structure |
 | `scale` | property | `Double` | native |
 | `scaleX` | property | `Double` | native |
 | `scaleY` | property | `Double` | native |
@@ -62,5 +67,6 @@ How each of them realizes these members is on its own page.
 | `translationX` | property | `Double` | native |
 | `translationY` | property | `Double` | native |
 | `unfocus` | act | `() -> Void` |  |
+| `verticalAlignmentDefault` | property | `AxisAlignment` | structure |
 | `width` | property | `Double` | native |
 | `zIndex` | property | `Double` | native |

@@ -70,8 +70,6 @@ struct SampleTabPage: View {
             held
                 .frame(height: proxy.size.height)
                 .frame(width: proxy.size.width)
-                .verticalAlignment(.start)
-                .horizontalAlignment(.start)
         }
         // Dressed as every page of the gallery is, and named and pictured for
         // its tab: the tab's caption and icon. The window takes the sample's
@@ -86,8 +84,8 @@ struct SampleTabPage: View {
 
     /// The line under the title over what the tab shows, in one cell that
     /// fills the rest of the page.
-    private var held: Grid {
-        Grid {
+    private var held: VStack {
+        VStack(spacing: 16) {
             Text(sample.summary)
                 .font(.system(size: 15))
                 .foregroundStyle(Palette.subtle)
@@ -96,8 +94,7 @@ struct SampleTabPage: View {
                 // An example that scrolls itself takes the whole cell; one
                 // that does not keeps its own height at the top.
                 SamplePage.boxed(sample.examples[index].view, fills: sample.fills)
-                    .verticalAlignment(sample.fills ? .fill : .start)
-                    .gridRow(1)
+                    .frame(maxHeight: sample.fills ? .infinity : nil, alignment: .top)
             } else {
                 ScrollView {
                     VStack {
@@ -107,12 +104,9 @@ struct SampleTabPage: View {
                     }
                     .spacing(24)
                 }
-                .orientation(.vertical)
-                .gridRow(1)
+                .frame(maxHeight: .infinity)
             }
         }
-        .rows(.auto, .fill)
-        .rowSpacing(16)
         .padding(24)
     }
 

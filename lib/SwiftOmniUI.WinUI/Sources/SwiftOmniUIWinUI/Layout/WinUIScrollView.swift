@@ -128,7 +128,10 @@ final class WinUIScrollView: WinUILayoutView {
     /// Stands WinUI's scroller over the whole of the room, then an offset the tree wrote before there was one - or,
     /// first time only, the default anchor a reader asked it to open at.
     override func arrange(in bounds: Rect) {
-        _ = scroller.measure(width: bounds.width, height: bounds.height)
+        // Measured natively at the room it stands in - a no-op until the document changed: the presenter then
+        // measures and arranges, holding its anchor, before the document's rows move.
+        var measured = [0.0, 0.0]
+        swiftomniui_winui_measure(scroller.handle, bounds.width, bounds.height, &measured)
         scroller.layout(bounds)
         if let target = writtenOffset.laidOutNow() {
             move(to: target)

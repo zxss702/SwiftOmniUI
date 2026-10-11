@@ -66,6 +66,10 @@ let package = Package(
     // The SwiftOmniUI checkout: the library at its root, and a head's host.
     // Named, so the checkout's folder may carry any name - a path dependency's
     // identity would otherwise be the folder's.
+    // An application outside this repository names the published package
+    // instead, and changes nothing else:
+    //
+    //     .package(url: "https://github.com/zxss702/SwiftOmniUI.git", exact: "0.5.2")
     dependencies: [.package(name: "SwiftOmniUIRoot", path: "../..")],
     targets: targets
 )

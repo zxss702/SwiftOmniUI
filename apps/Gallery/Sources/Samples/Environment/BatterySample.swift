@@ -19,7 +19,6 @@ struct BatterySample: SampleContent, ExampleContent {
                 VStack {
                     // The battery is read here, so a change the host reports
                     // builds this closure - and nothing else on the page.
-                    DebugInfoLabel()
 
                     Text(battery.chargeLevel <= 0
                         ? "the host has not said"
@@ -35,7 +34,6 @@ struct BatterySample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text(battery.chargeLevel <= 0
                 ? "the host has not said"

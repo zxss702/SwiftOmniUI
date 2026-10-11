@@ -13,6 +13,8 @@
     public static var cases: [ConformanceCase] {
         [
             Aspects.standsAlone("Grid"),
+            Aspects.holds(GridContract.flowColumns, on: "Grid",
+                          [GridItem(.fixed(20)), GridItem(.flexible())], then: [GridItem(.fixed(40))]),
             ConformanceCase("eachChildStandsInItsCell", proves: [
                 Covered(GridContract.columns), Covered(GridContract.rows),
                 Covered(GridContract.columnSpacing), Covered(GridContract.rowSpacing),

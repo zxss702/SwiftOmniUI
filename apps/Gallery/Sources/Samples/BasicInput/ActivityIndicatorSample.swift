@@ -14,14 +14,12 @@ struct ActivityIndicatorSample: SampleContent, ExampleContent {
         VStack {
             // The flag is read here, so starting and stopping builds this
             // closure - the spinner itself costs nothing to keep running.
-            DebugInfoLabel()
 
             Group { if loading { ProgressView() } }
                 .frame(height: 48)
 
             HStack {
                 Text("Working")
-                    .verticalAlignment(.center)
 
                 Toggle(isOn: $loading)
             }
@@ -30,7 +28,6 @@ struct ActivityIndicatorSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Group { if loading { ProgressView() } }
                 .tint(Palette.accent)
@@ -39,7 +36,6 @@ struct ActivityIndicatorSample: SampleContent, ExampleContent {
             HStack {
                 Text("Working")
                     .font(.system(size: 14))
-                    .verticalAlignment(.center)
 
                 Toggle(isOn: $loading)
                     .accessibilityIdentifier("activityIndicator.loading")
@@ -47,7 +43,6 @@ struct ActivityIndicatorSample: SampleContent, ExampleContent {
                     .tint(Palette.accent)
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
         }
         .spacing(12)

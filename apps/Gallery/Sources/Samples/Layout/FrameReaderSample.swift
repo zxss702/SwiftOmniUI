@@ -10,7 +10,7 @@ struct FrameReaderSample: SampleContent, ExampleContent {
 
     static let id = "frameReader"
     static let title = "Measuring a frame"
-    static let summary = "GeometryReader builds from its measured frame; `.onFrameChanged` reports any view's."
+    static let summary = "GeometryReader builds from its measured frame; `.onGeometryChange` reports any view's."
 
     static let code = """
         @State private var width = 220.0
@@ -22,7 +22,6 @@ struct FrameReaderSample: SampleContent, ExampleContent {
             // `slot`, `window` and `safe` are read in these braces - the three
             // lines below print all of them - so every frame report builds
             // this closure, which is the whole cost of watching a frame.
-            DebugInfoLabel()
 
             // THE PARENT, DRAWN in a gentle tint, because `slot` below is
             // measured against THIS box and the numbers say nothing until
@@ -39,17 +38,14 @@ struct FrameReaderSample: SampleContent, ExampleContent {
                 GeometryReader { proxy in
                     Text("\\(Int(proxy.size.width)) × \\(Int(proxy.size.height))")
                 }
-                // Driven: the host carries the width, and no render
-                // describes it.
-                .frame(width: $width)
+                .frame(width: width)
                 .frame(height: 120)
-                .horizontalAlignment(.center)
-                // Reporting is a modifier on ANY view - one handler per
-                // space. Nothing is measured unless something asks: a view
-                // without a handler is not even subscribed.
-                .onFrameChanged { slot = $0 }
-                .onFrameChanged(in: .global) { window = $0 }
-                .onFrameChanged(in: .safeArea) { safe = $0 }
+                // Reporting is a modifier on ANY view - one watch per value.
+                // Nothing is measured unless something asks: a view without
+                // a watch is not even subscribed.
+                .onGeometryChange(for: Rect.self) { $0.frame(in: .parent) } action: { slot = $0 }
+                .onGeometryChange(for: Rect.self) { $0.frame(in: .global) } action: { window = $0 }
+                .onGeometryChange(for: Rect.self) { $0.frame(in: .safeArea) } action: { safe = $0 }
             }
             .padding(16)
             .background(Palette.selected)
@@ -76,7 +72,6 @@ struct FrameReaderSample: SampleContent, ExampleContent {
             // `slot`, `window` and `safe` are read in these braces - the three
             // lines below print all of them - so every frame report builds
             // this closure, which is the whole cost of watching a frame.
-            DebugInfoLabel()
 
             // THE PARENT, DRAWN in a gentle tint, because `slot` below is
             // measured against THIS box and the numbers say nothing until
@@ -97,21 +92,16 @@ struct FrameReaderSample: SampleContent, ExampleContent {
                         .font(.system(size: 22))
                         .bold()
                         .foregroundStyle(Palette.onAccent)
-                        .horizontalAlignment(.center)
-                        .verticalAlignment(.center)
                 }
-                // Driven: the host carries the width, and no render
-                // describes it.
-                .frame(width: $width)
+                .frame(width: width)
                 .frame(height: 120)
                 .background(Palette.accent)
-                .horizontalAlignment(.center)
-                // Reporting is a modifier on ANY view - one handler per
-                // space. Nothing is measured unless something asks: a view
-                // without a handler is not even subscribed.
-                .onFrameChanged { slot = $0 }
-                .onFrameChanged(in: .global) { window = $0 }
-                .onFrameChanged(in: .safeArea) { safe = $0 }
+                // Reporting is a modifier on ANY view - one watch per value.
+                // Nothing is measured unless something asks: a view without
+                // a watch is not even subscribed.
+                .onGeometryChange(for: Rect.self) { $0.frame(in: .parent) } action: { slot = $0 }
+                .onGeometryChange(for: Rect.self) { $0.frame(in: .global) } action: { window = $0 }
+                .onGeometryChange(for: Rect.self) { $0.frame(in: .safeArea) } action: { safe = $0 }
             }
             .spacing(8)
             .padding(16)
@@ -143,7 +133,6 @@ struct FrameReaderSample: SampleContent, ExampleContent {
                     try await $width.journey.move(to: $width.journey.value < 240 ? 340 : 140)
                 })
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(12)
@@ -159,24 +148,22 @@ struct FrameReaderSample: SampleContent, ExampleContent {
                 .foregroundStyle(Palette.subtle)
 
             Text("A frame costs nothing until something asks for it: a view with no "
-                + "`.onFrameChanged` is not even subscribed. A report comes when the frame "
-                + "settles somewhere new, so dragging the slider re-lays the panel out and "
-                + "the button's walk reports every step of the way.")
+                + "`.onGeometryChange` is not even subscribed. A report comes when the "
+                + "watched value settles somewhere new, so dragging the slider re-lays "
+                + "the panel out and the button's walk reports every step of the way.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("The panel's width and the slider's thumb are one driven state - "
-                + "`.frame(width: $width)` and `Slider($width)` - so dragging the thumb "
-                + "resizes the panel without the page being described for it, and the "
-                + "button moves that same state.")
+            Text("The panel's width and the slider's thumb are one state - "
+                + "`.frame(width: width)` and `Slider($width)` - so dragging the thumb "
+                + "resizes the panel, and the button walks that same state.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("The width costs no build - a driven state describes nothing by itself - "
-                + "but the measurement does. The reader builds its content from the frame "
-                + "it was given, and the three handlers beside it write the page's own "
-                + "states, which the lines under the panel print. So the page is a reader "
-                + "too, and the count at the top moves for the frame reports and nothing else.")
+            Text("The reader builds its content from the frame it was given, and the "
+                + "three watchers beside it write the page's own states, which the "
+                + "lines under the panel print. So the page is a reader too, and the "
+                + "count at the top moves for the frame reports and nothing else.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
         }

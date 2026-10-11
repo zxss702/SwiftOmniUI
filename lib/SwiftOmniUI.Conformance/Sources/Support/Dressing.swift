@@ -62,6 +62,30 @@ public struct Hear<Owner: Contract, Value: HostRepresentable & Sendable>: Worn {
     }
 }
 
+/// One event carrying two values, and what hears them - a file drop's paths and point.
+public struct HearTwo<Owner: Contract, First, Second>: Worn
+where First: HostRepresentable & Sendable, Second: HostRepresentable & Sendable {
+    /// The event.
+    public let event: ElementEvent<Owner, (First, Second)>
+
+    /// What hears it.
+    public let handler: @Sendable (First, Second) async throws -> Void
+
+    /// `event` heard by `handler`.
+    public init(
+        _ event: ElementEvent<Owner, (First, Second)>,
+        _ handler: @escaping @Sendable (First, Second) async throws -> Void
+    ) {
+        self.event = event
+        self.handler = handler
+    }
+
+    public func worn<Element: ModifiableElement>(by element: Element) -> Element where Element.Modified == Element {
+        let handler = handler
+        return element.onEvent(event) { first, second in try await handler(first, second) }
+    }
+}
+
 /// One event carrying three values, and what hears them.
 public struct HearThree<Owner: Contract, First, Second, Third>: Worn
 where First: HostRepresentable & Sendable, Second: HostRepresentable & Sendable, Third: HostRepresentable & Sendable {

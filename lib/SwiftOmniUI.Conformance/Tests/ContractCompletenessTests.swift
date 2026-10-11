@@ -12,7 +12,9 @@ import XCTest
     /// Every contract has one family, named for it, and every family is a contract's.
     func testEveryContractHasOneFamily() {
         // Closures, not key paths: a key path through an existential metatype crashes Swift 6.4's SILGen.
-        let contracts = LibraryContracts.tiers.map { $0.name } + LibraryContracts.elements.map { $0.name }
+        let contracts = LibraryContracts.tiers.map { $0.name }
+            + LibraryContracts.`internal`.map { $0.name }
+            + LibraryContracts.elements.map { $0.name }
         let families = Families.all.map { $0.name }
 
         XCTAssertEqual(families.sorted(), contracts.sorted())

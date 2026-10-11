@@ -48,6 +48,13 @@ private struct PressCard: Element {
 }
 
 @MainActor final class ConcurrencyTests: XCTestCase {
+    /// Touches the shared renderer, whose init installs the UI thread's
+    /// executor before any task of this suite can be made - see UIThread.swift.
+    override func setUp() {
+        super.setUp()
+        Renderer.shared.clearInvalidation()
+    }
+
     /// Answers every act still queued and runs every job until nothing is
     /// left, so a test that stopped mid-handler leaves no suspended handler
     /// and no unanswered act for the NEXT test to trip over - a stray

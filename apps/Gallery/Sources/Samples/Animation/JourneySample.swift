@@ -9,12 +9,12 @@ struct JourneySample: SampleContent, ExampleContent {
 
     static let laws = ["Default", "Spring", "Long and slow", "None"]
 
-    static func law(_ index: Int) -> Animation {
+    static func law(_ index: Int) -> Animation? {
         switch index {
         case 1: .spring(response: 0.32)
         case 2: .easeInOut(duration: 0.9)
-        case 3: .none
-        default: .standard
+        case 3: nil
+        default: .default
         }
     }
 
@@ -29,12 +29,12 @@ struct JourneySample: SampleContent, ExampleContent {
 
         static let laws = ["Default", "Spring", "Long and slow", "None"]
 
-        static func law(_ index: Int) -> Animation {
+        static func law(_ index: Int) -> Animation? {
             switch index {
             case 1: .spring(response: 0.32)
             case 2: .easeInOut(duration: 0.9)
-            case 3: .none
-            default: .standard
+            case 3: nil
+            default: .default
             }
         }
 
@@ -44,7 +44,6 @@ struct JourneySample: SampleContent, ExampleContent {
             // The panels are described from `wide`, `warm` and `law`, read
             // here, so a press builds this closure once and the host walks
             // the rest.
-            DebugInfoLabel()
 
             ColorPicker()
                 .color(warm ? Palette.accent : Palette.brand)
@@ -70,7 +69,7 @@ struct JourneySample: SampleContent, ExampleContent {
                 .frame(height: wide ? 120 : 60)
                 .cornerRadius(wide ? 32 : 8)
                 .animation(Self.law(law))
-                .animation(.none, .size)
+                .animation(nil, value: wide)
 
             HStack {
                 Button("Size", action: { wide.toggle() })
@@ -82,7 +81,6 @@ struct JourneySample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("A change that travels")
                 .font(.system(size: 11))
@@ -122,8 +120,8 @@ struct JourneySample: SampleContent, ExampleContent {
             .frame(width: wide ? 300 : 120)
             .frame(height: wide ? 110 : 56)
             .cornerRadius(wide ? 28 : 8)
-            .horizontalAlignment(.start)
-            .animation(travels ? Self.law(law) : .none)
+            .animation(travels ? Self.law(law) : nil)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// The same panel with a RULE: everything travels except how big it is.
@@ -133,9 +131,9 @@ struct JourneySample: SampleContent, ExampleContent {
             .frame(width: wide ? 300 : 120)
             .frame(height: wide ? 110 : 56)
             .cornerRadius(wide ? 28 : 8)
-            .horizontalAlignment(.start)
             .animation(Self.law(law))
-            .animation(.none, .size)
+            .animation(nil, value: wide)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     var notes: (any View)? {

@@ -16,7 +16,6 @@ struct CheckBoxSample: SampleContent, ExampleContent {
 
         VStack {
             // The ticks are read here, so every box builds this closure.
-            DebugInfoLabel()
 
             Toggle("I have read the terms", isOn: $agreed)
                 .toggleStyle(.checkbox)
@@ -43,7 +42,6 @@ struct CheckBoxSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Toggle("I have read the terms", isOn: $agreed)
                 .toggleStyle(.checkbox)

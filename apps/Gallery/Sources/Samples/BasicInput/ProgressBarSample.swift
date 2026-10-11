@@ -16,7 +16,6 @@ struct ProgressBarSample: SampleContent, ExampleContent {
 
         VStack {
             // How far along is read here, so every step builds this closure.
-            DebugInfoLabel()
 
             Text("Step \\(Int(done)) of \\(Int(steps))")
 
@@ -25,12 +24,10 @@ struct ProgressBarSample: SampleContent, ExampleContent {
             ProgressView(done / steps)
                 .frame(height: 8)
 
-            Stepper($done, in: 0...steps)
-                .step(1)
+            Stepper($done, in: 0...steps, step: 1)
 
-            // A bar built empty carries no value at all, so `.progress` is
-            // how one reaches it. This one shows what is LEFT, so the two
-            // move opposite ways.
+            // The same state said the other way: what is LEFT, so the two
+            // bars move opposite ways.
             ProgressView(1 - done / steps)
                 .frame(height: 8)
         }
@@ -38,7 +35,6 @@ struct ProgressBarSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("Step \(Int(done)) of \(Int(steps))")
                 .font(.system(size: 17))
@@ -48,11 +44,9 @@ struct ProgressBarSample: SampleContent, ExampleContent {
                 .tint(Palette.accent)
                 .frame(height: 8)
 
-            Stepper($done, in: 0...steps)
+            Stepper($done, in: 0...steps, step: 1)
                 .accessibilityIdentifier("progressBar.done")
                 .accessibilityLabel("Work done")
-                .step(1)
-                .horizontalAlignment(.center)
 
             SectionTitle("The same property, as a modifier")
 
@@ -73,19 +67,10 @@ struct ProgressBarSample: SampleContent, ExampleContent {
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("`ProgressView()` carries no value at all, so `.progress` is how one "
-                + "reaches it - and it sets the very property the initializer's argument "
-                + "sets. This one shows what is LEFT to do, so the two bars move opposite "
-                + "ways as the stepper is tapped.")
-                .font(.system(size: 12))
-                .foregroundStyle(Palette.subtle)
-
-            Text("That pairing is the rule, not this control's quirk: wherever a "
-                + "control takes its purpose in the initializer - `Toggle(isOn: $on)`, "
-                + "`Picker(items)`, `Path(\"M 28,0 ...\")`, `Polygon(points)` - there is a "
-                + "modifier of the same name beside it. The initializer is what a view "
-                + "written in place uses; the MODIFIER is what a `Style` needs, and what "
-                + "a control built empty and filled in later has.")
+            Text("The value is set in the initializer - `ProgressView(0.4)` - like "
+                + "`Toggle(isOn: $on)` or `Path(\"M 28,0 ...\")`. This one shows what is "
+                + "LEFT to do, so the two bars move opposite ways as the stepper is "
+                + "tapped.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
         }

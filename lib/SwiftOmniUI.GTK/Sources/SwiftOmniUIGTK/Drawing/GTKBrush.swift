@@ -90,7 +90,8 @@ enum GTKBrush: Equatable {
             }
         case .radial(let center, let radius, let stops):
             var middle = point(center)
-            let reach = Float(HostBrush.reach(of: radius, width: width, height: height))
+            // Gsk asserts hradius > 0; a nil-sized box degenerates to its last stop.
+            let reach = max(Float(HostBrush.reach(of: radius, width: width, height: height)), .ulpOfOne)
             let native = stops.map(\.native)
             native.withUnsafeBufferPointer {
                 gtk_snapshot_append_radial_gradient(

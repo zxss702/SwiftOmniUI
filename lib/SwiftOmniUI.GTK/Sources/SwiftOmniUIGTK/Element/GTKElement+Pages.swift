@@ -82,8 +82,10 @@ extension GTKElement {
     /// A page's toolbar entry as a widget of its header bar: a spacer's room, the view an item carries, or a
     /// titled or pictured action.
     private static func action(_ item: MountedElement) -> GTKToolbarAction {
+        // A symbol is the icon theme's name for it, a picture its file: `GTKPictures.icon` tells them apart.
+        let picture = item.value(.icon).flatMap(ImageSource.init(propValue:))
         var action = GTKToolbarAction(
-            title: item.value(.text)?.string ?? "", icon: item.value(.icon)?.string,
+            title: item.value(.text)?.string ?? "", icon: picture?.symbol ?? picture.flatMap { $0.file.isEmpty ? nil : $0.file },
             isEnabled: item.value(.isEnabled)?.bool ?? true,
             perform: { [weak item] in item?.gtk.send(.clicked, []) })
         action.isDestructive = item.value(.isDestructive)?.bool == true

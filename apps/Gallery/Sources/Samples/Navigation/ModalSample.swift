@@ -35,7 +35,6 @@ struct ModalSample: SampleContent, ExampleContent {
 
             var body: some View {
                 VStack {
-                    DebugInfoLabel()
 
                     Button("Present", action: { sheets.append(.settings) })
                         
@@ -62,7 +61,6 @@ struct ModalSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Button("Present native modal", action: { nav.present(.page) })
                 .accessibilityIdentifier("modal.present")
@@ -70,7 +68,6 @@ struct ModalSample: SampleContent, ExampleContent {
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             Text(nav.sheets.isEmpty ? "Nothing presented" : "Depth: \(nav.sheets.count)")

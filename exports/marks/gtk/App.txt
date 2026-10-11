@@ -3,17 +3,22 @@ App: ✅
 App.alert: cannot read a question - GTK's driver has no path for it yet
 App.announce: cannot read what the screen reader said - GTK's driver has no path for it yet
 App.chooseAction: cannot read a question - GTK's driver has no path for it yet
+App.chooseFiles: cannot read a file dialog - GTK's driver has no path for it yet
 App.confirm: cannot read a question - GTK's driver has no path for it yet
+App.copyText: waits on App.localizedString
 App.currentTime: ✅
 App.currentTimeZone: ✅
 App.handlerFailed: cannot read the log - GTK's driver has no path for it yet
 App.hideOnScreenKeyboard: ✅
 App.launchFile: not realized
 App.launchLink: not realized
+App.localizedString: not realized
 App.openFiles: not realized
+App.openFolders: cannot read a file dialog - GTK's driver has no path for it yet
 App.persistSceneValue: not realized
 App.persistValue: cannot read what is kept - GTK's driver has no path for it yet
 App.prompt: cannot read a question - GTK's driver has no path for it yet
 App.readFile: not realized
 App.saveFile: not realized
+App.urlOpened: not realized
 App.utcOffset: ✅

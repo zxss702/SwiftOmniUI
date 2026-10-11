@@ -76,6 +76,18 @@ public struct Slider: VisualElement, TintElement, SliderProperties{
         self = Slider(value).minimum(bounds.lowerBound).maximum(bounds.upperBound)
     }
 
+    /// SwiftUI's `Slider(value:in:onEditingChanged:)`: `editing` is `true` as
+    /// the thumb is grabbed, `false` as it is let go.
+    public init(
+        _ value: Binding<Double>,
+        in bounds: ClosedRange<Double>,
+        onEditingChanged: @escaping (Bool) -> Void
+    ) {
+        self = Slider(value, in: bounds)
+            .onDragStarted { onEditingChanged(true) }
+            .onDragCompleted { onEditingChanged(false) }
+    }
+
     // Design: docs/design/views/bindings.md#a-finger-takes-a-moving-thumb
     /// The same two-way value as `Slider($value)`, written as a modifier.
     ///

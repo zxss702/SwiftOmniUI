@@ -257,6 +257,11 @@ struct ContentButton: View {
                 button.node.children = [image.node]
                 return button
             }
+            // Words, or a view of the author's: still the bar's own button,
+            // with the label as its face.
+            var button = Button().onClicked(action)
+            button.node.children = [label.node]
+            return button
         }
         return label.onTapGesture(action)
     }

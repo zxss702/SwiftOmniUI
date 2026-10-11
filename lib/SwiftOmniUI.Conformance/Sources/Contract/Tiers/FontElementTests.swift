@@ -18,6 +18,12 @@
                 Aspects.holds(FontElementContract.fontFamily, on: element, "Arial", then: "Courier New", with: Words.on(element)),
                 Aspects.holds(FontElementContract.fontAutoScalingEnabled, on: element, true, then: false,
                               with: Words.on(element)),
+                Aspects.holds(FontElementContract.fontTextStyle, on: element, .title, then: .body,
+                              with: Words.on(element)),
+                Aspects.holds(FontElementContract.fontWeight, on: element, .bold, then: .light,
+                              with: Words.on(element)),
+                Aspects.holds(FontElementContract.fontDesign, on: element, .default, then: .monospaced,
+                              with: Words.on(element)),
             ]
         }
     }

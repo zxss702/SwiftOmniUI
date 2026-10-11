@@ -29,7 +29,6 @@ struct TaskSleepSample: SampleContent, ExampleContent {
 
         VStack {
             // The countdown is read here, so every step builds this closure.
-            DebugInfoLabel()
 
             Text("\\(remaining)")
 
@@ -87,7 +86,6 @@ struct TaskSleepSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("\(remaining)")
                 .font(.system(size: 64))
@@ -138,7 +136,6 @@ struct TaskSleepSample: SampleContent, ExampleContent {
                     
             }
             .spacing(10)
-            .horizontalAlignment(.center)
 
             HStack {
                 ForEach([10, 30, 60]) { length in
@@ -153,7 +150,6 @@ struct TaskSleepSample: SampleContent, ExampleContent {
                 }
             }
             .spacing(8)
-            .horizontalAlignment(.center)
         }
         .spacing(12)
         .onDisappear { running = false }

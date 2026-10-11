@@ -17,11 +17,9 @@ struct SwitchSample: SampleContent, ExampleContent {
 
         VStack {
             // The flag is read here, so every flip builds this closure.
-            DebugInfoLabel()
 
             HStack {
                 Text("Sound")
-                    .verticalAlignment(.center)
 
                 Toggle(isOn: $soundOn)
                     // Runs beside the binding's write-back, carrying what the
@@ -48,12 +46,10 @@ struct SwitchSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             HStack {
                 Text("Sound")
                     .font(.system(size: 16))
-                    .verticalAlignment(.center)
 
                 Toggle(isOn: $soundOn)
                     .accessibilityIdentifier("switch.sound")
@@ -62,7 +58,6 @@ struct SwitchSample: SampleContent, ExampleContent {
                     .onChange(of: soundOn) { _, on in said = on ? "thrown on" : "thrown off" }
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
             // A toggle as a button that holds its pressed look - a toolbar's,
             // which is what `.toggleStyle(.button)` asks of each host.

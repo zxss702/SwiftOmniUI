@@ -18,6 +18,7 @@
                 Aspects.holds(LayoutContract.clipsContent, on: element, false, then: true),
                 Aspects.holds(LayoutContract.letsInputThrough, on: element, false, then: true),
                 Aspects.holds(LayoutContract.hitShape, on: element, .rectangle, then: .circle),
+                Aspects.holds(LayoutContract.scrollTargetLayout, on: element, true, then: false),
             ]
         }
     }

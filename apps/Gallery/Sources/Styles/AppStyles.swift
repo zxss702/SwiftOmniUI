@@ -26,7 +26,7 @@ enum AppStyles {
     /// control with its values already on it. The formFactor comes from the
     /// application's `@Environment` - one style reads it: the SearchField's
     /// touch floor, which every formFactor but the desktop keeps.
-    static func sheet(on formFactor: FormFactor) -> StyleSheet {
+    @MainActor static func sheet(on formFactor: FormFactor) -> StyleSheet {
         StyleSheet {
             // MARK: Text
 
@@ -42,7 +42,6 @@ enum AppStyles {
                 .font(.system(size: 32))
                 .bold()
                 .tracking(-0.5)
-                .horizontalAlignment(.center)
                 .multilineTextAlignment(.center)
 
             // A PAIR, and the second is written from the first: everything
@@ -57,8 +56,11 @@ enum AppStyles {
                 .multilineTextAlignment(.center)
 
             Style<Text>("QuoteLoud")
-                .basedOn("Quote")
                 .foregroundStyle(Palette.accent)
+                .font(.system(size: 17))
+                .italic()
+                .tracking(0.3)
+                .multilineTextAlignment(.center)
 
             // MARK: Buttons
 
@@ -67,15 +69,10 @@ enum AppStyles {
                 .background(Palette.accent)
                 .font(.system(size: 14))
                 .bold()
-                .strokeWidth(0)
                 .shape(.roundedRectangle(10))                
                 .padding(EdgeInsets(16, 11))
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                    .background(Palette.outline)
-                }
 
             // A button that lives in the WINDOW's chrome rather than on a
             // page. The implicit style above is an accent pill 44 points tall
@@ -110,15 +107,8 @@ enum AppStyles {
                 .background(.transparent)
                 .font(.system(size: 13))
                 .bold()
-                .strokeWidth(0)
                 .padding(EdgeInsets(5, 0))
                 .frame(height: 26)
-                .visualState(.normal) { $0
-                    .opacity(1)
-                }
-                .visualState(.pointerOver) { $0
-                    .opacity(0.85)
-                }
 
             // A button that lives in a LIST ROW, where the touch floor is
             // not merely unnecessary but harmful. A recycled cell measures a
@@ -137,50 +127,33 @@ enum AppStyles {
                 .background(Palette.accent)
                 .font(.system(size: 13))
                 .bold()
-                .strokeWidth(0)
                 .shape(.roundedRectangle(10))
                 .padding(EdgeInsets(14, 4))
                 .frame(minHeight: 0)
                 .frame(minWidth: 0)
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                    .background(Palette.outline)
-                }
 
             Style<Button>("IconButton")
                 .opacity(1)
                 .stroke(.transparent)
-                .strokeWidth(0)
                 .shape(.roundedRectangle(10))
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .opacity(0.4)
-                }
 
             // MARK: Fields
 
             Style<TextField>()
                 .foregroundStyle(Palette.text)
                 .background(.transparent)
-                .placeholderColor(Palette.subtle)
                 .font(.system(size: 15))
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                }
 
             Style<TextEditor>()
                 .foregroundStyle(Palette.text)
                 .background(.transparent)
-                .placeholderColor(Palette.subtle)
                 .font(.system(size: 15))
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                }
 
             Style<Picker>()
                 .foregroundStyle(Palette.text)
@@ -188,9 +161,6 @@ enum AppStyles {
                 .font(.system(size: 15))
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                }
 
             Style<DatePicker>()
                 .foregroundStyle(Palette.text)
@@ -198,9 +168,6 @@ enum AppStyles {
                 .font(.system(size: 15))
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                }
 
             Style<TimePicker>()
                 .foregroundStyle(Palette.text)
@@ -208,9 +175,6 @@ enum AppStyles {
                 .font(.system(size: 15))
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                }
 
             // NO background: a search field keeps the platform's own
             // look on a coloured surface, and that look is the host's. The
@@ -219,15 +183,10 @@ enum AppStyles {
             // ChromeChip rule.
             Style<SearchField>()
                 .foregroundStyle(Palette.text)
-                .placeholderColor(Palette.subtle)
                 .tint(Palette.accent)
                 .font(.system(size: 15))
                 .frame(minHeight: formFactor == .desktop ? 0 : 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                    .placeholderColor(Palette.disabled)
-                }
 
             // MARK: Choices
             //
@@ -236,17 +195,11 @@ enum AppStyles {
 
             Style<Switch>()
                 .tint(Palette.accent)
-                .visualState(.disabled) { $0
-                    .tint(Palette.disabled)
-                }
 
             Style<CheckBox>()
                 .tint(Palette.accent)
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .tint(Palette.disabled)
-                }
 
             Style<RadioButton>()
                 .background(.transparent)
@@ -254,15 +207,9 @@ enum AppStyles {
                 .font(.system(size: 15))
                 .frame(minHeight: 44)
                 .frame(minWidth: 44)
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                }
 
             Style<Slider>()
                 .tint(Palette.accent)
-                .visualState(.disabled) { $0
-                    .tint(Palette.disabled)
-                }
 
             // MARK: Progress and indicators
 
@@ -271,13 +218,6 @@ enum AppStyles {
 
             Style<ProgressBar>()
                 .tint(Palette.accent)
-                .visualState(.disabled) { $0
-                    .tint(Palette.disabled)
-                }
-
-            Style<PositionIndicator>()
-                .indicatorColor(Palette.outline)
-                .selectedIndicatorColor(Palette.accent)
 
             // MARK: The menu's rows
             //
@@ -295,7 +235,6 @@ enum AppStyles {
 
             Style<Text>("MenuRowText")
                 .font(.system(size: 16))
-                .verticalAlignment(.center)
                 .foregroundStyle(Palette.subtle)
 
             // MARK: Shapes
@@ -313,8 +252,6 @@ enum AppStyles {
                 .background(Palette.raised)
                 .stroke(Palette.outline)
                 .shape(.roundedRectangle(14))
-                .strokeWidth(1)
-                .clipsContent(true)
 
             // COLOUR, not background: a ColorPicker draws its colour, and a
             // background is a second square behind that one - which Android

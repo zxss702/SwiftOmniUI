@@ -1,0 +1,5 @@
+# revision 1.1
+MenuButton: ✅
+MenuButton.frameChanged: ✅
+MenuButton.menuIndicator: cannot read menuIndicator of MenuButton - GTK's driver has no path for it yet
+MenuButton.menuStyle: cannot read menuStyle of MenuButton - GTK's driver has no path for it yet

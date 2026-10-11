@@ -1,13 +1,14 @@
 # revision 1.1
 List: ✅
-List.endReached: ✅
-List.endReachedWithin: ✅
+List.endReached: cannot scroll on Grid - GTK's driver has no path for it yet
+List.endReachedWithin: cannot scroll on Grid - GTK's driver has no path for it yet
 List.frameChanged: ✅
-List.itemActivated: ✅
-List.items: ✅
-List.itemsLayout: ✅
-List.realizedChanged: ✅
-List.scrollTo: ✅
-List.selectedItems: ✅
-List.selectionChanged: ✅
-List.selectionMode: ✅
+List.itemActivated: ❌ threw no element has the id "2 of Grid"
+List.items: ❌ threw no element has the id "0 of Grid"
+List.itemsLayout: ❌ threw no element has the id "0 of Grid"
+List.listStyle: cannot read listStyle of Grid - GTK's driver has no path for it yet
+List.realizedChanged: ❌ threw no element has the id "0 of Grid"
+List.scrollTo: ❌ threw no element has the id "80 of Grid"
+List.selectedItems: cannot read selectionMode of Grid - GTK's driver has no path for it yet
+List.selectionChanged: cannot read selectionMode of Grid - GTK's driver has no path for it yet
+List.selectionMode: cannot read selectionMode of Grid - GTK's driver has no path for it yet

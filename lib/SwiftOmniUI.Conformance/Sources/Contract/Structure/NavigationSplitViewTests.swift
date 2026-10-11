@@ -11,6 +11,9 @@
 
     public static var cases: [ConformanceCase] {
         [
+            Aspects.holds(
+                NavigationSplitViewContract.columnVisibility, on: "NavigationSplitView", .doubleColumn,
+                then: .detailOnly),
             ConformanceCase("standsAloneShowingItsDetail", proves: [
                 Covered(NavigationSplitViewContract.self), Covered(ViewContract.frameChanged, on: "Text"),
             ]) { s in
@@ -55,6 +58,29 @@
                 try s.perform(.toggle, on: split)
                 s.settle { open.wrappedValue }
                 s.expect(open.wrappedValue, true, "and showed it again")
+            },
+            ConformanceCase("theUsersColumnFoldingIsHeard", proves: [
+                Covered(NavigationSplitViewContract.columnVisibility),
+                Covered(NavigationSplitViewContract.columnVisibilityChanged),
+            ]) { s in
+                let visibility = State(wrappedValue: NavigationSplitViewVisibility.all)
+                let heard = Received<NavigationSplitViewVisibility>()
+                s.start {
+                    NavigationSplitView(columnVisibility: visibility.projectedValue) {
+                        Text("Sidebar")
+                    } content: {
+                        WideDetail(Text("Content"))
+                    } detail: {
+                        WideDetail(Text("Detail"))
+                    }
+                    .onEvent(NavigationSplitViewContract.columnVisibilityChanged) { heard.values.append($0) }
+                }
+                let split = try s.element(ofType: NavigationSplitViewContract.nodeType)
+
+                try s.perform(.toggle, on: split)
+                s.settle { !heard.values.isEmpty }
+                s.expect(heard.values.isEmpty, false, "the folding heard")
+                s.expect(visibility.wrappedValue != .all, true, "and the binding moved")
             },
             ConformanceCase("theProgramsHidingIsShown", proves: [
                 Covered(NavigationSplitViewContract.isSidebarVisible),

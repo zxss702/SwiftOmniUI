@@ -20,7 +20,6 @@ struct KeyboardSample: SampleContent, ExampleContent {
 
         VStack {
             // `said` is read here, so the answer below builds this closure.
-            DebugInfoLabel()
 
             TextField("Name", text: $name)
                 .aim(first)
@@ -56,26 +55,23 @@ struct KeyboardSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
-            TextField($name)
+            TextField("Name", text: $name)
                 .accessibilityIdentifier("keyboard.name")
                 .accessibilityLabel("Name")
-                .placeholder("Name")
                 .aim(first)
 
-            TextField($note)
+            TextField("Note", text: $note)
                 .accessibilityIdentifier("keyboard.note")
                 .accessibilityLabel("Note")
-                .placeholder("Note")
 
             HStack {
                 Button("Focus first", action: { try await first.focus() })
-                    .horizontalAlignment(.fill)
+                    .frame(maxWidth: .infinity)
                     
 
                 Button("Unfocus first", action: { try await first.unfocus() })
-                    .horizontalAlignment(.fill)
+                    .frame(maxWidth: .infinity)
                     
             }
             .spacing(8)

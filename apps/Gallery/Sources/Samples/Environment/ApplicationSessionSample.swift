@@ -12,40 +12,44 @@ struct ApplicationSessionSample: SampleContent, ExampleContent {
     static let title = "Application session"
     static let summary = "The application's own session, read and written like any state - here the animation every value takes."
 
+    /// The law the picker stands on, by name.
+    @State private var lawName = "Standard"
+
     static let laws = ["Standard", "Spring", "None"]
 
-    static func law(_ index: Int) -> Animation {
-        switch index {
-        case 1: .spring(response: 0.32, dampingFraction: 0.6)
-        case 2: .none
-        default: .standard
+    static func law(named name: String) -> Animation {
+        switch name {
+        case "Spring": .spring(response: 0.32, dampingFraction: 0.6)
+        case "None": .linear(duration: 0)
+        default: .default
         }
     }
 
     static let code = """
         @Environment private var application: ApplicationSession
         @State private var wide = false
+        @State private var lawName = "Standard"
 
         static let laws = ["Standard", "Spring", "None"]
 
-        static func law(_ index: Int) -> Animation {
-            switch index {
-            case 1: .spring(response: 0.32, dampingFraction: 0.6)
-            case 2: .none
-            default: .standard
+        static func law(named name: String) -> Animation {
+            switch name {
+            case "Spring": .spring(response: 0.32, dampingFraction: 0.6)
+            case "None": .linear(duration: 0)
+            default: .default
             }
         }
 
         VStack {
-            // `application.animation` and `wide` are read here, so a choice or
-            // a press builds this closure.
-            DebugInfoLabel()
+            // `lawName` and `wide` are read here, so a choice or a press builds
+            // this closure.
 
             // One write for the whole application: every value without an
             // animation of its own travels so from now on.
-            Picker(Self.laws)
-                .onSelectedIndexChanged { application.animation = Self.law($0) }
-                .selectedIndex(Self.laws.indices.first { Self.law($0) == application.animation } ?? 0)
+            Picker("Law", selection: $lawName) {
+                ForEach(Self.laws, id: \\.self) { Text($0).tag($0) }
+            }
+            .onChange(of: lawName) { application.animation = Self.law(named: lawName) }
 
             // No `.animation` here: the panel takes the application's.
             ZStack {}
@@ -53,33 +57,29 @@ struct ApplicationSessionSample: SampleContent, ExampleContent {
                 .frame(width: wide ? 300 : 120, height: 60)
                 .shape(.roundedRectangle(8))
 
-            Button("Change").onClicked { wide.toggle() }
+            Button("Change") { wide.toggle() }
         }
         """
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("Pick None, then open another sample: nothing in the application travels.")
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.subtle)
                 .multilineTextAlignment(.center)
 
-            Picker(Self.laws)
-                .onSelectedIndexChanged { application.animation = Self.law($0) }
-                .selectedIndex(Self.laws.indices.first { Self.law($0) == application.animation } ?? 0)
-                .horizontalAlignment(.center)
+            Picker("Law", selection: $lawName) {
+                ForEach(Self.laws, id: \.self) { Text($0).tag($0) }
+            }
+            .onChange(of: lawName) { application.animation = Self.law(named: lawName) }
 
             ZStack {}
                 .background(wide ? Palette.accent : Palette.brand)
                 .frame(width: wide ? 300 : 120, height: 60)
                 .shape(.roundedRectangle(8))
-                .horizontalAlignment(.center)
 
-            Button("Change")
-                .horizontalAlignment(.center)
-                .onClicked { wide.toggle() }
+            Button("Change") { wide.toggle() }
         }
         .spacing(12)
     }

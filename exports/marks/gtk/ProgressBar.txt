@@ -2,3 +2,4 @@
 ProgressBar: ✅
 ProgressBar.frameChanged: ✅
 ProgressBar.progress: ✅
+ProgressBar.progressStyle: cannot read progressStyle of ProgressBar - GTK's driver has no path for it yet

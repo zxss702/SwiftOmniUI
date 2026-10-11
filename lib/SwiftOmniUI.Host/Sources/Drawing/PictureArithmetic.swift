@@ -14,7 +14,8 @@
         if name.lowercased().hasSuffix(".png") {
             return [name, String(name.dropLast(4)) + ".svg"]
         }
-        return [name, name + ".png", name + ".svg"]
+        let bare = !(name.split(separator: "/").last ?? "").contains(".")
+        return bare ? [name, name + ".png", name + ".svg"] : [name]
     }
 
     /// The files a picture `name` stands for where a host draws no SVG, in order, each with how many pixels a point

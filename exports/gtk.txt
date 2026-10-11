@@ -94,6 +94,9 @@ HStack
   strokeWidth
 Image
   aspect
+  fontSize
+  fontTextStyle
+  isResizable
   source
 LazyHGrid
   background
@@ -109,6 +112,7 @@ LazyHGrid
   shape
   stroke
   strokeWidth
+  verticalContentAlignment
   realizedChanged()
 LazyHStack
   background
@@ -130,6 +134,7 @@ LazyVGrid
   contentPadding
   flowColumns
   hitShape
+  horizontalContentAlignment
   ignoresInput
   items
   letsInputThrough
@@ -319,6 +324,7 @@ Text
   fontTextStyle
   fontWeight
   foregroundStyle
+  horizontalContentAlignment
   lineBreak
   lineHeight
   lineLimit
@@ -327,6 +333,7 @@ Text
   text
   textCase
   textDecorations
+  verticalContentAlignment
   verticalTextAlignment
 TextEditor
   cursorPosition
@@ -466,12 +473,14 @@ ZStack
   chooseAction()
   chooseFiles()
   confirm()
+  copyText()
   currentTime()
   currentTimeZone()
   focus()
   handlerFailed()
   hideOnScreenKeyboard()
   measureText()
+  openFolders()
   persistValue()
   prompt()
   scrollTo()

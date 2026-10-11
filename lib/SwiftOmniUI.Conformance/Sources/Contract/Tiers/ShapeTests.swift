@@ -24,6 +24,7 @@
                 Aspects.holds(ShapeContract.strokeMiterLimit, on: element, 10, then: 4, with: figure(element)),
                 Aspects.holds(ShapeContract.aspect, on: element, .fit, then: .stretch, with: figure(element)),
                 Aspects.holds(ShapeContract.renderTransform, on: element, .identity, then: .rotate(45), with: figure(element)),
+                Aspects.holds(ShapeContract.strokeBorder, on: element, .solidColor(.red), then: .solidColor(.blue), with: figure(element)),
             ]
         }
     }

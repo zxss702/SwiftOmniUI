@@ -169,9 +169,16 @@ class WinUILazyView: WinUITravellingLayout {
         }
         // A held scroller's notices trail the compositor by whole screens: keep
         // a viewport of run past either end mounted so what sweeps in next is painted.
+        // Built a stretch at a time: a window still reaching half a viewport past what the move can show stands,
+        // so a render carries viewports of rows, not one row a notice.
         if held, let realized = realize {
             let room = axis == .vertical ? rect.height : rect.width
-            realize = max(0, realized.lowerBound - room)..<(realized.upperBound + room)
+            if let kept = cells.window?.realize, kept.lowerBound <= max(0, realized.lowerBound - room / 2),
+               kept.upperBound >= realized.upperBound + room / 2 {
+                realize = kept
+            } else {
+                realize = max(0, realized.lowerBound - room)..<(realized.upperBound + room)
+            }
         }
         if override != nil { lastAnnounced = incoming }
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)

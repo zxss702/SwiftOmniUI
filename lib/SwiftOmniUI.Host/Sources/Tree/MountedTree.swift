@@ -79,6 +79,7 @@
     /// A host that cannot say where a departing view stood.
     public var departingRoom: Rect? { nil }
 
+    /// A departure nothing was said of asks nothing back.
     public func departureChanged() {}
 
     /// No tab chosen apart from the tree.
@@ -135,6 +136,10 @@
     private var patchTime: Double?
     private(set) var languageDirection: LayoutDirection?
     private var patchReducesMotion: Bool?
+
+    /// Whether a render since the windows last composed their chrome touched anything outside lazy runs' rows: a
+    /// window composes its chrome again only then. The host clears it once its windows have.
+    public var chromeMayChange = true
 
     /// What the message being applied costs, while an inspector records or the tally is written; nil otherwise.
     var tally: RenderTally?

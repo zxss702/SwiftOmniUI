@@ -1,8 +1,8 @@
 # revision 1.1
 Canvas: ✅
-Canvas.dragged: cannot pressDown on Canvas - GTK's driver has no path for it yet
-Canvas.drawable: cannot read the colour of Canvas - GTK's driver has no path for it yet
+Canvas.dragged: cannot pressDown on Grid - GTK's driver has no path for it yet
+Canvas.drawable: cannot read the colour of Grid - GTK's driver has no path for it yet
 Canvas.frameChanged: ✅
 Canvas.measureText: ✅
-Canvas.pressed: cannot pressDown on Canvas - GTK's driver has no path for it yet
-Canvas.released: cannot pressDown on Canvas - GTK's driver has no path for it yet
+Canvas.pressed: cannot pressDown on Grid - GTK's driver has no path for it yet
+Canvas.released: cannot pressDown on Grid - GTK's driver has no path for it yet

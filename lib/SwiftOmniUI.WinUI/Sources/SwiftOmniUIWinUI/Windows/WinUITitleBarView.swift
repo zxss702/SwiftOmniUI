@@ -48,10 +48,12 @@ final class WinUITitleBarView: WinUIView {
             WinUIStrings.withCStrings(actions.map(\.title)) { titles in
                 WinUIStrings.withCStrings(actions.map { $0.identifier ?? "" }) { identifiers in
                     WinUIStrings.withCStrings(actions.map { $0.icon.map { $0 + "\n" }.joined() }) { icons in
+                    WinUIStrings.withCStrings(actions.map { $0.symbol ?? "" }) { symbols in
                         swiftomniui_winui_title_bar_set_actions(
-                            handle, titles, identifiers, icons, overflows, actions.map(\.isEnabled),
+                            handle, titles, identifiers, icons, symbols, overflows, actions.map(\.isEnabled),
                             actions.map(\.view?.handle), actions.map { $0.spacer.map { Int32($0.rawValue) + 1 } ?? 0 },
                             Int32(actions.count), Int32(chrome.leadingActions.count))
+                    }
                     }
                 }
             }

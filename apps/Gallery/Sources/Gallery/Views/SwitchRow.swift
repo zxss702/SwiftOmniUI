@@ -30,7 +30,6 @@ struct SwitchRow: View {
         HStack {
             Text(text)
                 .font(.system(size: 13))
-                .verticalAlignment(.center)
 
             Toggle(isOn: value)
                 // The caption is a Text BESIDE the switch, and no platform
@@ -39,7 +38,6 @@ struct SwitchRow: View {
                 // it, and the handle is worked out from them - Handle.swift.
                 .accessibilityIdentifier(handle("switch", text))
                 .accessibilityLabel(text)
-                .verticalAlignment(.center)
                 // WINDOWS GIVES A SWITCH A MINIMUM WIDTH OF ITS OWN - room for
                 // the On/Off words its template can show - and charges it
                 // whether or not anything is written there: measured at 154

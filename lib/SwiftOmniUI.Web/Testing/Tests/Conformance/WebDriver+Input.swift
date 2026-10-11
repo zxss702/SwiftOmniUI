@@ -19,6 +19,19 @@ extension WebDriver {
         if act == .close, element.type == .window { return try running().runtime.ending() }
         if case .answer(let caption, let typing) = act { return try answer(caption, typing: typing, on: element) }
         if case .answerFiles(let names) = act { return try answerFiles(names, on: element) }
+        if case .dropFiles(let paths) = act {
+            // The system's files let go on the element, at its middle: what a drop out of Finder raises.
+            guard let target = element.native as? WebElement else { throw DriverCannot(act, on: element) }
+            let place = try place(of: element)
+            target.send(.dropPaths, [.strings(paths), .numbers([place.width / 2, place.height / 2])])
+            return
+        }
+        if case .openLink(let link) = act {
+            // The platform handing the application a link - a document opened on it, a protocol followed into it.
+            guard let runtime = renderer?.runtime else { throw DriverCannot(act, on: element) }
+            _ = runtime.core.raise(AppContract.urlOpened, link)
+            return
+        }
         if case .dragAndDrop(let target, let across) = act { return try dragAndDrop(element, onto: target, across: across) }
         // The browser's way back, over the page's own entry: from one it did not put there, the user leaves the site.
         if act == .goBack {

@@ -27,14 +27,13 @@ extension PageSession {
     ///     inspector of.
     ///   - nav: where the gallery is, which the way home moves - nil on the
     ///     home page, which is where it goes.
-    func gallery(_ title: String, scene: SceneSession, nav: Navigation?) {
+    @MainActor func gallery(_ title: String, scene: SceneSession, nav: Navigation?) {
         self.title = title
-        // Icons give both actions a stable native footprint. Their captions
-        // remain available to accessibility and to platforms that show text.
+        // The inspector's ⓘ and Home's house are the two buttons every page
+        // carries; their captions remain available to accessibility and to
+        // platforms that show text.
         toolbarItems = [
-            .inspector(scene)
-                .text("Inspector")
-                .icon("nav_inspect_dark.png"),
+            .inspector(scene),
         ] + (nav.map { [.home($0)] } ?? [])
 
         // Tinted rather than white, which is what lets a card lift off it with

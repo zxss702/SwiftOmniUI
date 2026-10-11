@@ -4,6 +4,7 @@ WindowScene: waits on WindowScene.created
 WindowScene.activated: not realized
 WindowScene.created: not realized
 WindowScene.deactivated: not realized
+WindowScene.defaultPosition: not realized
 WindowScene.destroying: not realized
 WindowScene.floatsOnTop: not realized
 WindowScene.height: not realized
@@ -16,6 +17,7 @@ WindowScene.maximumWidth: not realized
 WindowScene.minimumHeight: not realized
 WindowScene.minimumWidth: not realized
 WindowScene.modalPopped: not realized
+WindowScene.resizability: cannot read resizability of WindowScene - GTK's driver has no path for it yet
 WindowScene.resumed: not realized
 WindowScene.stopped: not realized
 WindowScene.title: not realized

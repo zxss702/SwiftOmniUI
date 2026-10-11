@@ -29,21 +29,19 @@ struct RemovingRowSample: SampleContent, ExampleContent {
             // `atOnce` are read: deleting a row builds this closure, and a
             // reading taken outside it would be about a stack the delete never
             // rebuilds.
-            DebugInfoLabel()
 
             ForEach(Self.rows, id: \\.self) { row in
-                Grid {
-                    Text(row).gridColumn(0)
+                HStack {
+                    Text(row)
+
+                    Spacer()
 
                     Button("Delete", action: { remove(row) })
-                        .gridColumn(1)
-                        
                 }
-                .columns(.fill, .auto)
                 .hidden(gone.contains(row) || atOnce.contains(row))
                 // What the switch below chooses: a row told to travel at NO
                 // animation goes at once, and the stack still closes over it.
-                .animation(atOnce.contains(row) ? .none : .inherited)
+                .animation(atOnce.contains(row) ? nil : .default)
             }
         }
 
@@ -71,29 +69,25 @@ struct RemovingRowSample: SampleContent, ExampleContent {
                 // and `atOnce` are read: deleting a row builds this closure,
                 // and a reading taken outside it would be about a stack the
                 // delete never rebuilds.
-                DebugInfoLabel()
 
                 ForEach(Self.rows, id: \.self) { row in
-                    Grid {
+                    HStack {
                         Text(row)
                             .font(.system(size: 15))
-                            .verticalAlignment(.center)
-                            .gridColumn(0)
+
+                        Spacer()
 
                         Button("Delete", action: { remove(row) })
                             .font(.system(size: 12))
                             .padding(EdgeInsets(10, 4))
-                            .gridColumn(1)
-                            
                     }
-                    .columns(.fill, .auto)
                     .padding(EdgeInsets(14, 6))
                     .background(Palette.raised)
                     .frame(height: 46)
                     .hidden(gone.contains(row) || atOnce.contains(row))
                     // The other half of the sample: a row told to travel at no
                     // animation goes at once, and the stack still closes over it.
-                    .animation(atOnce.contains(row) ? nil : .inherited)
+                    .animation(atOnce.contains(row) ? nil : .default)
                 }
             }
             .spacing(6)

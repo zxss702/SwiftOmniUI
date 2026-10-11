@@ -1,17 +1,31 @@
 import SwiftOmniUI
 
-/// Rows and columns with each child's place written on the child.
+/// One cell of the grids below: words on a colour.
+private struct GridCell: View {
+    let text: String
+    let color: String
+
+    var body: some View {
+        Text(text)
+            .foregroundStyle(.white)
+            .background(Color(color))
+            .padding(8)
+    }
+}
+
+/// Rows and columns described by `GridRow`s, with a spanning cell and a
+/// column whose width a switch changes.
 struct GridSample: SampleContent {
     static let id = "grid"
     static let title = "Grid"
-    static let summary = "Rows and columns, with each child's place written on the child."
+    static let summary = "Rows of cells in shared columns, one cell spanning them all."
 
     var examples: [Example] {
         [Example(GridPlacement())]
     }
 }
 
-/// Four cells - one down two rows, one across both columns - and a column
+/// Two rows of two cells over a cell spanning both columns - and a column
 /// whose width a switch changes.
 private struct GridPlacement: ExampleContent {
     @State private var wideSecondColumn = true
@@ -21,33 +35,36 @@ private struct GridPlacement: ExampleContent {
 
         VStack {
             // `wideSecondColumn` is read here, so flipping its switch builds
-            // this closure - and the cells cross to their new places.
-            DebugInfoLabel()
+            // this closure - and the cells take their new widths.
 
-            Grid {
-                // One cell down the whole left side, beside two that stay in
-                // a row each.
-                GridCell(text: "Column 0, Rows 0 and 1", color: "#E53935")
-                    .gridRowSpan(2)
+            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    GridCell(text: "Column 0, Row 0", color: "#E53935")
+                        .frame(height: 64)
+                        .frame(maxWidth: .infinity)
+                    GridCell(text: "Column 1, Row 0", color: "#1E88E5")
+                        .frame(height: 64)
+                        .frame(width: wideSecondColumn ? 240 : 120)
+                }
 
-                GridCell(text: "Column 1, Row 0", color: "#1E88E5")
-                    .gridColumn(1)
+                GridRow {
+                    GridCell(text: "Column 0, Row 1", color: "#43A047")
+                        .frame(height: 64)
+                        .frame(maxWidth: .infinity)
+                    GridCell(text: "Column 1, Row 1", color: "#8E24AA")
+                        .frame(height: 64)
+                        .frame(width: wideSecondColumn ? 240 : 120)
+                }
 
-                GridCell(text: "Column 1, Row 1", color: "#8E24AA")
-                    .gridRow(1)
-                    .gridColumn(1)
-
-                GridCell(text: "Row 2, spanning both columns", color: "#F4511E")
-                    .gridRow(2)
-                    .gridColumnSpan(2)
+                GridRow {
+                    GridCell(text: "Row 2, spanning both columns", color: "#F4511E")
+                        .gridCellColumns(2)
+                        .frame(maxWidth: .infinity)
+                }
             }
-            .rows(.fixed(64), .fixed(64), .auto)
-            .columns(.fill, .proportional(wideSecondColumn ? 2 : 1))
-            .rowSpacing(10)
-            .columnSpacing(10)
 
-            // Changing a definition patches the grid in place: the cells keep
-            // their controls and only the column widths move.
+            // The width is read here, so flipping it rebuilds this closure -
+            // and the column follows.
             SwitchRow("Second column twice as wide", $wideSecondColumn)
         }
 
@@ -66,75 +83,59 @@ private struct GridPlacement: ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
-            Grid {
-                // One cell down the whole left side, beside two that stay in
-                // a row each.
-                GridCell(text: "Column 0, Rows 0 and 1", color: "#E53935")
-                    .gridRowSpan(2)
+            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    GridCell(text: "Column 0, Row 0", color: "#E53935")
+                        .frame(height: 64)
+                        .frame(maxWidth: .infinity)
+                    GridCell(text: "Column 1, Row 0", color: "#1E88E5")
+                        .frame(height: 64)
+                        .frame(width: wideSecondColumn ? 240 : 120)
+                }
 
-                GridCell(text: "Column 1, Row 0", color: "#1E88E5")
-                    .gridColumn(1)
+                GridRow {
+                    GridCell(text: "Column 0, Row 1", color: "#43A047")
+                        .frame(height: 64)
+                        .frame(maxWidth: .infinity)
+                    GridCell(text: "Column 1, Row 1", color: "#8E24AA")
+                        .frame(height: 64)
+                        .frame(width: wideSecondColumn ? 240 : 120)
+                }
 
-                GridCell(text: "Column 1, Row 1", color: "#8E24AA")
-                    .gridRow(1)
-                    .gridColumn(1)
-
-                GridCell(text: "Row 2, spanning both columns", color: "#F4511E")
-                    .gridRow(2)
-                    .gridColumnSpan(2)
+                GridRow {
+                    GridCell(text: "Row 2, spanning both columns", color: "#F4511E")
+                        .gridCellColumns(2)
+                        .frame(maxWidth: .infinity)
+                }
             }
-            .rows(.fixed(64), .fixed(64), .auto)
-            .columns(.fill, .proportional(wideSecondColumn ? 2 : 1))
-            .rowSpacing(10)
-            .columnSpacing(10)
 
-            // Changing a definition patches the grid in place: the cells keep
-            // their controls and only the column widths move.
+            // The width is read here, so flipping it rebuilds this closure -
+            // and the column follows.
             SwitchRow("Second column twice as wide", $wideSecondColumn)
-                .horizontalAlignment(.center)
         }
         .spacing(12)
     }
 
     var notes: (any View)? {
         VStack {
-            Text("Where a view sits is written on the view - `.gridRow(1)`, "
-                + "`.gridColumn(1)` - and those modifiers are on every view, because any "
-                + "view can be a grid child.")
+            Text("A `GridRow`'s children land one to a column in order; a bare child "
+                + "stands as a row of its own. `.gridCellColumns(2)` is how a cell "
+                + "covers more than one column.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("A span counts from the view's own cell: `.gridRowSpan(2)` on the red "
-                + "cell covers rows 0 and 1 and the spacing between them, and "
-                + "`.gridColumnSpan(2)` does the same across. A cell nothing is placed in "
-                + "stays empty.")
+            Text("A column is as wide as its widest cell, so sizing the cells sizes "
+                + "the column - `.frame(maxWidth: .infinity)` lets the first take all "
+                + "the room the second leaves.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("A row or column is a `GridLength`: `.fixed(64)`, `.auto`, `.fill` "
-                + "and `.proportional(2)`.")
+            Text("A cell nothing is placed in stays empty: a `GridRow` shorter than "
+                + "the grid leaves its last columns unfilled.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
         }
         .spacing(8)
-    }
-}
-
-/// One coloured cell, composed rather than built inline - and placed with
-/// `.gridRow`, `.gridColumn` and the spans like any other view.
-private struct GridCell: View {
-    let text: String
-    let color: String
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 12))
-            .foregroundStyle(.white)
-            .background(Color(color))
-            .padding(8)
-            .multilineTextAlignment(.center)
-            .verticalTextAlignment(.center)
     }
 }

@@ -16,10 +16,8 @@ struct SearchFieldSample: SampleContent, ExampleContent {
         VStack {
             // The list below is filtered from `query`, so every keystroke builds
             // this closure; the bar itself is handed the state.
-            DebugInfoLabel()
 
-            SearchField($query)
-                .placeholder("Search the list")
+            SearchField("Search the list", text: $query)
                 .onSubmit { searched = query }
 
             VStack {
@@ -35,8 +33,7 @@ struct SearchFieldSample: SampleContent, ExampleContent {
 
             // The same query again, in the accent - where the platform lets
             // an application tint a search field.
-            SearchField($query)
-                .placeholder("Search the list")
+            SearchField("Search the list", text: $query)
                 .tint(Palette.accent)
         }
 
@@ -52,12 +49,10 @@ struct SearchFieldSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
-            SearchField($query)
+            SearchField("Search the list", text: $query)
                 .accessibilityIdentifier("searchBar.query")
                 .accessibilityLabel("Search the list")
-                .placeholder("Search the list")
                 .onSubmit { searched = query }
 
             VStack {
@@ -78,10 +73,9 @@ struct SearchFieldSample: SampleContent, ExampleContent {
 
             SectionTitle("In the accent")
 
-            SearchField($query)
+            SearchField("Search the list", text: $query)
                 .accessibilityIdentifier("searchBar.query.styled")
                 .accessibilityLabel("Search the list, coloured")
-                .placeholder("Search the list")
                 .tint(Palette.accent)
         }
         .spacing(12)

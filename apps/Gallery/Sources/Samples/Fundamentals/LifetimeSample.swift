@@ -30,7 +30,6 @@ struct LifetimeSample: SampleContent, ExampleContent {
             // Every button builds this closure again. Build this again changes
             // nothing the card is built with, so it carries the card and
             // creates nothing.
-            DebugInfoLabel()
 
             SwitchRow("Show the card", $shown)
 
@@ -81,7 +80,6 @@ struct LifetimeSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             SwitchRow("Show the card", $shown)
 
@@ -156,7 +154,6 @@ private struct LifetimeCard: View {
             .background(Palette.accent)
             .shape(.roundedRectangle(10))
             .padding(EdgeInsets(20, 12))
-            .horizontalAlignment(.center)
             
             .onAppear {
                 log.append("\(log.count + 1) · card \(number) created")

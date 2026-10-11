@@ -183,30 +183,41 @@ import XCTest
 
         let page = try page(VStack { card; shape; button; entry; box }.spacing(number.projectedValue).node)
 
-        // The number is state 1, the colour 2 and the insets 3, in the walk.
+        // A state binds where the walk first meets it: the number is state 1
+        // on the stack, the insets 2 on the padding cell, the turn 3 on the
+        // frame cell and the colour 4 on the card, in the walk.
         XCTAssertEqual(ties(page, .auto(3)), tied(["spacing"], to: 1, .inOut, .property))
         XCTAssertEqual(
             ties(page, .auto(3), .auto(4)),
-            tied([
-                "height", "maximumHeight", "maximumWidth", "minimumHeight", "minimumWidth", "opacity",
-                "pivotX", "pivotY", "scale", "scaleX", "scaleY",
-                "strokeWidth", "translationX", "translationY", "width",
-            ], to: 1, .inOut, .property)
-                .merging(tied(["background"], to: 2, .inOut, .property)) { $1 }
-                .merging(tied(["padding", "contentPadding"], to: 3, .inOut, .property)) { $1 }
-                .merging(tied(["rotation", "rotationX", "rotationY"], to: 4, .inOut, .property)) { $1 })
+            tied(["contentPadding"], to: 2, .inOut, .property))
         XCTAssertEqual(
             ties(page, .auto(3), .auto(4), .auto(5)),
-            tied(["characterSpacing", "fontSize"], to: 1, .inOut, .property)
-                .merging(tied(["foregroundStyle"], to: 2, .inOut, .property)) { $1 })
+            tied([
+                "height", "maximumHeight", "maximumWidth", "minimumHeight", "minimumWidth",
+                "pivotX", "pivotY", "scale", "scaleX", "scaleY",
+                "translationX", "translationY",
+            ], to: 1, .inOut, .property)
+                .merging(tied(["rotation", "rotationX", "rotationY"], to: 3, .inOut, .property)) { $1 })
         XCTAssertEqual(
-            ties(page, .auto(3), .auto(6)),
+            ties(page, .auto(3), .auto(4), .auto(5), .auto(6)),
+            tied(["width"], to: 1, .inOut, .property))
+        XCTAssertEqual(
+            ties(page, .auto(3), .auto(4), .auto(5), .auto(6), .auto(7)),
+            tied(["opacity", "strokeWidth"], to: 1, .inOut, .property)
+                .merging(tied(["contentPadding"], to: 2, .inOut, .property)) { $1 }
+                .merging(tied(["background"], to: 4, .inOut, .property)) { $1 })
+        XCTAssertEqual(
+            ties(page, .auto(3), .auto(4), .auto(5), .auto(6), .auto(7), .auto(8)),
+            tied(["characterSpacing", "fontSize"], to: 1, .inOut, .property)
+                .merging(tied(["foregroundStyle"], to: 4, .inOut, .property)) { $1 })
+        XCTAssertEqual(
+            ties(page, .auto(3), .auto(9)),
             tied(["strokeDashOffset", "strokeMiterLimit", "strokeWidth"], to: 1, .inOut, .property))
         XCTAssertEqual(
-            ties(page, .auto(3), .auto(7)),
+            ties(page, .auto(3), .auto(10)),
             tied(["strokeWidth"], to: 1, .inOut, .property))
-        XCTAssertEqual(ties(page, .auto(3), .auto(8)), tied(["placeholderColor"], to: 2, .inOut, .property))
-        XCTAssertEqual(ties(page, .auto(3), .auto(9)), tied(["color"], to: 2, .inOut, .property))
+        XCTAssertEqual(ties(page, .auto(3), .auto(11)), tied(["placeholderColor"], to: 4, .inOut, .property))
+        XCTAssertEqual(ties(page, .auto(3), .auto(12)), tied(["color"], to: 4, .inOut, .property))
     }
 
     /// Text, which has no lanes and no journey: it is written when it changes

@@ -3,6 +3,7 @@ Ellipse.aspect: cannot read the colour of Ellipse - GTK's driver has no path for
 Ellipse.fill: cannot read the colour of Ellipse - GTK's driver has no path for it yet
 Ellipse.renderTransform: cannot read the colour of Ellipse - GTK's driver has no path for it yet
 Ellipse.stroke: cannot read the colour of Ellipse - GTK's driver has no path for it yet
+Ellipse.strokeBorder: not realized
 Ellipse.strokeDashOffset: cannot read strokeDashOffset of Ellipse - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashOffset; its drawing proves it
 Ellipse.strokeDashPattern: cannot read strokeDashPattern of Ellipse - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashPattern; its drawing proves it
 Ellipse.strokeLineCap: cannot read strokeLineCap of Ellipse - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeLineCap; its drawing proves it
@@ -13,6 +14,7 @@ Line.aspect: cannot read the colour of Line - GTK's driver has no path for it ye
 Line.fill: cannot read the colour of Line - GTK's driver has no path for it yet
 Line.renderTransform: cannot read the colour of Line - GTK's driver has no path for it yet
 Line.stroke: cannot read the colour of Line - GTK's driver has no path for it yet
+Line.strokeBorder: not realized
 Line.strokeDashOffset: cannot read strokeDashOffset of Line - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashOffset; its drawing proves it
 Line.strokeDashPattern: cannot read strokeDashPattern of Line - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashPattern; its drawing proves it
 Line.strokeLineCap: cannot read strokeLineCap of Line - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeLineCap; its drawing proves it
@@ -23,6 +25,7 @@ Path.aspect: cannot read the colour of Path - GTK's driver has no path for it ye
 Path.fill: cannot read the colour of Path - GTK's driver has no path for it yet
 Path.renderTransform: cannot read the colour of Path - GTK's driver has no path for it yet
 Path.stroke: cannot read the colour of Path - GTK's driver has no path for it yet
+Path.strokeBorder: not realized
 Path.strokeDashOffset: cannot read strokeDashOffset of Path - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashOffset; its drawing proves it
 Path.strokeDashPattern: cannot read strokeDashPattern of Path - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashPattern; its drawing proves it
 Path.strokeLineCap: cannot read strokeLineCap of Path - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeLineCap; its drawing proves it
@@ -33,6 +36,7 @@ Polygon.aspect: cannot read the colour of Polygon - GTK's driver has no path for
 Polygon.fill: cannot read the colour of Polygon - GTK's driver has no path for it yet
 Polygon.renderTransform: cannot read the colour of Polygon - GTK's driver has no path for it yet
 Polygon.stroke: cannot read the colour of Polygon - GTK's driver has no path for it yet
+Polygon.strokeBorder: not realized
 Polygon.strokeDashOffset: cannot read strokeDashOffset of Polygon - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashOffset; its drawing proves it
 Polygon.strokeDashPattern: cannot read strokeDashPattern of Polygon - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashPattern; its drawing proves it
 Polygon.strokeLineCap: cannot read strokeLineCap of Polygon - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeLineCap; its drawing proves it
@@ -43,6 +47,7 @@ Polyline.aspect: cannot read the colour of Polyline - GTK's driver has no path f
 Polyline.fill: cannot read the colour of Polyline - GTK's driver has no path for it yet
 Polyline.renderTransform: cannot read the colour of Polyline - GTK's driver has no path for it yet
 Polyline.stroke: cannot read the colour of Polyline - GTK's driver has no path for it yet
+Polyline.strokeBorder: not realized
 Polyline.strokeDashOffset: cannot read strokeDashOffset of Polyline - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashOffset; its drawing proves it
 Polyline.strokeDashPattern: cannot read strokeDashPattern of Polyline - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashPattern; its drawing proves it
 Polyline.strokeLineCap: cannot read strokeLineCap of Polyline - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeLineCap; its drawing proves it
@@ -53,6 +58,7 @@ Rectangle.aspect: cannot read the colour of Rectangle - GTK's driver has no path
 Rectangle.fill: cannot read the colour of Rectangle - GTK's driver has no path for it yet
 Rectangle.renderTransform: cannot read the colour of Rectangle - GTK's driver has no path for it yet
 Rectangle.stroke: cannot read the colour of Rectangle - GTK's driver has no path for it yet
+Rectangle.strokeBorder: not realized
 Rectangle.strokeDashOffset: cannot read strokeDashOffset of Rectangle - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashOffset; its drawing proves it
 Rectangle.strokeDashPattern: cannot read strokeDashPattern of Rectangle - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeDashPattern; its drawing proves it
 Rectangle.strokeLineCap: cannot read strokeLineCap of Rectangle - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeLineCap; its drawing proves it

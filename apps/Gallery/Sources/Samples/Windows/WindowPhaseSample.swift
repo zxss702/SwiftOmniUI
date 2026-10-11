@@ -21,7 +21,6 @@ struct WindowPhaseSample: SampleContent, ExampleContent {
         @Environment private var window: WindowSession
 
         VStack {
-            DebugInfoLabel()
 
             Text("application · \\(application.phase)")   // active, inactive or background
             Text("this gallery · \\(scene.phase)")        // active, inactive or background
@@ -33,7 +32,6 @@ struct WindowPhaseSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             PhaseRow(name: "application", value: "\(application.phase)")
             PhaseRow(name: "this gallery", value: "\(scene.phase)")
@@ -77,14 +75,11 @@ private struct PhaseRow: View {
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.subtle)
                 .frame(width: 110)
-                .verticalAlignment(.center)
 
             Text(value)
                 .font(.system(size: 24))
                 .bold()
-                .verticalAlignment(.center)
         }
         .spacing(12)
-        .horizontalAlignment(.center)
     }
 }

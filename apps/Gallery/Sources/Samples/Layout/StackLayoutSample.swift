@@ -24,16 +24,15 @@ struct StackLayoutSample: SampleContent, ExampleContent {
         // Where a child sits in the room its stack gives it.
         VStack {
             StackCell(text: "start")
-                .horizontalAlignment(.start)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             StackCell(text: "center")
-                .horizontalAlignment(.center)
 
             StackCell(text: "end")
-                .horizontalAlignment(.end)
+                .frame(maxWidth: .infinity, alignment: .trailing)
 
             StackCell(text: "fill")
-                .horizontalAlignment(.fill)
+                .frame(maxWidth: .infinity)
         }
         .spacing(8)
 
@@ -73,16 +72,15 @@ struct StackLayoutSample: SampleContent, ExampleContent {
 
             VStack {
                 StackCell(text: "start")
-                    .horizontalAlignment(.start)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 StackCell(text: "center")
-                    .horizontalAlignment(.center)
 
                 StackCell(text: "end")
-                    .horizontalAlignment(.end)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
 
                 StackCell(text: "fill")
-                    .horizontalAlignment(.fill)
+                    .frame(maxWidth: .infinity)
             }
             .spacing(8)
         }

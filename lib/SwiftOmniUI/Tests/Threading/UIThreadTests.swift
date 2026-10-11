@@ -34,6 +34,13 @@ private struct Shows: View {
 }
 
 @MainActor final class UIThreadTests: XCTestCase {
+    /// Touches the shared renderer, whose init installs the UI thread's
+    /// executor before any task of this suite can be made - see UIThread.swift.
+    override func setUp() {
+        super.setUp()
+        Renderer.shared.clearInvalidation()
+    }
+
     // MARK: - The waker
 
     /// A handler may await something that is NOT a host act - `Task.sleep`,
@@ -652,7 +659,11 @@ private struct Shows: View {
             var rest = manifest[...]
             while let opening = rest.range(of: ".\(kind)(") {
                 let arguments = balanced(rest[opening.upperBound...])
-                let labels = arguments.matches(of: label).map { String($0.1) }
+                // The call's OWN labels only: a `.when(platforms:)` or a
+                // `.product(name:)` nested in a dependency is none, however
+                // its labels read - what a name+condition dependency means.
+                let own = arguments.replacing(try! Regex("\\.\\w+\\([^)]*\\)"), with: "")
+                let labels = own.matches(of: label).map { String($0.1) }
                 if let name = quoted("name", in: arguments),
                    labels.contains(where: { $0 != "name" && $0 != "condition" }) {
                     found.append(DeclaredTarget(kind: kind, name: name, arguments: arguments))

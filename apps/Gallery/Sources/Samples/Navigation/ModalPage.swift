@@ -31,12 +31,10 @@ struct ModalPage: View {
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             Button("Present another", action: { nav.present(.page) })
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             Text("Depth: \(nav.sheets.count)")
@@ -46,7 +44,6 @@ struct ModalPage: View {
         }
         .spacing(16)
         .padding(24)
-        .verticalAlignment(.center)
         .onAppear {
             page.title = "Presented"
             page.background = Palette.surface

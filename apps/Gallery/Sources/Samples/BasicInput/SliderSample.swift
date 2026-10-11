@@ -18,20 +18,18 @@ struct SliderSample: SampleContent, ExampleContent {
         VStack {
             // The volume is READ here, so EVERY report the thumb makes builds
             // this closure - which is what a get on a dragged value costs.
-            DebugInfoLabel()
 
             Text(soundOn ? "Volume: \\(Int(volume))" : "Muted")
 
-            Slider($volume, in: 0...100)
-                .disabled(!soundOn)
-                .onDragStarted { dragging = true }
-                .onDragCompleted { dragging = false }
+            Slider($volume, in: 0...100) { editing in
+                dragging = editing
+            }
+            .disabled(!soundOn)
 
             Text(dragging ? "Dragging..." : "At rest")
 
             HStack {
                 Text("Sound")
-                    .verticalAlignment(.center)
 
                 Toggle(isOn: $soundOn)
             }
@@ -40,19 +38,18 @@ struct SliderSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text(soundOn ? "Volume: \(Int(volume))" : "Muted")
                 .font(.system(size: 17))
                 .multilineTextAlignment(.center)
 
-            Slider($volume, in: 0...100)
+            Slider($volume, in: 0...100) { editing in
+                    dragging = editing
+                }
                 .accessibilityIdentifier("slider.volume")
                 .accessibilityLabel("Volume")
                 .disabled(!soundOn)
                 .tint(Palette.accent)
-                .onDragStarted { dragging = true }
-                .onDragCompleted { dragging = false }
 
             Text(dragging ? "Dragging..." : "At rest")
                 .font(.system(size: 13))
@@ -61,7 +58,6 @@ struct SliderSample: SampleContent, ExampleContent {
             HStack {
                 Text("Sound")
                     .font(.system(size: 14))
-                    .verticalAlignment(.center)
 
                 Toggle(isOn: $soundOn)
                     .accessibilityIdentifier("slider.sound")
@@ -69,17 +65,16 @@ struct SliderSample: SampleContent, ExampleContent {
                     .tint(Palette.accent)
             }
             .spacing(12)
-            .horizontalAlignment(.center)
         }
         .spacing(12)
     }
 
     var notes: (any View)? {
         VStack {
-            Text("The drag's two ends are events of their own - `.onDragStarted` as the "
-                + "thumb is grabbed, `.onDragCompleted` as it is let go - and every step "
-                + "between them is an `.onValueChanged`. Work too heavy for every step "
-                + "belongs in the completed end.")
+            Text("`onEditingChanged` reports the drag's two ends - `true` as the thumb is "
+                + "grabbed, `false` as it is let go - and every step between them is a "
+                + "write onto `$volume`. Work too heavy for every step belongs in the "
+                + "let-go end.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 

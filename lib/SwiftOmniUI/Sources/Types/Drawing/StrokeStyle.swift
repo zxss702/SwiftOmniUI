@@ -20,11 +20,33 @@ public struct StrokeStyle: Equatable, Sendable {
     /// How the corners where segments meet are drawn.
     public var lineJoin: LineJoin
 
-    /// An outline `lineWidth` wide, its ends and corners finished as said.
-    public init(lineWidth: Double, lineCap: LineCap, lineJoin: LineJoin) {
+    /// How far a sharp corner may reach before it is cut flat, in multiples of
+    /// the stroke width - SwiftUI's `miterLimit`.
+    public var miterLimit: Double
+
+    /// The dashes and the gaps between them, in multiples of the stroke width;
+    /// empty is a solid line.
+    public var dash: [Double]
+
+    /// How far into the dash pattern the line starts.
+    public var dashPhase: Double
+
+    /// An outline `lineWidth` wide, its ends, corners, miters and dashes as
+    /// said - SwiftUI's `StrokeStyle` spelling.
+    public init(
+        lineWidth: Double,
+        lineCap: LineCap = .flat,
+        lineJoin: LineJoin = .miter,
+        miterLimit: Double = 10,
+        dash: [Double] = [],
+        dashPhase: Double = 0
+    ) {
         self.lineWidth = lineWidth
         self.lineCap = lineCap
         self.lineJoin = lineJoin
+        self.miterLimit = miterLimit
+        self.dash = dash
+        self.dashPhase = dashPhase
     }
 
     /// An outline `lineWidth` wide, ends flat and corners mitered.

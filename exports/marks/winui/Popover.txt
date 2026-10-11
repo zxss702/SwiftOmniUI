@@ -1,0 +1,5 @@
+# revision 1.1
+Popover: waits on Popover.isOpen
+Popover.arrowEdge: not realized
+Popover.dismissed: not realized
+Popover.isOpen: not realized

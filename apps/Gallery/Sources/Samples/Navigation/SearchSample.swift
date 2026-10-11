@@ -30,7 +30,6 @@ struct SearchSample: SampleContent, ExampleContent {
             VStack {
                 // The query and the matches are read here, so every keystroke
                 // in the bar builds this closure.
-                DebugInfoLabel()
 
                 ForEach(matches, id: \\.self) { item in
                     MenuRow(item) { nav.push(.item(item)) }
@@ -43,7 +42,7 @@ struct SearchSample: SampleContent, ExampleContent {
             // The title view belongs to the page session, like toolbar items.
             .onAppear {
                 page.titleView = SearchField($query)
-                    .placeholder("Search the list")
+                    .accessibilityLabel("Search the list")
                     .background(Palette.surface)
                     .frame(height: 38)
             }
@@ -61,7 +60,6 @@ struct SearchSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("Type in the box on the navigation bar; these rows follow it.")
                 .font(.system(size: 14))
@@ -84,7 +82,6 @@ struct SearchSample: SampleContent, ExampleContent {
             Button("Clear the box", action: { query = "" })
                 .disabled(query.isEmpty)
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(12)
@@ -94,12 +91,9 @@ struct SearchSample: SampleContent, ExampleContent {
             page.titleView = SearchField($query)
                 .accessibilityIdentifier("search.query")
                 .accessibilityLabel("Search the list")
-                .placeholder("Search the list")
                 .foregroundStyle(Palette.text)
-                .placeholderColor(Palette.subtle)
                 .background(Palette.surface)
                 .frame(height: 38)
-                .verticalAlignment(.center)
         }
     }
 

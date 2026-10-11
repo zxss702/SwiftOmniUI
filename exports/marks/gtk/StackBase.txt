@@ -1,5 +1,5 @@
 # revision 1.1
-HStack.spacing: ✅
-LazyHStack.spacing: ◐ cannot read spacing of LazyHStack - GTK's driver has no path for it yet
-LazyVStack.spacing: ◐ cannot read spacing of LazyVStack - GTK's driver has no path for it yet
+HStack.spacing: ❌ 30.0 expected, 43.0 came - the first's 20 and the spacing's 10 on
+LazyHStack.spacing: ◐ cannot read spacing of Grid - GTK's driver has no path for it yet
+LazyVStack.spacing: ◐ cannot read spacing of Grid - GTK's driver has no path for it yet
 VStack.spacing: ✅

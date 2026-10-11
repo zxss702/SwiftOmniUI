@@ -30,7 +30,6 @@ struct ConcurrentStateSample: SampleContent, ExampleContent {
         VStack {
             // The 20,000 writes land here as renders: this closure reads
             // `total`, and the reading says how many it was actually built for.
-            DebugInfoLabel()
 
             Text("\\(total)")
 
@@ -79,7 +78,6 @@ struct ConcurrentStateSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("\(total)")
                 .font(.system(size: 56))
@@ -125,7 +123,6 @@ struct ConcurrentStateSample: SampleContent, ExampleContent {
                 .shape(.roundedRectangle(10))
                 .padding(EdgeInsets(22, 12))
                 .disabled(running)
-                .horizontalAlignment(.center)
                 
         }
         .spacing(16)

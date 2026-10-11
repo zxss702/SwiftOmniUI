@@ -60,7 +60,6 @@ struct ColorBoxSample: SampleContent, ExampleContent {
                     .frame(height: 44)
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
             ColorPicker(Palette.outline)
                 .frame(height: 1)

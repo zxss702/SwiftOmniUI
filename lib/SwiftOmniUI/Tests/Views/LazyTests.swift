@@ -97,6 +97,19 @@ private struct LazyPage: View {
         }
     }
 
+    /// `lazyRowStack` is core wiring: the differ reads it to turn a row's
+    /// fragment into the stack its children stand in - it never crosses to a
+    /// host, so a patch carries no such key.
+    func testARowStackMarkerStaysInTheCore() throws {
+        let renders = Renders()
+        let stack = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack(spacing: 8) { ForEach(0..<4) { Text("\($0)") } }
+        }.node))
+        let ids = try XCTUnwrap(stack.props[.items]?.strings)
+        let shown = try lazy(.lazyVStack, in: realize([ids[0]], in: renders, lazy: stack))
+        XCTAssertNil(shown.subtree.first { $0.props["lazyRowStack"] != nil })
+    }
+
     func testScrollingReusesThePreparedSourceAndDataChangesRebuildIt() throws {
         let built = Built()
         let renders = Renders()

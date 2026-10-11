@@ -26,9 +26,6 @@ struct GalleryScene: Scene {
     /// What this gallery looks like - kept with it. See SessionStyle.swift.
     @State private var style = SessionStyle()
 
-    /// What the main window's chrome says - written by the TitleBar sample.
-    @State private var bar = TitleBarState()
-
     /// What the main window has said about its life - its phase, watched in
     /// `MainWindow` and read by the Lifecycle sample.
     @State private var log = WindowLog()
@@ -45,17 +42,12 @@ struct GalleryScene: Scene {
     var windows: Windows {
         let nav = self.nav
         let style = self.style
-        let bar = self.bar
         let log = self.log
 
         return Windows {
             WindowGroup(.fonts) { FontsWindow() }
-                .hidesWhenInactive(style.hidesTools)
-                .floatsOnTop(style.floatsTools)
 
             WindowGroup(.colours) { ColoursWindow() }
-                .hidesWhenInactive(style.hidesTools)
-                .floatsOnTop(style.floatsTools)
 
             WindowGroup(.debugInspector) { DebugInspector() }
 
@@ -64,12 +56,10 @@ struct GalleryScene: Scene {
         } main: {
             MainWindow(
                 catalog: kept.catalog {
-                    Catalog(nav: nav, style: style, bar: bar, log: log)
+                    Catalog(nav: nav, style: style, log: log)
                 },
                 nav: nav,
-                style: style,
-                log: log,
-                bar: bar)
+                log: log)
         }
         .environment(nav)
         .environment(style)

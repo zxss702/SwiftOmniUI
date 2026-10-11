@@ -37,24 +37,25 @@ struct MenuPage: View {
     @Environment private var window: WindowSession
 
     var body: some View {
+        // Three rows: the header and the footer keep their height, and the
+        // rows take what is left and scroll between them. A bare child of a
+        // Grid is a row of its own, and the scroller's `maxHeight` is what
+        // makes its row the one that fills.
+        //
+        // The header is outside the scroller so its background owns the page's
+        // top edge while only the rows participate in scrolling.
         Grid {
             header
 
             ScrollView {
                 rows
             }
-            .gridRow(1)
+            .frame(maxHeight: .infinity)
 
             footer
 
             WindowPhaseLog(log: log)
         }
-        // Three rows: the header and the footer keep their height, and the
-        // rows take what is left and scroll between them.
-        //
-        // The header is outside the scroller so its background owns the page's
-        // top edge while only the rows participate in scrolling.
-        .rows(.auto, .fill, .auto)
         // EDGE TO EDGE, so the gradient runs behind the status bar the way the
         // navigation bar beside it does. Every LAYOUT insets itself, so the
         // header says it too.
@@ -86,7 +87,7 @@ struct MenuPage: View {
                 Image("swiftomniui_mark.png")
                     .frame(width: 51)
                     .frame(height: 51)
-                    .horizontalAlignment(.start)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Text("SwiftOmniUI")
@@ -147,7 +148,7 @@ struct MenuPage: View {
     /// What is underneath: the platform compiled in, and the formFactor the host
     /// answered before the first render.
     private var footer: any View {
-        Text("native: \(stateUIPlatform()) · \(device.formFactor)")
+        Text("native: \(device.platform) · \(device.formFactor)")
             .font(.system(size: 11))
             .foregroundStyle(Palette.subtle)
             .multilineTextAlignment(.center)
@@ -155,7 +156,5 @@ struct MenuPage: View {
             // edge: a phone with no home button draws a bar across the bottom
             // of the screen, and this line would otherwise sit under it.
             .padding(EdgeInsets(16, 16, 16, 30))
-            // The footer's own row, written on the footer.
-            .gridRow(2)
     }
 }

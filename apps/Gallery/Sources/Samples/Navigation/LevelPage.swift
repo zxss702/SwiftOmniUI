@@ -67,12 +67,10 @@ struct LevelPage: View {
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             Button("Back", action: { path.removeLast() })
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             Text("Go deeper and come back: the same page counts a second arrival.")

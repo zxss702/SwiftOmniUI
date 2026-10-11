@@ -56,7 +56,8 @@ The extension installs the **Swift** extension (swiftlang) with it. Install
 
 Open the repository folder. The status bar shows two SwiftOmniUI items:
 
-- **the host** - GTK on Linux, WinUI on Windows, Android or the Web on macOS.
+- **the host** - GTK on Linux, WinUI on Windows, or Android and the Web
+  elsewhere.
   The editor works as that host: code under `#if GTK` is completed only while
   GTK is chosen, and as Android the language server compiles for Android with
   the Swift SDK for Android. Switching restarts the Swift language server

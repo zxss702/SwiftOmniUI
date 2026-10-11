@@ -29,7 +29,6 @@ struct SemanticsSample: SampleContent, ExampleContent {
         // What a user is told is read here, so throwing the switch builds
         // this closure again.
         VStack {
-            DebugInfoLabel()
 
             HStack {
                 // A picture and nothing else. To anybody not looking at it,
@@ -53,7 +52,7 @@ struct SemanticsSample: SampleContent, ExampleContent {
             // Read as a heading: somewhere a user jumping through the page
             // can land.
             Text("A heading, and drawn the same")
-                .accessibilityHeadingLevel(.level1)
+                .accessibilityAddTraits(.isHeader)
 
             // Said out loud, now, whatever the user was on. An ACT, because
             // it is something that happens at a moment rather than a value a
@@ -78,7 +77,7 @@ struct SemanticsSample: SampleContent, ExampleContent {
                 }
             }
             .style("Card")
-            .automationExcludedWithChildren(true)
+            .accessibilityHidden(true)
 
             ColorPicker(Palette.outline)
                 .frame(height: 1)
@@ -100,18 +99,15 @@ struct SemanticsSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             HStack {
                 VStack {
                     Button(icon: ImageSource(light: "nav_media.png", dark: "nav_media_dark.png"), action: { taps += 1 })
                         .style("IconButton")
                         .accessibilityIdentifier("semantics.bare")
-                        .aspect(.fit)
                         .frame(width: 64)
                         .frame(height: 64)
-                        .stroke(Palette.outline)
-                        .strokeWidth(1)
+                        .stroke(Palette.outline, width: 1)
                         .shape(.roundedRectangle(12))
                         
 
@@ -146,14 +142,12 @@ struct SemanticsSample: SampleContent, ExampleContent {
                 .frame(width: 150)
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
             Text("Tapped \(taps) time\(taps == 1 ? "" : "s")")
                 .font(.system(size: 15))
                 .multilineTextAlignment(.center)
 
             SwitchRow("Describe the second button", $described)
-                .horizontalAlignment(.center)
 
             SectionTitle("A heading is what this says it is")
 
@@ -167,7 +161,7 @@ struct SemanticsSample: SampleContent, ExampleContent {
                 Text("A heading, and drawn the same")
                     .font(.system(size: 20))
                     .bold()
-                    .accessibilityHeadingLevel(.level1)
+                    .accessibilityAddTraits(.isHeader)
             }
             .spacing(4)
 
@@ -181,7 +175,6 @@ struct SemanticsSample: SampleContent, ExampleContent {
                 .accessibilityIdentifier("semantics.announce")
                 .font(.system(size: 13))
                 .padding(EdgeInsets(16, 6))
-                .horizontalAlignment(.center)
                 
 
             Text(said.isEmpty ? "nothing said yet" : "said: \(said)")
@@ -223,10 +216,9 @@ struct SemanticsSample: SampleContent, ExampleContent {
                     .padding(12)
                 }
                 .style("Card")
-                .automationExcludedWithChildren(true)
+                .accessibilityHidden(true)
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
             // A rule is decoration: a stop that would waste the user's time.
             ColorPicker(Palette.outline)
@@ -245,11 +237,9 @@ struct SemanticsSample: SampleContent, ExampleContent {
         let button = Button(icon: ImageSource(light: "nav_layout.png", dark: "nav_layout_dark.png"), action: { taps += 1 })
             .style("IconButton")
             .accessibilityIdentifier("semantics.described")
-            .aspect(.fit)
             .frame(width: 64)
             .frame(height: 64)
-            .stroke(Palette.outline)
-            .strokeWidth(1)
+            .stroke(Palette.outline, width: 1)
             .shape(.roundedRectangle(12))
             
 
@@ -263,7 +253,7 @@ struct SemanticsSample: SampleContent, ExampleContent {
             Text("Two jobs, four modifiers, and they do not stand in for one another. "
                 + "`.accessibilityLabel` and `.accessibilityHint` are what a screen reader "
                 + "SAYS: the first names the control, the second says what using it does. "
-                + "`.accessibilityHeadingLevel` marks a view as a heading, which is how a "
+                + "`accessibilityAddTraits(.isHeader)` marks a view as a heading, which is how a "
                 + "user moves through a long page. `.accessibilityIdentifier` is a handle nobody "
                 + "hears - it is what a UI test, a script or an agent driving the "
                 + "application asks the platform to find.")

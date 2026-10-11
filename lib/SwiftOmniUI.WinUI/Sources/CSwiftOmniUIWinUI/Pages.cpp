@@ -211,7 +211,8 @@ extern "C" int32_t swiftomniui_winui_title_bar_words(SwiftOmniUIObjectRef handle
 
 extern "C" void swiftomniui_winui_title_bar_set_actions(
     SwiftOmniUIObjectRef handle, char const *const *texts, char const *const *identifiers, char const *const *icons,
-    bool const *overflows, bool const *enabled, SwiftOmniUIObjectRef const *contents, int32_t const *kinds,
+    char const *const *symbols, bool const *overflows, bool const *enabled, SwiftOmniUIObjectRef const *contents,
+    int32_t const *kinds,
     int32_t count, int32_t leadingCount
 ) {
     try {
@@ -232,11 +233,17 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
                 commands.Append(controls::AppBarSeparator());
                 continue;
             }
-            // A view the item carries stands in the button's place.
+            // A view the item carries stands in the button's place: the bar's own button as a command, any other in
+            // a container.
             if (contents[index]) {
+                auto content = borrow<xaml::UIElement>(contents[index]);
+                if (auto command = content.try_as<controls::ICommandBarElement>()) {
+                    commands.Append(command);
+                    continue;
+                }
                 controls::AppBarElementContainer container;
                 container.VerticalContentAlignment(xaml::VerticalAlignment::Center);
-                container.Content(borrow<xaml::UIElement>(contents[index]));
+                container.Content(content);
                 commands.Append(container);
                 continue;
             }
@@ -246,11 +253,21 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
             if (identifiers[index] && *identifiers[index]) {
                 xaml::Automation::AutomationProperties::SetAutomationId(button, text(identifiers[index]));
             }
-            // An action with a picture shows the picture alone; its words name it to Narrator and in its tip.
+            // An action with a picture shows the picture alone; its words name it to Narrator and in its tip. A
+            // symbol is a Segoe Fluent glyph, as an Image draws one.
+            controls::IconElement icon{nullptr};
             if (auto file = pictureFile(icons[index]); !file.empty()) {
-                controls::ImageIcon icon;
-                icon.Source(pictureSource(file));
-                icon.Tag(winrt::box_value(winrt::hstring(file)));
+                controls::ImageIcon image;
+                image.Source(pictureSource(file));
+                image.Tag(winrt::box_value(winrt::hstring(file)));
+                icon = image;
+            } else if (symbols[index] && *symbols[index]) {
+                controls::FontIcon glyph;
+                glyph.FontFamily(media::FontFamily(L"Segoe Fluent Icons"));
+                glyph.Glyph(text(symbols[index]));
+                icon = glyph;
+            }
+            if (icon) {
                 button.Icon(icon);
                 button.LabelPosition(controls::CommandBarLabelPosition::Collapsed);
                 controls::ToolTipService::SetToolTip(button, winrt::box_value(text(texts[index])));

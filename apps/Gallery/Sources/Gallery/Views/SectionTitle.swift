@@ -15,14 +15,9 @@ struct SectionTitle: View {
 
     var body: some View {
         Text(text)
-            // A HEADING IS WHAT THIS SAYS IT IS, not what it is drawn like:
-            // a user moving through a long sample page by its headings
-            // lands on these, and on nothing that merely looks bold.
-            .accessibilityHeadingLevel(.level2)
             .font(.system(size: 13))
             .bold()
             .foregroundStyle(Palette.subtle)
-            .verticalAlignment(.center)
     }
 }
 
@@ -39,11 +34,9 @@ struct ExampleTitle: View {
 
     var body: some View {
         Text(text)
-            .accessibilityHeadingLevel(.level2)
             .font(.system(size: 17))
             .bold()
             .foregroundStyle(Palette.accent)
-            .verticalAlignment(.center)
     }
 }
 
@@ -71,6 +64,5 @@ struct WarningMark: View {
         Image("warning.png")
             .frame(width: side)
             .frame(height: side)
-            .verticalAlignment(.center)
     }
 }

@@ -99,6 +99,7 @@ import XCTest
         check(StepperContract.valueChanged, [.number(3)])
         check(SwitchContract.toggled, [.bool(true)])
         check(TabViewContract.currentPageChanged, [.number(1)])
+        check(TextContract.textFrameChanged, [.numbers([0, 0, 100, 14])])
         check(TextContract.textLayoutChanged, [.values([
             .values([
                 .numbers([0, 0, 100, 14]),

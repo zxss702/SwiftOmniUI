@@ -11,6 +11,7 @@
     public static var cases: [ConformanceCase] {
         [
             Aspects.standsAlone("ProgressBar"),
+            Aspects.holds(ProgressBarContract.progressStyle, on: "ProgressBar", "bar", then: "ring"),
             ConformanceCase("aBarStandsAtItsShareOfTheWorkWithinItsEnds", proves: [
                 Covered(ProgressBarContract.progress),
             ]) { s in

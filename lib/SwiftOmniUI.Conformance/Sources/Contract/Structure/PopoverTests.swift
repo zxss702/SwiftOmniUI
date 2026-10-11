@@ -11,6 +11,7 @@
 
     public static var cases: [ConformanceCase] {
         [
+            Aspects.holds(PopoverContract.arrowEdge, on: "Popover", .top, then: .bottom),
             ConformanceCase("aPopoverOpensAndClosesAsTheStateSays", proves: [
                 Covered(PopoverContract.self), Covered(PopoverContract.isOpen),
             ], needs: [Covered(ButtonContract.clicked)]) { s in

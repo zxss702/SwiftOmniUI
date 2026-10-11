@@ -98,11 +98,11 @@ struct TabsControls: View {
     }
 
     /// One of the buttons, all of which look the same.
-    private func move(_ caption: String, _ act: @escaping EventHandler) -> Button {
+    private func move(_ caption: String, _ act: @escaping EventHandler) -> any View {
         Button(caption, action: act)
             .font(.system(size: 13))
             .padding(EdgeInsets(16, 6))
-            .horizontalAlignment(.start)
+            .frame(maxWidth: .infinity, alignment: .leading)
             
     }
 

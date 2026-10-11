@@ -97,9 +97,9 @@ extension View {
     /// `Label(_:image:)` and `Label(_:systemImage:)` initializers keeps its
     /// look inside the page and names no item.
     public func tabItem(_ label: Label) -> ModifiedContent {
-        var made = label.iconSource.map { setting(PageElementContract.icon, $0) }
+        var made = label.semanticParts.icon.map { setting(PageElementContract.icon, $0) }
             ?? revised { _ in }
-        if let title = label.titleText {
+        if let title = label.semanticParts.title {
             made = made
                 .setting(PageElementContract.title, title.display)
                 .setting(PageElementContract.titleKey, title.key)

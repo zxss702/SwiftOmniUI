@@ -23,16 +23,14 @@ struct LivingLayoutSample: SampleContent, ExampleContent {
         // layout; what carries it from the old place to the new one is the
         // host's engine, so an insert slides everything under it down.
         VStack {
-            // `wide` is read in THESE braces - `.columns` below asks
-            // it - so widening the grid builds this closure. What the rows do
+            // `wide` is read in THESE braces - the frames below ask
+            // it - so widening the row builds this closure. What the rows do
             // is counted by the reading inside their own stack.
-            DebugInfoLabel()
 
             VStack {
                 // INSIDE these braces, because that is where `rows` is read:
                 // Add, Remove and Shuffle build this closure, and the views
                 // left standing keep their controls.
-                DebugInfoLabel()
 
                 ForEach(rows, id: \\.self) { name in
                     ZStack { Text(name) }.style("Card")
@@ -50,18 +48,14 @@ struct LivingLayoutSample: SampleContent, ExampleContent {
                 Button("Shuffle", action: { rows.shuffle() })
             }
 
-            // A grid whose column widths change: every child crosses to its
-            // new column, because a placement is a placement whoever worked it
+            // A row whose cell widths change: every child crosses to its new
+            // share of the room, because a frame is a frame whoever worked it
             // out.
-            Grid {
-                Text("one").gridColumn(0)
-                Text("two").gridColumn(1)
-                Text("three").gridColumn(2)
+            HStack {
+                Text("one").frame(maxWidth: wide ? .infinity : 110)
+                Text("two").frame(maxWidth: .infinity)
+                Text("three").frame(maxWidth: wide ? 110 : .infinity)
             }
-            .columns(
-                wide ? .proportional(3) : .proportional(1),
-                .proportional(1),
-                wide ? .proportional(1) : .proportional(3))
 
             Button("Widen the other end", action: { wide.toggle() })
         }
@@ -69,10 +63,9 @@ struct LivingLayoutSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            // `wide` is read in THESE braces - `.columns` below asks
-            // it - so widening the grid builds this closure. What the rows do
+            // `wide` is read in THESE braces - the frames below ask
+            // it - so widening the row builds this closure. What the rows do
             // is counted by the reading inside their own stack.
-            DebugInfoLabel()
 
             Text("A stack")
                 .font(.system(size: 11))
@@ -83,18 +76,16 @@ struct LivingLayoutSample: SampleContent, ExampleContent {
                 // INSIDE these braces, because that is where `rows` is read:
                 // Add, Remove and Shuffle build this closure, and the views
                 // left standing keep their controls.
-                DebugInfoLabel()
 
                 ForEach(rows, id: \.self) { name in
                     ZStack {
                         Text(name)
                             .font(.system(size: 15))
-                            .verticalAlignment(.center)
                     }
                     .style("Card")
                     .padding(EdgeInsets(12, 8, 12, 8))
                     .background(Palette.raised)
-                    .strokeWidth(0)
+                    .stroke(.transparent)
                     .frame(height: 40)
                 }
             }
@@ -119,16 +110,12 @@ struct LivingLayoutSample: SampleContent, ExampleContent {
                 .tracking(1)
                 .foregroundStyle(Palette.subtle)
 
-            Grid {
-                cell("one", Palette.brand, at: 0)
-                cell("two", Palette.accent, at: 1)
-                cell("three", Palette.brand, at: 2, faded: true)
+            HStack {
+                cell("one", Palette.brand, wide: wide)
+                cell("two", Palette.accent)
+                cell("three", Palette.brand, wide: !wide, faded: true)
             }
-            .columns(
-                wide ? .proportional(3) : .proportional(1),
-                .proportional(1),
-                wide ? .proportional(1) : .proportional(3))
-            .columnSpacing(8)
+            .spacing(8)
             .frame(height: 52)
 
             Button("Widen the other end", action: { wide.toggle() })
@@ -137,20 +124,19 @@ struct LivingLayoutSample: SampleContent, ExampleContent {
     }
 
     private func cell(
-        _ text: String, _ colour: Color, at column: Int, faded: Bool = false
+        _ text: String, _ colour: Color, wide: Bool? = nil, faded: Bool = false
     ) -> any View {
         ZStack {
             Text(text)
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.onBrand)
-                .horizontalAlignment(.center)
-                .verticalAlignment(.center)
         }
         .style("Card")
         .background(colour)
         .opacity(faded ? 0.55 : 1)
-        .strokeWidth(0)
-        .gridColumn(column)
+        .stroke(.transparent)
+        .frame(width: wide == false ? 110 : nil)
+        .frame(maxWidth: wide != false ? .infinity : nil)
     }
 
     var notes: (any View)? {

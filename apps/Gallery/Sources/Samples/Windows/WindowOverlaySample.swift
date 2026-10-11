@@ -35,8 +35,7 @@ struct WindowOverlaySample: SampleContent, ExampleContent {
                     Text("Over every page")
                     Button("Dismiss", action: { window.overlays[.notice] = nil })
                 }
-                .horizontalAlignment(.center)
-                .verticalAlignment(.start)
+                .frame(maxHeight: .infinity, alignment: .top)
             }
         }
         """
@@ -48,7 +47,7 @@ struct WindowOverlaySample: SampleContent, ExampleContent {
             Toggle(isOn: $shown)
                 .accessibilityIdentifier("window.overlay")
                 .accessibilityLabel("Notice over the window")
-            Text("Notice over the window").verticalAlignment(.center)
+            Text("Notice over the window")
         }
         .spacing(8)
         .onChange(of: shown) {
@@ -69,7 +68,6 @@ private struct WindowNotice: View {
         HStack {
             Text("Over every page")
                 .foregroundStyle(.white)
-                .verticalAlignment(.center)
             Button("Dismiss", action: { window.overlays[.notice] = nil })
                 .accessibilityIdentifier("window.overlay.dismiss")
                 
@@ -79,7 +77,6 @@ private struct WindowNotice: View {
         .background(Palette.accent)
         .shape(.roundedRectangle(10))
         .padding(12)
-        .horizontalAlignment(.center)
-        .verticalAlignment(.start)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }

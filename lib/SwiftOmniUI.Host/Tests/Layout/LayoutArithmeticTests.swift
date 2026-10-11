@@ -57,9 +57,9 @@ final class LayoutArithmeticTests: XCTestCase {
             direction: .leftToRight)
 
         XCTAssertEqual(size, LayoutSize(width: 24, height: 29))
-        XCTAssertEqual(places[0], Rect(2, 2, 96, 10), "a filling child takes the slot's width")
+        XCTAssertEqual(places[0], Rect(2, 12.5, 96, 10), "a filling child takes the slot's width")
         XCTAssertNil(places[1])
-        XCTAssertEqual(places[2], Rect(40, 17, 20, 10), "a centred child stands in the middle")
+        XCTAssertEqual(places[2], Rect(40, 27.5, 20, 10), "a centred child stands in the middle")
     }
 
     /// A flexible child - a `Spacer` - takes the room a stack has left over along its axis, two of them
@@ -118,8 +118,8 @@ final class LayoutArithmeticTests: XCTestCase {
             of: items, axis: .horizontal, spacing: 5, padding: EdgeInsets(2, 0, 0, 0), in: Rect(0, 0, 100, 10),
             direction: .rightToLeft)
 
-        XCTAssertEqual(places[0], Rect(75, 0, 20, 10), "the first child against the right edge, inside padding and margin")
-        XCTAssertEqual(places[1], Rect(40, 0, 30, 10), "the next one to its left, the spacing between")
+        XCTAssertEqual(places[0], Rect(55, 0, 20, 10), "the row centred in its room, the first child on its right")
+        XCTAssertEqual(places[1], Rect(20, 0, 30, 10), "the next one to its left, the spacing between")
     }
 
     /// A column keeps its order down; a child aligned to its start stands at the right.

@@ -74,6 +74,18 @@ members it writes, through the element's own `setValue`, and finds by its id
 or as the one element of its kind. The case runs on a host for each element
 the host realizes, and proves the member there.
 
+## A backend's element
+
+A backend - a package realizing a library element on one host,
+`lib/Backends/<Element>.<Host>`, for a library the platform does not ship -
+is registered by the host's tests before the families run, as an
+application's head registers it. From then on the element is realized
+there: its family and the families of the tiers it wears make their cases
+for it, and the verdicts stand in the host's column with the rest. What the
+driver cannot know of the backend's own widget - a member it holds, an act
+through it, what it reaches only past the toolkit - the host's tests hand the
+driver beside it (`WinUIDriver.backends`, `GTKDriver.backends`).
+
 ## The driver
 
 Each host's test target supplies a driver: how its toolkit starts a page,

@@ -3,4 +3,9 @@ Text: ✅
 Text.frameChanged: ✅
 Text.lineBreak: ◐ cannot read lineBreak of Text - GTK's driver has no path for it yet
 Text.lineLimit: ◐ cannot read lineLimit of Text - GTK's driver has no path for it yet
+Text.minimumScaleFactor: – Pango gives a label no shrink-to-fit factor; the text truncates by its lineBreak instead.
+Text.selectable: cannot read selectable of Text - GTK's driver has no path for it yet
 Text.text: ✅
+Text.textFrameChanged: not realized
+Text.textLayoutChanged: not realized
+Text.textRenderer: cannot read textRenderer of Text - GTK's driver has no path for it yet

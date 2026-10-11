@@ -25,7 +25,6 @@ struct PollSample: SampleContent, ExampleContent {
         VStack {
             // What the poll last answered is read here, so every answer
             // builds this closure once.
-            DebugInfoLabel()
 
             Text(status)
             Text("\\(rounds) round(s)")
@@ -74,7 +73,6 @@ struct PollSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text(status)
                 .font(.system(size: 20))
@@ -103,7 +101,6 @@ struct PollSample: SampleContent, ExampleContent {
                 })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(20, 6))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(12)

@@ -48,6 +48,12 @@ public struct Polygon: Shape, PolygonProperties {
         node = Node(shape: PolygonContract.self)
         node.write(PolygonContract.points, points)
     }
+
+    /// SwiftUI's `fill(_:style:)`: `fillStyle.isEOFilled` picks the even-odd
+    /// rule a self-crossing outline is filled by.
+    public func fill(_ style: some ShapeStyle, style fillStyle: FillStyle) -> Modified {
+        fill(style).fillRule(fillStyle.isEOFilled ? .evenOdd : .nonzero)
+    }
 }
 
 extension Polygon {

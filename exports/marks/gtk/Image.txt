@@ -2,4 +2,6 @@
 Image: ✅
 Image.frameChanged: ✅
 Image.isAnimating: not realized
+Image.isResizable: cannot read isResizable of Image - GTK's driver has no path for it yet
+Image.renderingMode: cannot read renderingMode of Image - GTK's driver has no path for it yet
 Image.source: ◐ cannot read source of Image - GTK's driver has no path for it yet

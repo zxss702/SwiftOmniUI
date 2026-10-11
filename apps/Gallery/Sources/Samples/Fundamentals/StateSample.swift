@@ -21,7 +21,6 @@ struct StateSample: SampleContent, ExampleContent {
             VStack {
                 // THIS closure reads `counter`, so a write to it rebuilds THIS
                 // closure - and the reading says `for counter`.
-                DebugInfoLabel()
 
                 Text("Count: \\(counter)")
                     .multilineTextAlignment(.center)
@@ -41,7 +40,6 @@ struct StateSample: SampleContent, ExampleContent {
                         // it and leaves the one around it standing still;
                         // `$name` lends the value to the TextField and makes a
                         // reader of nobody.
-                        DebugInfoLabel()
 
                         TextField("And the same for text", text: $name)
 
@@ -71,7 +69,6 @@ struct StateSample: SampleContent, ExampleContent {
                     .tracking(1)
                     .foregroundStyle(Palette.accent)
 
-                DebugInfoLabel()
 
                 Text("Count: \(counter)")
                     .font(.system(size: 22))
@@ -85,8 +82,7 @@ struct StateSample: SampleContent, ExampleContent {
                         
 
                     Button("Reset", action: { counter = 0 })
-                        .stroke(Palette.outline)
-                        .strokeWidth(1)
+                        .stroke(Palette.outline, width: 1)
                         .background(.transparent)
                         .foregroundStyle(Palette.subtle)
                         .shape(.roundedRectangle(8))
@@ -95,7 +91,6 @@ struct StateSample: SampleContent, ExampleContent {
                         
                 }
                 .spacing(12)
-                .horizontalAlignment(.center)
 
                 ZStack {
                     VStack {
@@ -104,12 +99,10 @@ struct StateSample: SampleContent, ExampleContent {
                             .tracking(1)
                             .foregroundStyle(Palette.accent)
 
-                        DebugInfoLabel()
 
-                        TextField($name)
+                        TextField("And the same for text", text: $name)
                             .accessibilityIdentifier("state.name")
                             .accessibilityLabel("Name")
-                            .placeholder("And the same for text")
 
                         Text(name.isEmpty ? "Hello, stranger" : "Hello, \(name)!")
                             .font(.system(size: 17))
@@ -119,16 +112,14 @@ struct StateSample: SampleContent, ExampleContent {
                 }
                 .style("Card")
                 .padding(14)
-                .stroke(Palette.accent)
-                .strokeWidth(1)
+                .stroke(Palette.accent, width: 1)
                 .shape(.roundedRectangle(10))
             }
             .spacing(14)
         }
         .style("Card")
         .padding(14)
-        .stroke(Palette.accent)
-        .strokeWidth(1)
+        .stroke(Palette.accent, width: 1)
         .shape(.roundedRectangle(12))
     }
 

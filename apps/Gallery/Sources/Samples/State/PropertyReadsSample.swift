@@ -39,7 +39,6 @@ struct PropertyReadsSample: SampleContent, ExampleContent {
 
             // Reads `visits`. Only a write to `visits` builds this again.
             VStack {
-                DebugInfoLabel()
 
                 Text("visits: \\(profile.visits)")
             }
@@ -47,13 +46,10 @@ struct PropertyReadsSample: SampleContent, ExampleContent {
             // Writes `name` and reads nothing: `profile.$name` is the name's
             // own state, handed to the host whole, so the field is no reader.
             VStack {
-                TextField(profile.$name)
-                    .placeholder("Type a name")
-            }
+                TextField("Type a name", text: profile.$name)            }
 
             // Reads `name`. Only a write to `name` builds this again.
             VStack {
-                DebugInfoLabel()
 
                 Text("name: \\(profile.name)")
             }
@@ -73,12 +69,10 @@ struct PropertyReadsSample: SampleContent, ExampleContent {
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
                     .padding(EdgeInsets(20, 10))
-                    .horizontalAlignment(.center)
                     
             }
 
             VStack {
-                DebugInfoLabel()
 
                 Text("visits: \(profile.visits)")
                     .font(.system(size: 17))
@@ -88,18 +82,16 @@ struct PropertyReadsSample: SampleContent, ExampleContent {
             .background(Palette.surface)
 
             VStack {
-                TextField(profile.$name)
+                TextField("Type a name", text: profile.$name)
                     .accessibilityIdentifier("propertyReads.name")
                     .accessibilityLabel("Name")
-                    .placeholder("Type a name")
             }
 
             VStack {
-                DebugInfoLabel()
 
                 Text("name: \(profile.name.isEmpty ? "-" : profile.name)")
                     .font(.system(size: 17))
-                    .lineBreak(.tailTruncation)
+                    .truncationMode(.tail)
             }
             .spacing(4)
             .padding(14)

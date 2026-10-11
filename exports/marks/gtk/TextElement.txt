@@ -1,15 +1,29 @@
 # revision 1.1
+Button.baselineOffset: not realized
 Button.text: ✅
 Button.textCase: ✅
+Button.textKey: not realized
+RadioButton.baselineOffset: not realized
 RadioButton.text: ✅
 RadioButton.textCase: ✅
+RadioButton.textKey: not realized
+SearchField.baselineOffset: not realized
 SearchField.text: ✅
 SearchField.textCase: ✅
+SearchField.textKey: not realized
+Span.baselineOffset: not realized
 Span.text: cannot read text of Span - GTK's driver has no path for it yet
 Span.textCase: not realized
+Span.textKey: not realized
+Text.baselineOffset: not realized
 Text.text: ✅
 Text.textCase: ✅
+Text.textKey: not realized
+TextEditor.baselineOffset: not realized
 TextEditor.text: ✅
 TextEditor.textCase: ✅
+TextEditor.textKey: not realized
+TextField.baselineOffset: not realized
 TextField.text: ✅
 TextField.textCase: ✅
+TextField.textKey: not realized

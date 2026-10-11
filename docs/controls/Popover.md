@@ -26,7 +26,7 @@ See [the dictionary](README.md) for how a mark is given.
 | Host | Created | Members (3) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
 | Android Views |  |  | `PopupWindow` | no run of it on these sources |
-| WinUI 3 |  |  | `Flyout` | no run of it on these sources |
+| WinUI 3 | ⏸ |  | `Flyout` | waits on Popover.isOpen, not realized yet |
 | GTK 4 | ⏸ |  | `GtkPopover` | waits on Popover.isOpen, not realized yet |
 | Web |  |  | anchored popover (?) | no host yet |
 
@@ -36,6 +36,6 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Menus/PopoverContract.sw
 
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| `isOpen` | property | `Bool` | native |  |  |  |  | GTK 4: not realized |
-| `arrowEdge` | property | `Edge` | adaptive |  |  |  |  |  |
-| `dismissed` | event |  | adaptive |  |  |  |  | GTK 4: not realized |
+| `isOpen` | property | `Bool` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `arrowEdge` | property | `Edge` | adaptive |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `dismissed` | event |  | adaptive |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |

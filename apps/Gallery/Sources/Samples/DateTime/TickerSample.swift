@@ -18,7 +18,6 @@ struct TickerSample: SampleContent, ExampleContent {
         VStack {
             // The tick is read here, so every second builds this closure -
             // which is what a clock costs when its digits are described.
-            DebugInfoLabel()
 
             Text("\\((ticker.limit ?? 0) - ticker.ticks)")
 
@@ -52,7 +51,6 @@ struct TickerSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("\((ticker.limit ?? 0) - ticker.ticks)")
                 .font(.system(size: 64))
@@ -75,7 +73,6 @@ struct TickerSample: SampleContent, ExampleContent {
                     
             }
             .spacing(10)
-            .horizontalAlignment(.center)
 
             HStack {
                 ForEach([10, 30, 60]) { length in
@@ -89,7 +86,6 @@ struct TickerSample: SampleContent, ExampleContent {
                 }
             }
             .spacing(8)
-            .horizontalAlignment(.center)
         }
         .spacing(12)
         .onDisappear { ticker.stop() }

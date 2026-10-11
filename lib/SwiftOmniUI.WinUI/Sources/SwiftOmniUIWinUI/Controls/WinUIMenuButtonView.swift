@@ -16,23 +16,32 @@ final class WinUIMenuButtonView: WinUIView {
     /// The entries as they were last written.
     private(set) var shown = WinUIMenu()
 
-    init() {
-        super.init { number in swiftomniui_winui_menu_button_make(number) }
+    /// The platform's menu button, or - `toolbar` - the bar's own command button, whose look WinUI owns.
+    init(toolbar: Bool = false) {
+        super.init { number in toolbar ? swiftomniui_winui_toolbar_menu_button_make(number) : swiftomniui_winui_menu_button_make(number) }
+        isToolbarControl = toolbar
     }
 
-    /// The face the press opens the menu from: the label child's view; nil for the chevron alone.
+    /// The face the press opens the menu from: the label child's view; nil for the chevron alone - on the bar, for
+    /// the label alone.
     func setFace(_ face: WinUIView?) {
         swiftomniui_winui_menu_button_set_face(handle, face?.handle)
     }
 
-    /// Whether the face draws the chevron that says it opens a menu.
+    /// The words naming the bar's button, where its face is words.
+    func setLabel(_ words: String) {
+        swiftomniui_winui_set_caption(handle, words)
+    }
+
+    /// Whether the face draws the chevron that says it opens a menu; the bar's button draws none.
     func setIndicator(_ shown: Bool) {
+        if isToolbarControl { return }
         swiftomniui_winui_menu_button_set_indicator(handle, shown ? 1 : 0)
     }
 
-    /// Whether the trigger draws the platform's frameless look - `.borderlessButton`'s.
+    /// Whether the trigger draws the platform's frameless look - `.borderlessButton`'s; the bar's keeps WinUI's.
     func setBorderless(_ borderless: Bool) {
-        if isToolbarControl { return swiftomniui_winui_toolbar_button_set_look(handle) }
+        if isToolbarControl { return }
         swiftomniui_winui_menu_button_set_borderless(handle, borderless ? 1 : 0)
     }
 

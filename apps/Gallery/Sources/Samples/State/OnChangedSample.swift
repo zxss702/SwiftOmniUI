@@ -18,7 +18,6 @@ struct OnChangedSample: SampleContent, ExampleContent {
         VStack {
             // THIS closure reads `celsius`, so every report from the slider
             // builds it again - which is what a get on a dragged value costs.
-            DebugInfoLabel()
 
             Text("\\(Int(celsius)) °C")
 
@@ -44,12 +43,10 @@ struct OnChangedSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("\(Int(celsius)) °C")
                 .font(.system(size: 34))
                 .bold()
-                .horizontalAlignment(.center)
 
             Slider($celsius, in: -10...40)
                 .accessibilityIdentifier("onChanged.celsius")

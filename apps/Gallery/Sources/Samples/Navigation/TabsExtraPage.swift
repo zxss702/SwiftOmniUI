@@ -39,7 +39,6 @@ struct TabsExtraPage: View {
 
                 Button("Back to the Navigation samples", action: { nav.openGroup("navigation") })
                     .padding(EdgeInsets(20, 10))
-                    .horizontalAlignment(.center)
                     
             }
             .spacing(14)

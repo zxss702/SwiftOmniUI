@@ -37,6 +37,6 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Menus/MenuContract.swift
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
 | `isEnabled` | property | `Bool` | native | · | ✅ | ✅ |  | cannot read the menu of Text - Android's driver has no path for it yet |
-| `placement` | property | `CommandGroupPlacement` | adaptive |  |  |  |  |  |
+| `placement` | property | `CommandGroupPlacement` | adaptive |  |  |  |  | GTK 4: not realized |
 | `text` | property | `String` | native | · | ✅ | ✅ |  | cannot read the menu of Text - Android's driver has no path for it yet |
-| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |

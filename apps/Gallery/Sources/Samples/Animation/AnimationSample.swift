@@ -105,7 +105,6 @@ struct AnimationSample: SampleContent, ExampleContent {
             .background(Palette.brand)
             .stroke(Palette.accent)
             .shape(.roundedRectangle(32))
-            .horizontalAlignment(.center)
 
             Picker("Animation", selection: $curve) {
                 ForEach(Self.curves.indices) { Text(Self.curves[$0]).tag($0) }
@@ -131,7 +130,6 @@ struct AnimationSample: SampleContent, ExampleContent {
                 }
             }
             .spacing(8)
-            .horizontalAlignment(.center)
 
             button("Reset") {
                 withAnimation(nil) {
@@ -141,7 +139,6 @@ struct AnimationSample: SampleContent, ExampleContent {
                     angle = 0
                 }
             }
-            .horizontalAlignment(.center)
         }
         .spacing(12)
     }

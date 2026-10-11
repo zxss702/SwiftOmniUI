@@ -23,7 +23,6 @@ struct DeviceInfoSample: SampleContent, ExampleContent {
             var body: some View {
                 VStack {
                     // The device never changes, so this stands at one build.
-                    DebugInfoLabel()
 
                     Text("\\(app.name) \\(app.versionString) "
                         + "(\\(app.buildString))")
@@ -40,7 +39,6 @@ struct DeviceInfoSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("\(app.name) \(app.versionString) (\(app.buildString))")
                 .font(.system(size: 22))

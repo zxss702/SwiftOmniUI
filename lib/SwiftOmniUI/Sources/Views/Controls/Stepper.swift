@@ -71,15 +71,15 @@ public struct Stepper: VisualElement, StepperProperties{
         self = Stepper().value(value)
     }
 
-    /// A two-way stepper over `bounds` - SwiftUI's `Stepper(value:in:)` with
-    /// the range told once in the initializer.
-    public init(_ value: Binding<Double>, in bounds: ClosedRange<Double>) {
-        self = Stepper(value).minimum(bounds.lowerBound).maximum(bounds.upperBound)
+    /// A two-way stepper over `bounds` - SwiftUI's `Stepper(value:in:step:)`
+    /// with the range and the stride told once in the initializer.
+    public init(_ value: Binding<Double>, in bounds: ClosedRange<Double>, step: Double = 1) {
+        self = Stepper(value).minimum(bounds.lowerBound).maximum(bounds.upperBound).step(step)
     }
 
     /// A one-way stepper over `bounds`, reporting through `.onValueChanged`.
-    public init(_ value: Double, in bounds: ClosedRange<Double>) {
-        self = Stepper(value).minimum(bounds.lowerBound).maximum(bounds.upperBound)
+    public init(_ value: Double, in bounds: ClosedRange<Double>, step: Double = 1) {
+        self = Stepper(value).minimum(bounds.lowerBound).maximum(bounds.upperBound).step(step)
     }
 
     // Design: docs/design/views/bindings.md#two-way-controls

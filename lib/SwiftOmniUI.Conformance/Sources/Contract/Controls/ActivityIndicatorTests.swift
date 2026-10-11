@@ -11,6 +11,7 @@
     public static var cases: [ConformanceCase] {
         [
             Aspects.standsAlone("ActivityIndicator"),
+            Aspects.holds(ActivityIndicatorContract.progressStyle, on: "ActivityIndicator", "spinner", then: "bar"),
             ConformanceCase("aSpinnerTurnsWhileItsWorkRuns", proves: [
                 Covered(ActivityIndicatorContract.isRunning),
             ], needs: [Covered(ButtonContract.clicked)]) { s in

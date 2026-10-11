@@ -1,5 +1,6 @@
 # revision 1.1
 Button: ✅
+Button.buttonStyle: cannot read buttonStyle of Button - GTK's driver has no path for it yet
 Button.clicked: ✅
 Button.frameChanged: ✅
 Button.icon: not realized
@@ -9,5 +10,7 @@ Button.isOn: cannot read isOn of Button - GTK's driver has no path for it yet
 Button.lineBreak: not realized
 Button.pressed: not realized
 Button.released: not realized
+Button.role: not realized
+Button.shortcut: cannot read shortcut of Button - GTK's driver has no path for it yet
 Button.toggled: cannot read isOn of Button - GTK's driver has no path for it yet
 Text.text: ✅

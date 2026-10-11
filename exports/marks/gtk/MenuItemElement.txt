@@ -3,9 +3,13 @@ MenuItem.clicked: ✅
 MenuItem.icon: – GNOME's menus show words alone, no picture beside them.
 MenuItem.isDestructive: – GNOME's menus mark no entry as destroying something.
 MenuItem.isEnabled: ✅
+MenuItem.shortcut: not realized
 MenuItem.text: ✅
+MenuItem.textKey: not realized
 ToolbarItem.clicked: cannot activate on ToolbarItem - GTK's driver has no path for it yet
 ToolbarItem.icon: cannot read icon of ToolbarItem - GTK's driver has no path for it yet
 ToolbarItem.isDestructive: not realized
 ToolbarItem.isEnabled: cannot activate on ToolbarItem - GTK's driver has no path for it yet
+ToolbarItem.shortcut: not realized
 ToolbarItem.text: cannot read text of ToolbarItem - GTK's driver has no path for it yet
+ToolbarItem.textKey: not realized

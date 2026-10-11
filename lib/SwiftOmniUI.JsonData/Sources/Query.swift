@@ -11,6 +11,7 @@
 
 import Foundation
 import JsonData
+import JsonDataCore
 import SwiftOmniUICore
 
 /// A value `MainActor.assumeIsolated` hands back, whose result must be

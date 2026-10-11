@@ -7,6 +7,9 @@
 @_spi(Host) @MainActor public struct WindowContentSizing {
     public var bounds: WindowBounds
 
+    /// The window's bounds as the content's measures read them: its natural
+    /// size, the smallest it still reads at, and what it declares, each held
+    /// against what the window already allows.
     public init(
         of window: MountedElement, content: MountedElement?,
         measure: (MountedElement, Double?) -> LayoutSize?
@@ -26,6 +29,7 @@
         bounds.maximumHeight = Self.upper(bounds.maximumHeight, sized ? declared.maximumHeight : nil, bounds.minimumHeight)
     }
 
+    /// Whether any size but the one bounds holds is still open.
     public var isResizable: Bool {
         bounds.minimumWidth != bounds.maximumWidth || bounds.minimumWidth == nil
             || bounds.minimumHeight != bounds.maximumHeight || bounds.minimumHeight == nil
@@ -88,6 +92,8 @@
         [explicit, content].compactMap { $0 }.min().map { max($0, minimum ?? 0) }
     }
 
+    /// A measured size held to the bounds: the frame's delta is the part the
+    /// bounds refused.
     public func constrain(_ size: LayoutSize) -> WindowFrame {
         let width = Extent.bounded(size.width, minimum: bounds.minimumWidth, maximum: bounds.maximumWidth)
         let height = Extent.bounded(size.height, minimum: bounds.minimumHeight, maximum: bounds.maximumHeight)

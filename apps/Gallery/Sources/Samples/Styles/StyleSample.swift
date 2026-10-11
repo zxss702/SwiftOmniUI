@@ -27,17 +27,13 @@ struct StyleSample: SampleContent, ExampleContent {
                 .background(Palette.accent)
                 .shape(.roundedRectangle(10))
                 .padding(EdgeInsets(16, 11))
-                .visualState(.disabled) { $0
-                    .foregroundStyle(Palette.disabled)
-                    .background(Palette.outline)
-                }
 
             Style<Text>("Headline")
                 .font(.system(size: 32))
                 .multilineTextAlignment(.center)
 
-            // One shape, stated once. The second style is the first plus
-            // a colour - and inherits everything it does not mention.
+            // One shape, stated once. The second style is the first restated
+            // plus a colour.
             Style<Text>("Quote")
                 .foregroundStyle(Palette.subtle)
                 .font(.system(size: 17))
@@ -46,8 +42,11 @@ struct StyleSample: SampleContent, ExampleContent {
                 .multilineTextAlignment(.center)
 
             Style<Text>("QuoteLoud")
-                .basedOn("Quote")
                 .foregroundStyle(Palette.accent)
+                .font(.system(size: 17))
+                .italic()
+                .tracking(0.3)
+                .multilineTextAlignment(.center)
         }
 
         // And in the view, where nothing says how a button looks:
@@ -56,7 +55,6 @@ struct StyleSample: SampleContent, ExampleContent {
         VStack {
             // Nothing here is about styling: the switch is read in this
             // closure, so flipping it builds the closure again.
-            DebugInfoLabel()
 
             HStack {
                 Button("Save")
@@ -84,7 +82,6 @@ struct StyleSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             // Neither of these says anything about its own appearance. The
             // orange, the corners, the padding and the 44pt minimum all come
@@ -94,27 +91,22 @@ struct StyleSample: SampleContent, ExampleContent {
                 Button("Cancel")
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
-            // A style can say what a control looks like in a STATE; hearing
-            // the control enter one is what .onVisualStateChanged is for, next
-            // door in the Visual states sample.
+            // A control's enabled look follows `.disabled`: the same style
+            // draws it, dulled, once the state is off.
             Button(enabled ? "Enabled" : "Disabled", action: {})
                 .disabled(!enabled)
-                .horizontalAlignment(.center)
                 
 
             HStack {
                 Text("Enabled")
                     .font(.system(size: 14))
-                    .verticalAlignment(.center)
 
                 Toggle(isOn: $enabled)
                     .accessibilityIdentifier("styles.enabled")
                     .accessibilityLabel("Enabled")
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
             SectionTitle("A style asked for by name")
 
@@ -126,10 +118,8 @@ struct StyleSample: SampleContent, ExampleContent {
 
             SectionTitle("A style written from another")
 
-            // The same words twice. "Quote" states the shape; "QuoteLoud" is
-            // `.basedOn("Quote")` plus one colour - so everything that matches
-            // below is inherited, and the one thing that differs is the one
-            // thing it declares.
+            // The same words twice. "Quote" states the shape; "QuoteLoud"
+            // repeats it with a different colour.
             Text("The same nine words, and one of these declares a colour.")
                 .style("Quote")
 
@@ -153,10 +143,8 @@ struct StyleSample: SampleContent, ExampleContent {
                 .foregroundStyle(Palette.subtle)
 
             Text("Both quotes are italic, both are 17 point, both are centred, both "
-                + "carry the same letter spacing - and only one of them says so. "
-                + "`QuoteLoud` is `.basedOn(\"Quote\")` and a text colour, which "
-                + "is the whole of its declaration. A property the child states "
-                + "wins; every property it leaves out comes from the parent.")
+                + "carry the same letter spacing - `QuoteLoud` states all of it "
+                + "again, with only its colour changed.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 

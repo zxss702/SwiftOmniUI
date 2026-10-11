@@ -108,6 +108,11 @@ import CRT
         apply(patch)
     }
 
+    /// Whether this element is a lazy run, building its rows as its window asks.
+    var isLazyRun: Bool {
+        type == .lazyVStack || type == .lazyHStack || type == .lazyVGrid || type == .lazyHGrid
+    }
+
     /// Applies a patch of this element.
     public func apply(_ patch: HostPatch) {
         guard let tree else { return }
@@ -172,6 +177,11 @@ import CRT
         if case .unchanged = patch.children { childrenChanged = patch.lazyContentChanged } else { childrenChanged = true }
 
         let lazy = type == .lazyVStack || type == .lazyHStack || type == .lazyVGrid || type == .lazyHGrid
+        // What a lazy run builds or lets go - its rows and the run itself - names no page's chrome.
+        if !tree.chromeMayChange, !changed.isEmpty || { if case .arranged = patch.children { true } else { false } }(),
+           sequence(first: self, next: \.parent).allSatisfy({ !$0.isLazyRun }) {
+            tree.chromeMayChange = true
+        }
         if lazy, changed.contains(.items) || !described {
             lazyIdentities = Set(value(.items)?.strings ?? [])
         }

@@ -16,7 +16,6 @@ private struct VisitBadge: View {
         VStack {
             // The session is read in THIS closure, so a write to it builds
             // this closure and nothing above it.
-            DebugInfoLabel()
 
             Text("\(session.name) - \(session.visits) visit(s)")
                 .font(.system(size: 17))
@@ -33,10 +32,9 @@ private struct NameEditor: View {
     @Environment var session: Session
 
     var body: some View {
-        TextField(session.$name)
+        TextField("Signed-in name", text: session.$name)
             .accessibilityIdentifier("environment.name")
             .accessibilityLabel("Signed-in name")
-            .placeholder("Signed-in name")
     }
 }
 
@@ -64,7 +62,6 @@ struct EnvironmentSample: SampleContent, ExampleContent {
                 VStack {
                     // The session is read in THIS closure, so a write to it
                     // builds this closure and nothing above it.
-                    DebugInfoLabel()
 
                     Text("\\(session.name) - \\(session.visits) visit(s)")
                 }
@@ -75,9 +72,7 @@ struct EnvironmentSample: SampleContent, ExampleContent {
             @Environment var session: Session
 
             var body: some View {
-                TextField(session.$name)
-                    .placeholder("Signed-in name")
-            }
+                TextField("Signed-in name", text: session.$name)            }
         }
 
         struct RootView: View {
@@ -88,7 +83,6 @@ struct EnvironmentSample: SampleContent, ExampleContent {
                 VStack {
                     // The provider hands a reference on and reads no property
                     // of it, so a write in the object builds nothing here.
-                    DebugInfoLabel()
 
                     VStack {
                         VisitBadge()
@@ -111,7 +105,6 @@ struct EnvironmentSample: SampleContent, ExampleContent {
         VStack {
             // The provider hands a reference on and reads no property of it,
             // so a write in the object is none of this closure's business.
-            DebugInfoLabel()
 
             VStack {
                 VisitBadge()
@@ -121,7 +114,6 @@ struct EnvironmentSample: SampleContent, ExampleContent {
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
                     .padding(EdgeInsets(20, 10))
-                    .horizontalAlignment(.center)
                     
 
                 NameEditor()

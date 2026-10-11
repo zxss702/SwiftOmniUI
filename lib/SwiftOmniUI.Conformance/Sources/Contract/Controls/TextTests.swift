@@ -12,6 +12,25 @@
     public static var cases: [ConformanceCase] {
         [
             Aspects.standsAlone("Text"),
+            Aspects.holds(TextContract.selectable, on: "Text", false, then: true),
+            Aspects.holds(TextContract.minimumScaleFactor, on: "Text", 1, then: 0.5),
+            Aspects.holds(TextContract.textRenderer, on: "Text", "default", then: "annotated"),
+            ConformanceCase("aLabelReportsItsFrameAndItsWordsLaidOut", proves: [
+                Covered(TextContract.textFrameChanged), Covered(TextContract.textLayoutChanged),
+            ]) { s in
+                let frames = Received<[Double]>()
+                let layout = Received<TextLayoutReport>()
+                s.start {
+                    VStack {
+                        Text("Some words")
+                            .onEvent(TextContract.textFrameChanged) { frames.values.append($0) }
+                            .onEvent(TextContract.textLayoutChanged) { layout.values.append($0) }
+                    }
+                }
+                try s.settle { !frames.values.isEmpty && !layout.values.isEmpty }
+                s.expect(frames.values.isEmpty, false, "its frame reported")
+                s.expect(layout.values.isEmpty, false, "and how its words lay")
+            },
             ConformanceCase("aLabelShowsItsWords", proves: [
                 Covered(TextElementContract.text, on: "Text"),
             ]) { s in

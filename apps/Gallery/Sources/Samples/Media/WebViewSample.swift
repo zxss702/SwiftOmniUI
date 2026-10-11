@@ -40,29 +40,24 @@ private struct WebBrowserPart: ExampleContent {
             @Aim(WebView.self) private var browser
 
             var body: some View {
-                Grid {
-                    VStack {
+                VStack {
+                    HStack {
                         // The history flags are read by this bar, so every
                         // page that loads builds this closure.
-                        DebugInfoLabel()
+                        Button("Back", action: { try await browser.goBack() })
+                            .disabled(!hasBack)
+                            
 
-                        HStack {
-                            Button("Back", action: { try await browser.goBack() })
-                                .disabled(!hasBack)
-                                
+                        Button("Forward", action: { try await browser.goForward() })
+                            .disabled(!hasForward)
+                            
 
-                            Button("Forward", action: { try await browser.goForward() })
-                                .disabled(!hasForward)
-                                
-
-                            Button("Reload", action: { try await browser.reload() })
-                                
-                        }
+                        Button("Reload", action: { try await browser.reload() })
+                            
                     }
-                    .gridRow(0)
 
-                    // The browser takes the STAR row - as tall as the window
-                    // leaves - and everything around it keeps its own height.
+                    // The browser takes all the height the window leaves -
+                    // everything around it keeps its own height.
                     WebView("https://example.com")
                         .aim(browser)
                         // What the view calls itself to the server. Left
@@ -81,53 +76,43 @@ private struct WebBrowserPart: ExampleContent {
                         .onProcessTerminated {
                             status = "the web process died - press Reload"
                         }
-                        .gridRow(1)
+                        .frame(maxHeight: .infinity)
 
                     Text(status)
-                        .gridRow(2)
 
                     Button("Title?", action: {
                             answer = try await browser.evaluateJavaScript("document.title")
                         })
                         
-                        .gridRow(3)
 
                     Text(answer)
-                        .gridRow(4)
                 }
-                .rows(.auto, .fill, .auto, .auto, .auto)
             }
         }
         """
 
     var body: some View {
-        Grid {
-            VStack {
-                DebugInfoLabel()
+        VStack {
 
-                HStack {
-                    Button("Back", action: { try await browser.goBack() })
-                        .disabled(!hasBack)
-                        .padding(EdgeInsets(14, 8))
-                        
+            HStack {
+                Button("Back", action: { try await browser.goBack() })
+                    .disabled(!hasBack)
+                    .padding(EdgeInsets(14, 8))
+                    
 
-                    Button("Forward", action: { try await browser.goForward() })
-                        .disabled(!hasForward)
-                        .padding(EdgeInsets(14, 8))
-                        
+                Button("Forward", action: { try await browser.goForward() })
+                    .disabled(!hasForward)
+                    .padding(EdgeInsets(14, 8))
+                    
 
-                    Button("Reload", action: { try await browser.reload() })
-                        .padding(EdgeInsets(14, 8))
-                        
-                }
-                .spacing(8)
-                .horizontalAlignment(.center)
+                Button("Reload", action: { try await browser.reload() })
+                    .padding(EdgeInsets(14, 8))
+                    
             }
-            .spacing(4)
-            .gridRow(0)
+            .spacing(8)
 
-            // The browser takes the STAR row - as tall as the window leaves -
-            // and everything around it keeps its own height.
+            // The browser takes all the height the window leaves - everything
+            // around it keeps its own height.
             WebView("https://example.com")
                 .aim(browser)
                 // What the view calls itself to the server. Left unwritten it
@@ -146,28 +131,23 @@ private struct WebBrowserPart: ExampleContent {
                 .onProcessTerminated {
                     status = "the web process died - press Reload"
                 }
-                .gridRow(1)
+                .frame(maxHeight: .infinity)
 
             Text(status)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(Palette.accent)
-                .gridRow(2)
 
             Button("Title?", action: {
                     answer = try await browser.evaluateJavaScript("document.title")
                 })
                 .padding(EdgeInsets(14, 8))
-                .horizontalAlignment(.center)
                 
-                .gridRow(3)
 
             Text(answer)
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
-                .gridRow(4)
         }
-        .rows(.auto, .fill, .auto, .auto, .auto)
-        .rowSpacing(12)
+        .spacing(12)
     }
 
     var notes: (any View)? {

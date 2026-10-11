@@ -1,3 +1,5 @@
 # revision 1.1
 Span.lineHeight: not realized
+Span.lineSpacing: not realized
 Text.lineHeight: cannot read lineHeight of Text - GTK's driver has no path for it yet
+Text.lineSpacing: not realized

@@ -17,8 +17,7 @@ struct OutlineSample: SampleContent, ExampleContent {
                 Text("rounded, with a hairline")
             }
             .padding(16)
-            .stroke(Palette.outline)
-            .strokeWidth(1)
+            .stroke(Palette.outline, width: 1)
             .shape(.roundedRectangle(12))
 
             HStack {
@@ -27,8 +26,7 @@ struct OutlineSample: SampleContent, ExampleContent {
             }
             .spacing(6)
             .padding(16)
-            .stroke(Palette.accent)
-            .strokeWidth(3)
+            .stroke(Palette.accent, width: 3)
             .shape(.rectangle)
 
             ZStack {
@@ -40,12 +38,20 @@ struct OutlineSample: SampleContent, ExampleContent {
 
             // The box fills the ZStack; its corners are cut only while the
             // ZStack clips what it holds.
-            ZStack {
-                ColorPicker(Palette.accent)
+            if clips {
+                ZStack {
+                    ColorPicker(Palette.accent)
+                }
+                .shape(.roundedRectangle(24))
+                .clipped()
+                .frame(height: 60)
+            } else {
+                ZStack {
+                    ColorPicker(Palette.accent)
+                }
+                .shape(.roundedRectangle(24))
+                .frame(height: 60)
             }
-            .shape(.roundedRectangle(24))
-            .clipsContent(clips)
-            .frame(height: 60)
 
             SwitchRow("Cut what it holds", $clips)
         }
@@ -62,8 +68,7 @@ struct OutlineSample: SampleContent, ExampleContent {
             }
             .spacing(2)
             .padding(16)
-            .stroke(Palette.outline)
-            .strokeWidth(1)
+            .stroke(Palette.outline, width: 1)
             .shape(.roundedRectangle(12))
 
             HStack {
@@ -74,26 +79,31 @@ struct OutlineSample: SampleContent, ExampleContent {
             }
             .spacing(6)
             .padding(16)
-            .stroke(Palette.accent)
-            .strokeWidth(3)
+            .stroke(Palette.accent, width: 3)
             .shape(.rectangle)
 
             ZStack {
                 Text("An ellipse")
                     .font(.system(size: 15))
-                    .horizontalAlignment(.center)
-                    .verticalAlignment(.center)
             }
             .padding(24)
             .stroke(Palette.accent)
             .shape(.ellipse)
 
-            ZStack {
-                ColorPicker(Palette.accent)
+            if clips {
+                ZStack {
+                    ColorPicker(Palette.accent)
+                }
+                .shape(.roundedRectangle(24))
+                .clipped()
+                .frame(height: 60)
+            } else {
+                ZStack {
+                    ColorPicker(Palette.accent)
+                }
+                .shape(.roundedRectangle(24))
+                .frame(height: 60)
             }
-            .shape(.roundedRectangle(24))
-            .clipsContent(clips)
-            .frame(height: 60)
 
             SwitchRow("Cut what it holds", $clips)
         }
@@ -102,7 +112,7 @@ struct OutlineSample: SampleContent, ExampleContent {
 
     var notes: (any View)? {
         Text("The shape is `.rectangle`, `.roundedRectangle(radius)` or `.ellipse`: the layout's background is "
-            + "painted to it and its outline follows it. `.clipsContent(true)` cuts what the layout holds to it too.")
+            + "painted to it and its outline follows it. `.clipped()` cuts what the layout holds to it too.")
             .font(.system(size: 12))
             .foregroundStyle(Palette.subtle)
     }

@@ -4,7 +4,7 @@
 
 ```text
 Package.swift                      all SwiftOmniUI targets, products and test entry points
-Sources/SwiftOmniUI/             the facade: SwiftUI on Apple platforms, SwiftOmniUI elsewhere
+Sources/SwiftOmniUI/             the facade `import SwiftOmniUI` lands on
 lib/SwiftOmniUI/Sources/               platform-neutral SwiftOmniUI core
 lib/SwiftOmniUI/Tests/                 core tests and shared test support
 lib/SwiftOmniUI.Host/                  the host layer every host stands on, and its tests

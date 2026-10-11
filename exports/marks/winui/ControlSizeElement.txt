@@ -1,0 +1,16 @@
+# revision 1.1
+ActivityIndicator.controlSize: not realized
+Button.controlSize: not realized
+CheckBox.controlSize: not realized
+ColorPicker.controlSize: not realized
+DatePicker.controlSize: not realized
+Picker.controlSize: not realized
+ProgressBar.controlSize: not realized
+RadioButton.controlSize: not realized
+SearchField.controlSize: not realized
+Slider.controlSize: not realized
+Stepper.controlSize: not realized
+Switch.controlSize: not realized
+TextEditor.controlSize: not realized
+TextField.controlSize: not realized
+TimePicker.controlSize: not realized

@@ -1,0 +1,5 @@
+# revision 1.1
+LazyVStack: ✅
+LazyVStack.frameChanged: ✅
+LazyVStack.items: ❌ the driver cannot read items of Grid, and says nothing of why
+LazyVStack.realizedChanged: ✅

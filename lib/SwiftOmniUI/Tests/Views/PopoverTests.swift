@@ -11,6 +11,13 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class PopoverTests: XCTestCase {
+    /// Touches the shared renderer, whose init installs the UI thread's
+    /// executor before any task of this suite can be made - see UIThread.swift.
+    override func setUp() {
+        super.setUp()
+        Renderer.shared.clearInvalidation()
+    }
+
     @State private var shown = true
 
     private func popover(_ view: some View) -> Node? {

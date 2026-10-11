@@ -1,47 +1,38 @@
 import SwiftOmniUI
 
-/// Children drawn one over another, each in the whole room or in the area it
-/// names, and which of them is on top.
+/// Children drawn one over another, each in the whole room or where its own
+/// frame puts it, and which of them is on top.
 struct ZStackSample: SampleContent {
     static let id = "zStack"
     static let title = "ZStack"
-    static let summary = "Children drawn one over another, each in the whole room or in an area of its own."
+    static let summary = "Children drawn one over another, each in the whole room or where its own frame puts it."
 
     var examples: [Example] {
         [Example(Areas()), Example(Layers())]
     }
 }
 
-/// Two markers aligned in the whole room, and a panel in an area a switch
-/// states in fractions or in device units.
+/// Two markers aligned in the whole room, and a panel drawn in a corner of it.
 private struct Areas: ExampleContent {
-    @State private var proportional = true
-
     static let code = """
-        @State private var proportional = true
-
         VStack {
-            ZStack {
-                // No area: the whole room, filled.
+            ZStack(alignment: .topLeading) {
+                // The whole room, filled.
                 ColorPicker(Palette.outline)
 
-                // The panel fills the area it names: the right half of the
-                // room, or 120 by 60 at 16, 16 whatever the room's size.
+                // Its own size, tucked into the top-left.
                 ColorPicker(Color("#1E88E5"))
-                    .area(proportional ? .proportional(0.5, 0, 0.5, 1) : .absolute(16, 16, 120, 60))
+                    .frame(width: 120, height: 60)
+                    .offset(x: 16, y: 16)
 
-                // Its natural size, where its alignments put it.
+                // Its natural size, where the stack's alignment put it.
                 Marker(text: "start", color: "#E53935")
-                    .horizontalAlignment(.start)
-                    .verticalAlignment(.start)
 
+                // Asking for the whole room, so its own alignment answers.
                 Marker(text: "end", color: "#00897B")
-                    .horizontalAlignment(.end)
-                    .verticalAlignment(.end)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
             .frame(height: 180)
-
-            SwitchRow("Proportional area", $proportional)
         }
 
         private struct Marker: View {
@@ -58,34 +49,23 @@ private struct Areas: ExampleContent {
         """
 
     var body: some View {
-        VStack {
-            // NO BUILD READING HERE. `proportional` is read inside the stack's
-            // own braces, and a container describes its children when the
-            // differ asks, so the only closure this switch rebuilds is that one.
-            ZStack {
-                ColorPicker(Palette.outline)
+        ZStack(alignment: .topLeading) {
+            ColorPicker(Palette.outline)
 
-                ColorPicker(Color("#1E88E5"))
-                    .area(proportional ? .proportional(0.5, 0, 0.5, 1) : .absolute(16, 16, 120, 60))
+            ColorPicker(Color("#1E88E5"))
+                .frame(width: 120, height: 60)
+                .offset(x: 16, y: 16)
 
-                Marker(text: "start", color: "#E53935")
-                    .horizontalAlignment(.start)
-                    .verticalAlignment(.start)
+            Marker(text: "start", color: "#E53935")
 
-                Marker(text: "end", color: "#00897B")
-                    .horizontalAlignment(.end)
-                    .verticalAlignment(.end)
-            }
-            .frame(height: 180)
-
-            SwitchRow("Proportional area", $proportional)
-                .horizontalAlignment(.center)
+            Marker(text: "end", color: "#00897B")
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
-        .spacing(12)
+        .frame(height: 180)
     }
 
     var notes: (any View)? {
-        Text("Resize the window: a proportional area follows the room, an absolute one stays put.")
+        Text("A child keeps its own size until it asks for the room - the frame's alignment then says where in it it stands.")
             .font(.system(size: 12))
             .foregroundStyle(Palette.subtle)
     }
@@ -105,13 +85,13 @@ private struct Layers: ExampleContent {
                 ColorPicker(Color("#E53935"))
                     .frame(width: 150)
                     .frame(height: 70)
-                    .horizontalAlignment(.start)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .zIndex(redInFront ? 1 : 0)
 
                 ColorPicker(Color("#1E88E5"))
                     .frame(width: 150)
                     .frame(height: 70)
-                    .horizontalAlignment(.end)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                     .zIndex(redInFront ? 0 : 1)
             }
             .frame(height: 70)
@@ -127,21 +107,19 @@ private struct Layers: ExampleContent {
                 ColorPicker(Color("#E53935"))
                     .frame(width: 150)
                     .frame(height: 70)
-                    .horizontalAlignment(.start)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .zIndex(redInFront ? 1 : 0)
 
                 ColorPicker(Color("#1E88E5"))
                     .frame(width: 150)
                     .frame(height: 70)
-                    .horizontalAlignment(.end)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                     .zIndex(redInFront ? 0 : 1)
             }
             .frame(height: 70)
             .frame(maxWidth: 240)
-            .horizontalAlignment(.center)
 
             SwitchRow("Red in front", $redInFront)
-                .horizontalAlignment(.center)
         }
         .spacing(12)
     }

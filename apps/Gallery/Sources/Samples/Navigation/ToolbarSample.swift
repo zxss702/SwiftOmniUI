@@ -10,10 +10,6 @@ struct ToolbarSample: SampleContent, ExampleContent {
     /// same identity.
     @State private var added = 0
 
-    /// Which of the two buttons ON the bar asks to be drawn first. The number
-    /// it decides is `.priority`; the lower number appears first.
-    @State private var addFirst = false
-
     /// The page this sample is on, whose bar and menus these are.
     @Environment private var page: PageSession
 
@@ -29,7 +25,6 @@ struct ToolbarSample: SampleContent, ExampleContent {
         @State private var saved = 0
         @State private var recent = ["notes.txt", "budget.csv"]
         @State private var added = 0
-        @State private var addFirst = false
 
         @Environment private var page: PageSession
         @State private var chrome: [ToolbarItem] = []
@@ -38,45 +33,34 @@ struct ToolbarSample: SampleContent, ExampleContent {
         // and written again when what they say moves.
         private var items: [ToolbarItem] {
             [
-                // Written Save then Add whichever way the switch is set; the
-                // lower priority still appears first.
-                ToolbarItem("Save")
-                    .id("save")
-                    .priority(addFirst ? 1 : 0)
-                    .onClicked { saved += 1 },
+                ToolbarItem("Save") { saved += 1 }
+                    .id("save"),
 
-                ToolbarItem("Add")
-                    .id("add")
-                    .priority(addFirst ? 0 : 1)
-                    .onClicked {
+                ToolbarItem("Add") {
                         added += 1
                         recent.append("file\\(added).txt")
-                    },
+                    }
+                    .id("add"),
 
-                ToolbarItem("Clear")
+                ToolbarItem("Clear", placement: .overflow) { saved = 0 }
                     .id("clear")
-                    .placement(.overflow)
-                    .isDestructive(true)
-                    .disabled(saved <= 0)
-                    .onClicked { saved = 0 },
+                    .disabled(saved <= 0),
             ]
         }
 
         private var menus: [Menu] {
             [
                 Menu("File") {
-                    MenuItem("Save")
+                    MenuItem("Save") { saved += 1 }
                         .id("save")
-                        .onClicked { saved += 1 }
 
                     Divider()
                         .id("line")
 
                     Menu("Recent") {
                         ForEach(recent) { file in
-                            MenuItem(file)
+                            MenuItem(file) { recent.removeAll { $0 == file } }
                                 .id(file)
-                                .onClicked { recent.removeAll { $0 == file } }
                         }
                     }
                     .id("recent")
@@ -90,25 +74,16 @@ struct ToolbarSample: SampleContent, ExampleContent {
             VStack {
                 // The counts are read here, so every toolbar item that acts
                 // builds this closure.
-                DebugInfoLabel()
 
                 Text("Saved \\(saved) time(s)")
                 Text(recent.isEmpty ? "No recent files" : recent.joined(separator: ", "))
 
-                HStack {
-                    Toggle(isOn: $addFirst)
-
-                    Text(addFirst
-                        ? "Add asks first - .priority(0), against Save's 1"
-                        : "Save asks first - .priority(0), against Add's 1")
-                }
             }
             .onAppear {
                 chrome = page.toolbarItems      // what the page put there first
                 page.toolbarItems = items + chrome
                 page.menuBar = menus
             }
-            .onChange(of: addFirst) { page.toolbarItems = items + chrome }
             .onChange(of: saved) { page.toolbarItems = items + chrome }
             .onChange(of: recent) { page.menuBar = menus }
         }
@@ -118,27 +93,18 @@ struct ToolbarSample: SampleContent, ExampleContent {
     /// own.
     private var items: [ToolbarItem] {
         [
-            // Written Save then Add whichever way the switch is set; the lower
-            // priority still appears first.
-            ToolbarItem("Save")
-                .id("save")
-                .priority(addFirst ? 1 : 0)
-                .onClicked { saved += 1 },
+            ToolbarItem("Save") { saved += 1 }
+                .id("save"),
 
-            ToolbarItem("Add")
-                .id("add")
-                .priority(addFirst ? 0 : 1)
-                .onClicked {
+            ToolbarItem("Add") {
                     added += 1
                     recent.append("file\(added).txt")
-                },
+                }
+                .id("add"),
 
-            ToolbarItem("Clear")
+            ToolbarItem("Clear", placement: .overflow) { saved = 0 }
                 .id("clear")
-                .placement(.overflow)
-                .isDestructive(true)
-                .disabled(saved <= 0)
-                .onClicked { saved = 0 },
+                .disabled(saved <= 0),
         ]
     }
 
@@ -146,18 +112,16 @@ struct ToolbarSample: SampleContent, ExampleContent {
     private var menus: [Menu] {
         [
             Menu("File") {
-                MenuItem("Save")
+                MenuItem("Save") { saved += 1 }
                     .id("save")
-                    .onClicked { saved += 1 }
 
                 Divider()
                     .id("line")
 
                 Menu("Recent") {
                     ForEach(recent) { file in
-                        MenuItem(file)
+                        MenuItem(file) { recent.removeAll { $0 == file } }
                             .id(file)
-                            .onClicked { recent.removeAll { $0 == file } }
                     }
                 }
                 .id("recent")
@@ -169,7 +133,6 @@ struct ToolbarSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("Saved \(saved) time(s)")
                 .font(.system(size: 17))
@@ -182,20 +145,6 @@ struct ToolbarSample: SampleContent, ExampleContent {
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            SectionTitle("Which one comes first")
-
-            HStack {
-                Toggle(isOn: $addFirst)
-                    .accessibilityIdentifier("toolbar.addFirst")
-                    .accessibilityLabel("Add asks first")
-
-                Text(addFirst
-                    ? "Add asks first - `.priority(0)`, against Save's 1"
-                    : "Save asks first - `.priority(0)`, against Add's 1")
-                    .font(.system(size: 14))
-                    .verticalAlignment(.center)
-            }
-            .spacing(10)
         }
         .spacing(12)
         // The bar and the menus are the PAGE's, so this sample writes them
@@ -207,22 +156,16 @@ struct ToolbarSample: SampleContent, ExampleContent {
             page.menuBar = menus
         }
         // What they say follows the state, so they are written again when it
-        // moves: `saved` decides whether Clear can be pressed, `addFirst` the
-        // priorities, `recent` the submenu.
-        .onChange(of: addFirst) { page.toolbarItems = items + chrome }
+        // moves: `saved` decides whether Clear can be pressed, `recent` the
+        // submenu.
         .onChange(of: saved) { page.toolbarItems = items + chrome }
         .onChange(of: recent) { page.menuBar = menus }
     }
 
     var notes: (any View)? {
         VStack {
-            Text("Save and Add are on the page's bar. Clear is a destructive item in the "
+            Text("Save and Add are on the page's bar. Clear sits in the "
                 + "native overflow, enabled once something is saved.")
-                .font(.system(size: 12))
-                .foregroundStyle(Palette.subtle)
-
-            Text("Lower priority appears first; equal priority keeps source order. "
-                + "Flip the switch and the same native items exchange places.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 

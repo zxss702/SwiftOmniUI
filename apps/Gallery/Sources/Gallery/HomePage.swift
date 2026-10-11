@@ -12,12 +12,10 @@ import SwiftOmniUI
 /// **THE PAGE IS ARRANGED FROM ITS OWN MEASUREMENT**, which is the interesting
 /// thing about it and the reason it is written the way it is. The run of cards
 /// is given what the rows can spare, and what they can spare is not known until
-/// the page has been laid out - so the measurement is read TWICE, by two roads,
-/// because the two answers are different in kind. How TALL the run stands moves
-/// with every pass the layout settles through and is worn rather than drawn, so
-/// it is `.frame` into a driven state and `.engine(following:)` over it: no render, on
-/// the host's own frames. WHICH ROWS THERE ARE is described, so it renders -
-/// but only when a user turns the device or drags the window past a
+/// the page has been laid out - so the page is a `GeometryReader`, and the same
+/// `fitted` function answers both questions the room poses: which rows there
+/// are, and how tall the run stands. WHICH ROWS THERE ARE is described, so it
+/// renders - but only when a user turns the device or drags the window past a
 /// threshold, which is a handful of times in a session rather than a handful of
 /// times a second.
 struct HomePage: View {
@@ -43,23 +41,6 @@ struct HomePage: View {
     /// The screen, which decides whether a phone is on its side.
     @Environment var display: DeviceDisplay
 
-    /// How much of the page stands beside the cards.
-    ///
-    /// THE ONE THING THE MEASUREMENT DECIDES THAT IS DESCRIBED, which is why it
-    /// is the one thing about the room that renders. A row that is not there is
-    /// not a size, so no driven value can say it.
-    @State private var chrome = Chrome.full
-
-    /// How tall the run of cards stands, which the engine below answers.
-    ///
-    /// A SIZE WORKED OUT FROM A MEASUREMENT DOES NOT TRAVEL, and here that is
-    /// what the WRITE says rather than a word beside it: the engine writes a
-    /// whole journey already standing at its answer, so every write is an
-    /// arrival. Sent as the plain name - which is a set point, and a journey -
-    /// this size would crawl to its answer over half a second, with everything
-    /// under the run riding every step of it.
-    @State private var box = HomePage.gallery
-
     /// How far the page has come in.
     ///
     /// THE ROOM IS NOT KNOWN UNTIL IT IS MEASURED, and this page is arranged
@@ -67,67 +48,32 @@ struct HomePage: View {
     /// which the star row cannot say until it has been laid out. So the first
     /// arrangement is a guess, the second is the answer, and the step between
     /// them is a jump - not in the cards alone, but in everything standing
-    /// under them.
-    ///
-    /// Rather than hide the step, the page arrives once it is over - and
-    /// DRIVEN, so the engine below both decides when that is and starts it,
-    /// in the same cycle and without a render either side of it.
+    /// under them. Rather than hide the step, the page fades in once it is
+    /// over.
     @State private var shown = 0.0
-
-    /// The page's own room, as the platform lays it out.
-    ///
-    /// DRIVEN, so the host writes it on its own frames and nothing is built
-    /// again for it. Two things read it: the engine below, which is what sizes
-    /// the run, and the entrance, which waits for it to hold still.
-    @State private var room = Rect(0, 0, 0, 0)
-
-    /// Where the entrance has got to - the engine's own step.
-    ///
-    /// ORDINARY STATE THAT NOTHING DESCRIBES: kept by property name across
-    /// renders, read and written by the arithmetic alone, and a write to it
-    /// asks for no render because no body reads it. The three below are the
-    /// same shape - what an engine remembers between cycles is a `@State`
-    /// like any other, told apart from a described one by nothing but where
-    /// it is used.
-    @State private var phase = Entrance.measuring
-
-    /// The room as the cycle before this one saw it, which is what "held
-    /// still" is measured against.
-    @State private var held = Rect(0, 0, 0, 0)
-
-    /// How long the room has held still, in milliseconds - started over by
-    /// every cycle that sees it move.
-    @State private var still = 0.0
-
-    /// How long the entrance has waited altogether, in milliseconds.
-    ///
-    /// COUNTED ACROSS EVERY MOVE, where `still` counts since the last one: a
-    /// room that moves starts that clock over, so it alone could never run
-    /// out of patience.
-    @State private var waited = 0.0
 
     var body: some View {
         let groups = catalog.groups
 
-        // THE CEILING AND THE CHROME ARE READ HERE, in the body, and handed to
-        // the arithmetic below rather than looked up inside it. A read an
-        // ENGINE makes is recorded NOWHERE - it runs on the host's own frames,
-        // outside every render - so a value only the engine looked at would
-        // move with nothing built again, and the run would stand at the height
-        // the last shape gave it.
-        let ceiling = affords
-        let wearing = chrome
+        // THE PAGE'S OWN ROOM, read by the layout itself: a `GeometryReader`
+        // hands the closure its measured size, which is the one value the
+        // arrangement below is worked out from. Which rows stand and how tall
+        // the run is are the same function's two answers - `fitted` below - so
+        // a render knows both in one pass.
+        return GeometryReader { room in
+            let fitted = Self.fitted(
+                in: Rect(0, 0, room.size.width, room.size.height), at: affords)
 
-        // A GRID OF THREE ROWS: the heading takes what it needs, the run of
-        // cards takes what is LEFT, and the two lines about what this is sit at
-        // the foot.
-        //
-        // ONE GRID RATHER THAN A BRANCH PER SHAPE. An `if` in a builder is a
-        // branch KEY, so a page that crossed the threshold would destroy the
-        // run of cards and build it again; a row whose view is not visible
-        // collapses to nothing, and the pair - centred in the star row - then
-        // stands in the middle of the page by itself.
-        return Grid {
+            // A GRID OF THREE ROWS: the heading takes what it needs, the run of
+            // cards takes what is LEFT, and the two lines about what this is
+            // sit at the foot.
+            //
+            // ONE GRID RATHER THAN A BRANCH PER SHAPE. An `if` in a builder is a
+            // branch KEY, so a page that crossed the threshold would destroy the
+            // run of cards and build it again; a row whose view is not visible
+            // collapses to nothing, and the pair - centred in the star row - then
+            // stands in the middle of the page by itself.
+            Grid(horizontalSpacing: nil, verticalSpacing: Self.gap) {
             VStack {
 
                 // The mark, the name and what it is, on the identity gradient -
@@ -141,7 +87,7 @@ struct HomePage: View {
                         Image("swiftomniui_mark.png")
                             .frame(width: 84)
                             .frame(height: 84)
-                            .horizontalAlignment(.start)
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
                         Text("SwiftOmniUI Gallery")
                             .font(.system(size: 34))
@@ -160,41 +106,28 @@ struct HomePage: View {
                 .style("Card")
                 .background(Palette.identity)
                 .stroke(.transparent)
-                .strokeWidth(0)
                 .shape(.roundedRectangle(18))
 
                 SectionTitle("\(catalog.sampleCount(on: device.formFactor)) SAMPLES "
                     + "IN \(groups.count) GROUPS")
             }
             .spacing(14)
-            .verticalAlignment(.start)
             // A PHONE ON ITS SIDE has no height for a heading: the cards are
             // what the page is for, so they are what it keeps.
-            .hidden(!wearing.heads)
-            .gridRow(0)
+            .hidden(!fitted.chrome.heads)
 
             VStack {
                 // ONE CARD PER GROUP, turned by a finger, a trackpad or a
-                // wheel. Nothing here is described while the run moves: the
-                // gallery's arithmetic follows the scroller on the host's own
-                // frames, and the one render is the card CHANGING - which is
-                // what the words below are written from.
+                // wheel. A tapped card pushes its group - the tap is the face's
+                // own, the run's job being to carry the cards.
                 GalleryView(groups, id: \.route) { group in
                     GroupFace(title: group.title, summary: group.summary, picture: group.card)
+                        .onTapGesture { nav.push(.group(group.route)) }
                 }
                 .position($chosen)
-                .onItemTapped { group in nav.push(.group(group.route)) }
-                // THE FAR CARDS DARKEN RATHER THAN FADE. A faded card here
-                // would show the card BEHIND it - the wheel stands them one
-                // over another - so what reads as depth is a shade over the
-                // card rather than the card going transparent. It wears the
-                // card's own corners, which is why the view is the
-                // application's to give.
-                .shade(ColorPicker(Color("#000000")).cornerRadius(16))
-                // WHAT THE ROWS CAN SPARE, worn on the host's own frames. The
-                // state is written by the engine under this grid, so a page
-                // settling through half a dozen passes costs no render at all.
-                .frame(height: $box)
+                // WHAT THE ROWS CAN SPARE, answered by the same `fitted` the
+                // rows are.
+                .frame(height: fitted.run)
 
                 // AND THE SAME RUN, A CARD AT A TIME, directly under the cards
                 // it steps. ON A DESKTOP ONLY: a finger has the run itself and
@@ -225,11 +158,9 @@ struct HomePage: View {
                 // empty underneath rather than how tall it is.
                 Caption(catalog: catalog, position: $chosen, formFactor: device.formFactor)
                     .frame(height: Self.caption)
-                    .verticalAlignment(.start)
             }
             .spacing(Self.gap)
-            .verticalAlignment(.center)
-            .gridRow(1)
+            .frame(maxHeight: .infinity)
 
             // WHAT THIS IS, at the FOOT of the page and centred: the cards are
             // what a user came for, and these two lines are what they read
@@ -243,111 +174,27 @@ struct HomePage: View {
                     .foregroundStyle(Palette.subtle)
                     .multilineTextAlignment(.center)
 
-                // The platform is compiled in; the formFactor - phone, tablet,
-                // desktop - is the host's answer, which is what lets the
-                // catalog list desktop chrome only where it draws.
-                Text("native: \(stateUIPlatform()) · \(device.formFactor)")
+                // The platform is the host's answer; the formFactor - phone,
+                // tablet, desktop - is what lets the catalog list desktop
+                // chrome only where it draws.
+                Text("native: \(device.platform) · \(device.formFactor)")
                     .font(.system(size: 11))
                     .foregroundStyle(Palette.subtle)
                     .multilineTextAlignment(.center)
             }
             .spacing(4)
-            .hidden(!wearing.foots)
-            .gridRow(2)
+            .hidden(!fitted.chrome.foots)
         }
-        .rows(.auto, .fill, .auto)
-        .rowSpacing(Self.gap)
         // The margin is the rows' own to lose: the frame below is this grid's
         // outer one, so the arithmetic takes the margin off explicitly.
-        .padding(Self.margin, Self.margin)
-        // THE PAGE'S OWN ROOM, written by the host and read by the arithmetic
-        // that sizes the run. Nothing is built for it, which is the whole
-        // difference between this and measuring a page with a `GeometryReader`:
-        // the run's height then rode a render per settling pass, and everything
-        // standing under it rode them too.
-        .frame($room)
-        .engine(following: $room) { cycle in
-            // NOTHING IS DECIDED FROM A ROOM NOBODY HAS MEASURED. Every render
-            // arms every engine, so this runs once over the room as DECLARED -
-            // before any layout has happened - and the host writes a frame
-            // only once the platform has really laid the view out. Until then
-            // the state holds what is written beside it, and there is nothing
-            // here to work out.
-            if room.height > 0 {
-                // A SIZE WORKED OUT FROM A MEASUREMENT DOES NOT TRAVEL, and
-                // `snap(to:)` is the one write that says so - there, going
-                // nowhere, standing still. Written as the plain name, which is
-                // a set point, this number would crawl to its answer over
-                // half a second with everything under the run riding every
-                // step of it.
-                $box.journey.snap(to: Self.fitted(in: room, at: ceiling).run)
-            }
-
-            guard phase == .measuring else { return .wait }
-
-            waited += cycle.elapsed
-
-            // THE ROOM MOVING STARTS THE CLOCK OVER: what is being waited for
-            // is a measurement that has HELD STILL, not one that has merely
-            // arrived.
-            if room != held {
-                held = room
-                still = 0
-            } else {
-                still += cycle.elapsed
-            }
-
-            let settled = room.height > 0 && still >= Self.steady
-
-            // AND PATIENCE IS THE OTHER BOUND. An entrance is worth less than a
-            // page nobody can see, so a room that never settles - or never
-            // arrives at all - must not hold the page at nothing for ever.
-            // Keeping it is the engine's OWN business: an engine that answers
-            // `.again` holds the display's clock open, and nothing else will
-            // ever put it still.
-            guard settled || waited >= Self.patience else { return .again }
-
-            $shown.journey.animation = .eased(Self.entrance, .cubicOut)
+        .padding(Self.margin)
+        }
+        .opacity(shown)
+        .animation(.easeOut(duration: Self.entrance), value: shown)
+        .onAppear {
             shown = 1
-            // `phase` is named in no `following:`, so writing it wakes
-            // nothing and the entrance is over for good - the engine goes on
-            // waking for `room`, sizing the run, and answering `.wait` at the
-            // guard above.
-            phase = .arriving
-
-            return .wait
+            page.gallery("Home", scene: scene, nav: nil)
         }
-        // AND THE SAME MEASUREMENT AGAIN, for the one answer that is DRAWN
-        // rather than worn. A driven value read in a body is a read nothing
-        // records, so a row's presence cannot be taken from `room`: it needs a
-        // report the tree hears. This one is quiet - it writes only where the
-        // answer actually flips, which a user does by turning the device or
-        // dragging the window past a threshold.
-        //
-        // IT IS ALSO WHAT MARKS THE PAGE MEASURED, and that is the half worth
-        // knowing: a WATCHED frame is what tells the arranger to place this
-        // page's rows at once instead of carrying them, and only a watcher
-        // sets it - the driven feed above does not. Take this away and the
-        // rows travel through the very measurement that decides them.
-        .onFrameChanged { frame in
-            let answer = Self.fitted(in: frame, at: ceiling).chrome
-            guard answer != chrome else { return }
-
-            chrome = answer
-        }
-        .opacity($shown)
-        // No home button: this is it. The inspector stays, as it does on
-        // every page - what each render cost is a question about any of them.
-        .onAppear { page.gallery("Home", scene: scene, nav: nil) }
-    }
-
-    /// Where the page is in coming in.
-    private enum Entrance {
-        /// Waiting for the room to hold still.
-        case measuring
-
-        /// The fade is running, and the engine has nothing left to do.
-        case arriving
     }
 
     /// How much of the page stands beside the run of cards.
@@ -422,17 +269,8 @@ struct HomePage: View {
                 max(min(heads ? spare : usable - words, gallery), least))
     }
 
-    /// How long the measurement has to hold still before the page takes it
-    /// as settled, in milliseconds on the cycle's own clock.
-    private static var steady: Double { 240 }
-
-    /// How long it is worth waiting for a measurement at all, in milliseconds
-    /// - past which the page simply arrives, an entrance being worth less than
-    /// a page nobody can see.
-    private static var patience: Double { 1500 }
-
-    /// How long the page takes to come in, in milliseconds.
-    private static var entrance: UInt { 700 }
+    /// How long the page takes to come in, in seconds.
+    private static var entrance: Double { 0.7 }
 
     /// The page's own margin, which the rows do not get to share.
     private static var margin: Double { 24 }
@@ -539,7 +377,6 @@ private struct Steps: View {
             step("›", to: position + 1)
         }
         .spacing(10)
-        .horizontalAlignment(.center)
     }
 
     /// One arrow: where it goes, and whether there is anything there.
@@ -549,7 +386,6 @@ private struct Steps: View {
             .foregroundStyle(Palette.subtle)
             .background(.transparent)
             .stroke(Palette.outline)
-            .strokeWidth(1)
             .shape(.roundedRectangle(8))
             .padding(EdgeInsets(18, 2))
             .disabled(to < 0 || to >= count)
@@ -573,23 +409,23 @@ private struct GroupFace: View {
         ZStack {
             Grid {
                 Image(picture)
-                    .aspect(.fill)
+                    .scaledToFill()
 
                 Grid {
                     Text(title)
                         .font(.system(size: 18))
                         .bold()
                         .foregroundStyle(Palette.onBrand)
-                        .lineBreak(.tailTruncation)
+                        .truncationMode(.tail)
                         .padding(EdgeInsets(12, 10))
                 }
                 .background(Color("#B3000000"))
-                .verticalAlignment(.end)
+                .frame(maxHeight: .infinity, alignment: .bottom)
             }
             // THE PICTURE IS CUT AT THE CARD'S EDGE: a picture told to FILL
             // the card is painted at its own size all over the layout, so the
             // grid holding it - a layout, with edges to cut at - clips it.
-            .clipsContent(true)
+            .clipped()
         }
         .style("Card")
         // A CARD OF THE RUN IS A PICTURE WITH A CAPTION OVER IT, and the run
@@ -600,7 +436,7 @@ private struct GroupFace: View {
         .accessibilityIdentifier(handle("group", title))
         .accessibilityLabel(title)
         .accessibilityHint(summary)
-        .strokeWidth(0)
+        .stroke(.transparent)
         .shape(.roundedRectangle(16))
     }
 }

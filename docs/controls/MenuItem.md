@@ -54,6 +54,6 @@ What every item a user chooses from has - a menu's entry, a toolbar's item: a ca
 | `icon` | property | `ImageSource` | adaptive |  |  | – |  | not realized; WinUI 3: not realized; GTK 4: GNOME's menus show words alone, no picture beside them. |
 | `isDestructive` | property | `Bool` | adaptive | · |  | – |  | cannot read isDestructive of MenuItem - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: GNOME's menus mark no entry as destroying something. |
 | `isEnabled` | property | `Bool` | native | · | ✅ | ✅ |  | cannot activate on MenuItem - Android's driver has no path for it yet |
-| `shortcut` | property | `KeyboardShortcut` | native |  |  |  |  |  |
+| `shortcut` | property | `KeyboardShortcut` | native |  |  |  |  | GTK 4: not realized |
 | `text` | property | `String` | native | · | ✅ | ✅ |  | cannot read text of MenuItem - Android's driver has no path for it yet |
-| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |

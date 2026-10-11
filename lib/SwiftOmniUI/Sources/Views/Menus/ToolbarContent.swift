@@ -257,7 +257,7 @@ public struct ToolbarItemGroup<Content: View>: ToolbarContent, ToolbarEntry {
 ///     }
 public struct ToolbarSpacer: ToolbarContent, ToolbarEntry {
     /// The spacer's node.
-    var node: Node
+    public var node: Node
 
     /// The node, as written.
     var toolbarNodes: [Node] { [node] }
@@ -281,3 +281,5 @@ public struct ToolbarSpacer: ToolbarContent, ToolbarEntry {
         return copy
     }
 }
+
+extension ToolbarSpacer: PropertyContainer {}

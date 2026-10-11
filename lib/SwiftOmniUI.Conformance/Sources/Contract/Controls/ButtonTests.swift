@@ -12,6 +12,9 @@
     public static var cases: [ConformanceCase] {
         [
             Aspects.standsAlone("Button"),
+            Aspects.holds(ButtonContract.buttonStyle, on: "Button", .bordered, then: .plain),
+            Aspects.holds(ButtonContract.role, on: "Button", .normal, then: .destructive),
+            Aspects.holds(ButtonContract.shortcut, on: "Button", KeyboardShortcut("a"), then: KeyboardShortcut("b")),
             ConformanceCase("eachClickIsHeardOnceAndRendersWhatItsHandlerChanged", proves: [
                 Covered(ButtonContract.clicked),
                 Covered(TextElementContract.text, on: TextContract.self),

@@ -1,0 +1,8 @@
+# revision 1.1
+LazyHGrid: ✅
+LazyHGrid.columnSpacing: cannot read columnSpacing of Grid - GTK's driver has no path for it yet
+LazyHGrid.flowRows: cannot read flowRows of Grid - GTK's driver has no path for it yet
+LazyHGrid.frameChanged: ✅
+LazyHGrid.items: cannot read items of Grid - GTK's driver has no path for it yet
+LazyHGrid.realizedChanged: ✅
+LazyHGrid.rowSpacing: cannot read rowSpacing of Grid - GTK's driver has no path for it yet

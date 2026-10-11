@@ -4,6 +4,7 @@ import SwiftOmniUI
 /// on a value you write, on a control you call.
 struct AimSample: SampleContent, ExampleContent {
     @State private var text = ""
+    @State private var second = ""
 
     /// The control an act is about. `.aim` puts the element's own identity in
     /// here as the differ walks, so nothing is named and nothing collides.
@@ -25,6 +26,7 @@ struct AimSample: SampleContent, ExampleContent {
     static let code = """
         // A VALUE: the modifier shows it, and writing it changes the control.
         @State private var text = ""
+        @State private var second = ""
 
         // A CONTROL: .aim puts this view's identity in the aim, and the
         // control's methods are called on the aim.
@@ -36,13 +38,11 @@ struct AimSample: SampleContent, ExampleContent {
             // `says` is written by the handlers and read here, so this is the
             // closure a press rebuilds. The two fields are handed a binding
             // and an aim, neither of which reads anything.
-            DebugInfoLabel()
 
             TextField("The first field", text: $text)
                 .aim(field)
 
-            TextField()
-                .placeholder("The second field")
+            TextField("The second field", text: $second)
                 .aim(note)
 
             HStack {
@@ -75,18 +75,15 @@ struct AimSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
-            TextField($text)
+            TextField("The first field", text: $text)
                 .accessibilityIdentifier("aim.first")
                 .accessibilityLabel("The first field")
-                .placeholder("The first field")
                 .aim(field)
 
-            TextField()
+            TextField("The second field", text: $second)
                 .accessibilityIdentifier("aim.second")
                 .accessibilityLabel("The second field")
-                .placeholder("The second field")
                 .aim(note)
 
             HStack {
@@ -112,8 +109,7 @@ struct AimSample: SampleContent, ExampleContent {
                         try await field.unfocus()
                         says = "let go of \(field)"
                     })
-                    .stroke(Palette.outline)
-                    .strokeWidth(1)
+                    .stroke(Palette.outline, width: 1)
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
@@ -142,8 +138,7 @@ struct AimSample: SampleContent, ExampleContent {
 
             Text("A property is a modifier - opacity, rotation, a stack's background - "
                 + "which takes a binding and animates along that binding's journey. Nothing "
-                + "is both a modifier and a method, and a scroller's offset is state as "
-                + "well: `.scrollOffset($offset)`.")
+                + "is both a modifier and a method.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 

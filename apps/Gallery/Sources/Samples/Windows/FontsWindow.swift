@@ -34,8 +34,7 @@ struct FontsPage: View {
                     .font(.system(size: 15))
                     .foregroundStyle(chosen ? .white : Palette.text)
                     .background(chosen ? style.accent.color : .transparent)
-                    .stroke(Palette.subtle)
-                    .strokeWidth(chosen ? 0 : 1)
+                    .stroke(chosen ? .transparent : Palette.subtle)
                     .shape(.roundedRectangle(8))
                     .padding(EdgeInsets(14, 8))
                     
@@ -47,7 +46,7 @@ struct FontsPage: View {
             Button("Done", action: { try await window.close() })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(14, 6))
-                .horizontalAlignment(.end)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 
         }
         .spacing(10)

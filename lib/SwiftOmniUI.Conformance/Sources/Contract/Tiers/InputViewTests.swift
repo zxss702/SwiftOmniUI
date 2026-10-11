@@ -15,6 +15,7 @@
                 typed(element), bounded(element), written(element), readOnly(element), closed(element),
                 Aspects.holds(InputViewContract.maximumLength, on: element, 10, then: 3),
                 Aspects.holds(InputViewContract.placeholder, on: element, "Name", then: "E-mail"),
+                Aspects.holds(InputViewContract.placeholderKey, on: element, "name", then: "email"),
                 Aspects.holds(InputViewContract.placeholderColor, on: element, .red, then: .blue),
                 Aspects.holds(InputViewContract.textContentType, on: element, .email, then: .url),
                 Aspects.holds(InputViewContract.isReadOnly, on: element, false, then: true),

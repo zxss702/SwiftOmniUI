@@ -445,6 +445,9 @@ void swiftomniui_winui_text_set_decorations(SwiftOmniUIObjectRef text, bool unde
 
 SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view);
 
+/// A toolbar's own button - WinUI's AppBarToggleButton, momentary until `button_set_on` has it keep a state.
+SwiftOmniUIObjectRef swiftomniui_winui_toolbar_button_make(int64_t view);
+
 /// The words a button or a radio button shows.
 void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef control, char const *utf8);
 
@@ -458,7 +461,7 @@ void swiftomniui_winui_button_set_look(SwiftOmniUIObjectRef button, SwiftOmniUIB
 void swiftomniui_winui_button_set_style(SwiftOmniUIObjectRef button, int kind);
 void swiftomniui_winui_button_set_face(SwiftOmniUIObjectRef button, SwiftOmniUIObjectRef content);
 
-/// Toolbar triggers: transparent at rest, with the system's subtle hover and pressed fills.
+/// The app menu's trigger on the bar: transparent at rest, with the system's subtle hover and pressed fills.
 void swiftomniui_winui_toolbar_button_set_look(SwiftOmniUIObjectRef button);
 
 /// A button's keyboard shortcut: a `VirtualKey` number, `VirtualKeyModifiers` flags in the same order - 0 for none.
@@ -502,6 +505,9 @@ void swiftomniui_winui_set_context_menu(SwiftOmniUIObjectRef element, int64_t vi
 /// A menu living in the view: a `Button` whose `Flyout` a press opens, its face a row - the label child before a
 /// chevron the indicator setting shows or hides.
 SwiftOmniUIObjectRef swiftomniui_winui_menu_button_make(int64_t view);
+
+/// A menu on a toolbar: WinUI's AppBarButton, whose flyout `menu_button_set_menu` writes.
+SwiftOmniUIObjectRef swiftomniui_winui_toolbar_menu_button_make(int64_t view);
 
 /// The label child's element the button's face shows before its chevron; none for the chevron alone.
 void swiftomniui_winui_menu_button_set_face(SwiftOmniUIObjectRef button, SwiftOmniUIObjectRef content);
@@ -741,6 +747,9 @@ void swiftomniui_winui_scroller_set(SwiftOmniUIObjectRef scroller, SwiftOmniUIOb
 /// enough to move (2). `scrollBounceBehavior`'s `.basedOnSize` is the last.
 void swiftomniui_winui_scroller_modes(SwiftOmniUIObjectRef scroller, int32_t verticalMode, int32_t horizontalMode);
 
+/// Marks the scroller's presenter to measure and arrange again: its anchor is chosen before the document moves.
+void swiftomniui_winui_scroller_invalidate_presenter(SwiftOmniUIObjectRef scroller);
+
 /// Native vertical and horizontal ScrollMode values, in that order.
 void swiftomniui_winui_scroller_read_modes(SwiftOmniUIObjectRef scroller, int32_t *modes);
 
@@ -830,12 +839,13 @@ void swiftomniui_winui_title_bar_set(SwiftOmniUIObjectRef bar, char const *title
                                  bool hasBackground, uint32_t background, bool hasForeground, uint32_t foreground,
                                  int32_t words);
 /// The page's actions on a window's chrome: each one's words, the identifier automation finds it by (empty for
-/// none), the files its picture may stand in - each ended by a line feed, empty for none - whether it stands in the
-/// overflow, and whether it can be chosen; `kinds` says what each entry is - 0 a button, 1 a fixed gap, 2 a
+/// none), the files its picture may stand in - each ended by a line feed, empty for none - the Segoe Fluent glyph
+/// it shows where its picture is a symbol (empty for none), whether it stands in the overflow, and whether it can be
+/// chosen; `kinds` says what each entry is - 0 a button, 1 a fixed gap, 2 a
 /// flexible one - and `contents` the view an entry shows in the button's place, null for a button.
 void swiftomniui_winui_title_bar_set_actions(SwiftOmniUIObjectRef bar, char const *const *texts,
                                          char const *const *identifiers, char const *const *icons,
-                                         bool const *overflows, bool const *enabled,
+                                         char const *const *symbols, bool const *overflows, bool const *enabled,
                                          SwiftOmniUIObjectRef const *contents, int32_t const *kinds,
                                          int32_t count, int32_t leadingCount);
 

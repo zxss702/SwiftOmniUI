@@ -138,6 +138,15 @@ final class WinUIDriver: HostDriver {
             view.heard(.pinch(.running, scale: scale, at: point))
             view.heard(.pinch(.completed, scale: 1, at: point))
         case (.scroll(let offset), let scroll as WinUIScrollView): scroll.scroller.move(to: offset)
+        case (.dropFiles(let paths), _):
+            // The system's files let go on the element, at its middle: what an Explorer drop raises.
+            guard let target = element.native as? WinUIElement else { throw DriverCannot(act, on: element) }
+            let place = try place(of: element)
+            target.send(.dropPaths, [.strings(paths), .numbers([place.width / 2, place.height / 2])])
+        case (.openLink(let link), _):
+            // The shell handing the application a link - a document activated, a protocol taken.
+            guard let runtime = renderer?.runtime else { throw DriverCannot(act, on: element) }
+            runtime.core.raise(AppContract.urlOpened, link)
         case (.focus, let view?): _ = swiftomniui_winui_focus(view.handle, true)
         case (.goBack, _) where element.type == .navigationStack: try window().titleBar.chose(-1)
         case (.goBack, _) where element.type == .windowScene: try window().titleBar.chose(-3)

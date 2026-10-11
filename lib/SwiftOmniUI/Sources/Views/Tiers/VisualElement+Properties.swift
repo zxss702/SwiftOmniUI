@@ -43,6 +43,7 @@ extension Node {
 }
 
 extension VisualElementProperties where Self: View {
+    /// Widths the view as the state says, the cell it owns padding it first.
     @_spi(Host) public func frame(width: Binding<Double>) -> Modified {
         modified { node in
             node.wrapPaddedFrame()
@@ -50,6 +51,7 @@ extension VisualElementProperties where Self: View {
         }
     }
 
+    /// Heights the view as the state says, the cell it owns padding it first.
     @_spi(Host) public func frame(height: Binding<Double>) -> Modified {
         modified { node in
             node.wrapPaddedFrame()
@@ -57,6 +59,8 @@ extension VisualElementProperties where Self: View {
         }
     }
 
+    /// Sizes the view to the given width and height, aligning its content
+    /// inside the cell the frame owns.
     public func frame(width: Double? = nil, height: Double? = nil, alignment: Alignment = .center) -> Modified {
         modified { node in
             node.wrapPaddedFrame(alignment: alignment)

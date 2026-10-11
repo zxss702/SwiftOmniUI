@@ -1,7 +1,8 @@
 # revision 1.1
 Grid: ✅
-Grid.columnSpacing: ✅
-Grid.columns: ✅
+Grid.columnSpacing: ❌ [115.0, 10.0, 175.0, 20.0] expected, [115.0, 10.0, 0.0, 20.0] came - the rest, past the spacing
+Grid.columns: ❌ [115.0, 10.0, 175.0, 20.0] expected, [115.0, 10.0, 0.0, 20.0] came - the rest, past the spacing
+Grid.flowColumns: cannot read flowColumns of Grid - GTK's driver has no path for it yet
 Grid.frameChanged: ✅
-Grid.rowSpacing: ✅
-Grid.rows: ✅
+Grid.rowSpacing: ❌ [115.0, 10.0, 175.0, 20.0] expected, [115.0, 10.0, 0.0, 20.0] came - the rest, past the spacing
+Grid.rows: ❌ [0.0, 30.0, 100.0, 150.0] expected, [0.0, 30.0, 0.0, 0.0] came

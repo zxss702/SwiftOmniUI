@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <unordered_map>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Numerics.h>
@@ -74,6 +75,30 @@ namespace {
         double x = std::nan(""), y = std::nan("");
         bool held = false;
     };
+
+    // The program's latest move per scroller. The presenter clamps a move to the reach the compositor last
+    // committed - stale on a first frame - so a move that completes short of where it can now reach, neither
+    // superseded nor taken over by the user, is asked again.
+    std::unordered_map<void *, int32_t> latestMove;
+
+    void scrollTo(controls::ScrollView const &scroller, double x, double y, bool animated) {
+        auto id = scroller.ScrollTo(x, y, controls::ScrollingScrollOptions(
+            animated ? controls::ScrollingAnimationMode::Enabled : controls::ScrollingAnimationMode::Disabled,
+            controls::ScrollingSnapPointsMode::Ignore));
+        latestMove[winrt::get_abi(scroller)] = id;
+        // An animation lands where its own curve ends, and the user may take it over: only a jump is asked again.
+        if (animated) return;
+        auto token = std::make_shared<winrt::event_token>();
+        *token = scroller.ScrollCompleted(guarded("handling ScrollCompleted", [=](controls::ScrollView const &self,
+                                             controls::ScrollingScrollCompletedEventArgs const &args) {
+            if (args.CorrelationId() != id) return;
+            self.ScrollCompleted(*token);
+            if (latestMove[winrt::get_abi(self)] != id || self.State() != controls::ScrollingInteractionState::Idle) return;
+            double tx = std::clamp(x, 0.0, self.ScrollableWidth()), ty = std::clamp(y, 0.0, self.ScrollableHeight());
+            if (std::abs(self.HorizontalOffset() - tx) > 0.5 || std::abs(self.VerticalOffset() - ty) > 0.5)
+                scrollTo(self, x, y, animated);
+        }));
+    }
 }
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
@@ -99,6 +124,12 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
             auto end = args.EndPosition();
             flight->x = end.x;
             flight->y = end.y;
+            // The animation runs from the next frame, before StateChanged says so: the scroller is held now, and
+            // the window it leaves stays built with the one it heads for.
+            if (!flight->held) {
+                flight->held = true;
+                callbacks.held(view, true);
+            }
             callbacks.scrolling(view,
                 scroller.HorizontalOffset(), scroller.VerticalOffset(), end.x, end.y);
         }));
@@ -162,12 +193,17 @@ extern "C" void swiftomniui_winui_scroller_modes(
 
 extern "C" void swiftomniui_winui_scroller_move(SwiftOmniUIObjectRef handle, double x, double y, bool animated) {
     try {
-        auto scroller = borrow<controls::ScrollView>(handle);
-        scroller.ScrollTo(x, y, controls::ScrollingScrollOptions(
-            animated ? controls::ScrollingAnimationMode::Enabled : controls::ScrollingAnimationMode::Disabled,
-            controls::ScrollingSnapPointsMode::Ignore));
+        scrollTo(borrow<controls::ScrollView>(handle), x, y, animated);
     } catch (...) {
         report("moving a scroller");
+    }
+}
+
+extern "C" void swiftomniui_winui_scroller_invalidate_presenter(SwiftOmniUIObjectRef handle) {
+    try {
+        if (auto presenter = borrow<controls::ScrollView>(handle).ScrollPresenter()) presenter.InvalidateMeasure();
+    } catch (...) {
+        report("invalidating a scroller's presenter");
     }
 }
 

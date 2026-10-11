@@ -32,6 +32,12 @@
         ScrollContentElementContract.self,
     ]
 
+    /// Contracts no element wears: the marks the pipeline writes for itself,
+    /// which a node carries inside the library and a host never sees.
+    public static let `internal`: [any Contract.Type] = [
+        PipelineMarksContract.self,
+    ]
+
     /// Every element: one contract per node type the library declares.
     public static let elements: [any ElementContract.Type] = [
         ActivityIndicatorContract.self, AppContract.self,
@@ -56,7 +62,7 @@
     ]
 
     /// Every contract.
-    static let all: [any Contract.Type] = tiers + elements.map { $0 as any Contract.Type }
+    static let all: [any Contract.Type] = tiers + `internal` + elements.map { $0 as any Contract.Type }
 
     /// Every element's contract, by the node type it declares - how a modifier
     /// answers "does this element wear that tier" without knowing the view.

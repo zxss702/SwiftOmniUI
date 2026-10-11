@@ -26,7 +26,6 @@ struct BrushSample: SampleContent, ExampleContent {
 
         VStack {
             // The gradient's end is read here, so moving it builds this closure.
-            DebugInfoLabel()
 
             Rectangle()
                 .cornerRadius(12)
@@ -34,7 +33,6 @@ struct BrushSample: SampleContent, ExampleContent {
                     Self.stops,
                     startPoint: Point(0, 0),
                     endPoint: Self.ends[end].point))
-                .aspect(.stretch)        // fills the room, proportions and all
                 .frame(height: 80)
 
             Button("endPoint: \\(Self.ends[end].name)", action: { end = (end + 1) % Self.ends.count })
@@ -53,7 +51,7 @@ struct BrushSample: SampleContent, ExampleContent {
                     .padding(EdgeInsets(16, 10))
             }
             .style("Card")
-            .strokeWidth(4)
+            .stroke(Palette.outline, width: 4)
             .shape(.roundedRectangle(10))
             .stroke(.linearGradient(Self.stops, startPoint: Point(0, 0), endPoint: Point(1, 0)))
 
@@ -82,7 +80,6 @@ struct BrushSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             SectionTitle("Along a line")
 
@@ -92,13 +89,11 @@ struct BrushSample: SampleContent, ExampleContent {
                     Self.stops,
                     startPoint: Point(0, 0),
                     endPoint: Self.ends[end].point))
-                .aspect(.stretch)
                 .frame(height: 80)
 
             Button("endPoint: \(Self.ends[end].name)", action: { end = (end + 1) % Self.ends.count })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(16, 6))
-                .horizontalAlignment(.center)
                 
 
             SectionTitle("Out from a point")
@@ -110,7 +105,6 @@ struct BrushSample: SampleContent, ExampleContent {
                     radius: 0.75))
                 .frame(width: 96)
                 .frame(height: 96)
-                .horizontalAlignment(.center)
 
             SectionTitle("On a stroke and a background")
 
@@ -120,7 +114,7 @@ struct BrushSample: SampleContent, ExampleContent {
                     .padding(EdgeInsets(16, 10))
             }
             .style("Card")
-            .strokeWidth(4)
+            .stroke(Palette.outline, width: 4)
             .shape(.roundedRectangle(10))
             .stroke(.linearGradient(Self.stops, startPoint: Point(0, 0), endPoint: Point(1, 0)))
 

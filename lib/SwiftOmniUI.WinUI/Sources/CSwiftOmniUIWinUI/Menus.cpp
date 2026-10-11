@@ -178,9 +178,28 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_menu_button_make(int64_t view)
     }
 }
 
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_toolbar_menu_button_make(int64_t view) {
+    try {
+        // A menu on the bar: WinUI's own command button, its flyout the menu, its content its icon's slot.
+        controls::AppBarButton button;
+        button.LabelPosition(controls::CommandBarLabelPosition::Collapsed);
+        button.Click(guarded("handling Click",
+            [view](IInspectable const &, xaml::RoutedEventArgs const &) { callbacks.clicked(view); }));
+        return detach(button);
+    } catch (...) {
+        report("making a toolbar menu button");
+        return nullptr;
+    }
+}
+
 extern "C" void swiftomniui_winui_menu_button_set_face(SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef content) {
     try {
-        auto face = borrow<controls::Button>(handle).Content().as<controls::StackPanel>();
+        auto button = borrow<controls::Button>(handle);
+        if (auto command = button.try_as<controls::AppBarButton>()) {
+            command.Content(content ? as<xaml::UIElement>(content) : nullptr);
+            return;
+        }
+        auto face = button.Content().as<controls::StackPanel>();
         auto children = face.Children();
         if (children.Size() > 1) children.RemoveAt(0);
         if (content) children.InsertAt(0, as<xaml::UIElement>(content));

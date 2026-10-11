@@ -29,13 +29,13 @@ struct SizingSample: SampleContent, ExampleContent {
                 ColorPicker(Palette.outline)
                     .frame(width: 60)
                     .frame(height: 80)
-                    .verticalAlignment(.start)
+                    .frame(maxHeight: .infinity, alignment: .top)
 
                 ColorPicker(Palette.accent)
                     .frame(width: 60)
                     .frame(height: 80)
                     .frame(maxHeight: 32)
-                    .verticalAlignment(.start)
+                    .frame(maxHeight: .infinity, alignment: .top)
             }
             .spacing(10)
 
@@ -45,7 +45,7 @@ struct SizingSample: SampleContent, ExampleContent {
                     .frame(height: 24)
                     .offset(x: 60)
             }
-            .clipsContent(true)
+            .clipped()
             .frame(width: 120)
 
             // The same child in the same layout, and nothing cut off.
@@ -54,7 +54,6 @@ struct SizingSample: SampleContent, ExampleContent {
                     .frame(height: 24)
                     .offset(x: 60)
             }
-            .clipsContent(false)
             .frame(width: 120)
         }
         """
@@ -77,32 +76,31 @@ struct SizingSample: SampleContent, ExampleContent {
                     ColorPicker(Palette.outline)
                         .frame(width: 60)
                         .frame(height: 80)
-                        .verticalAlignment(.start)
+                        .frame(maxHeight: .infinity, alignment: .top)
 
                     ColorPicker(Palette.accent)
                         .frame(width: 60)
                         .frame(height: 80)
                         .frame(maxHeight: 32)
-                        .verticalAlignment(.start)
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
                 .spacing(10))
 
-            row("clipsContent(true)",
+            row("clipped()",
                 VStack {
                     ColorPicker(Palette.accent)
                         .frame(height: 24)
                         .offset(x: 60)
                 }
-                .clipsContent(true)
+                .clipped()
                 .frame(width: 120))
 
-            row("clipsContent(false)",
+            row("not clipped",
                 VStack {
                     ColorPicker(Palette.accent)
                         .frame(height: 24)
                         .offset(x: 60)
                 }
-                .clipsContent(false)
                 .frame(width: 120))
         }
         .spacing(14)

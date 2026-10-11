@@ -16,7 +16,16 @@
             [
                 margined(element), aligned(element), inArea(element), inCell(element), acrossCells(element),
                 tapped(element), panned(element), pannedDown(element), swiped(element), pinched(element), pointed(element),
-                dragged(element), droppedOn(element),
+                dragged(element), droppedOn(element), filesDroppedOn(element), named(element),
+                Aspects.holds(ViewContract.pointerStyle, on: element, .text, then: .default),
+                Aspects.holds(ViewContract.horizontalContentAlignment, on: element, .start, then: .end),
+                Aspects.holds(ViewContract.verticalContentAlignment, on: element, .start, then: .end),
+                Aspects.holds(ViewContract.coordinateSpaceName, on: element, "space.a", then: "space.b"),
+                Aspects.holds(ViewContract.flex, on: element, 0, then: 1),
+                Aspects.holds(ViewContract.horizontalGuide, on: element, [0, 4], then: [1, 8]),
+                Aspects.holds(ViewContract.verticalGuide, on: element, [0, 4], then: [1, 8]),
+                Aspects.holds(ViewContract.layoutPriority, on: element, 0, then: 1),
+                Aspects.holds(ViewContract.tag, on: element, .name("one"), then: .name("two")),
             ]
         } + [scrolledInAList]
     }
@@ -418,6 +427,49 @@
             try s.perform(.dragAndDrop(onto: "target", across: "crossed"), on: s.element("source"))
             s.settle { heard.values.contains { $0.hasPrefix("drop") } }
             s.expect(heard.values, ["over", "left", "drop words"], "the one crossed heard it come and go")
+        }
+    }
+
+    /// A view taking drops hears the system's files let go on it, with where they landed.
+    static func filesDroppedOn(_ element: String) -> ConformanceCase {
+        ConformanceCase("\(element).aFileDropOnItIsHeardWithItsPaths", proves: [
+            Covered(ViewContract.allowDrop, on: element), Covered(ViewContract.dropPaths, on: element),
+        ]) { s in
+            let heard = Received<String>()
+            s.start {
+                VStack {
+                    Specimens.view(element, [
+                        Write(VisualElementContract.width, 80), Write(VisualElementContract.height, 40),
+                        Write(ViewContract.allowDrop, true),
+                        HearTwo(ViewContract.dropPaths) { paths, point in
+                            heard.values.append("drop \(paths.joined(separator: " ")) at \(Int(point.x)),\(Int(point.y))")
+                        },
+                    ], id: "target")
+                }
+                .horizontalAlignment(.start)
+            }
+
+            try s.perform(.dropFiles(["a.txt", "b.txt"]), on: s.element("target"))
+            s.settle { heard.values.count == 1 }
+            s.expect(heard.values, ["drop a.txt b.txt at 40,20"], "the paths and where they landed")
+        }
+    }
+
+    /// A view standing in its own named space hears the spaces' frames reported.
+    static func named(_ element: String) -> ConformanceCase {
+        ConformanceCase("\(element).reportsItsNamedSpaces", proves: [
+            Covered(ViewContract.coordinateSpaceName, on: element),
+            Covered(ViewContract.namedFramesChanged, on: element),
+        ]) { s in
+            let heard = Received<[NamedSpaceFrame]>()
+            s.start {
+                Specimens.page(element, [
+                    Write(ViewContract.coordinateSpaceName, "space"),
+                    Hear(ViewContract.namedFramesChanged) { heard.values.append($0) },
+                ])
+            }
+            try s.settle { !heard.values.isEmpty }
+            s.expect(heard.values.isEmpty, false, "its named spaces reported")
         }
     }
 

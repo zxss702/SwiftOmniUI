@@ -274,6 +274,7 @@ import XCTest
 
         // Before any report the closure was handed a zero rectangle.
         let grid = first.children.first?.children.first
+        XCTAssertEqual(grid?.props["isGeometryReader"], .bool(true))
         XCTAssertEqual(grid?.children.first?.props["text"], .string("0 wide"))
 
         Renderer.shared.clearInvalidation()

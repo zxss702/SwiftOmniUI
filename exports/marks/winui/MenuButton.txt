@@ -1,0 +1,5 @@
+# revision 1.1
+MenuButton: ✅
+MenuButton.frameChanged: ✅
+MenuButton.menuIndicator: ❌ the driver cannot read menuIndicator of MenuButton, and says nothing of why
+MenuButton.menuStyle: ❌ the driver cannot read menuStyle of MenuButton, and says nothing of why

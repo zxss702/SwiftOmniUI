@@ -14,6 +14,13 @@ private struct MainWindow: WindowScene {
 }
 
 @MainActor final class SwiftUISurfaceTests: XCTestCase {
+    /// Touches the shared renderer, whose init installs the UI thread's
+    /// executor before any task of this suite can be made - see UIThread.swift.
+    override func setUp() {
+        super.setUp()
+        Renderer.shared.clearInvalidation()
+    }
+
     // MARK: - Font.default
 
     /// `Font.default` reads as ordinary body text, as SwiftUI's does.

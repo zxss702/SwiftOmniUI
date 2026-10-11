@@ -1,0 +1,8 @@
+# revision 1.1
+LazyHGrid.scrollContentBackground: not realized
+LazyHStack.scrollContentBackground: not realized
+LazyVGrid.scrollContentBackground: not realized
+LazyVStack.scrollContentBackground: not realized
+List.scrollContentBackground: not realized
+ScrollView.scrollContentBackground: not realized
+TextEditor.scrollContentBackground: not realized

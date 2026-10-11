@@ -32,12 +32,10 @@ private struct NoteRow: View {
         VStack {
             // The field is handed the note's own state and reads nothing; the
             // label below READS `note`, which is what builds this again.
-            DebugInfoLabel()
 
-            TextField(basket.$note)
+            TextField("A note on the basket", text: basket.$note)
                 .accessibilityIdentifier("stateClass.note")
                 .accessibilityLabel("A note on the basket")
-                .placeholder("A note on the basket")
 
             Text(basket.note.isEmpty ? "No note yet" : "Note: \(basket.note)")
                 .font(.system(size: 17))
@@ -76,11 +74,8 @@ struct StateClassSample: SampleContent, ExampleContent {
                 VStack {
                     // The field is handed the note's own state and reads
                     // nothing; the label READS `note`, so typing rebuilds this.
-                    DebugInfoLabel()
 
-                    TextField(basket.$note)
-                        .placeholder("A note on the basket")
-
+                    TextField("A note on the basket", text: basket.$note)
                     Text(basket.note.isEmpty ? "No note yet" : "Note: \\(basket.note)")
                 }
             }
@@ -91,7 +86,6 @@ struct StateClassSample: SampleContent, ExampleContent {
         VStack {
             // And this one reads the items, so adding and removing rebuild it
             // - while typing a note leaves it standing.
-            DebugInfoLabel()
 
             Text("\\(basket.items.count) item(s)")
 
@@ -115,7 +109,6 @@ struct StateClassSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("\(basket.items.count) item(s)")
                 .font(.system(size: 22))
@@ -135,8 +128,7 @@ struct StateClassSample: SampleContent, ExampleContent {
                     
 
                 Button("Remove", action: { basket.items.removeLast() })
-                    .stroke(Palette.outline)
-                    .strokeWidth(1)
+                    .stroke(Palette.outline, width: 1)
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
@@ -145,13 +137,11 @@ struct StateClassSample: SampleContent, ExampleContent {
                     
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
             NoteRow(basket: $basket)
 
             Button("Tap a plain property (\(basket.plainTaps))", action: { basket.plainTaps += 1 })
-                .stroke(Palette.outline)
-                .strokeWidth(1)
+                .stroke(Palette.outline, width: 1)
                 .background(.transparent)
                 .foregroundStyle(Palette.subtle)
                 .shape(.roundedRectangle(8))

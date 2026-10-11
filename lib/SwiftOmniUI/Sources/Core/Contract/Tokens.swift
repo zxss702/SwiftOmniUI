@@ -167,11 +167,11 @@ extension NodeType {
     static let fontDesign = FontElementContract.fontDesign.token
     static let format = DatePickerContract.format.token
     static let frame = VisualElementContract.frame.token
-    static let isFrameContent = Prop("isFrameContent")
-    static let isLayoutDecoration = Prop("isLayoutDecoration")
-    static let isGeometryReader = Prop("isGeometryReader")
-    static let lazyRowStack = Prop("lazyRowStack")
-    static let safeAreaInsetEdge = Prop("safeAreaInsetEdge")
+    static let isFrameContent = VisualElementContract.isFrameContent.token
+    static let isLayoutDecoration = VisualElementContract.isLayoutDecoration.token
+    static let isGeometryReader = VisualElementContract.isGeometryReader.token
+    static let lazyRowStack = PipelineMarksContract.lazyRowStack.token
+    static let safeAreaInsetEdge = VisualElementContract.safeAreaInsetEdge.token
     static let flowColumns = GridContract.flowColumns.token
     static let flowRows = LazyHGridContract.flowRows.token
     static let gridColumn = ViewContract.gridColumn.token
@@ -187,7 +187,7 @@ extension NodeType {
     /// A stack's `alignment:` - or an overlay's - where the child names no
     /// `horizontalAlignment` of its own; the child's own, a shape's `.fill`
     /// among them, always wins.
-    static let horizontalAlignmentDefault = Prop("horizontalAlignmentDefault")
+    static let horizontalAlignmentDefault = VisualElementContract.horizontalAlignmentDefault.token
 
     static let horizontalScrollIndicators = ScrollViewContract.horizontalScrollIndicators.token
     static let multilineTextAlignment = TextAlignmentElementContract.multilineTextAlignment.token
@@ -289,6 +289,7 @@ extension NodeType {
     static let menuStyle = MenuButtonContract.menuStyle.token
     static let menuIndicator = MenuButtonContract.menuIndicator.token
     static let renderingMode = ImageContract.renderingMode.token
+    static let isResizable = ImageContract.isResizable.token
     static let progressStyle = ProgressBarContract.progressStyle.token
     static let strokeBorder = ShapeContract.strokeBorder.token
     static let contentTransition = VisualElementContract.contentTransition.token
@@ -343,7 +344,7 @@ extension NodeType {
     static let verticalContentAlignment = ViewContract.verticalContentAlignment.token
 
     /// The same as `horizontalAlignmentDefault`, down the other axis.
-    static let verticalAlignmentDefault = Prop("verticalAlignmentDefault")
+    static let verticalAlignmentDefault = VisualElementContract.verticalAlignmentDefault.token
     static let verticalScrollIndicators = ScrollViewContract.verticalScrollIndicators.token
     static let verticalTextAlignment = TextAlignmentElementContract.verticalTextAlignment.token
     static let width = VisualElementContract.width.token

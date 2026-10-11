@@ -15,6 +15,8 @@
     public static var cases: [ConformanceCase] {
         [
             Aspects.standsAlone("Image"),
+            Aspects.holds(ImageContract.renderingMode, on: "Image", .original, then: .template),
+            Aspects.holds(ImageContract.isResizable, on: "Image", false, then: true),
             ConformanceCase("aPictureStandsAtItsOwnSize", proves: [
                 Covered(ImageContract.source),
             ]) { s in

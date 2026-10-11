@@ -114,14 +114,10 @@ extern "C" void swiftomniui_winui_text_set_vertical(SwiftOmniUIObjectRef handle,
     }
 }
 
-extern "C" SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view) {
-    try {
-        // A staying-pressed button at heart: it draws the platform's ordinary
-        // button until `isOn` gives it a state to keep - a press on one that
-        // keeps nothing has its check taken back at once, to false rather than
-        // nothing: nothing is the button's THIRD, indeterminate look, which
-        // keeps none of the resources the look set.
-        primitives::ToggleButton button;
+namespace {
+    /// What every button of ours reports: its checks - taken back at once on one that keeps nothing - its click,
+    /// and being held down and let go.
+    void wireButton(primitives::ToggleButton const &button, int64_t view) {
         button.Checked(guarded("handling Checked", [view](IInspectable const &sender, xaml::RoutedEventArgs const &) {
             auto b = sender.as<primitives::ToggleButton>();
             if (!keeps(b)) { b.IsChecked(false); return; }
@@ -138,9 +134,34 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view) {
             [view](xaml::DependencyObject const &sender, xaml::DependencyProperty const &) {
                 callbacks.held(view, sender.as<controls::Primitives::ButtonBase>().IsPressed());
             });
+    }
+}
+
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view) {
+    try {
+        // A staying-pressed button at heart: it draws the platform's ordinary
+        // button until `isOn` gives it a state to keep - a press on one that
+        // keeps nothing has its check taken back at once, to false rather than
+        // nothing: nothing is the button's THIRD, indeterminate look, which
+        // keeps none of the resources the look set.
+        primitives::ToggleButton button;
+        wireButton(button, view);
         return detach(button);
     } catch (...) {
         report("making a button");
+        return nullptr;
+    }
+}
+
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_toolbar_button_make(int64_t view) {
+    try {
+        // The bar's own trigger, the same button at heart: its content is its icon's slot, its words its label.
+        controls::AppBarToggleButton button;
+        button.LabelPosition(controls::CommandBarLabelPosition::Collapsed);
+        wireButton(button, view);
+        return detach(button);
+    } catch (...) {
+        report("making a toolbar button");
         return nullptr;
     }
 }
@@ -202,7 +223,22 @@ extern "C" void swiftomniui_winui_button_set_face(SwiftOmniUIObjectRef handle, S
 
 extern "C" void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef handle, char const *utf8) {
     try {
-        as<controls::ContentControl>(handle).Content(winrt::box_value(text(utf8)));
+        auto control = as<controls::ContentControl>(handle);
+        auto words = text(utf8);
+        // A bar's button is named by its label - its content is its icon's slot - and shows none where it has none.
+        auto position = words.empty() ? controls::CommandBarLabelPosition::Collapsed
+                                      : controls::CommandBarLabelPosition::Default;
+        if (auto toggle = control.try_as<controls::AppBarToggleButton>()) {
+            toggle.Label(words);
+            toggle.LabelPosition(position);
+            return;
+        }
+        if (auto command = control.try_as<controls::AppBarButton>()) {
+            command.Label(words);
+            command.LabelPosition(position);
+            return;
+        }
+        control.Content(winrt::box_value(words));
     } catch (...) {
         report("setting a caption");
     }

@@ -18,25 +18,22 @@ struct DatePickerSample: SampleContent, ExampleContent {
         VStack {
             // `due` is printed below, so picking a day builds this closure; the
             // picker itself is handed the state.
-            DebugInfoLabel()
 
-            DatePicker($due)
-                .minimumDate(CalendarDate(year: 2020, month: 1, day: 1))
-                .maximumDate(CalendarDate(year: 2030, month: 12, day: 31))
+            DatePicker($due, in: CalendarDate(year: 2020, month: 1, day: 1)...CalendarDate(year: 2030, month: 12, day: 31))
                 .format("D")
-                .onDateChanged { date in
-                    chosen = date.text
+                .onChange(of: due) {
+                    chosen = due.text
                     picks += 1
                 }
 
             Text("Due \\(due.text)")
 
             Text(picks == 0
-                ? "onDateChanged has not fired"
-                : "onDateChanged: \\(chosen), \\(picks) so far")
+                ? "onChange has not fired"
+                : "onChange: \\(chosen), \\(picks) so far")
 
-            // A day written from the TREE is not a pick: the field moves and
-            // the count stays where it is.
+            // `onChange` hears every write - the button's counts too, since a
+            // write is a write no matter which side made it.
             Button("Push it to New Year", action: { due = CalendarDate(year: 2027, month: 1, day: 1) })
                 
         }
@@ -44,16 +41,13 @@ struct DatePickerSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
-            DatePicker($due)
+            DatePicker($due, in: CalendarDate(year: 2020, month: 1, day: 1)...CalendarDate(year: 2030, month: 12, day: 31))
                 .accessibilityIdentifier("datePicker.due")
                 .accessibilityLabel("Due date")
-                .minimumDate(CalendarDate(year: 2020, month: 1, day: 1))
-                .maximumDate(CalendarDate(year: 2030, month: 12, day: 31))
                 .format("D")
-                .onDateChanged { date in
-                    chosen = date.text
+                .onChange(of: due) {
+                    chosen = due.text
                     picks += 1
                 }
 
@@ -62,15 +56,14 @@ struct DatePickerSample: SampleContent, ExampleContent {
                 .multilineTextAlignment(.center)
 
             Text(picks == 0
-                ? "onDateChanged has not fired"
-                : "onDateChanged: \(chosen), \(picks) so far")
+                ? "onChange has not fired"
+                : "onChange: \(chosen), \(picks) so far")
                 .font(.system(size: 13))
                 .multilineTextAlignment(.center)
 
             Button("Push it to New Year", action: { due = CalendarDate(year: 2027, month: 1, day: 1) })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(16, 6))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(12)
@@ -78,12 +71,10 @@ struct DatePickerSample: SampleContent, ExampleContent {
 
     var notes: (any View)? {
         VStack {
-            Text("The binding and the event are two halves of one choice: `$due` takes "
-                + "the chosen day into state, and `onDateChanged` runs after that write "
-                + "with the same day - which is where anything beyond holding the value "
-                + "belongs. The button writes `due` from the tree instead, and the count "
-                + "stays put: the event answers the USER picking a day and nothing "
-                + "else.")
+            Text("`DatePicker($due, in:)` is the binding and the bounds in one: the "
+                + "chosen day goes into state, and `.onChange(of: due)` hears every "
+                + "write - a pick and the button's alike, since a write is a write no "
+                + "matter which side made it.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 

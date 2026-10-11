@@ -19,8 +19,10 @@ final class WinUIButtonView: WinUIView {
     /// worn on the element at all makes it one.
     var onToggled: ((Bool) -> Void)?
 
-    init() {
-        super.init { number in swiftomniui_winui_button_make(number) }
+    /// The platform's button, or - `toolbar` - the bar's own trigger, whose look WinUI owns.
+    init(toolbar: Bool = false) {
+        super.init { number in toolbar ? swiftomniui_winui_toolbar_button_make(number) : swiftomniui_winui_button_make(number) }
+        isToolbarControl = toolbar
     }
 
     /// The caption.
@@ -45,10 +47,8 @@ final class WinUIButtonView: WinUIView {
         let (fill, outline) = (WinUIBrush(background), WinUIBrush(stroke))
         let width = BoxArithmetic.outlineWidth(stroke: stroke, width: strokeWidth)
         paint("look", followsSize: fill.followsSize || outline.followsSize) { [weak self, handle] size in
-            if self?.isToolbarControl == true {
-                swiftomniui_winui_toolbar_button_set_look(handle)
-                return
-            }
+            // The bar's button keeps the look WinUI gives it.
+            if self?.isToolbarControl == true { return }
             fill.withRelayBrush(over: size) { fill in
                 outline.withRelayBrush(over: size) { outline in
                     swiftomniui_winui_button_set_look(
@@ -60,7 +60,7 @@ final class WinUIButtonView: WinUIView {
 
     /// The logical style, mapped to the theme style WinUI names for it.
     func setStyle(_ style: ButtonStyleKind?) {
-        if isToolbarControl { return swiftomniui_winui_toolbar_button_set_look(handle) }
+        if isToolbarControl { return }
         swiftomniui_winui_button_set_style(handle, (style ?? .automatic).rawValue)
     }
 

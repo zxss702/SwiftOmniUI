@@ -422,7 +422,91 @@
                 s.expect(try s.logged().contains { $0.contains("the draft could not be saved") }, true,
                          "the host's log names the failure")
             },
+            ConformanceCase("aLinkHandedItIsHeard", proves: [
+                Covered(AppContract.urlOpened),
+            ]) { s in
+                let heard = Received<String>()
+                s.start {
+                    VStack { Text("Home") }
+                        .onEvent(AppContract.urlOpened) { heard.values.append($0) }
+                }
+
+                try s.perform(.openLink("soui://doc/1"), on: s.element(ofType: AppContract.nodeType))
+                s.settle { heard.values.count == 1 }
+                s.expect(heard.values, ["soui://doc/1"], "the link heard where the page listens")
+            },
+            ConformanceCase("anImporterBringsThePathsPicked", proves: [
+                Covered(AppContract.chooseFiles),
+            ], needs: [Covered(ButtonContract.clicked)]) { s in
+                let said = Received<String>()
+                s.start { Importing(said: said) }
+                let window = try s.element(ofType: WindowSceneContract.nodeType)
+
+                try s.perform(.activate, on: s.element("import"))
+                try s.settle { try s.fileDialog() != nil }
+                s.expect(try s.fileDialog(), .open)
+                try s.perform(.answerFiles(["a.txt", "b.txt"]), on: window)
+                s.settle { !said.values.isEmpty }
+                s.expect(said.values.first?.contains("a.txt"), true, "the paths picked given back")
+            },
+            ConformanceCase("aFolderIsChosen", proves: [
+                Covered(AppContract.openFolders),
+            ], needs: [Covered(ButtonContract.clicked)]) { s in
+                let said = Received<String>()
+                s.start {
+                    VStack {
+                        Button("Folder").onClicked {
+                            said.values.append(try await Dialogs.openFolder()?.name ?? "nothing")
+                        }.id("pick")
+                    }
+                }
+                let window = try s.element(ofType: WindowSceneContract.nodeType)
+
+                try s.perform(.activate, on: s.element("pick"))
+                try s.settle { try s.fileDialog() != nil }
+                try s.perform(.answerFiles(["dir.one"]), on: window)
+                s.settle { !said.values.isEmpty }
+                s.expect(said.values.isEmpty, false, "the folder named")
+            },
+            ConformanceCase("aCopyIsTakenAndAKeyLocalized", proves: [
+                Covered(AppContract.copyText), Covered(AppContract.localizedString),
+            ], needs: [Covered(ButtonContract.clicked)]) { s in
+                let said = Received<String>()
+                s.start {
+                    VStack {
+                        Button("Copy").onClicked {
+                            try await Pasteboard.copy("kept words")
+                            said.values.append("copied")
+                        }.id("copy")
+                        Button("Localize").onClicked {
+                            said.values.append(await Strings.localize("greeting"))
+                        }.id("localize")
+                    }
+                }
+
+                try s.perform(.activate, on: s.element("copy"))
+                s.settle { said.values == ["copied"] }
+                try s.perform(.activate, on: s.element("localize"))
+                s.settle { said.values.count == 2 }
+                s.expect(said.values.count, 2, "both answered")
+            },
         ]
+    }
+}
+
+/// A page whose button raises the file-open panel, the paths picked said.
+struct Importing: View {
+    let said: Received<String>
+    @State private var picking = false
+
+    var body: some View {
+        VStack {
+            Button("Import").onClicked { picking = true }
+                .fileImporter(isPresented: $picking, allowsMultipleSelection: true) { result in
+                    said.values.append((try? result.get())?.joined(separator: " ") ?? "nothing")
+                }
+                .id("import")
+        }
     }
 }
 

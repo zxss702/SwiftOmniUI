@@ -14,18 +14,18 @@ GridRow.strokeWidth: not realized
 HStack.shape: cannot read shape of HStack - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its shape; its drawing proves it
 HStack.stroke: cannot read stroke of HStack - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its stroke; its drawing proves it
 HStack.strokeWidth: cannot read strokeWidth of HStack - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its strokeWidth; its drawing proves it
-LazyHGrid.shape: cannot read shape of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.stroke: cannot read stroke of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.strokeWidth: cannot read strokeWidth of LazyHGrid - GTK's driver has no path for it yet
-LazyHStack.shape: cannot read shape of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.stroke: cannot read stroke of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.strokeWidth: cannot read strokeWidth of LazyHStack - GTK's driver has no path for it yet
-LazyVGrid.shape: cannot read shape of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.stroke: cannot read stroke of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.strokeWidth: cannot read strokeWidth of LazyVGrid - GTK's driver has no path for it yet
-LazyVStack.shape: cannot read shape of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.stroke: cannot read stroke of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.strokeWidth: cannot read strokeWidth of LazyVStack - GTK's driver has no path for it yet
+LazyHGrid.shape: cannot read shape of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its shape; its drawing proves it
+LazyHGrid.stroke: cannot read stroke of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its stroke; its drawing proves it
+LazyHGrid.strokeWidth: cannot read strokeWidth of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its strokeWidth; its drawing proves it
+LazyHStack.shape: cannot read shape of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its shape; its drawing proves it
+LazyHStack.stroke: cannot read stroke of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its stroke; its drawing proves it
+LazyHStack.strokeWidth: cannot read strokeWidth of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its strokeWidth; its drawing proves it
+LazyVGrid.shape: cannot read shape of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its shape; its drawing proves it
+LazyVGrid.stroke: cannot read stroke of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its stroke; its drawing proves it
+LazyVGrid.strokeWidth: cannot read strokeWidth of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its strokeWidth; its drawing proves it
+LazyVStack.shape: cannot read shape of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its shape; its drawing proves it
+LazyVStack.stroke: cannot read stroke of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its stroke; its drawing proves it
+LazyVStack.strokeWidth: cannot read strokeWidth of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its strokeWidth; its drawing proves it
 Masked.shape: cannot read shape of Masked - GTK's driver has no path for it yet
 Masked.stroke: cannot read stroke of Masked - GTK's driver has no path for it yet
 Masked.strokeWidth: cannot read strokeWidth of Masked - GTK's driver has no path for it yet

@@ -184,6 +184,23 @@ namespace {
         return std::nullopt;
     }
 
+    /// A command bar's button of either kind - a page's action, or the bar's own button a view carries - as a test
+    /// reads one: its label, whether it can be chosen, its icon, and the element automation names.
+    struct Command {
+        winrt::hstring label;
+        bool enabled;
+        controls::IconElement icon;
+        xaml::DependencyObject object;
+    };
+
+    std::optional<Command> commandOf(controls::ICommandBarElement const &command) {
+        if (auto button = command.try_as<controls::AppBarButton>())
+            return Command{button.Label(), button.IsEnabled(), button.Icon(), button};
+        if (auto toggle = command.try_as<controls::AppBarToggleButton>())
+            return Command{toggle.Label(), toggle.IsEnabled(), toggle.Icon(), toggle};
+        return std::nullopt;
+    }
+
     /// What a window's chrome holds: its title, its way back, its toggle, its colours and its actions - each action
     /// by its label, "!" before one that cannot be chosen, the overflow's after "|".
     std::optional<std::string> chrome(controls::TitleBar const &bar, std::string_view what) {
@@ -197,10 +214,10 @@ namespace {
             auto listed = [](auto const &commands) {
                 std::string words;
                 for (auto const &command : commands) {
-                    auto button = command.template try_as<controls::AppBarButton>();
+                    auto button = commandOf(command);
                     if (!button) continue;
-                    words += (words.empty() ? "" : ";") + std::string(button.IsEnabled() ? "" : "!") +
-                             narrow(button.Label());
+                    words += (words.empty() ? "" : ";") + std::string(button->enabled ? "" : "!") +
+                             narrow(button->label);
                 }
                 return words;
             };
@@ -211,9 +228,9 @@ namespace {
             auto listed = [](auto const &commands) {
                 std::string files;
                 for (auto const &command : commands) {
-                    auto button = command.template try_as<controls::AppBarButton>();
+                    auto button = commandOf(command);
                     if (!button) continue;
-                    auto icon = button.Icon().template try_as<controls::ImageIcon>();
+                    auto icon = button->icon ? button->icon.try_as<controls::ImageIcon>() : nullptr;
                     auto file = icon && icon.Tag() ? winrt::unbox_value<winrt::hstring>(icon.Tag()) : winrt::hstring();
                     files += (files.empty() ? "" : ";") + narrow(file);
                 }
@@ -226,9 +243,10 @@ namespace {
             auto listed = [](auto const &commands) {
                 std::string words;
                 for (auto const &command : commands) {
-                    auto button = command.template try_as<controls::AppBarButton>();
+                    auto button = commandOf(command);
                     if (!button) continue;
-                    words += (words.empty() ? "" : ";") + narrow(xaml::Automation::AutomationProperties::GetAutomationId(button));
+                    words += (words.empty() ? "" : ";")
+                        + narrow(xaml::Automation::AutomationProperties::GetAutomationId(button->object));
                 }
                 return words;
             };
@@ -454,8 +472,13 @@ void swiftomniui::launched(std::string const &target) {
 }
 
 extern "C" int32_t swiftomniui_winui_file_dialog(void) {
-    auto dialog = fileDialog();
-    if (!dialog) return -1;
-    // A dialog that opens types its file's name in a combo box of its own (cmb13, 1148); one that saves does not.
-    return GetDlgItem(dialog, 1148) ? 0 : 1;
+    try {
+        auto dialog = fileDialog();
+        if (!dialog) return -1;
+        // A dialog that opens types its file's name in a combo box of its own (cmb13, 1148); one that saves does not.
+        return GetDlgItem(dialog, 1148) ? 0 : 1;
+    } catch (...) {
+        report("asking a file dialog's kind");
+        return -1;
+    }
 }

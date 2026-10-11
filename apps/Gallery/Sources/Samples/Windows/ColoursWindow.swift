@@ -38,7 +38,7 @@ struct ColoursPage: View {
             Button("Done", action: { try await window.close() })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(14, 6))
-                .horizontalAlignment(.end)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 
         }
         .spacing(10)

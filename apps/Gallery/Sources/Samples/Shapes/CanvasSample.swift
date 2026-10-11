@@ -1,6 +1,6 @@
 import SwiftOmniUI
 
-/// A canvas drawn from state, and one drawn from a finger.
+/// A canvas drawn from state, and one drawn through a GraphicsContext.
 struct CanvasSample: SampleContent {
     static let id = "canvas"
     static let title = "Canvas"
@@ -12,7 +12,7 @@ struct CanvasSample: SampleContent {
 
     var examples: [Example] {
         [
-            Example(FollowsState()), Example(FollowsAFinger()),
+            Example(FollowsState()),
             Example(WrittenWithContext()), Example(Measured()),
         ]
     }
@@ -31,7 +31,6 @@ private struct FollowsState: ExampleContent {
                 VStack {
                     // The bars are read by the drawing below, so changing
                     // one builds this closure - which is what redraws it.
-                    DebugInfoLabel()
 
                     Canvas {
                         for (index, value) in bars.enumerated() {
@@ -61,7 +60,6 @@ private struct FollowsState: ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Canvas {
                 for (index, value) in bars.enumerated() {
@@ -84,7 +82,6 @@ private struct FollowsState: ExampleContent {
             Button("Different numbers", action: { bars = bars.map { _ in Double.random(in: 0.15...1) } })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(16, 6))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(12)
@@ -99,85 +96,7 @@ private struct FollowsState: ExampleContent {
     }
 }
 
-/// The same canvas, drawn from what a finger is doing to it.
-private struct FollowsAFinger: ExampleContent {
-    @State private var trail: [Point] = []
-
-    static let code = """
-        struct FollowsAFinger: View {
-            @State private var trail: [Point] = []
-
-            // Where a finger went, drawn where it went: the canvas reports in
-            // its own coordinates, which is what the instructions use.
-            var body: some View {
-                VStack {
-                    // The trail is read by the drawing, so every report the
-                    // finger makes builds this closure and draws again.
-                    DebugInfoLabel()
-
-                    Canvas {
-                        Draw.strokeColor(Palette.outline)
-                        Draw.strokeWidth(1)
-                        Draw.drawRoundedRectangle(
-                            x: 1, y: 1, width: 300, height: 118, cornerRadius: 8)
-
-                        Draw.fillColor(Palette.accent)
-                        for point in trail {
-                            Draw.fillEllipse(x: point.x - 4, y: point.y - 4, width: 8, height: 8)
-                        }
-                    }
-                    .frame(height: 120)
-                    .onPressed { trail = [$0] }
-                    .onDragged { trail = Array((trail + [$0]).suffix(120)) }
-                    .onReleased { _ in }
-
-                    Button("Clear", action: { trail = [] })
-                        .disabled(trail.isEmpty)
-                        
-                }
-            }
-        }
-        """
-
-    var body: some View {
-        VStack {
-            DebugInfoLabel()
-
-            Canvas {
-                Draw.strokeColor(Palette.outline)
-                Draw.strokeWidth(1)
-                Draw.drawRoundedRectangle(x: 1, y: 1, width: 300, height: 118, cornerRadius: 8)
-
-                Draw.fillColor(Palette.accent)
-                for point in trail {
-                    Draw.fillEllipse(x: point.x - 4, y: point.y - 4, width: 8, height: 8)
-                }
-            }
-            .frame(height: 120)
-            .onPressed { trail = [$0] }
-            .onDragged { trail = Array((trail + [$0]).suffix(120)) }
-            .onReleased { _ in }
-
-            Button("Clear", action: { trail = [] })
-                .font(.system(size: 13))
-                .padding(EdgeInsets(16, 6))
-                .horizontalAlignment(.center)
-                .disabled(trail.isEmpty)
-                
-        }
-        .spacing(12)
-    }
-
-    var notes: (any View)? {
-        Text("Every point the finger reports is a write: the trail changes, the "
-            + "drawing is described again, and the new instructions travel.")
-            .font(.system(size: 12))
-            .foregroundStyle(Palette.subtle)
-    }
-}
-
-/// The SwiftUI-shaped canvas: `Canvas(renderer:)` hands a `GraphicsContext`
-/// and the settled size, and `context.draw(Text)` writes words.
+/// The same canvas, drawn through a GraphicsContext with paths and text.
 private struct WrittenWithContext: ExampleContent {
     static let code = """
         var body: some View {
@@ -282,7 +201,6 @@ private struct Measured: ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Canvas {
                 Draw.foregroundStyle(Palette.text)
@@ -315,7 +233,6 @@ private struct Measured: ExampleContent {
                 ?? "measuring...")
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.subtle)
-                .horizontalAlignment(.center)
         }
         .spacing(12)
     }

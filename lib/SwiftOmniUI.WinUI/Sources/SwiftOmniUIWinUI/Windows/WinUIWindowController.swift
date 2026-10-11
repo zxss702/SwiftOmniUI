@@ -38,7 +38,7 @@ final class WinUIWindowController {
         if let (_, arrangement) = changes.arrangement { window.show(arrangement?.winUI.view, present: false) }
         showSheets(presentation.sheets)
         if let overlay = changes.overlay { window.showOverlay(overlay?.winUI.view) }
-        refreshChrome(in: runtime)
+        if runtime.tree.chromeMayChange || changes.arrangement != nil || changes.traits != nil { refreshChrome(in: runtime) }
         boundContent(element, requested: changes.frame, quiet: changes.arrangement == nil && changes.traits == nil, keepingSizing: keepingSizing)
         let asked = WindowFrame(of: element)
         if asked.x == nil, asked.y == nil, let anchor = element.value(.defaultPosition)?.numbers {
@@ -172,10 +172,12 @@ final class WinUIWindowController {
     /// A page's toolbar entry as a command of the chrome: a spacer's room, the view an item carries, or a
     /// titled or pictured action.
     private static func action(_ item: MountedElement) -> WinUIToolbarAction {
+        let picture = item.value(.icon).flatMap(ImageSource.init(propValue:))
         var action = WinUIToolbarAction(
             title: item.value(.text)?.string ?? "", isEnabled: item.value(.isEnabled)?.bool ?? true,
             identifier: item.value(.accessibilityIdentifier)?.string,
-            icon: item.value(.icon)?.string.flatMap { $0.isEmpty ? nil : PictureArithmetic.files(for: $0) } ?? [],
+            icon: picture.map(\.file).flatMap { $0.isEmpty ? nil : PictureArithmetic.files(for: $0) } ?? [],
+            symbol: picture?.symbol,
             perform: { [weak item] in item?.winUI.send(.clicked, []) })
         if item.type == .toolbarSpacer {
             action.spacer = ToolbarSpacerVariant(rawValue: item.value(.variant)?.enumeration ?? 0)

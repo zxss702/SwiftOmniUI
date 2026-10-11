@@ -54,13 +54,20 @@ extension ShapeProperties {
     }
 
     /// `style` stroked as `strokeStyle` says - the SwiftUI spelling carrying
-    /// width, cap and join together.
+    /// width, cap, join, miter and dashes together.
     public func stroke(_ style: some ShapeStyle, style strokeStyle: StrokeStyle) -> Modified {
         modified {
             $0.props[ShapeContract.stroke.token] = style.brush.propValue
             $0.write(ShapeContract.strokeWidth, strokeStyle.lineWidth)
             $0.write(ShapeContract.strokeLineCap, strokeStyle.lineCap)
             $0.write(ShapeContract.strokeLineJoin, strokeStyle.lineJoin)
+            $0.write(ShapeContract.strokeMiterLimit, strokeStyle.miterLimit)
+            if !strokeStyle.dash.isEmpty {
+                $0.write(ShapeContract.strokeDashPattern, strokeStyle.dash)
+            }
+            if strokeStyle.dashPhase != 0 {
+                $0.write(ShapeContract.strokeDashOffset, strokeStyle.dashPhase)
+            }
         }
     }
 

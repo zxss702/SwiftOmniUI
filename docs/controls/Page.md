@@ -27,7 +27,7 @@ See [the dictionary](README.md) for how a mark is given.
 | --- | :---: | --- | --- | --- |
 | Android Views | ✅ | 6 ✅ | custom `ViewGroup` |  |
 | WinUI 3 | ✅ | 9 ✅ | `Page` |  |
-| GTK 4 | ✅ | 4 ✅ | custom `GtkWidget` |  |
+| GTK 4 | ✅ | 4 ✅ · 4 – | custom `GtkWidget` |  |
 | Web |  |  | `<section>` | no host yet |
 
 Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Structure/PageContract.swift`.
@@ -53,17 +53,17 @@ What a page shows about itself where another container presents it as an item - 
 
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| `badge` | property | `String` | native |  |  |  |  |  |
-| `document` | property | `String` | adaptive |  |  |  |  |  |
+| `badge` | property | `String` | native |  |  | · |  | GTK 4: cannot read badge of Page - GTK's driver has no path for it yet |
+| `document` | property | `String` | adaptive |  |  | – |  | GTK 4: GTK 4 names a window for a document in its title alone. |
 | `icon` | property | `ImageSource` | adaptive | · |  |  |  | cannot read icon of Page - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
-| `interactiveDismissDisabled` | property | `Bool` | native |  |  |  |  |  |
-| `preferredColumnWidth` | property | `[Double]` | adaptive |  |  |  |  |  |
-| `presentationDetents` | property | `[PresentationDetent]` | native |  |  |  |  |  |
-| `presentationDragIndicator` | property | `Visibility` | native |  |  |  |  |  |
-| `subtitle` | property | `String` | adaptive |  |  |  |  |  |
-| `subtitleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `interactiveDismissDisabled` | property | `Bool` | native |  |  | – |  | GTK 4: A GTK sheet is libadwaita's dialog: Escape and its close always take it. |
+| `preferredColumnWidth` | property | `[Double]` | adaptive |  |  | · |  | GTK 4: cannot read preferredColumnWidth of Page - GTK's driver has no path for it yet |
+| `presentationDetents` | property | `[PresentationDetent]` | native |  |  | – |  | GTK 4: A GTK sheet is libadwaita's dialog, sized by what it shows - detents are not its to take. |
+| `presentationDragIndicator` | property | `Visibility` | native |  |  | – |  | GTK 4: A GTK sheet is libadwaita's dialog, which draws no grabber of its own. |
+| `subtitle` | property | `String` | adaptive |  |  | · |  | GTK 4: cannot read subtitle of Page - GTK's driver has no path for it yet |
+| `subtitleKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |
 | `title` | property | `String` | native | · | ✅ | · |  | cannot read title of Page - Android's driver has no path for it yet; GTK 4: cannot read title of Page - GTK's driver has no path for it yet |
-| `titleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
-| `toolbarBackground` | property | `Visibility` | adaptive |  |  |  |  |  |
-| `toolbarVisibility` | property | `Visibility` | adaptive |  |  |  |  |  |
-| `windowBackground` | property | `Color` | adaptive |  |  |  |  |  |
+| `titleKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |
+| `toolbarBackground` | property | `Visibility` | adaptive |  |  | · |  | GTK 4: cannot read toolbarBackground of Page - GTK's driver has no path for it yet |
+| `toolbarVisibility` | property | `Visibility` | adaptive |  |  | · |  | GTK 4: cannot read toolbarVisibility of Page - GTK's driver has no path for it yet |
+| `windowBackground` | property | `Color` | adaptive |  |  | · |  | GTK 4: cannot read windowBackground of Page - GTK's driver has no path for it yet |

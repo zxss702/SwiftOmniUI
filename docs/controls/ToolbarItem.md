@@ -57,6 +57,6 @@ What every item a user chooses from has - a menu's entry, a toolbar's item: a ca
 | `icon` | property | `ImageSource` | adaptive | · | ✅ | · |  | cannot read icon of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read icon of ToolbarItem - GTK's driver has no path for it yet |
 | `isDestructive` | property | `Bool` | adaptive | · |  |  |  | cannot read isDestructive of ToolbarItem - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
 | `isEnabled` | property | `Bool` | native | · | ✅ | · |  | cannot activate on ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot activate on ToolbarItem - GTK's driver has no path for it yet |
-| `shortcut` | property | `KeyboardShortcut` | native |  |  |  |  |  |
+| `shortcut` | property | `KeyboardShortcut` | native |  |  |  |  | GTK 4: not realized |
 | `text` | property | `String` | native | · | ✅ | · |  | cannot read text of ToolbarItem - Android's driver has no path for it yet; GTK 4: cannot read text of ToolbarItem - GTK's driver has no path for it yet |
-| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `textKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |

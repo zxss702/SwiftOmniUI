@@ -1,5 +1,7 @@
 # revision 2.1
 NavigationSplitView: ✅
+NavigationSplitView.columnVisibility: cannot read columnVisibility of NavigationSplitView - GTK's driver has no path for it yet
+NavigationSplitView.columnVisibilityChanged: cannot toggle on NavigationSplitView - GTK's driver has no path for it yet
 NavigationSplitView.isSidebarVisible: cannot read isSidebarVisible of NavigationSplitView - GTK's driver has no path for it yet
 NavigationSplitView.isSidebarVisibleChanged: not realized
 Text.frameChanged: ✅

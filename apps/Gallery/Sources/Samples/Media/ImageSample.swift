@@ -82,7 +82,6 @@ struct ImageSample: SampleContent, ExampleContent {
                     .clipShape(Circle())
 
                 Text("clipped to a circle")
-                    .verticalAlignment(.center)
             }
 
             // The same shape drawn black, and drawn once per color scheme. An Image
@@ -93,7 +92,6 @@ struct ImageSample: SampleContent, ExampleContent {
                     .frame(height: 32)
 
                 Text("black artwork, always")
-                    .verticalAlignment(.center)
             }
 
             HStack {
@@ -102,7 +100,6 @@ struct ImageSample: SampleContent, ExampleContent {
                     .frame(height: 32)
 
                 Text("one per colorScheme - switch the system between light and dark")
-                    .verticalAlignment(.center)
             }
         }
         """
@@ -127,7 +124,6 @@ struct ImageSample: SampleContent, ExampleContent {
                     .frame(height: 48)
             }
             .spacing(16)
-            .horizontalAlignment(.center)
 
             SectionTitle("Fit or fill")
 
@@ -163,7 +159,6 @@ struct ImageSample: SampleContent, ExampleContent {
                 .spacing(4)
             }
             .spacing(16)
-            .horizontalAlignment(.center)
 
             SectionTitle("One per colorScheme")
 
@@ -178,7 +173,6 @@ struct ImageSample: SampleContent, ExampleContent {
 
                 Text("black artwork, always")
                     .font(.system(size: 13))
-                    .verticalAlignment(.center)
             }
             .spacing(12)
 
@@ -189,7 +183,6 @@ struct ImageSample: SampleContent, ExampleContent {
 
                 Text("one per colorScheme - switch the system between light and dark")
                     .font(.system(size: 13))
-                    .verticalAlignment(.center)
             }
             .spacing(12)
 
@@ -214,7 +207,6 @@ struct ImageSample: SampleContent, ExampleContent {
                 }
             }
             .spacing(16)
-            .horizontalAlignment(.center)
 
             // A Label is a title with a symbol at its head - and its style
             // picks which of the two shows.
@@ -239,7 +231,6 @@ struct ImageSample: SampleContent, ExampleContent {
                     .frame(height: 24)
             }
             .spacing(16)
-            .horizontalAlignment(.center)
         }
         .spacing(12)
     }

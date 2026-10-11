@@ -18,7 +18,6 @@ struct DeviceDisplaySample: SampleContent, ExampleContent {
                 VStack {
                     // The display is read here, so a turn or a resize builds
                     // this closure.
-                    DebugInfoLabel()
 
                     Text("\\(Int(display.width)) × \\(Int(display.height)) px")
 
@@ -40,7 +39,6 @@ struct DeviceDisplaySample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("\(Int(display.width)) × \(Int(display.height)) px")
                 .font(.system(size: 28))

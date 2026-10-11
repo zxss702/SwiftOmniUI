@@ -1,24 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-// `.safeAreaInset`: a bar pinned to an edge of the window, over the content.
-
 extension View {
-    /// A bar pinned to an edge of the window, drawn over the content.
-    ///
-    ///     List(items) { Row($0) }
-    ///         .safeAreaInset(edge: .bottom) { NowPlayingBar() }
-    ///
-    /// The inset is the window's own overlay - it rides the window rather
-    /// than the view it was written on, so it holds its place over a
-    /// navigation's pushes and pops alike. A second `.safeAreaInset` written
-    /// for the same edge replaces the first, as a window's edge is one place.
-    ///
-    /// - Parameters:
-    ///   - edge: the window's edge the bar stands on.
-    ///   - alignment: where on the edge it goes - the edge's other two
-    ///     directions are the window's corners.
-    ///   - content: the bar.
+    /// A bar pinned to an edge of the window, drawn over the content: the
+    /// window's own overlay, which rides the window rather than the view it
+    /// was written on and so holds its place over a navigation's pushes and
+    /// pops. A second inset on the same edge replaces the first.
     ///
     /// SPI: the `Edge` form is the host's own; the public name answers
     /// `VerticalEdge` and `HorizontalEdge`, the way SwiftUI spells them.
@@ -36,22 +23,13 @@ extension View {
 /// The anchor `.safeAreaInset` leaves in the tree: the view it was written
 /// on, plus a hook that writes the window's overlay for that edge.
 struct SafeAreaInsetAnchor<Content: View>: View {
-    /// The view `.safeAreaInset` was written on.
     let base: any View
-
-    /// The edge the inset stands on.
     let edge: Edge
-
-    /// Where on the edge it goes.
     let alignment: AxisAlignment
-
-    /// The bar.
     let inset: () -> Content
-
-    /// The window the overlay rides.
     @Environment var window: WindowSession
 
-    /// The overlay key this edge answers: one place per edge of the window.
+    // One place per edge of the window.
     private var key: OverlayKey { OverlayKey("swiftomniui.safeAreaInset.\(edge.rawValue)") }
 
     var body: some View {
@@ -67,19 +45,13 @@ struct SafeAreaInsetAnchor<Content: View>: View {
 
 /// What the overlay shows: the bar, laid along its edge.
 private struct InsetView<Content: View>: View {
-    /// The edge the inset stands on.
     let edge: Edge
-
-    /// Where on the edge it goes.
     let alignment: AxisAlignment
-
-    /// The bar.
     let inset: () -> Content
 
     var body: some View {
-        // The overlay's own stack: the bar at its edge, the window's whole
-        // room behind it letting touches through. On the edge's own axis it
-        // fills; across it the alignment says where.
+        // On the edge's own axis the bar fills; across it the alignment says
+        // where.
         let pinned = inset()
         return pinned
             .verticalAlignment(edge == .top ? .start : edge == .bottom ? .end : alignment)

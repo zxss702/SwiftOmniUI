@@ -166,7 +166,7 @@ struct Sample {
         examples.count == 1 ? "Example" : "Example \(index + 1)"
     }
 
-    init<Content: SampleContent>(_ content: Content) {
+    @MainActor init<Content: SampleContent>(_ content: Content) {
         id = Content.id
         title = Content.title
         summary = Content.summary

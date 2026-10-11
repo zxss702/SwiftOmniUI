@@ -43,7 +43,6 @@ struct MissingPage: View {
 
             Button("Back", action: { path.removeLast() })
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(16)

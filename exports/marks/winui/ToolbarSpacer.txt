@@ -1,0 +1,4 @@
+# revision 1.1
+ToolbarSpacer: ✅
+ToolbarSpacer.placement: ❌ the driver cannot read placement of ToolbarSpacer, and says nothing of why
+ToolbarSpacer.variant: ❌ the driver cannot read variant of ToolbarSpacer, and says nothing of why

@@ -137,6 +137,13 @@ private struct Shown: View {
 }
 
 @MainActor final class StateTests: XCTestCase {
+    /// Touches the shared renderer, whose init installs the UI thread's
+    /// executor before any task of this suite can be made - see UIThread.swift.
+    override func setUp() {
+        super.setUp()
+        Renderer.shared.clearInvalidation()
+    }
+
     func testAdoptingABoxSharesItsStorageBothWays() {
         let old = State(1)
         let fresh = State(0)

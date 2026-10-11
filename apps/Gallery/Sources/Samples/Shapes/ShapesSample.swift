@@ -20,7 +20,6 @@ struct ShapesSample: SampleContent, ExampleContent {
 
         VStack {
             // The fill rule is read here, so switching it builds this closure.
-            DebugInfoLabel()
 
             HStack {
                 Rectangle()
@@ -50,18 +49,14 @@ struct ShapesSample: SampleContent, ExampleContent {
                 Line()
                     .x1(0).y1(0)
                     .x2(56).y2(56)
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeLineCap(.round)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .miter))
                     .frame(width: 56)
                     .frame(height: 56)
 
                 Line()
                     .x1(0).y1(28)
                     .x2(56).y2(28)
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeDashPattern([3, 2])
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, dash: [3, 2]))
                     .frame(width: 56)
                     .frame(height: 56)
 
@@ -73,26 +68,24 @@ struct ShapesSample: SampleContent, ExampleContent {
                     .frame(height: 56)
 
                 // A transform on the GEOMETRY - the same ViewTransform
-                // every view takes, drawn whole: a lean draws here, and the
+                // every view takes, drawn whole: a tilt draws here, and the
                 // stroke follows the shape it makes. On any shape, not only
                 // a Path.
                 Path("M 28,0 L 56,56 L 0,56 Z")
                     .fill(Palette.accent)
-                    .renderTransform(.skew(20, 0))
+                    .rotationEffect(-20)
                     .frame(width: 56)
                     .frame(height: 56)
 
                 Rectangle()
                     .fill(Palette.accent)
                     .cornerRadius(14)
-                    .renderTransform(.skew(20, 0))
+                    .rotationEffect(-20)
                     .frame(width: 56)
                     .frame(height: 56)
 
                 Polyline([Point(0, 44), Point(14, 12), Point(30, 34), Point(56, 4)])
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeLineJoin(.round)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, lineCap: .flat, lineJoin: .round))
                     .frame(width: 56)
                     .frame(height: 56)
             }
@@ -103,20 +96,14 @@ struct ShapesSample: SampleContent, ExampleContent {
                 Line()
                     .x1(0).y1(4)
                     .x2(200).y2(4)
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeDashPattern([3, 2])
-                    .strokeDashOffset(0)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, dash: [3, 2]))
                     .frame(width: 200)
                     .frame(height: 8)
 
                 Line()
                     .x1(0).y1(4)
                     .x2(200).y2(4)
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeDashPattern([3, 2])
-                    .strokeDashOffset(2.5)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, dash: [3, 2], dashPhase: 2.5))
                     .frame(width: 200)
                     .frame(height: 8)
             }
@@ -126,25 +113,18 @@ struct ShapesSample: SampleContent, ExampleContent {
             // may be, in stroke widths; past it the point is cut flat.
             HStack {
                 Polyline([Point(10, 4), Point(28, 48), Point(46, 4)])
-                    .stroke(Palette.accent)
-                    .strokeWidth(8)
-                    .strokeLineJoin(.miter)
-                    .strokeMiterLimit(10)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 8, miterLimit: 10))
                     .frame(width: 56)
                     .frame(height: 72)
 
                 Polyline([Point(10, 4), Point(28, 48), Point(46, 4)])
-                    .stroke(Palette.accent)
-                    .strokeWidth(8)
-                    .strokeLineJoin(.miter)
-                    .strokeMiterLimit(1)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 8, miterLimit: 1))
                     .frame(width: 56)
                     .frame(height: 72)
             }
 
             Polygon(Self.star)
-                .fill(Palette.accent)
-                .fillRule(rule)
+                .fill(Palette.accent, style: FillStyle(eoFill: rule == .evenOdd, antialiased: true))
                 .frame(width: 56)
                 .frame(height: 56)
 
@@ -162,7 +142,6 @@ struct ShapesSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             SectionTitle("Filled")
 
@@ -190,7 +169,6 @@ struct ShapesSample: SampleContent, ExampleContent {
                     .frame(height: 56)
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
             SectionTitle("Stroked")
 
@@ -198,18 +176,14 @@ struct ShapesSample: SampleContent, ExampleContent {
                 Line()
                     .x1(0).y1(0)
                     .x2(56).y2(56)
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeLineCap(.round)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .miter))
                     .frame(width: 56)
                     .frame(height: 56)
 
                 Line()
                     .x1(0).y1(28)
                     .x2(56).y2(28)
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeDashPattern([3, 2])
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, dash: [3, 2]))
                     .frame(width: 56)
                     .frame(height: 56)
 
@@ -219,31 +193,28 @@ struct ShapesSample: SampleContent, ExampleContent {
                     .frame(height: 56)
 
                 // A transform on the GEOMETRY - the same ViewTransform
-                // every view takes, drawn whole: a lean draws here, and the
+                // every view takes, drawn whole: a tilt draws here, and the
                 // stroke follows the shape it makes. On any shape, not only
                 // a Path.
                 Path("M 28,0 L 56,56 L 0,56 Z")
                     .fill(Palette.accent)
-                    .renderTransform(.skew(20, 0))
+                    .rotationEffect(-20)
                     .frame(width: 56)
                     .frame(height: 56)
 
                 Rectangle()
                     .fill(Palette.accent)
                     .cornerRadius(14)
-                    .renderTransform(.skew(20, 0))
+                    .rotationEffect(-20)
                     .frame(width: 56)
                     .frame(height: 56)
 
                 Polyline([Point(0, 44), Point(14, 12), Point(30, 34), Point(56, 4)])
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeLineJoin(.round)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, lineCap: .flat, lineJoin: .round))
                     .frame(width: 56)
                     .frame(height: 56)
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
             SectionTitle("Where the dashes start")
 
@@ -251,61 +222,44 @@ struct ShapesSample: SampleContent, ExampleContent {
                 Line()
                     .x1(0).y1(4)
                     .x2(200).y2(4)
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeDashPattern([3, 2])
-                    .strokeDashOffset(0)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, dash: [3, 2]))
                     .frame(width: 200)
                     .frame(height: 8)
 
                 Line()
                     .x1(0).y1(4)
                     .x2(200).y2(4)
-                    .stroke(Palette.accent)
-                    .strokeWidth(4)
-                    .strokeDashPattern([3, 2])
-                    .strokeDashOffset(2.5)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, dash: [3, 2], dashPhase: 2.5))
                     .frame(width: 200)
                     .frame(height: 8)
             }
             .spacing(10)
-            .horizontalAlignment(.center)
 
             SectionTitle("How far a sharp corner reaches")
 
             HStack {
                 Polyline([Point(10, 4), Point(28, 48), Point(46, 4)])
-                    .stroke(Palette.accent)
-                    .strokeWidth(8)
-                    .strokeLineJoin(.miter)
-                    .strokeMiterLimit(10)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 8, miterLimit: 10))
                     .frame(width: 56)
                     .frame(height: 72)
 
                 Polyline([Point(10, 4), Point(28, 48), Point(46, 4)])
-                    .stroke(Palette.accent)
-                    .strokeWidth(8)
-                    .strokeLineJoin(.miter)
-                    .strokeMiterLimit(1)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 8, miterLimit: 1))
                     .frame(width: 56)
                     .frame(height: 72)
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
             SectionTitle("An outline that crosses itself")
 
             Polygon(Self.star)
-                .fill(Palette.accent)
-                .fillRule(rule)
+                .fill(Palette.accent, style: FillStyle(eoFill: rule == .evenOdd, antialiased: true))
                 .frame(width: 56)
                 .frame(height: 56)
-                .horizontalAlignment(.center)
 
             Button("fillRule: .\(rule)", action: { rule = rule == .evenOdd ? .nonzero : .evenOdd })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(16, 6))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(12)

@@ -1,12 +1,12 @@
 import SwiftOmniUI
 
-/// Text of several lines, in an editor of a stated height and one that grows.
+/// Text of several lines, in two editors sharing the one state.
 struct TextEditorSample: SampleContent, ExampleContent {
     @State private var draft = ""
 
     static let id = "textEditor"
     static let title = "TextEditor"
-    static let summary = "A TextField with room: several lines, and a size that can follow the text."
+    static let summary = "A TextField with room: several lines, and a state two editors can share."
 
     static let code = """
         @State private var draft = ""
@@ -14,29 +14,25 @@ struct TextEditorSample: SampleContent, ExampleContent {
         VStack {
             // The count of characters below reads `draft`, so every keystroke
             // builds this closure; the two editors are handed the state.
-            DebugInfoLabel()
 
-            // The same text in both editors: the left keeps its stated
-            // height, the right grows with every line you add.
-            Grid {
-                VStack {
-                    Text("a stated height")
+            // The same text in both editors, so typing in either moves the
+            // other - the state is shared.
+            Grid(horizontalSpacing: 12, verticalSpacing: nil) {
+                GridRow {
+                    VStack {
+                        Text("a stated height")
 
-                    TextEditor($draft)
-                        .placeholder("Anything worth remembering")
-                        .frame(height: 110)
+                        TextEditor("Anything worth remembering", text: $draft)
+                            .frame(height: 110)
+                    }
+
+                    VStack {
+                        Text("the same text again")
+
+                        TextEditor("The same text, written twice", text: $draft)
+                    }
                 }
-
-                VStack {
-                    Text(".growsWithText(true)")
-
-                    TextEditor($draft)
-                        .placeholder("The same text, sized by it")
-                        .growsWithText(true)
-                }
-                .gridColumn(1)
             }
-            .columns(.fill, .fill)
 
             Text(draft.isEmpty ? "nothing written yet" : "\\(draft.count) character(s)")
 
@@ -48,41 +44,35 @@ struct TextEditorSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             // The same text in both editors, so typing in either moves the
-            // other - and only the right one grows with it.
-            Grid {
-                VStack {
-                    Text("a stated height")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Palette.subtle)
+            // other - the state is shared.
+            Grid(horizontalSpacing: 12, verticalSpacing: nil) {
+                GridRow {
+                    VStack {
+                        Text("a stated height")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.subtle)
 
-                    TextEditor($draft)
-                        .accessibilityIdentifier("editor.notes")
-                        .accessibilityLabel("Notes")
-                        .placeholder("Anything worth remembering")
-                        .frame(height: 110)
+                        TextEditor("Anything worth remembering", text: $draft)
+                            .accessibilityIdentifier("editor.notes")
+                            .accessibilityLabel("Notes")
+                            .frame(height: 110)
+                    }
+                    .spacing(4)
+
+                    VStack {
+                        Text("the same text again")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.subtle)
+
+                        TextEditor("The same text, written twice", text: $draft)
+                            .accessibilityIdentifier("editor.notes.again")
+                            .accessibilityLabel("Notes, again")
+                    }
+                    .spacing(4)
                 }
-                .spacing(4)
-
-                VStack {
-                    Text(".growsWithText(true)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Palette.subtle)
-
-                    TextEditor($draft)
-                        .accessibilityIdentifier("editor.notes.growsWithText")
-                        .accessibilityLabel("Notes, sized by the text")
-                        .placeholder("The same text, sized by it")
-                        .growsWithText(true)
-                }
-                .spacing(4)
-                .verticalAlignment(.start)
-                .gridColumn(1)
             }
-            .columns(.fill, .fill)
-            .columnSpacing(12)
 
             Text(draft.isEmpty ? "nothing written yet" : "\(draft.count) character(s)")
                 .font(.system(size: 12))
@@ -92,7 +82,6 @@ struct TextEditorSample: SampleContent, ExampleContent {
             Button("Clear", action: { draft = "" })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(16, 6))
-                .horizontalAlignment(.center)
                 .disabled(draft.isEmpty)
                 
         }

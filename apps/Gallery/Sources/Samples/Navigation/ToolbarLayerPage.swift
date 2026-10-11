@@ -40,15 +40,13 @@ struct ToolbarLayerPage: View {
         .spacing(12)
         .padding(24)
         .toolbar {
-            ToolbarItem("Share")
+            ToolbarItem("Share") { shared += 1 }
                 .id("layer.share")
                 .accessibilityIdentifier("layer.share")
-                .onClicked { shared += 1 }
 
-            ToolbarItem("Deeper")
+            ToolbarItem("Deeper") { path.append(.layer(depth + 1)) }
                 .id("layer.deeper")
                 .accessibilityIdentifier("layer.deeper")
-                .onClicked { path.append(.layer(depth + 1)) }
         }
         .onAppear { page.gallery("Layer \(depth)", scene: scene, nav: nav) }
     }

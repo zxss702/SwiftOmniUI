@@ -316,8 +316,8 @@ import XCTest
         func panel(_ fade: Double, _ width: Double) -> Node {
             ZStack { Text("x") }
                 .opacity(fade)
-                .frame(width: width)
                 .animation(own, .opacity)
+                .frame(width: width)
                 .id("p")
                 .node
         }
@@ -325,7 +325,7 @@ import XCTest
         renders.render(panel(1, 100))
         let patch = renders.render(panel(0.2, 300))
 
-        XCTAssertEqual(patch.transitions[.opacity]?.animation, own)
+        XCTAssertEqual(patch.children.first?.transitions[.opacity]?.animation, own)
         XCTAssertEqual(patch.transitions[.width]?.animation, .standard,
                        "what no rule names travels the way everything else does")
     }

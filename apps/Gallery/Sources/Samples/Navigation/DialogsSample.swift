@@ -16,7 +16,6 @@ struct DialogsSample: SampleContent, ExampleContent {
         VStack {
             // The answer is read here, so every dialog that closes builds
             // this closure.
-            DebugInfoLabel()
 
             // One button, nothing to answer: the handler resumes when it is
             // dismissed, so the next line runs with the alert already gone.
@@ -66,7 +65,6 @@ struct DialogsSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Button("Tell me something", action: {
                     try await Dialogs.alert(

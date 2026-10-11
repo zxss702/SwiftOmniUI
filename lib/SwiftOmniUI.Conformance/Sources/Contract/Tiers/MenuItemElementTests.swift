@@ -18,6 +18,9 @@
                 Aspects.holds(MenuItemElementContract.icon, on: element, "test_dot.png", then: "test_wide.png"),
                 Aspects.holds(MenuItemElementContract.isDestructive, on: element, false, then: true),
                 Aspects.holds(MenuItemElementContract.isEnabled, on: element, true, then: false),
+                Aspects.holds(MenuItemElementContract.textKey, on: element, "copy", then: "duplicate"),
+                Aspects.holds(MenuItemElementContract.shortcut, on: element, KeyboardShortcut("c"),
+                              then: KeyboardShortcut("d")),
             ]
         }
     }

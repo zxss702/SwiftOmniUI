@@ -1,19 +1,34 @@
 # revision 1.1
+ActivityIndicator.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 ActivityIndicator.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.accessibilityHint: cannot read accessibilityHint of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.accessibilityLabel: cannot read accessibilityLabel of ActivityIndicator - GTK's driver has no path for it yet
+ActivityIndicator.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 ActivityIndicator.automationExcludedWithChildren: cannot read automationExcludedWithChildren of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.background: not realized
+ActivityIndicator.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+ActivityIndicator.blur: not realized
+ActivityIndicator.compositingGroup: not realized
+ActivityIndicator.contentTransition: – GTK swaps a label's words with no transition yet.
+ActivityIndicator.drawingGroup: not realized
 ActivityIndicator.focus: – ActivityIndicator takes no keyboard focus here: it refuses it, and nothing is heard
 ActivityIndicator.frame: ✅
 ActivityIndicator.frameChanged: ✅
 ActivityIndicator.height: ✅
+ActivityIndicator.hint: cannot read hint of ActivityIndicator - GTK's driver has no path for it yet
+ActivityIndicator.hintKey: not realized
+ActivityIndicator.horizontalAlignmentDefault: not realized
 ActivityIndicator.ignoresInput: not realized
 ActivityIndicator.isAccessibilityHidden: cannot read isAccessibilityHidden of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.isEnabled: ✅
 ActivityIndicator.isFocusedChanged: – ActivityIndicator takes no keyboard focus here: it refuses it, and nothing is heard
+ActivityIndicator.isFrameContent: not realized
+ActivityIndicator.isGeometryReader: not realized
+ActivityIndicator.isLayoutDecoration: not realized
 ActivityIndicator.isVisible: ✅
 ActivityIndicator.layoutDirection: cannot read layoutDirection of ActivityIndicator - GTK's driver has no path for it yet
+ActivityIndicator.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+ActivityIndicator.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 ActivityIndicator.maximumHeight: ✅
 ActivityIndicator.maximumWidth: ✅
 ActivityIndicator.minimumHeight: ✅
@@ -24,30 +39,53 @@ ActivityIndicator.pivotY: cannot read pivotY of ActivityIndicator - GTK's driver
 ActivityIndicator.rotation: cannot read rotation of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.rotationX: cannot read rotationX of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.rotationY: cannot read rotationY of ActivityIndicator - GTK's driver has no path for it yet
+ActivityIndicator.safeAreaInsetEdge: not realized
 ActivityIndicator.scale: cannot read scale of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.scaleX: cannot read scaleX of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.scaleY: cannot read scaleY of ActivityIndicator - GTK's driver has no path for it yet
+ActivityIndicator.shadow: not realized
 ActivityIndicator.style: ✅
+ActivityIndicator.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+ActivityIndicator.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+ActivityIndicator.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+ActivityIndicator.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+ActivityIndicator.transition: cannot read transition of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.translationX: cannot read translationX of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.translationY: cannot read translationY of ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.unfocus: – ActivityIndicator takes no keyboard focus here: it refuses it, and nothing is heard
+ActivityIndicator.verticalAlignmentDefault: not realized
 ActivityIndicator.width: ✅
 ActivityIndicator.zIndex: not realized
+Button.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Button.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Button - GTK's driver has no path for it yet
 Button.accessibilityHint: cannot read accessibilityHint of Button - GTK's driver has no path for it yet
 Button.accessibilityLabel: cannot read accessibilityLabel of Button - GTK's driver has no path for it yet
+Button.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Button.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Button - GTK's driver has no path for it yet
 Button.background: cannot read background of Button - GTK's driver has no path for it yet
+Button.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Button.blur: not realized
+Button.compositingGroup: not realized
+Button.contentTransition: – GTK swaps a label's words with no transition yet.
+Button.drawingGroup: not realized
 Button.focus: ✅
 Button.frame: ✅
 Button.frameChanged: ✅
 Button.height: ✅
+Button.hint: cannot read hint of Button - GTK's driver has no path for it yet
+Button.hintKey: not realized
+Button.horizontalAlignmentDefault: not realized
 Button.ignoresInput: not realized
 Button.isAccessibilityHidden: cannot read isAccessibilityHidden of Button - GTK's driver has no path for it yet
 Button.isEnabled: ✅
 Button.isFocusedChanged: ✅
+Button.isFrameContent: not realized
+Button.isGeometryReader: not realized
+Button.isLayoutDecoration: not realized
 Button.isVisible: ✅
 Button.layoutDirection: cannot read layoutDirection of Button - GTK's driver has no path for it yet
+Button.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Button.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Button.maximumHeight: ✅
 Button.maximumWidth: ✅
 Button.minimumHeight: ✅
@@ -58,30 +96,53 @@ Button.pivotY: cannot read pivotY of Button - GTK's driver has no path for it ye
 Button.rotation: cannot read rotation of Button - GTK's driver has no path for it yet
 Button.rotationX: cannot read rotationX of Button - GTK's driver has no path for it yet
 Button.rotationY: cannot read rotationY of Button - GTK's driver has no path for it yet
+Button.safeAreaInsetEdge: not realized
 Button.scale: cannot read scale of Button - GTK's driver has no path for it yet
 Button.scaleX: cannot read scaleX of Button - GTK's driver has no path for it yet
 Button.scaleY: cannot read scaleY of Button - GTK's driver has no path for it yet
+Button.shadow: not realized
 Button.style: ✅
+Button.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Button.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Button.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Button.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Button.transition: cannot read transition of Button - GTK's driver has no path for it yet
 Button.translationX: cannot read translationX of Button - GTK's driver has no path for it yet
 Button.translationY: cannot read translationY of Button - GTK's driver has no path for it yet
 Button.unfocus: ✅
+Button.verticalAlignmentDefault: not realized
 Button.width: ✅
 Button.zIndex: not realized
+Canvas.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Canvas.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Canvas - GTK's driver has no path for it yet
 Canvas.accessibilityHint: cannot read accessibilityHint of Canvas - GTK's driver has no path for it yet
 Canvas.accessibilityLabel: cannot read accessibilityLabel of Canvas - GTK's driver has no path for it yet
+Canvas.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Canvas.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Canvas - GTK's driver has no path for it yet
 Canvas.background: not realized
+Canvas.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Canvas.blur: not realized
+Canvas.compositingGroup: not realized
+Canvas.contentTransition: – GTK swaps a label's words with no transition yet.
+Canvas.drawingGroup: not realized
 Canvas.focus: – Canvas takes no keyboard focus here: it refuses it, and nothing is heard
 Canvas.frame: ✅
 Canvas.frameChanged: ✅
 Canvas.height: ✅
+Canvas.hint: cannot read hint of Canvas - GTK's driver has no path for it yet
+Canvas.hintKey: not realized
+Canvas.horizontalAlignmentDefault: not realized
 Canvas.ignoresInput: not realized
 Canvas.isAccessibilityHidden: cannot read isAccessibilityHidden of Canvas - GTK's driver has no path for it yet
 Canvas.isEnabled: ✅
 Canvas.isFocusedChanged: – Canvas takes no keyboard focus here: it refuses it, and nothing is heard
+Canvas.isFrameContent: not realized
+Canvas.isGeometryReader: not realized
+Canvas.isLayoutDecoration: not realized
 Canvas.isVisible: ✅
 Canvas.layoutDirection: cannot read layoutDirection of Canvas - GTK's driver has no path for it yet
+Canvas.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Canvas.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Canvas.maximumHeight: ✅
 Canvas.maximumWidth: ✅
 Canvas.minimumHeight: ✅
@@ -92,30 +153,53 @@ Canvas.pivotY: cannot read pivotY of Canvas - GTK's driver has no path for it ye
 Canvas.rotation: cannot read rotation of Canvas - GTK's driver has no path for it yet
 Canvas.rotationX: cannot read rotationX of Canvas - GTK's driver has no path for it yet
 Canvas.rotationY: cannot read rotationY of Canvas - GTK's driver has no path for it yet
+Canvas.safeAreaInsetEdge: not realized
 Canvas.scale: cannot read scale of Canvas - GTK's driver has no path for it yet
 Canvas.scaleX: cannot read scaleX of Canvas - GTK's driver has no path for it yet
 Canvas.scaleY: cannot read scaleY of Canvas - GTK's driver has no path for it yet
+Canvas.shadow: not realized
 Canvas.style: ✅
+Canvas.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Canvas.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Canvas.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Canvas.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Canvas.transition: cannot read transition of Canvas - GTK's driver has no path for it yet
 Canvas.translationX: cannot read translationX of Canvas - GTK's driver has no path for it yet
 Canvas.translationY: cannot read translationY of Canvas - GTK's driver has no path for it yet
 Canvas.unfocus: – Canvas takes no keyboard focus here: it refuses it, and nothing is heard
+Canvas.verticalAlignmentDefault: not realized
 Canvas.width: ✅
 Canvas.zIndex: not realized
+CheckBox.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 CheckBox.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of CheckBox - GTK's driver has no path for it yet
 CheckBox.accessibilityHint: cannot read accessibilityHint of CheckBox - GTK's driver has no path for it yet
 CheckBox.accessibilityLabel: cannot read accessibilityLabel of CheckBox - GTK's driver has no path for it yet
+CheckBox.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 CheckBox.automationExcludedWithChildren: cannot read automationExcludedWithChildren of CheckBox - GTK's driver has no path for it yet
 CheckBox.background: not realized
+CheckBox.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+CheckBox.blur: not realized
+CheckBox.compositingGroup: not realized
+CheckBox.contentTransition: – GTK swaps a label's words with no transition yet.
+CheckBox.drawingGroup: not realized
 CheckBox.focus: ✅
 CheckBox.frame: ✅
 CheckBox.frameChanged: ✅
 CheckBox.height: ✅
+CheckBox.hint: cannot read hint of CheckBox - GTK's driver has no path for it yet
+CheckBox.hintKey: not realized
+CheckBox.horizontalAlignmentDefault: not realized
 CheckBox.ignoresInput: not realized
 CheckBox.isAccessibilityHidden: cannot read isAccessibilityHidden of CheckBox - GTK's driver has no path for it yet
 CheckBox.isEnabled: ✅
 CheckBox.isFocusedChanged: ✅
+CheckBox.isFrameContent: not realized
+CheckBox.isGeometryReader: not realized
+CheckBox.isLayoutDecoration: not realized
 CheckBox.isVisible: ✅
 CheckBox.layoutDirection: cannot read layoutDirection of CheckBox - GTK's driver has no path for it yet
+CheckBox.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+CheckBox.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 CheckBox.maximumHeight: ✅
 CheckBox.maximumWidth: ✅
 CheckBox.minimumHeight: ✅
@@ -126,30 +210,53 @@ CheckBox.pivotY: cannot read pivotY of CheckBox - GTK's driver has no path for i
 CheckBox.rotation: cannot read rotation of CheckBox - GTK's driver has no path for it yet
 CheckBox.rotationX: cannot read rotationX of CheckBox - GTK's driver has no path for it yet
 CheckBox.rotationY: cannot read rotationY of CheckBox - GTK's driver has no path for it yet
+CheckBox.safeAreaInsetEdge: not realized
 CheckBox.scale: cannot read scale of CheckBox - GTK's driver has no path for it yet
 CheckBox.scaleX: cannot read scaleX of CheckBox - GTK's driver has no path for it yet
 CheckBox.scaleY: cannot read scaleY of CheckBox - GTK's driver has no path for it yet
+CheckBox.shadow: not realized
 CheckBox.style: ✅
+CheckBox.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+CheckBox.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+CheckBox.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+CheckBox.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+CheckBox.transition: cannot read transition of CheckBox - GTK's driver has no path for it yet
 CheckBox.translationX: cannot read translationX of CheckBox - GTK's driver has no path for it yet
 CheckBox.translationY: cannot read translationY of CheckBox - GTK's driver has no path for it yet
 CheckBox.unfocus: ✅
+CheckBox.verticalAlignmentDefault: not realized
 CheckBox.width: ✅
 CheckBox.zIndex: not realized
+ColorPicker.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 ColorPicker.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.accessibilityHint: cannot read accessibilityHint of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.accessibilityLabel: cannot read accessibilityLabel of ColorPicker - GTK's driver has no path for it yet
+ColorPicker.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 ColorPicker.automationExcludedWithChildren: cannot read automationExcludedWithChildren of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.background: not realized
+ColorPicker.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+ColorPicker.blur: not realized
+ColorPicker.compositingGroup: not realized
+ColorPicker.contentTransition: – GTK swaps a label's words with no transition yet.
+ColorPicker.drawingGroup: not realized
 ColorPicker.focus: – ColorPicker takes no keyboard focus here: it refuses it, and nothing is heard
 ColorPicker.frame: ✅
 ColorPicker.frameChanged: ✅
 ColorPicker.height: ✅
+ColorPicker.hint: cannot read hint of ColorPicker - GTK's driver has no path for it yet
+ColorPicker.hintKey: not realized
+ColorPicker.horizontalAlignmentDefault: not realized
 ColorPicker.ignoresInput: not realized
 ColorPicker.isAccessibilityHidden: cannot read isAccessibilityHidden of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.isEnabled: ✅
 ColorPicker.isFocusedChanged: – ColorPicker takes no keyboard focus here: it refuses it, and nothing is heard
+ColorPicker.isFrameContent: not realized
+ColorPicker.isGeometryReader: not realized
+ColorPicker.isLayoutDecoration: not realized
 ColorPicker.isVisible: ✅
 ColorPicker.layoutDirection: cannot read layoutDirection of ColorPicker - GTK's driver has no path for it yet
+ColorPicker.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+ColorPicker.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 ColorPicker.maximumHeight: ✅
 ColorPicker.maximumWidth: ✅
 ColorPicker.minimumHeight: ✅
@@ -160,30 +267,53 @@ ColorPicker.pivotY: cannot read pivotY of ColorPicker - GTK's driver has no path
 ColorPicker.rotation: cannot read rotation of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.rotationX: cannot read rotationX of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.rotationY: cannot read rotationY of ColorPicker - GTK's driver has no path for it yet
+ColorPicker.safeAreaInsetEdge: not realized
 ColorPicker.scale: cannot read scale of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.scaleX: cannot read scaleX of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.scaleY: cannot read scaleY of ColorPicker - GTK's driver has no path for it yet
+ColorPicker.shadow: not realized
 ColorPicker.style: ✅
+ColorPicker.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+ColorPicker.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+ColorPicker.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+ColorPicker.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+ColorPicker.transition: cannot read transition of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.translationX: cannot read translationX of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.translationY: cannot read translationY of ColorPicker - GTK's driver has no path for it yet
 ColorPicker.unfocus: – ColorPicker takes no keyboard focus here: it refuses it, and nothing is heard
+ColorPicker.verticalAlignmentDefault: not realized
 ColorPicker.width: ✅
 ColorPicker.zIndex: not realized
+CustomLayout.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 CustomLayout.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.accessibilityHint: cannot read accessibilityHint of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.accessibilityLabel: cannot read accessibilityLabel of CustomLayout - GTK's driver has no path for it yet
+CustomLayout.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 CustomLayout.automationExcludedWithChildren: cannot read automationExcludedWithChildren of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.background: cannot read background of CustomLayout - GTK's driver has no path for it yet
+CustomLayout.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+CustomLayout.blur: not realized
+CustomLayout.compositingGroup: not realized
+CustomLayout.contentTransition: – GTK swaps a label's words with no transition yet.
+CustomLayout.drawingGroup: not realized
 CustomLayout.focus: – CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard
 CustomLayout.frame: ✅
 CustomLayout.frameChanged: ✅
 CustomLayout.height: ✅
+CustomLayout.hint: cannot read hint of CustomLayout - GTK's driver has no path for it yet
+CustomLayout.hintKey: not realized
+CustomLayout.horizontalAlignmentDefault: not realized
 CustomLayout.ignoresInput: cannot read what reaches CustomLayout - GTK's driver has no path for it yet
 CustomLayout.isAccessibilityHidden: cannot read isAccessibilityHidden of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.isEnabled: ✅
 CustomLayout.isFocusedChanged: – CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard
+CustomLayout.isFrameContent: not realized
+CustomLayout.isGeometryReader: not realized
+CustomLayout.isLayoutDecoration: not realized
 CustomLayout.isVisible: ✅
 CustomLayout.layoutDirection: cannot read layoutDirection of CustomLayout - GTK's driver has no path for it yet
+CustomLayout.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+CustomLayout.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 CustomLayout.maximumHeight: ✅
 CustomLayout.maximumWidth: ✅
 CustomLayout.minimumHeight: ✅
@@ -194,30 +324,53 @@ CustomLayout.pivotY: cannot read pivotY of CustomLayout - GTK's driver has no pa
 CustomLayout.rotation: cannot read rotation of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.rotationX: cannot read rotationX of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.rotationY: cannot read rotationY of CustomLayout - GTK's driver has no path for it yet
+CustomLayout.safeAreaInsetEdge: not realized
 CustomLayout.scale: cannot read scale of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.scaleX: cannot read scaleX of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.scaleY: cannot read scaleY of CustomLayout - GTK's driver has no path for it yet
+CustomLayout.shadow: not realized
 CustomLayout.style: ✅
+CustomLayout.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+CustomLayout.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+CustomLayout.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+CustomLayout.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+CustomLayout.transition: cannot read transition of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.translationX: cannot read translationX of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.translationY: cannot read translationY of CustomLayout - GTK's driver has no path for it yet
 CustomLayout.unfocus: – CustomLayout takes no keyboard focus here: it refuses it, and nothing is heard
+CustomLayout.verticalAlignmentDefault: not realized
 CustomLayout.width: ✅
 CustomLayout.zIndex: not realized
+DatePicker.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 DatePicker.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of DatePicker - GTK's driver has no path for it yet
 DatePicker.accessibilityHint: cannot read accessibilityHint of DatePicker - GTK's driver has no path for it yet
 DatePicker.accessibilityLabel: cannot read accessibilityLabel of DatePicker - GTK's driver has no path for it yet
+DatePicker.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 DatePicker.automationExcludedWithChildren: cannot read automationExcludedWithChildren of DatePicker - GTK's driver has no path for it yet
 DatePicker.background: not realized
+DatePicker.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+DatePicker.blur: not realized
+DatePicker.compositingGroup: not realized
+DatePicker.contentTransition: – GTK swaps a label's words with no transition yet.
+DatePicker.drawingGroup: not realized
 DatePicker.focus: ✅
 DatePicker.frame: ✅
 DatePicker.frameChanged: ✅
 DatePicker.height: ✅
+DatePicker.hint: cannot read hint of DatePicker - GTK's driver has no path for it yet
+DatePicker.hintKey: not realized
+DatePicker.horizontalAlignmentDefault: not realized
 DatePicker.ignoresInput: not realized
 DatePicker.isAccessibilityHidden: cannot read isAccessibilityHidden of DatePicker - GTK's driver has no path for it yet
 DatePicker.isEnabled: ✅
 DatePicker.isFocusedChanged: ✅
+DatePicker.isFrameContent: not realized
+DatePicker.isGeometryReader: not realized
+DatePicker.isLayoutDecoration: not realized
 DatePicker.isVisible: ✅
 DatePicker.layoutDirection: cannot read layoutDirection of DatePicker - GTK's driver has no path for it yet
+DatePicker.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+DatePicker.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 DatePicker.maximumHeight: ✅
 DatePicker.maximumWidth: ✅
 DatePicker.minimumHeight: ✅
@@ -228,30 +381,53 @@ DatePicker.pivotY: cannot read pivotY of DatePicker - GTK's driver has no path f
 DatePicker.rotation: cannot read rotation of DatePicker - GTK's driver has no path for it yet
 DatePicker.rotationX: cannot read rotationX of DatePicker - GTK's driver has no path for it yet
 DatePicker.rotationY: cannot read rotationY of DatePicker - GTK's driver has no path for it yet
+DatePicker.safeAreaInsetEdge: not realized
 DatePicker.scale: cannot read scale of DatePicker - GTK's driver has no path for it yet
 DatePicker.scaleX: cannot read scaleX of DatePicker - GTK's driver has no path for it yet
 DatePicker.scaleY: cannot read scaleY of DatePicker - GTK's driver has no path for it yet
+DatePicker.shadow: not realized
 DatePicker.style: ✅
+DatePicker.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+DatePicker.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+DatePicker.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+DatePicker.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+DatePicker.transition: cannot read transition of DatePicker - GTK's driver has no path for it yet
 DatePicker.translationX: cannot read translationX of DatePicker - GTK's driver has no path for it yet
 DatePicker.translationY: cannot read translationY of DatePicker - GTK's driver has no path for it yet
 DatePicker.unfocus: ✅
+DatePicker.verticalAlignmentDefault: not realized
 DatePicker.width: ✅
 DatePicker.zIndex: not realized
+Ellipse.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Ellipse.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Ellipse - GTK's driver has no path for it yet
 Ellipse.accessibilityHint: cannot read accessibilityHint of Ellipse - GTK's driver has no path for it yet
 Ellipse.accessibilityLabel: cannot read accessibilityLabel of Ellipse - GTK's driver has no path for it yet
+Ellipse.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Ellipse.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Ellipse - GTK's driver has no path for it yet
 Ellipse.background: not realized
+Ellipse.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Ellipse.blur: not realized
+Ellipse.compositingGroup: not realized
+Ellipse.contentTransition: – GTK swaps a label's words with no transition yet.
+Ellipse.drawingGroup: not realized
 Ellipse.focus: – Ellipse takes no keyboard focus here: it refuses it, and nothing is heard
 Ellipse.frame: ✅
 Ellipse.frameChanged: ✅
 Ellipse.height: ✅
+Ellipse.hint: cannot read hint of Ellipse - GTK's driver has no path for it yet
+Ellipse.hintKey: not realized
+Ellipse.horizontalAlignmentDefault: not realized
 Ellipse.ignoresInput: not realized
 Ellipse.isAccessibilityHidden: cannot read isAccessibilityHidden of Ellipse - GTK's driver has no path for it yet
 Ellipse.isEnabled: ✅
 Ellipse.isFocusedChanged: – Ellipse takes no keyboard focus here: it refuses it, and nothing is heard
+Ellipse.isFrameContent: not realized
+Ellipse.isGeometryReader: not realized
+Ellipse.isLayoutDecoration: not realized
 Ellipse.isVisible: ✅
 Ellipse.layoutDirection: cannot read layoutDirection of Ellipse - GTK's driver has no path for it yet
+Ellipse.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Ellipse.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Ellipse.maximumHeight: ✅
 Ellipse.maximumWidth: ✅
 Ellipse.minimumHeight: ✅
@@ -262,30 +438,53 @@ Ellipse.pivotY: cannot read pivotY of Ellipse - GTK's driver has no path for it 
 Ellipse.rotation: cannot read rotation of Ellipse - GTK's driver has no path for it yet
 Ellipse.rotationX: cannot read rotationX of Ellipse - GTK's driver has no path for it yet
 Ellipse.rotationY: cannot read rotationY of Ellipse - GTK's driver has no path for it yet
+Ellipse.safeAreaInsetEdge: not realized
 Ellipse.scale: cannot read scale of Ellipse - GTK's driver has no path for it yet
 Ellipse.scaleX: cannot read scaleX of Ellipse - GTK's driver has no path for it yet
 Ellipse.scaleY: cannot read scaleY of Ellipse - GTK's driver has no path for it yet
+Ellipse.shadow: not realized
 Ellipse.style: ✅
+Ellipse.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Ellipse.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Ellipse.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Ellipse.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Ellipse.transition: cannot read transition of Ellipse - GTK's driver has no path for it yet
 Ellipse.translationX: cannot read translationX of Ellipse - GTK's driver has no path for it yet
 Ellipse.translationY: cannot read translationY of Ellipse - GTK's driver has no path for it yet
 Ellipse.unfocus: – Ellipse takes no keyboard focus here: it refuses it, and nothing is heard
+Ellipse.verticalAlignmentDefault: not realized
 Ellipse.width: ✅
 Ellipse.zIndex: not realized
+Grid.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Grid.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Grid - GTK's driver has no path for it yet
 Grid.accessibilityHint: cannot read accessibilityHint of Grid - GTK's driver has no path for it yet
 Grid.accessibilityLabel: cannot read accessibilityLabel of Grid - GTK's driver has no path for it yet
+Grid.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Grid.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Grid - GTK's driver has no path for it yet
 Grid.background: cannot read background of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its background; its drawing proves it
+Grid.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Grid.blur: not realized
+Grid.compositingGroup: not realized
+Grid.contentTransition: – GTK swaps a label's words with no transition yet.
+Grid.drawingGroup: not realized
 Grid.focus: – Grid takes no keyboard focus here: it refuses it, and nothing is heard
 Grid.frame: ✅
 Grid.frameChanged: ✅
 Grid.height: ✅
+Grid.hint: cannot read hint of Grid - GTK's driver has no path for it yet
+Grid.hintKey: not realized
+Grid.horizontalAlignmentDefault: not realized
 Grid.ignoresInput: cannot read what reaches Grid - GTK's driver has no path for it yet
 Grid.isAccessibilityHidden: cannot read isAccessibilityHidden of Grid - GTK's driver has no path for it yet
 Grid.isEnabled: ✅
 Grid.isFocusedChanged: – Grid takes no keyboard focus here: it refuses it, and nothing is heard
+Grid.isFrameContent: not realized
+Grid.isGeometryReader: not realized
+Grid.isLayoutDecoration: not realized
 Grid.isVisible: ✅
 Grid.layoutDirection: cannot read layoutDirection of Grid - GTK's driver has no path for it yet
+Grid.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Grid.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Grid.maximumHeight: ✅
 Grid.maximumWidth: ✅
 Grid.minimumHeight: ✅
@@ -296,30 +495,53 @@ Grid.pivotY: cannot read pivotY of Grid - GTK's driver has no path for it yet
 Grid.rotation: cannot read rotation of Grid - GTK's driver has no path for it yet
 Grid.rotationX: cannot read rotationX of Grid - GTK's driver has no path for it yet
 Grid.rotationY: cannot read rotationY of Grid - GTK's driver has no path for it yet
+Grid.safeAreaInsetEdge: not realized
 Grid.scale: cannot read scale of Grid - GTK's driver has no path for it yet
 Grid.scaleX: cannot read scaleX of Grid - GTK's driver has no path for it yet
 Grid.scaleY: cannot read scaleY of Grid - GTK's driver has no path for it yet
+Grid.shadow: not realized
 Grid.style: ✅
+Grid.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Grid.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Grid.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Grid.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Grid.transition: cannot read transition of Grid - GTK's driver has no path for it yet
 Grid.translationX: cannot read translationX of Grid - GTK's driver has no path for it yet
 Grid.translationY: cannot read translationY of Grid - GTK's driver has no path for it yet
 Grid.unfocus: – Grid takes no keyboard focus here: it refuses it, and nothing is heard
+Grid.verticalAlignmentDefault: not realized
 Grid.width: ✅
 Grid.zIndex: not realized
+GridRow.accessibilityChildBehavior: not realized
 GridRow.accessibilityHeadingLevel: not realized
 GridRow.accessibilityHint: not realized
 GridRow.accessibilityLabel: not realized
+GridRow.accessibilityTraits: not realized
 GridRow.automationExcludedWithChildren: not realized
 GridRow.background: not realized
+GridRow.blendMode: not realized
+GridRow.blur: not realized
+GridRow.compositingGroup: not realized
+GridRow.contentTransition: not realized
+GridRow.drawingGroup: not realized
 GridRow.focus: not realized
 GridRow.frame: not realized
 GridRow.frameChanged: not realized
 GridRow.height: not realized
+GridRow.hint: not realized
+GridRow.hintKey: not realized
+GridRow.horizontalAlignmentDefault: not realized
 GridRow.ignoresInput: not realized
 GridRow.isAccessibilityHidden: not realized
 GridRow.isEnabled: not realized
 GridRow.isFocusedChanged: not realized
+GridRow.isFrameContent: not realized
+GridRow.isGeometryReader: not realized
+GridRow.isLayoutDecoration: not realized
 GridRow.isVisible: not realized
 GridRow.layoutDirection: not realized
+GridRow.matchedGeometry: not realized
+GridRow.matchedGeometrySource: not realized
 GridRow.maximumHeight: not realized
 GridRow.maximumWidth: not realized
 GridRow.minimumHeight: not realized
@@ -330,30 +552,53 @@ GridRow.pivotY: not realized
 GridRow.rotation: not realized
 GridRow.rotationX: not realized
 GridRow.rotationY: not realized
+GridRow.safeAreaInsetEdge: not realized
 GridRow.scale: not realized
 GridRow.scaleX: not realized
 GridRow.scaleY: not realized
+GridRow.shadow: not realized
 GridRow.style: not realized
+GridRow.symbolEffect: not realized
+GridRow.symbolEffectActive: not realized
+GridRow.symbolEffectOptions: not realized
+GridRow.symbolEffectValue: not realized
+GridRow.transition: not realized
 GridRow.translationX: not realized
 GridRow.translationY: not realized
 GridRow.unfocus: not realized
+GridRow.verticalAlignmentDefault: not realized
 GridRow.width: not realized
 GridRow.zIndex: not realized
+HStack.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 HStack.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of HStack - GTK's driver has no path for it yet
 HStack.accessibilityHint: cannot read accessibilityHint of HStack - GTK's driver has no path for it yet
 HStack.accessibilityLabel: cannot read accessibilityLabel of HStack - GTK's driver has no path for it yet
+HStack.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 HStack.automationExcludedWithChildren: cannot read automationExcludedWithChildren of HStack - GTK's driver has no path for it yet
 HStack.background: cannot read background of HStack - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its background; its drawing proves it
+HStack.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+HStack.blur: not realized
+HStack.compositingGroup: not realized
+HStack.contentTransition: – GTK swaps a label's words with no transition yet.
+HStack.drawingGroup: not realized
 HStack.focus: – HStack takes no keyboard focus here: it refuses it, and nothing is heard
 HStack.frame: ✅
 HStack.frameChanged: ✅
 HStack.height: ✅
+HStack.hint: cannot read hint of HStack - GTK's driver has no path for it yet
+HStack.hintKey: not realized
+HStack.horizontalAlignmentDefault: not realized
 HStack.ignoresInput: cannot read what reaches HStack - GTK's driver has no path for it yet
 HStack.isAccessibilityHidden: cannot read isAccessibilityHidden of HStack - GTK's driver has no path for it yet
 HStack.isEnabled: ✅
 HStack.isFocusedChanged: – HStack takes no keyboard focus here: it refuses it, and nothing is heard
+HStack.isFrameContent: not realized
+HStack.isGeometryReader: not realized
+HStack.isLayoutDecoration: not realized
 HStack.isVisible: ✅
 HStack.layoutDirection: cannot read layoutDirection of HStack - GTK's driver has no path for it yet
+HStack.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+HStack.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 HStack.maximumHeight: ✅
 HStack.maximumWidth: ✅
 HStack.minimumHeight: ✅
@@ -364,30 +609,53 @@ HStack.pivotY: cannot read pivotY of HStack - GTK's driver has no path for it ye
 HStack.rotation: cannot read rotation of HStack - GTK's driver has no path for it yet
 HStack.rotationX: cannot read rotationX of HStack - GTK's driver has no path for it yet
 HStack.rotationY: cannot read rotationY of HStack - GTK's driver has no path for it yet
+HStack.safeAreaInsetEdge: not realized
 HStack.scale: cannot read scale of HStack - GTK's driver has no path for it yet
 HStack.scaleX: cannot read scaleX of HStack - GTK's driver has no path for it yet
 HStack.scaleY: cannot read scaleY of HStack - GTK's driver has no path for it yet
+HStack.shadow: not realized
 HStack.style: ✅
+HStack.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+HStack.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+HStack.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+HStack.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+HStack.transition: cannot read transition of HStack - GTK's driver has no path for it yet
 HStack.translationX: cannot read translationX of HStack - GTK's driver has no path for it yet
 HStack.translationY: cannot read translationY of HStack - GTK's driver has no path for it yet
 HStack.unfocus: – HStack takes no keyboard focus here: it refuses it, and nothing is heard
+HStack.verticalAlignmentDefault: not realized
 HStack.width: ✅
 HStack.zIndex: not realized
+Image.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Image.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Image - GTK's driver has no path for it yet
 Image.accessibilityHint: cannot read accessibilityHint of Image - GTK's driver has no path for it yet
 Image.accessibilityLabel: cannot read accessibilityLabel of Image - GTK's driver has no path for it yet
+Image.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Image.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Image - GTK's driver has no path for it yet
 Image.background: not realized
+Image.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Image.blur: not realized
+Image.compositingGroup: not realized
+Image.contentTransition: – GTK swaps a label's words with no transition yet.
+Image.drawingGroup: not realized
 Image.focus: – Image takes no keyboard focus here: it refuses it, and nothing is heard
 Image.frame: ✅
 Image.frameChanged: ✅
 Image.height: ✅
+Image.hint: cannot read hint of Image - GTK's driver has no path for it yet
+Image.hintKey: not realized
+Image.horizontalAlignmentDefault: not realized
 Image.ignoresInput: not realized
 Image.isAccessibilityHidden: cannot read isAccessibilityHidden of Image - GTK's driver has no path for it yet
 Image.isEnabled: ✅
 Image.isFocusedChanged: – Image takes no keyboard focus here: it refuses it, and nothing is heard
+Image.isFrameContent: not realized
+Image.isGeometryReader: not realized
+Image.isLayoutDecoration: not realized
 Image.isVisible: ✅
 Image.layoutDirection: cannot read layoutDirection of Image - GTK's driver has no path for it yet
+Image.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Image.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Image.maximumHeight: ✅
 Image.maximumWidth: ✅
 Image.minimumHeight: ✅
@@ -398,166 +666,281 @@ Image.pivotY: cannot read pivotY of Image - GTK's driver has no path for it yet
 Image.rotation: cannot read rotation of Image - GTK's driver has no path for it yet
 Image.rotationX: cannot read rotationX of Image - GTK's driver has no path for it yet
 Image.rotationY: cannot read rotationY of Image - GTK's driver has no path for it yet
+Image.safeAreaInsetEdge: not realized
 Image.scale: cannot read scale of Image - GTK's driver has no path for it yet
 Image.scaleX: cannot read scaleX of Image - GTK's driver has no path for it yet
 Image.scaleY: cannot read scaleY of Image - GTK's driver has no path for it yet
+Image.shadow: not realized
 Image.style: ✅
+Image.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Image.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Image.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Image.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Image.transition: cannot read transition of Image - GTK's driver has no path for it yet
 Image.translationX: cannot read translationX of Image - GTK's driver has no path for it yet
 Image.translationY: cannot read translationY of Image - GTK's driver has no path for it yet
 Image.unfocus: – Image takes no keyboard focus here: it refuses it, and nothing is heard
+Image.verticalAlignmentDefault: not realized
 Image.width: ✅
 Image.zIndex: not realized
-LazyHGrid.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.accessibilityHint: cannot read accessibilityHint of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.accessibilityLabel: cannot read accessibilityLabel of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.automationExcludedWithChildren: cannot read automationExcludedWithChildren of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.background: cannot read background of LazyHGrid - GTK's driver has no path for it yet
+LazyHGrid.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
+LazyHGrid.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Grid - GTK's driver has no path for it yet
+LazyHGrid.accessibilityHint: cannot read accessibilityHint of Grid - GTK's driver has no path for it yet
+LazyHGrid.accessibilityLabel: cannot read accessibilityLabel of Grid - GTK's driver has no path for it yet
+LazyHGrid.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
+LazyHGrid.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Grid - GTK's driver has no path for it yet
+LazyHGrid.background: cannot read background of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its background; its drawing proves it
+LazyHGrid.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+LazyHGrid.blur: not realized
+LazyHGrid.compositingGroup: not realized
+LazyHGrid.contentTransition: – GTK swaps a label's words with no transition yet.
+LazyHGrid.drawingGroup: not realized
 LazyHGrid.focus: – LazyHGrid takes no keyboard focus here: it refuses it, and nothing is heard
 LazyHGrid.frame: ✅
 LazyHGrid.frameChanged: ✅
 LazyHGrid.height: ✅
-LazyHGrid.ignoresInput: cannot read what reaches LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.isAccessibilityHidden: cannot read isAccessibilityHidden of LazyHGrid - GTK's driver has no path for it yet
+LazyHGrid.hint: cannot read hint of Grid - GTK's driver has no path for it yet
+LazyHGrid.hintKey: not realized
+LazyHGrid.horizontalAlignmentDefault: not realized
+LazyHGrid.ignoresInput: cannot read what reaches Grid - GTK's driver has no path for it yet
+LazyHGrid.isAccessibilityHidden: cannot read isAccessibilityHidden of Grid - GTK's driver has no path for it yet
 LazyHGrid.isEnabled: ✅
 LazyHGrid.isFocusedChanged: – LazyHGrid takes no keyboard focus here: it refuses it, and nothing is heard
+LazyHGrid.isFrameContent: not realized
+LazyHGrid.isGeometryReader: not realized
+LazyHGrid.isLayoutDecoration: not realized
 LazyHGrid.isVisible: ✅
-LazyHGrid.layoutDirection: cannot read layoutDirection of LazyHGrid - GTK's driver has no path for it yet
+LazyHGrid.layoutDirection: cannot read layoutDirection of Grid - GTK's driver has no path for it yet
+LazyHGrid.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+LazyHGrid.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 LazyHGrid.maximumHeight: ✅
 LazyHGrid.maximumWidth: ✅
 LazyHGrid.minimumHeight: ✅
 LazyHGrid.minimumWidth: ✅
 LazyHGrid.opacity: ✅
-LazyHGrid.pivotX: cannot read pivotX of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.pivotY: cannot read pivotY of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.rotation: cannot read rotation of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.rotationX: cannot read rotationX of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.rotationY: cannot read rotationY of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.scale: cannot read scale of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.scaleX: cannot read scaleX of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.scaleY: cannot read scaleY of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.style: ✅
-LazyHGrid.translationX: cannot read translationX of LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.translationY: cannot read translationY of LazyHGrid - GTK's driver has no path for it yet
+LazyHGrid.pivotX: cannot read pivotX of Grid - GTK's driver has no path for it yet
+LazyHGrid.pivotY: cannot read pivotY of Grid - GTK's driver has no path for it yet
+LazyHGrid.rotation: cannot read rotation of Grid - GTK's driver has no path for it yet
+LazyHGrid.rotationX: cannot read rotationX of Grid - GTK's driver has no path for it yet
+LazyHGrid.rotationY: cannot read rotationY of Grid - GTK's driver has no path for it yet
+LazyHGrid.safeAreaInsetEdge: not realized
+LazyHGrid.scale: cannot read scale of Grid - GTK's driver has no path for it yet
+LazyHGrid.scaleX: cannot read scaleX of Grid - GTK's driver has no path for it yet
+LazyHGrid.scaleY: cannot read scaleY of Grid - GTK's driver has no path for it yet
+LazyHGrid.shadow: not realized
+LazyHGrid.style: ❌ 0.5 expected, 1.0 came - the style's opacity
+LazyHGrid.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+LazyHGrid.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+LazyHGrid.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+LazyHGrid.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+LazyHGrid.transition: cannot read transition of Grid - GTK's driver has no path for it yet
+LazyHGrid.translationX: cannot read translationX of Grid - GTK's driver has no path for it yet
+LazyHGrid.translationY: cannot read translationY of Grid - GTK's driver has no path for it yet
 LazyHGrid.unfocus: – LazyHGrid takes no keyboard focus here: it refuses it, and nothing is heard
+LazyHGrid.verticalAlignmentDefault: not realized
 LazyHGrid.width: ✅
 LazyHGrid.zIndex: not realized
-LazyHStack.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.accessibilityHint: cannot read accessibilityHint of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.accessibilityLabel: cannot read accessibilityLabel of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.automationExcludedWithChildren: cannot read automationExcludedWithChildren of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.background: cannot read background of LazyHStack - GTK's driver has no path for it yet
+LazyHStack.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
+LazyHStack.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Grid - GTK's driver has no path for it yet
+LazyHStack.accessibilityHint: cannot read accessibilityHint of Grid - GTK's driver has no path for it yet
+LazyHStack.accessibilityLabel: cannot read accessibilityLabel of Grid - GTK's driver has no path for it yet
+LazyHStack.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
+LazyHStack.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Grid - GTK's driver has no path for it yet
+LazyHStack.background: cannot read background of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its background; its drawing proves it
+LazyHStack.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+LazyHStack.blur: not realized
+LazyHStack.compositingGroup: not realized
+LazyHStack.contentTransition: – GTK swaps a label's words with no transition yet.
+LazyHStack.drawingGroup: not realized
 LazyHStack.focus: – LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard
 LazyHStack.frame: ✅
 LazyHStack.frameChanged: ✅
 LazyHStack.height: ✅
-LazyHStack.ignoresInput: cannot read what reaches LazyHStack - GTK's driver has no path for it yet
-LazyHStack.isAccessibilityHidden: cannot read isAccessibilityHidden of LazyHStack - GTK's driver has no path for it yet
+LazyHStack.hint: cannot read hint of Grid - GTK's driver has no path for it yet
+LazyHStack.hintKey: not realized
+LazyHStack.horizontalAlignmentDefault: not realized
+LazyHStack.ignoresInput: cannot read what reaches Grid - GTK's driver has no path for it yet
+LazyHStack.isAccessibilityHidden: cannot read isAccessibilityHidden of Grid - GTK's driver has no path for it yet
 LazyHStack.isEnabled: ✅
 LazyHStack.isFocusedChanged: – LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard
+LazyHStack.isFrameContent: not realized
+LazyHStack.isGeometryReader: not realized
+LazyHStack.isLayoutDecoration: not realized
 LazyHStack.isVisible: ✅
-LazyHStack.layoutDirection: cannot read layoutDirection of LazyHStack - GTK's driver has no path for it yet
+LazyHStack.layoutDirection: cannot read layoutDirection of Grid - GTK's driver has no path for it yet
+LazyHStack.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+LazyHStack.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 LazyHStack.maximumHeight: ✅
 LazyHStack.maximumWidth: ✅
 LazyHStack.minimumHeight: ✅
 LazyHStack.minimumWidth: ✅
 LazyHStack.opacity: ✅
-LazyHStack.pivotX: cannot read pivotX of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.pivotY: cannot read pivotY of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.rotation: cannot read rotation of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.rotationX: cannot read rotationX of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.rotationY: cannot read rotationY of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.scale: cannot read scale of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.scaleX: cannot read scaleX of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.scaleY: cannot read scaleY of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.style: ✅
-LazyHStack.translationX: cannot read translationX of LazyHStack - GTK's driver has no path for it yet
-LazyHStack.translationY: cannot read translationY of LazyHStack - GTK's driver has no path for it yet
+LazyHStack.pivotX: cannot read pivotX of Grid - GTK's driver has no path for it yet
+LazyHStack.pivotY: cannot read pivotY of Grid - GTK's driver has no path for it yet
+LazyHStack.rotation: cannot read rotation of Grid - GTK's driver has no path for it yet
+LazyHStack.rotationX: cannot read rotationX of Grid - GTK's driver has no path for it yet
+LazyHStack.rotationY: cannot read rotationY of Grid - GTK's driver has no path for it yet
+LazyHStack.safeAreaInsetEdge: not realized
+LazyHStack.scale: cannot read scale of Grid - GTK's driver has no path for it yet
+LazyHStack.scaleX: cannot read scaleX of Grid - GTK's driver has no path for it yet
+LazyHStack.scaleY: cannot read scaleY of Grid - GTK's driver has no path for it yet
+LazyHStack.shadow: not realized
+LazyHStack.style: ❌ 0.5 expected, 1.0 came - the style's opacity
+LazyHStack.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+LazyHStack.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+LazyHStack.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+LazyHStack.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+LazyHStack.transition: cannot read transition of Grid - GTK's driver has no path for it yet
+LazyHStack.translationX: cannot read translationX of Grid - GTK's driver has no path for it yet
+LazyHStack.translationY: cannot read translationY of Grid - GTK's driver has no path for it yet
 LazyHStack.unfocus: – LazyHStack takes no keyboard focus here: it refuses it, and nothing is heard
+LazyHStack.verticalAlignmentDefault: not realized
 LazyHStack.width: ✅
 LazyHStack.zIndex: not realized
-LazyVGrid.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.accessibilityHint: cannot read accessibilityHint of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.accessibilityLabel: cannot read accessibilityLabel of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.automationExcludedWithChildren: cannot read automationExcludedWithChildren of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.background: cannot read background of LazyVGrid - GTK's driver has no path for it yet
+LazyVGrid.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
+LazyVGrid.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Grid - GTK's driver has no path for it yet
+LazyVGrid.accessibilityHint: cannot read accessibilityHint of Grid - GTK's driver has no path for it yet
+LazyVGrid.accessibilityLabel: cannot read accessibilityLabel of Grid - GTK's driver has no path for it yet
+LazyVGrid.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
+LazyVGrid.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Grid - GTK's driver has no path for it yet
+LazyVGrid.background: cannot read background of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its background; its drawing proves it
+LazyVGrid.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+LazyVGrid.blur: not realized
+LazyVGrid.compositingGroup: not realized
+LazyVGrid.contentTransition: – GTK swaps a label's words with no transition yet.
+LazyVGrid.drawingGroup: not realized
 LazyVGrid.focus: – LazyVGrid takes no keyboard focus here: it refuses it, and nothing is heard
 LazyVGrid.frame: ✅
 LazyVGrid.frameChanged: ✅
 LazyVGrid.height: ✅
-LazyVGrid.ignoresInput: cannot read what reaches LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.isAccessibilityHidden: cannot read isAccessibilityHidden of LazyVGrid - GTK's driver has no path for it yet
+LazyVGrid.hint: cannot read hint of Grid - GTK's driver has no path for it yet
+LazyVGrid.hintKey: not realized
+LazyVGrid.horizontalAlignmentDefault: not realized
+LazyVGrid.ignoresInput: cannot read what reaches Grid - GTK's driver has no path for it yet
+LazyVGrid.isAccessibilityHidden: cannot read isAccessibilityHidden of Grid - GTK's driver has no path for it yet
 LazyVGrid.isEnabled: ✅
 LazyVGrid.isFocusedChanged: – LazyVGrid takes no keyboard focus here: it refuses it, and nothing is heard
+LazyVGrid.isFrameContent: not realized
+LazyVGrid.isGeometryReader: not realized
+LazyVGrid.isLayoutDecoration: not realized
 LazyVGrid.isVisible: ✅
-LazyVGrid.layoutDirection: cannot read layoutDirection of LazyVGrid - GTK's driver has no path for it yet
+LazyVGrid.layoutDirection: cannot read layoutDirection of Grid - GTK's driver has no path for it yet
+LazyVGrid.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+LazyVGrid.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 LazyVGrid.maximumHeight: ✅
 LazyVGrid.maximumWidth: ✅
 LazyVGrid.minimumHeight: ✅
 LazyVGrid.minimumWidth: ✅
 LazyVGrid.opacity: ✅
-LazyVGrid.pivotX: cannot read pivotX of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.pivotY: cannot read pivotY of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.rotation: cannot read rotation of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.rotationX: cannot read rotationX of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.rotationY: cannot read rotationY of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.scale: cannot read scale of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.scaleX: cannot read scaleX of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.scaleY: cannot read scaleY of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.style: ✅
-LazyVGrid.translationX: cannot read translationX of LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.translationY: cannot read translationY of LazyVGrid - GTK's driver has no path for it yet
+LazyVGrid.pivotX: cannot read pivotX of Grid - GTK's driver has no path for it yet
+LazyVGrid.pivotY: cannot read pivotY of Grid - GTK's driver has no path for it yet
+LazyVGrid.rotation: cannot read rotation of Grid - GTK's driver has no path for it yet
+LazyVGrid.rotationX: cannot read rotationX of Grid - GTK's driver has no path for it yet
+LazyVGrid.rotationY: cannot read rotationY of Grid - GTK's driver has no path for it yet
+LazyVGrid.safeAreaInsetEdge: not realized
+LazyVGrid.scale: cannot read scale of Grid - GTK's driver has no path for it yet
+LazyVGrid.scaleX: cannot read scaleX of Grid - GTK's driver has no path for it yet
+LazyVGrid.scaleY: cannot read scaleY of Grid - GTK's driver has no path for it yet
+LazyVGrid.shadow: not realized
+LazyVGrid.style: ❌ 0.5 expected, 1.0 came - the style's opacity
+LazyVGrid.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+LazyVGrid.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+LazyVGrid.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+LazyVGrid.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+LazyVGrid.transition: cannot read transition of Grid - GTK's driver has no path for it yet
+LazyVGrid.translationX: cannot read translationX of Grid - GTK's driver has no path for it yet
+LazyVGrid.translationY: cannot read translationY of Grid - GTK's driver has no path for it yet
 LazyVGrid.unfocus: – LazyVGrid takes no keyboard focus here: it refuses it, and nothing is heard
+LazyVGrid.verticalAlignmentDefault: not realized
 LazyVGrid.width: ✅
 LazyVGrid.zIndex: not realized
-LazyVStack.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.accessibilityHint: cannot read accessibilityHint of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.accessibilityLabel: cannot read accessibilityLabel of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.automationExcludedWithChildren: cannot read automationExcludedWithChildren of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.background: cannot read background of LazyVStack - GTK's driver has no path for it yet
+LazyVStack.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
+LazyVStack.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Grid - GTK's driver has no path for it yet
+LazyVStack.accessibilityHint: cannot read accessibilityHint of Grid - GTK's driver has no path for it yet
+LazyVStack.accessibilityLabel: cannot read accessibilityLabel of Grid - GTK's driver has no path for it yet
+LazyVStack.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
+LazyVStack.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Grid - GTK's driver has no path for it yet
+LazyVStack.background: cannot read background of Grid - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its background; its drawing proves it
+LazyVStack.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+LazyVStack.blur: not realized
+LazyVStack.compositingGroup: not realized
+LazyVStack.contentTransition: – GTK swaps a label's words with no transition yet.
+LazyVStack.drawingGroup: not realized
 LazyVStack.focus: – LazyVStack takes no keyboard focus here: it refuses it, and nothing is heard
 LazyVStack.frame: ✅
 LazyVStack.frameChanged: ✅
 LazyVStack.height: ✅
-LazyVStack.ignoresInput: cannot read what reaches LazyVStack - GTK's driver has no path for it yet
-LazyVStack.isAccessibilityHidden: cannot read isAccessibilityHidden of LazyVStack - GTK's driver has no path for it yet
+LazyVStack.hint: cannot read hint of Grid - GTK's driver has no path for it yet
+LazyVStack.hintKey: not realized
+LazyVStack.horizontalAlignmentDefault: not realized
+LazyVStack.ignoresInput: cannot read what reaches Grid - GTK's driver has no path for it yet
+LazyVStack.isAccessibilityHidden: cannot read isAccessibilityHidden of Grid - GTK's driver has no path for it yet
 LazyVStack.isEnabled: ✅
 LazyVStack.isFocusedChanged: – LazyVStack takes no keyboard focus here: it refuses it, and nothing is heard
+LazyVStack.isFrameContent: not realized
+LazyVStack.isGeometryReader: not realized
+LazyVStack.isLayoutDecoration: not realized
 LazyVStack.isVisible: ✅
-LazyVStack.layoutDirection: cannot read layoutDirection of LazyVStack - GTK's driver has no path for it yet
+LazyVStack.layoutDirection: cannot read layoutDirection of Grid - GTK's driver has no path for it yet
+LazyVStack.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+LazyVStack.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 LazyVStack.maximumHeight: ✅
 LazyVStack.maximumWidth: ✅
 LazyVStack.minimumHeight: ✅
 LazyVStack.minimumWidth: ✅
 LazyVStack.opacity: ✅
-LazyVStack.pivotX: cannot read pivotX of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.pivotY: cannot read pivotY of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.rotation: cannot read rotation of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.rotationX: cannot read rotationX of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.rotationY: cannot read rotationY of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.scale: cannot read scale of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.scaleX: cannot read scaleX of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.scaleY: cannot read scaleY of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.style: ✅
-LazyVStack.translationX: cannot read translationX of LazyVStack - GTK's driver has no path for it yet
-LazyVStack.translationY: cannot read translationY of LazyVStack - GTK's driver has no path for it yet
+LazyVStack.pivotX: cannot read pivotX of Grid - GTK's driver has no path for it yet
+LazyVStack.pivotY: cannot read pivotY of Grid - GTK's driver has no path for it yet
+LazyVStack.rotation: cannot read rotation of Grid - GTK's driver has no path for it yet
+LazyVStack.rotationX: cannot read rotationX of Grid - GTK's driver has no path for it yet
+LazyVStack.rotationY: cannot read rotationY of Grid - GTK's driver has no path for it yet
+LazyVStack.safeAreaInsetEdge: not realized
+LazyVStack.scale: cannot read scale of Grid - GTK's driver has no path for it yet
+LazyVStack.scaleX: cannot read scaleX of Grid - GTK's driver has no path for it yet
+LazyVStack.scaleY: cannot read scaleY of Grid - GTK's driver has no path for it yet
+LazyVStack.shadow: not realized
+LazyVStack.style: ❌ 0.5 expected, 1.0 came - the style's opacity
+LazyVStack.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+LazyVStack.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+LazyVStack.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+LazyVStack.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+LazyVStack.transition: cannot read transition of Grid - GTK's driver has no path for it yet
+LazyVStack.translationX: cannot read translationX of Grid - GTK's driver has no path for it yet
+LazyVStack.translationY: cannot read translationY of Grid - GTK's driver has no path for it yet
 LazyVStack.unfocus: – LazyVStack takes no keyboard focus here: it refuses it, and nothing is heard
+LazyVStack.verticalAlignmentDefault: not realized
 LazyVStack.width: ✅
 LazyVStack.zIndex: not realized
+Line.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Line.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Line - GTK's driver has no path for it yet
 Line.accessibilityHint: cannot read accessibilityHint of Line - GTK's driver has no path for it yet
 Line.accessibilityLabel: cannot read accessibilityLabel of Line - GTK's driver has no path for it yet
+Line.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Line.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Line - GTK's driver has no path for it yet
 Line.background: not realized
+Line.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Line.blur: not realized
+Line.compositingGroup: not realized
+Line.contentTransition: – GTK swaps a label's words with no transition yet.
+Line.drawingGroup: not realized
 Line.focus: – Line takes no keyboard focus here: it refuses it, and nothing is heard
 Line.frame: ✅
 Line.frameChanged: ✅
 Line.height: ✅
+Line.hint: cannot read hint of Line - GTK's driver has no path for it yet
+Line.hintKey: not realized
+Line.horizontalAlignmentDefault: not realized
 Line.ignoresInput: not realized
 Line.isAccessibilityHidden: cannot read isAccessibilityHidden of Line - GTK's driver has no path for it yet
 Line.isEnabled: ✅
 Line.isFocusedChanged: – Line takes no keyboard focus here: it refuses it, and nothing is heard
+Line.isFrameContent: not realized
+Line.isGeometryReader: not realized
+Line.isLayoutDecoration: not realized
 Line.isVisible: ✅
 Line.layoutDirection: cannot read layoutDirection of Line - GTK's driver has no path for it yet
+Line.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Line.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Line.maximumHeight: ✅
 Line.maximumWidth: ✅
 Line.minimumHeight: ✅
@@ -568,64 +951,110 @@ Line.pivotY: cannot read pivotY of Line - GTK's driver has no path for it yet
 Line.rotation: cannot read rotation of Line - GTK's driver has no path for it yet
 Line.rotationX: cannot read rotationX of Line - GTK's driver has no path for it yet
 Line.rotationY: cannot read rotationY of Line - GTK's driver has no path for it yet
+Line.safeAreaInsetEdge: not realized
 Line.scale: cannot read scale of Line - GTK's driver has no path for it yet
 Line.scaleX: cannot read scaleX of Line - GTK's driver has no path for it yet
 Line.scaleY: cannot read scaleY of Line - GTK's driver has no path for it yet
+Line.shadow: not realized
 Line.style: ✅
+Line.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Line.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Line.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Line.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Line.transition: cannot read transition of Line - GTK's driver has no path for it yet
 Line.translationX: cannot read translationX of Line - GTK's driver has no path for it yet
 Line.translationY: cannot read translationY of Line - GTK's driver has no path for it yet
 Line.unfocus: – Line takes no keyboard focus here: it refuses it, and nothing is heard
+Line.verticalAlignmentDefault: not realized
 Line.width: ✅
 Line.zIndex: not realized
-List.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of List - GTK's driver has no path for it yet
-List.accessibilityHint: cannot read accessibilityHint of List - GTK's driver has no path for it yet
-List.accessibilityLabel: cannot read accessibilityLabel of List - GTK's driver has no path for it yet
-List.automationExcludedWithChildren: cannot read automationExcludedWithChildren of List - GTK's driver has no path for it yet
+List.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
+List.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Grid - GTK's driver has no path for it yet
+List.accessibilityHint: cannot read accessibilityHint of Grid - GTK's driver has no path for it yet
+List.accessibilityLabel: cannot read accessibilityLabel of Grid - GTK's driver has no path for it yet
+List.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
+List.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Grid - GTK's driver has no path for it yet
 List.background: not realized
+List.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+List.blur: not realized
+List.compositingGroup: not realized
+List.contentTransition: – GTK swaps a label's words with no transition yet.
+List.drawingGroup: not realized
 List.focus: ✅
 List.frame: ✅
 List.frameChanged: ✅
 List.height: ✅
+List.hint: cannot read hint of Grid - GTK's driver has no path for it yet
+List.hintKey: not realized
+List.horizontalAlignmentDefault: not realized
 List.ignoresInput: not realized
-List.isAccessibilityHidden: cannot read isAccessibilityHidden of List - GTK's driver has no path for it yet
+List.isAccessibilityHidden: cannot read isAccessibilityHidden of Grid - GTK's driver has no path for it yet
 List.isEnabled: ✅
 List.isFocusedChanged: ✅
+List.isFrameContent: not realized
+List.isGeometryReader: not realized
+List.isLayoutDecoration: not realized
 List.isVisible: ✅
-List.layoutDirection: cannot read layoutDirection of List - GTK's driver has no path for it yet
+List.layoutDirection: cannot read layoutDirection of Grid - GTK's driver has no path for it yet
+List.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+List.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 List.maximumHeight: ✅
 List.maximumWidth: ✅
 List.minimumHeight: ✅
 List.minimumWidth: ✅
 List.opacity: ✅
-List.pivotX: cannot read pivotX of List - GTK's driver has no path for it yet
-List.pivotY: cannot read pivotY of List - GTK's driver has no path for it yet
-List.rotation: cannot read rotation of List - GTK's driver has no path for it yet
-List.rotationX: cannot read rotationX of List - GTK's driver has no path for it yet
-List.rotationY: cannot read rotationY of List - GTK's driver has no path for it yet
-List.scale: cannot read scale of List - GTK's driver has no path for it yet
-List.scaleX: cannot read scaleX of List - GTK's driver has no path for it yet
-List.scaleY: cannot read scaleY of List - GTK's driver has no path for it yet
+List.pivotX: cannot read pivotX of Grid - GTK's driver has no path for it yet
+List.pivotY: cannot read pivotY of Grid - GTK's driver has no path for it yet
+List.rotation: cannot read rotation of Grid - GTK's driver has no path for it yet
+List.rotationX: cannot read rotationX of Grid - GTK's driver has no path for it yet
+List.rotationY: cannot read rotationY of Grid - GTK's driver has no path for it yet
+List.safeAreaInsetEdge: not realized
+List.scale: cannot read scale of Grid - GTK's driver has no path for it yet
+List.scaleX: cannot read scaleX of Grid - GTK's driver has no path for it yet
+List.scaleY: cannot read scaleY of Grid - GTK's driver has no path for it yet
+List.shadow: not realized
 List.style: not realized
-List.translationX: cannot read translationX of List - GTK's driver has no path for it yet
-List.translationY: cannot read translationY of List - GTK's driver has no path for it yet
+List.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+List.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+List.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+List.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+List.transition: cannot read transition of Grid - GTK's driver has no path for it yet
+List.translationX: cannot read translationX of Grid - GTK's driver has no path for it yet
+List.translationY: cannot read translationY of Grid - GTK's driver has no path for it yet
 List.unfocus: ✅
+List.verticalAlignmentDefault: not realized
 List.width: ✅
 List.zIndex: not realized
+Map.accessibilityChildBehavior: not realized
 Map.accessibilityHeadingLevel: not realized
 Map.accessibilityHint: not realized
 Map.accessibilityLabel: not realized
+Map.accessibilityTraits: not realized
 Map.automationExcludedWithChildren: not realized
 Map.background: not realized
+Map.blendMode: not realized
+Map.blur: not realized
+Map.compositingGroup: not realized
+Map.contentTransition: not realized
+Map.drawingGroup: not realized
 Map.focus: not realized
 Map.frame: not realized
 Map.frameChanged: not realized
 Map.height: not realized
+Map.hint: not realized
+Map.hintKey: not realized
+Map.horizontalAlignmentDefault: not realized
 Map.ignoresInput: not realized
 Map.isAccessibilityHidden: not realized
 Map.isEnabled: not realized
 Map.isFocusedChanged: not realized
+Map.isFrameContent: not realized
+Map.isGeometryReader: not realized
+Map.isLayoutDecoration: not realized
 Map.isVisible: not realized
 Map.layoutDirection: not realized
+Map.matchedGeometry: not realized
+Map.matchedGeometrySource: not realized
 Map.maximumHeight: not realized
 Map.maximumWidth: not realized
 Map.minimumHeight: not realized
@@ -636,30 +1065,53 @@ Map.pivotY: not realized
 Map.rotation: not realized
 Map.rotationX: not realized
 Map.rotationY: not realized
+Map.safeAreaInsetEdge: not realized
 Map.scale: not realized
 Map.scaleX: not realized
 Map.scaleY: not realized
+Map.shadow: not realized
 Map.style: not realized
+Map.symbolEffect: not realized
+Map.symbolEffectActive: not realized
+Map.symbolEffectOptions: not realized
+Map.symbolEffectValue: not realized
+Map.transition: not realized
 Map.translationX: not realized
 Map.translationY: not realized
 Map.unfocus: not realized
+Map.verticalAlignmentDefault: not realized
 Map.width: not realized
 Map.zIndex: not realized
+Masked.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Masked.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Masked - GTK's driver has no path for it yet
 Masked.accessibilityHint: cannot read accessibilityHint of Masked - GTK's driver has no path for it yet
 Masked.accessibilityLabel: cannot read accessibilityLabel of Masked - GTK's driver has no path for it yet
+Masked.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Masked.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Masked - GTK's driver has no path for it yet
 Masked.background: cannot read background of Masked - GTK's driver has no path for it yet
+Masked.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Masked.blur: not realized
+Masked.compositingGroup: not realized
+Masked.contentTransition: – GTK swaps a label's words with no transition yet.
+Masked.drawingGroup: not realized
 Masked.focus: – Masked takes no keyboard focus here: it refuses it, and nothing is heard
 Masked.frame: ✅
 Masked.frameChanged: ✅
 Masked.height: ✅
+Masked.hint: cannot read hint of Masked - GTK's driver has no path for it yet
+Masked.hintKey: not realized
+Masked.horizontalAlignmentDefault: not realized
 Masked.ignoresInput: cannot read what reaches Masked - GTK's driver has no path for it yet
 Masked.isAccessibilityHidden: cannot read isAccessibilityHidden of Masked - GTK's driver has no path for it yet
 Masked.isEnabled: ✅
 Masked.isFocusedChanged: – Masked takes no keyboard focus here: it refuses it, and nothing is heard
+Masked.isFrameContent: not realized
+Masked.isGeometryReader: not realized
+Masked.isLayoutDecoration: not realized
 Masked.isVisible: ✅
 Masked.layoutDirection: cannot read layoutDirection of Masked - GTK's driver has no path for it yet
+Masked.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Masked.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Masked.maximumHeight: ✅
 Masked.maximumWidth: ✅
 Masked.minimumHeight: ✅
@@ -670,30 +1122,53 @@ Masked.pivotY: cannot read pivotY of Masked - GTK's driver has no path for it ye
 Masked.rotation: cannot read rotation of Masked - GTK's driver has no path for it yet
 Masked.rotationX: cannot read rotationX of Masked - GTK's driver has no path for it yet
 Masked.rotationY: cannot read rotationY of Masked - GTK's driver has no path for it yet
+Masked.safeAreaInsetEdge: not realized
 Masked.scale: cannot read scale of Masked - GTK's driver has no path for it yet
 Masked.scaleX: cannot read scaleX of Masked - GTK's driver has no path for it yet
 Masked.scaleY: cannot read scaleY of Masked - GTK's driver has no path for it yet
+Masked.shadow: not realized
 Masked.style: ✅
+Masked.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Masked.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Masked.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Masked.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Masked.transition: cannot read transition of Masked - GTK's driver has no path for it yet
 Masked.translationX: cannot read translationX of Masked - GTK's driver has no path for it yet
 Masked.translationY: cannot read translationY of Masked - GTK's driver has no path for it yet
 Masked.unfocus: – Masked takes no keyboard focus here: it refuses it, and nothing is heard
+Masked.verticalAlignmentDefault: not realized
 Masked.width: ✅
 Masked.zIndex: not realized
+MenuButton.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 MenuButton.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of MenuButton - GTK's driver has no path for it yet
 MenuButton.accessibilityHint: cannot read accessibilityHint of MenuButton - GTK's driver has no path for it yet
 MenuButton.accessibilityLabel: cannot read accessibilityLabel of MenuButton - GTK's driver has no path for it yet
+MenuButton.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 MenuButton.automationExcludedWithChildren: cannot read automationExcludedWithChildren of MenuButton - GTK's driver has no path for it yet
 MenuButton.background: not realized
+MenuButton.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+MenuButton.blur: not realized
+MenuButton.compositingGroup: not realized
+MenuButton.contentTransition: – GTK swaps a label's words with no transition yet.
+MenuButton.drawingGroup: not realized
 MenuButton.focus: ✅
 MenuButton.frame: ✅
 MenuButton.frameChanged: ✅
 MenuButton.height: ✅
+MenuButton.hint: cannot read hint of MenuButton - GTK's driver has no path for it yet
+MenuButton.hintKey: not realized
+MenuButton.horizontalAlignmentDefault: not realized
 MenuButton.ignoresInput: not realized
 MenuButton.isAccessibilityHidden: cannot read isAccessibilityHidden of MenuButton - GTK's driver has no path for it yet
 MenuButton.isEnabled: ✅
 MenuButton.isFocusedChanged: ✅
+MenuButton.isFrameContent: not realized
+MenuButton.isGeometryReader: not realized
+MenuButton.isLayoutDecoration: not realized
 MenuButton.isVisible: ✅
 MenuButton.layoutDirection: cannot read layoutDirection of MenuButton - GTK's driver has no path for it yet
+MenuButton.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+MenuButton.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 MenuButton.maximumHeight: ✅
 MenuButton.maximumWidth: ✅
 MenuButton.minimumHeight: ✅
@@ -704,30 +1179,53 @@ MenuButton.pivotY: cannot read pivotY of MenuButton - GTK's driver has no path f
 MenuButton.rotation: cannot read rotation of MenuButton - GTK's driver has no path for it yet
 MenuButton.rotationX: cannot read rotationX of MenuButton - GTK's driver has no path for it yet
 MenuButton.rotationY: cannot read rotationY of MenuButton - GTK's driver has no path for it yet
+MenuButton.safeAreaInsetEdge: not realized
 MenuButton.scale: cannot read scale of MenuButton - GTK's driver has no path for it yet
 MenuButton.scaleX: cannot read scaleX of MenuButton - GTK's driver has no path for it yet
 MenuButton.scaleY: cannot read scaleY of MenuButton - GTK's driver has no path for it yet
+MenuButton.shadow: not realized
 MenuButton.style: not realized
+MenuButton.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+MenuButton.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+MenuButton.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+MenuButton.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+MenuButton.transition: cannot read transition of MenuButton - GTK's driver has no path for it yet
 MenuButton.translationX: cannot read translationX of MenuButton - GTK's driver has no path for it yet
 MenuButton.translationY: cannot read translationY of MenuButton - GTK's driver has no path for it yet
 MenuButton.unfocus: ✅
+MenuButton.verticalAlignmentDefault: not realized
 MenuButton.width: ✅
 MenuButton.zIndex: not realized
+Path.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Path.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Path - GTK's driver has no path for it yet
 Path.accessibilityHint: cannot read accessibilityHint of Path - GTK's driver has no path for it yet
 Path.accessibilityLabel: cannot read accessibilityLabel of Path - GTK's driver has no path for it yet
+Path.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Path.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Path - GTK's driver has no path for it yet
 Path.background: not realized
+Path.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Path.blur: not realized
+Path.compositingGroup: not realized
+Path.contentTransition: – GTK swaps a label's words with no transition yet.
+Path.drawingGroup: not realized
 Path.focus: – Path takes no keyboard focus here: it refuses it, and nothing is heard
 Path.frame: ✅
 Path.frameChanged: ✅
 Path.height: ✅
+Path.hint: cannot read hint of Path - GTK's driver has no path for it yet
+Path.hintKey: not realized
+Path.horizontalAlignmentDefault: not realized
 Path.ignoresInput: not realized
 Path.isAccessibilityHidden: cannot read isAccessibilityHidden of Path - GTK's driver has no path for it yet
 Path.isEnabled: ✅
 Path.isFocusedChanged: – Path takes no keyboard focus here: it refuses it, and nothing is heard
+Path.isFrameContent: not realized
+Path.isGeometryReader: not realized
+Path.isLayoutDecoration: not realized
 Path.isVisible: ✅
 Path.layoutDirection: cannot read layoutDirection of Path - GTK's driver has no path for it yet
+Path.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Path.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Path.maximumHeight: ✅
 Path.maximumWidth: ✅
 Path.minimumHeight: ✅
@@ -738,30 +1236,53 @@ Path.pivotY: cannot read pivotY of Path - GTK's driver has no path for it yet
 Path.rotation: cannot read rotation of Path - GTK's driver has no path for it yet
 Path.rotationX: cannot read rotationX of Path - GTK's driver has no path for it yet
 Path.rotationY: cannot read rotationY of Path - GTK's driver has no path for it yet
+Path.safeAreaInsetEdge: not realized
 Path.scale: cannot read scale of Path - GTK's driver has no path for it yet
 Path.scaleX: cannot read scaleX of Path - GTK's driver has no path for it yet
 Path.scaleY: cannot read scaleY of Path - GTK's driver has no path for it yet
+Path.shadow: not realized
 Path.style: ✅
+Path.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Path.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Path.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Path.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Path.transition: cannot read transition of Path - GTK's driver has no path for it yet
 Path.translationX: cannot read translationX of Path - GTK's driver has no path for it yet
 Path.translationY: cannot read translationY of Path - GTK's driver has no path for it yet
 Path.unfocus: – Path takes no keyboard focus here: it refuses it, and nothing is heard
+Path.verticalAlignmentDefault: not realized
 Path.width: ✅
 Path.zIndex: not realized
+Picker.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Picker.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Picker - GTK's driver has no path for it yet
 Picker.accessibilityHint: cannot read accessibilityHint of Picker - GTK's driver has no path for it yet
 Picker.accessibilityLabel: cannot read accessibilityLabel of Picker - GTK's driver has no path for it yet
+Picker.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Picker.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Picker - GTK's driver has no path for it yet
 Picker.background: not realized
+Picker.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Picker.blur: not realized
+Picker.compositingGroup: not realized
+Picker.contentTransition: – GTK swaps a label's words with no transition yet.
+Picker.drawingGroup: not realized
 Picker.focus: ✅
 Picker.frame: ✅
 Picker.frameChanged: ✅
 Picker.height: ✅
+Picker.hint: cannot read hint of Picker - GTK's driver has no path for it yet
+Picker.hintKey: not realized
+Picker.horizontalAlignmentDefault: not realized
 Picker.ignoresInput: not realized
 Picker.isAccessibilityHidden: cannot read isAccessibilityHidden of Picker - GTK's driver has no path for it yet
 Picker.isEnabled: ✅
 Picker.isFocusedChanged: ✅
+Picker.isFrameContent: not realized
+Picker.isGeometryReader: not realized
+Picker.isLayoutDecoration: not realized
 Picker.isVisible: ✅
 Picker.layoutDirection: cannot read layoutDirection of Picker - GTK's driver has no path for it yet
+Picker.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Picker.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Picker.maximumHeight: ✅
 Picker.maximumWidth: ✅
 Picker.minimumHeight: ✅
@@ -772,30 +1293,53 @@ Picker.pivotY: cannot read pivotY of Picker - GTK's driver has no path for it ye
 Picker.rotation: cannot read rotation of Picker - GTK's driver has no path for it yet
 Picker.rotationX: cannot read rotationX of Picker - GTK's driver has no path for it yet
 Picker.rotationY: cannot read rotationY of Picker - GTK's driver has no path for it yet
+Picker.safeAreaInsetEdge: not realized
 Picker.scale: cannot read scale of Picker - GTK's driver has no path for it yet
 Picker.scaleX: cannot read scaleX of Picker - GTK's driver has no path for it yet
 Picker.scaleY: cannot read scaleY of Picker - GTK's driver has no path for it yet
+Picker.shadow: not realized
 Picker.style: ✅
+Picker.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Picker.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Picker.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Picker.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Picker.transition: cannot read transition of Picker - GTK's driver has no path for it yet
 Picker.translationX: cannot read translationX of Picker - GTK's driver has no path for it yet
 Picker.translationY: cannot read translationY of Picker - GTK's driver has no path for it yet
 Picker.unfocus: ✅
+Picker.verticalAlignmentDefault: not realized
 Picker.width: ✅
 Picker.zIndex: not realized
+Polygon.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Polygon.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Polygon - GTK's driver has no path for it yet
 Polygon.accessibilityHint: cannot read accessibilityHint of Polygon - GTK's driver has no path for it yet
 Polygon.accessibilityLabel: cannot read accessibilityLabel of Polygon - GTK's driver has no path for it yet
+Polygon.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Polygon.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Polygon - GTK's driver has no path for it yet
 Polygon.background: not realized
+Polygon.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Polygon.blur: not realized
+Polygon.compositingGroup: not realized
+Polygon.contentTransition: – GTK swaps a label's words with no transition yet.
+Polygon.drawingGroup: not realized
 Polygon.focus: – Polygon takes no keyboard focus here: it refuses it, and nothing is heard
 Polygon.frame: ✅
 Polygon.frameChanged: ✅
 Polygon.height: ✅
+Polygon.hint: cannot read hint of Polygon - GTK's driver has no path for it yet
+Polygon.hintKey: not realized
+Polygon.horizontalAlignmentDefault: not realized
 Polygon.ignoresInput: not realized
 Polygon.isAccessibilityHidden: cannot read isAccessibilityHidden of Polygon - GTK's driver has no path for it yet
 Polygon.isEnabled: ✅
 Polygon.isFocusedChanged: – Polygon takes no keyboard focus here: it refuses it, and nothing is heard
+Polygon.isFrameContent: not realized
+Polygon.isGeometryReader: not realized
+Polygon.isLayoutDecoration: not realized
 Polygon.isVisible: ✅
 Polygon.layoutDirection: cannot read layoutDirection of Polygon - GTK's driver has no path for it yet
+Polygon.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Polygon.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Polygon.maximumHeight: ✅
 Polygon.maximumWidth: ✅
 Polygon.minimumHeight: ✅
@@ -806,30 +1350,53 @@ Polygon.pivotY: cannot read pivotY of Polygon - GTK's driver has no path for it 
 Polygon.rotation: cannot read rotation of Polygon - GTK's driver has no path for it yet
 Polygon.rotationX: cannot read rotationX of Polygon - GTK's driver has no path for it yet
 Polygon.rotationY: cannot read rotationY of Polygon - GTK's driver has no path for it yet
+Polygon.safeAreaInsetEdge: not realized
 Polygon.scale: cannot read scale of Polygon - GTK's driver has no path for it yet
 Polygon.scaleX: cannot read scaleX of Polygon - GTK's driver has no path for it yet
 Polygon.scaleY: cannot read scaleY of Polygon - GTK's driver has no path for it yet
+Polygon.shadow: not realized
 Polygon.style: ✅
+Polygon.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Polygon.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Polygon.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Polygon.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Polygon.transition: cannot read transition of Polygon - GTK's driver has no path for it yet
 Polygon.translationX: cannot read translationX of Polygon - GTK's driver has no path for it yet
 Polygon.translationY: cannot read translationY of Polygon - GTK's driver has no path for it yet
 Polygon.unfocus: – Polygon takes no keyboard focus here: it refuses it, and nothing is heard
+Polygon.verticalAlignmentDefault: not realized
 Polygon.width: ✅
 Polygon.zIndex: not realized
+Polyline.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Polyline.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Polyline - GTK's driver has no path for it yet
 Polyline.accessibilityHint: cannot read accessibilityHint of Polyline - GTK's driver has no path for it yet
 Polyline.accessibilityLabel: cannot read accessibilityLabel of Polyline - GTK's driver has no path for it yet
+Polyline.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Polyline.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Polyline - GTK's driver has no path for it yet
 Polyline.background: not realized
+Polyline.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Polyline.blur: not realized
+Polyline.compositingGroup: not realized
+Polyline.contentTransition: – GTK swaps a label's words with no transition yet.
+Polyline.drawingGroup: not realized
 Polyline.focus: – Polyline takes no keyboard focus here: it refuses it, and nothing is heard
 Polyline.frame: ✅
 Polyline.frameChanged: ✅
 Polyline.height: ✅
+Polyline.hint: cannot read hint of Polyline - GTK's driver has no path for it yet
+Polyline.hintKey: not realized
+Polyline.horizontalAlignmentDefault: not realized
 Polyline.ignoresInput: not realized
 Polyline.isAccessibilityHidden: cannot read isAccessibilityHidden of Polyline - GTK's driver has no path for it yet
 Polyline.isEnabled: ✅
 Polyline.isFocusedChanged: – Polyline takes no keyboard focus here: it refuses it, and nothing is heard
+Polyline.isFrameContent: not realized
+Polyline.isGeometryReader: not realized
+Polyline.isLayoutDecoration: not realized
 Polyline.isVisible: ✅
 Polyline.layoutDirection: cannot read layoutDirection of Polyline - GTK's driver has no path for it yet
+Polyline.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Polyline.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Polyline.maximumHeight: ✅
 Polyline.maximumWidth: ✅
 Polyline.minimumHeight: ✅
@@ -840,30 +1407,53 @@ Polyline.pivotY: cannot read pivotY of Polyline - GTK's driver has no path for i
 Polyline.rotation: cannot read rotation of Polyline - GTK's driver has no path for it yet
 Polyline.rotationX: cannot read rotationX of Polyline - GTK's driver has no path for it yet
 Polyline.rotationY: cannot read rotationY of Polyline - GTK's driver has no path for it yet
+Polyline.safeAreaInsetEdge: not realized
 Polyline.scale: cannot read scale of Polyline - GTK's driver has no path for it yet
 Polyline.scaleX: cannot read scaleX of Polyline - GTK's driver has no path for it yet
 Polyline.scaleY: cannot read scaleY of Polyline - GTK's driver has no path for it yet
+Polyline.shadow: not realized
 Polyline.style: ✅
+Polyline.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Polyline.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Polyline.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Polyline.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Polyline.transition: cannot read transition of Polyline - GTK's driver has no path for it yet
 Polyline.translationX: cannot read translationX of Polyline - GTK's driver has no path for it yet
 Polyline.translationY: cannot read translationY of Polyline - GTK's driver has no path for it yet
 Polyline.unfocus: – Polyline takes no keyboard focus here: it refuses it, and nothing is heard
+Polyline.verticalAlignmentDefault: not realized
 Polyline.width: ✅
 Polyline.zIndex: not realized
+PositionIndicator.accessibilityChildBehavior: not realized
 PositionIndicator.accessibilityHeadingLevel: not realized
 PositionIndicator.accessibilityHint: not realized
 PositionIndicator.accessibilityLabel: not realized
+PositionIndicator.accessibilityTraits: not realized
 PositionIndicator.automationExcludedWithChildren: not realized
 PositionIndicator.background: not realized
+PositionIndicator.blendMode: not realized
+PositionIndicator.blur: not realized
+PositionIndicator.compositingGroup: not realized
+PositionIndicator.contentTransition: not realized
+PositionIndicator.drawingGroup: not realized
 PositionIndicator.focus: not realized
 PositionIndicator.frame: not realized
 PositionIndicator.frameChanged: not realized
 PositionIndicator.height: not realized
+PositionIndicator.hint: not realized
+PositionIndicator.hintKey: not realized
+PositionIndicator.horizontalAlignmentDefault: not realized
 PositionIndicator.ignoresInput: not realized
 PositionIndicator.isAccessibilityHidden: not realized
 PositionIndicator.isEnabled: not realized
 PositionIndicator.isFocusedChanged: not realized
+PositionIndicator.isFrameContent: not realized
+PositionIndicator.isGeometryReader: not realized
+PositionIndicator.isLayoutDecoration: not realized
 PositionIndicator.isVisible: not realized
 PositionIndicator.layoutDirection: not realized
+PositionIndicator.matchedGeometry: not realized
+PositionIndicator.matchedGeometrySource: not realized
 PositionIndicator.maximumHeight: not realized
 PositionIndicator.maximumWidth: not realized
 PositionIndicator.minimumHeight: not realized
@@ -874,30 +1464,53 @@ PositionIndicator.pivotY: not realized
 PositionIndicator.rotation: not realized
 PositionIndicator.rotationX: not realized
 PositionIndicator.rotationY: not realized
+PositionIndicator.safeAreaInsetEdge: not realized
 PositionIndicator.scale: not realized
 PositionIndicator.scaleX: not realized
 PositionIndicator.scaleY: not realized
+PositionIndicator.shadow: not realized
 PositionIndicator.style: not realized
+PositionIndicator.symbolEffect: not realized
+PositionIndicator.symbolEffectActive: not realized
+PositionIndicator.symbolEffectOptions: not realized
+PositionIndicator.symbolEffectValue: not realized
+PositionIndicator.transition: not realized
 PositionIndicator.translationX: not realized
 PositionIndicator.translationY: not realized
 PositionIndicator.unfocus: not realized
+PositionIndicator.verticalAlignmentDefault: not realized
 PositionIndicator.width: not realized
 PositionIndicator.zIndex: not realized
+ProgressBar.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 ProgressBar.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.accessibilityHint: cannot read accessibilityHint of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.accessibilityLabel: cannot read accessibilityLabel of ProgressBar - GTK's driver has no path for it yet
+ProgressBar.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 ProgressBar.automationExcludedWithChildren: cannot read automationExcludedWithChildren of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.background: not realized
+ProgressBar.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+ProgressBar.blur: not realized
+ProgressBar.compositingGroup: not realized
+ProgressBar.contentTransition: – GTK swaps a label's words with no transition yet.
+ProgressBar.drawingGroup: not realized
 ProgressBar.focus: – ProgressBar takes no keyboard focus here: it refuses it, and nothing is heard
 ProgressBar.frame: ✅
 ProgressBar.frameChanged: ✅
 ProgressBar.height: ✅
+ProgressBar.hint: cannot read hint of ProgressBar - GTK's driver has no path for it yet
+ProgressBar.hintKey: not realized
+ProgressBar.horizontalAlignmentDefault: not realized
 ProgressBar.ignoresInput: not realized
 ProgressBar.isAccessibilityHidden: cannot read isAccessibilityHidden of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.isEnabled: ✅
 ProgressBar.isFocusedChanged: – ProgressBar takes no keyboard focus here: it refuses it, and nothing is heard
+ProgressBar.isFrameContent: not realized
+ProgressBar.isGeometryReader: not realized
+ProgressBar.isLayoutDecoration: not realized
 ProgressBar.isVisible: ✅
 ProgressBar.layoutDirection: cannot read layoutDirection of ProgressBar - GTK's driver has no path for it yet
+ProgressBar.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+ProgressBar.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 ProgressBar.maximumHeight: ✅
 ProgressBar.maximumWidth: ✅
 ProgressBar.minimumHeight: ✅
@@ -908,30 +1521,53 @@ ProgressBar.pivotY: cannot read pivotY of ProgressBar - GTK's driver has no path
 ProgressBar.rotation: cannot read rotation of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.rotationX: cannot read rotationX of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.rotationY: cannot read rotationY of ProgressBar - GTK's driver has no path for it yet
+ProgressBar.safeAreaInsetEdge: not realized
 ProgressBar.scale: cannot read scale of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.scaleX: cannot read scaleX of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.scaleY: cannot read scaleY of ProgressBar - GTK's driver has no path for it yet
+ProgressBar.shadow: not realized
 ProgressBar.style: ✅
+ProgressBar.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+ProgressBar.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+ProgressBar.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+ProgressBar.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+ProgressBar.transition: cannot read transition of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.translationX: cannot read translationX of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.translationY: cannot read translationY of ProgressBar - GTK's driver has no path for it yet
 ProgressBar.unfocus: – ProgressBar takes no keyboard focus here: it refuses it, and nothing is heard
+ProgressBar.verticalAlignmentDefault: not realized
 ProgressBar.width: ✅
 ProgressBar.zIndex: not realized
+RadioButton.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 RadioButton.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of RadioButton - GTK's driver has no path for it yet
 RadioButton.accessibilityHint: cannot read accessibilityHint of RadioButton - GTK's driver has no path for it yet
 RadioButton.accessibilityLabel: cannot read accessibilityLabel of RadioButton - GTK's driver has no path for it yet
+RadioButton.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 RadioButton.automationExcludedWithChildren: cannot read automationExcludedWithChildren of RadioButton - GTK's driver has no path for it yet
 RadioButton.background: not realized
+RadioButton.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+RadioButton.blur: not realized
+RadioButton.compositingGroup: not realized
+RadioButton.contentTransition: – GTK swaps a label's words with no transition yet.
+RadioButton.drawingGroup: not realized
 RadioButton.focus: ✅
 RadioButton.frame: ✅
 RadioButton.frameChanged: ✅
 RadioButton.height: ✅
+RadioButton.hint: cannot read hint of RadioButton - GTK's driver has no path for it yet
+RadioButton.hintKey: not realized
+RadioButton.horizontalAlignmentDefault: not realized
 RadioButton.ignoresInput: not realized
 RadioButton.isAccessibilityHidden: cannot read isAccessibilityHidden of RadioButton - GTK's driver has no path for it yet
 RadioButton.isEnabled: ✅
 RadioButton.isFocusedChanged: ✅
+RadioButton.isFrameContent: not realized
+RadioButton.isGeometryReader: not realized
+RadioButton.isLayoutDecoration: not realized
 RadioButton.isVisible: ✅
 RadioButton.layoutDirection: cannot read layoutDirection of RadioButton - GTK's driver has no path for it yet
+RadioButton.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+RadioButton.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 RadioButton.maximumHeight: ✅
 RadioButton.maximumWidth: ✅
 RadioButton.minimumHeight: ✅
@@ -942,30 +1578,53 @@ RadioButton.pivotY: cannot read pivotY of RadioButton - GTK's driver has no path
 RadioButton.rotation: cannot read rotation of RadioButton - GTK's driver has no path for it yet
 RadioButton.rotationX: cannot read rotationX of RadioButton - GTK's driver has no path for it yet
 RadioButton.rotationY: cannot read rotationY of RadioButton - GTK's driver has no path for it yet
+RadioButton.safeAreaInsetEdge: not realized
 RadioButton.scale: cannot read scale of RadioButton - GTK's driver has no path for it yet
 RadioButton.scaleX: cannot read scaleX of RadioButton - GTK's driver has no path for it yet
 RadioButton.scaleY: cannot read scaleY of RadioButton - GTK's driver has no path for it yet
+RadioButton.shadow: not realized
 RadioButton.style: ✅
+RadioButton.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+RadioButton.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+RadioButton.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+RadioButton.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+RadioButton.transition: cannot read transition of RadioButton - GTK's driver has no path for it yet
 RadioButton.translationX: cannot read translationX of RadioButton - GTK's driver has no path for it yet
 RadioButton.translationY: cannot read translationY of RadioButton - GTK's driver has no path for it yet
 RadioButton.unfocus: ✅
+RadioButton.verticalAlignmentDefault: not realized
 RadioButton.width: ✅
 RadioButton.zIndex: not realized
+Rectangle.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Rectangle.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Rectangle - GTK's driver has no path for it yet
 Rectangle.accessibilityHint: cannot read accessibilityHint of Rectangle - GTK's driver has no path for it yet
 Rectangle.accessibilityLabel: cannot read accessibilityLabel of Rectangle - GTK's driver has no path for it yet
+Rectangle.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Rectangle.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Rectangle - GTK's driver has no path for it yet
 Rectangle.background: not realized
+Rectangle.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Rectangle.blur: not realized
+Rectangle.compositingGroup: not realized
+Rectangle.contentTransition: – GTK swaps a label's words with no transition yet.
+Rectangle.drawingGroup: not realized
 Rectangle.focus: – Rectangle takes no keyboard focus here: it refuses it, and nothing is heard
 Rectangle.frame: ✅
 Rectangle.frameChanged: ✅
 Rectangle.height: ✅
+Rectangle.hint: cannot read hint of Rectangle - GTK's driver has no path for it yet
+Rectangle.hintKey: not realized
+Rectangle.horizontalAlignmentDefault: not realized
 Rectangle.ignoresInput: not realized
 Rectangle.isAccessibilityHidden: cannot read isAccessibilityHidden of Rectangle - GTK's driver has no path for it yet
 Rectangle.isEnabled: ✅
 Rectangle.isFocusedChanged: – Rectangle takes no keyboard focus here: it refuses it, and nothing is heard
+Rectangle.isFrameContent: not realized
+Rectangle.isGeometryReader: not realized
+Rectangle.isLayoutDecoration: not realized
 Rectangle.isVisible: ✅
 Rectangle.layoutDirection: cannot read layoutDirection of Rectangle - GTK's driver has no path for it yet
+Rectangle.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Rectangle.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Rectangle.maximumHeight: ✅
 Rectangle.maximumWidth: ✅
 Rectangle.minimumHeight: ✅
@@ -976,30 +1635,53 @@ Rectangle.pivotY: cannot read pivotY of Rectangle - GTK's driver has no path for
 Rectangle.rotation: cannot read rotation of Rectangle - GTK's driver has no path for it yet
 Rectangle.rotationX: cannot read rotationX of Rectangle - GTK's driver has no path for it yet
 Rectangle.rotationY: cannot read rotationY of Rectangle - GTK's driver has no path for it yet
+Rectangle.safeAreaInsetEdge: not realized
 Rectangle.scale: cannot read scale of Rectangle - GTK's driver has no path for it yet
 Rectangle.scaleX: cannot read scaleX of Rectangle - GTK's driver has no path for it yet
 Rectangle.scaleY: cannot read scaleY of Rectangle - GTK's driver has no path for it yet
+Rectangle.shadow: not realized
 Rectangle.style: ✅
+Rectangle.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Rectangle.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Rectangle.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Rectangle.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Rectangle.transition: cannot read transition of Rectangle - GTK's driver has no path for it yet
 Rectangle.translationX: cannot read translationX of Rectangle - GTK's driver has no path for it yet
 Rectangle.translationY: cannot read translationY of Rectangle - GTK's driver has no path for it yet
 Rectangle.unfocus: – Rectangle takes no keyboard focus here: it refuses it, and nothing is heard
+Rectangle.verticalAlignmentDefault: not realized
 Rectangle.width: ✅
 Rectangle.zIndex: not realized
+ScrollView.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 ScrollView.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of ScrollView - GTK's driver has no path for it yet
 ScrollView.accessibilityHint: cannot read accessibilityHint of ScrollView - GTK's driver has no path for it yet
 ScrollView.accessibilityLabel: cannot read accessibilityLabel of ScrollView - GTK's driver has no path for it yet
+ScrollView.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 ScrollView.automationExcludedWithChildren: cannot read automationExcludedWithChildren of ScrollView - GTK's driver has no path for it yet
 ScrollView.background: cannot read background of ScrollView - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its background; its drawing proves it
+ScrollView.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+ScrollView.blur: not realized
+ScrollView.compositingGroup: not realized
+ScrollView.contentTransition: – GTK swaps a label's words with no transition yet.
+ScrollView.drawingGroup: not realized
 ScrollView.focus: ✅
 ScrollView.frame: ✅
 ScrollView.frameChanged: ✅
 ScrollView.height: ✅
+ScrollView.hint: cannot read hint of ScrollView - GTK's driver has no path for it yet
+ScrollView.hintKey: not realized
+ScrollView.horizontalAlignmentDefault: not realized
 ScrollView.ignoresInput: not realized
 ScrollView.isAccessibilityHidden: cannot read isAccessibilityHidden of ScrollView - GTK's driver has no path for it yet
 ScrollView.isEnabled: ✅
 ScrollView.isFocusedChanged: ✅
+ScrollView.isFrameContent: not realized
+ScrollView.isGeometryReader: not realized
+ScrollView.isLayoutDecoration: not realized
 ScrollView.isVisible: ✅
 ScrollView.layoutDirection: cannot read layoutDirection of ScrollView - GTK's driver has no path for it yet
+ScrollView.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+ScrollView.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 ScrollView.maximumHeight: ✅
 ScrollView.maximumWidth: ✅
 ScrollView.minimumHeight: ✅
@@ -1010,30 +1692,53 @@ ScrollView.pivotY: cannot read pivotY of ScrollView - GTK's driver has no path f
 ScrollView.rotation: cannot read rotation of ScrollView - GTK's driver has no path for it yet
 ScrollView.rotationX: cannot read rotationX of ScrollView - GTK's driver has no path for it yet
 ScrollView.rotationY: cannot read rotationY of ScrollView - GTK's driver has no path for it yet
+ScrollView.safeAreaInsetEdge: not realized
 ScrollView.scale: cannot read scale of ScrollView - GTK's driver has no path for it yet
 ScrollView.scaleX: cannot read scaleX of ScrollView - GTK's driver has no path for it yet
 ScrollView.scaleY: cannot read scaleY of ScrollView - GTK's driver has no path for it yet
+ScrollView.shadow: not realized
 ScrollView.style: ✅
+ScrollView.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+ScrollView.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+ScrollView.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+ScrollView.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+ScrollView.transition: cannot read transition of ScrollView - GTK's driver has no path for it yet
 ScrollView.translationX: cannot read translationX of ScrollView - GTK's driver has no path for it yet
 ScrollView.translationY: cannot read translationY of ScrollView - GTK's driver has no path for it yet
 ScrollView.unfocus: ✅
+ScrollView.verticalAlignmentDefault: not realized
 ScrollView.width: ✅
 ScrollView.zIndex: not realized
+SearchField.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 SearchField.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of SearchField - GTK's driver has no path for it yet
 SearchField.accessibilityHint: cannot read accessibilityHint of SearchField - GTK's driver has no path for it yet
 SearchField.accessibilityLabel: cannot read accessibilityLabel of SearchField - GTK's driver has no path for it yet
+SearchField.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 SearchField.automationExcludedWithChildren: cannot read automationExcludedWithChildren of SearchField - GTK's driver has no path for it yet
 SearchField.background: not realized
+SearchField.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+SearchField.blur: not realized
+SearchField.compositingGroup: not realized
+SearchField.contentTransition: – GTK swaps a label's words with no transition yet.
+SearchField.drawingGroup: not realized
 SearchField.focus: ✅
 SearchField.frame: ✅
 SearchField.frameChanged: ✅
 SearchField.height: ✅
+SearchField.hint: cannot read hint of SearchField - GTK's driver has no path for it yet
+SearchField.hintKey: not realized
+SearchField.horizontalAlignmentDefault: not realized
 SearchField.ignoresInput: not realized
 SearchField.isAccessibilityHidden: cannot read isAccessibilityHidden of SearchField - GTK's driver has no path for it yet
 SearchField.isEnabled: ✅
 SearchField.isFocusedChanged: ✅
+SearchField.isFrameContent: not realized
+SearchField.isGeometryReader: not realized
+SearchField.isLayoutDecoration: not realized
 SearchField.isVisible: ✅
 SearchField.layoutDirection: cannot read layoutDirection of SearchField - GTK's driver has no path for it yet
+SearchField.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+SearchField.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 SearchField.maximumHeight: ✅
 SearchField.maximumWidth: ✅
 SearchField.minimumHeight: ✅
@@ -1044,30 +1749,53 @@ SearchField.pivotY: cannot read pivotY of SearchField - GTK's driver has no path
 SearchField.rotation: cannot read rotation of SearchField - GTK's driver has no path for it yet
 SearchField.rotationX: cannot read rotationX of SearchField - GTK's driver has no path for it yet
 SearchField.rotationY: cannot read rotationY of SearchField - GTK's driver has no path for it yet
+SearchField.safeAreaInsetEdge: not realized
 SearchField.scale: cannot read scale of SearchField - GTK's driver has no path for it yet
 SearchField.scaleX: cannot read scaleX of SearchField - GTK's driver has no path for it yet
 SearchField.scaleY: cannot read scaleY of SearchField - GTK's driver has no path for it yet
+SearchField.shadow: not realized
 SearchField.style: ✅
+SearchField.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+SearchField.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+SearchField.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+SearchField.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+SearchField.transition: cannot read transition of SearchField - GTK's driver has no path for it yet
 SearchField.translationX: cannot read translationX of SearchField - GTK's driver has no path for it yet
 SearchField.translationY: cannot read translationY of SearchField - GTK's driver has no path for it yet
 SearchField.unfocus: ✅
+SearchField.verticalAlignmentDefault: not realized
 SearchField.width: ✅
 SearchField.zIndex: not realized
+Slider.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Slider.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Slider - GTK's driver has no path for it yet
 Slider.accessibilityHint: cannot read accessibilityHint of Slider - GTK's driver has no path for it yet
 Slider.accessibilityLabel: cannot read accessibilityLabel of Slider - GTK's driver has no path for it yet
+Slider.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Slider.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Slider - GTK's driver has no path for it yet
 Slider.background: not realized
+Slider.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Slider.blur: not realized
+Slider.compositingGroup: not realized
+Slider.contentTransition: – GTK swaps a label's words with no transition yet.
+Slider.drawingGroup: not realized
 Slider.focus: ✅
 Slider.frame: ✅
 Slider.frameChanged: ✅
 Slider.height: ✅
+Slider.hint: cannot read hint of Slider - GTK's driver has no path for it yet
+Slider.hintKey: not realized
+Slider.horizontalAlignmentDefault: not realized
 Slider.ignoresInput: not realized
 Slider.isAccessibilityHidden: cannot read isAccessibilityHidden of Slider - GTK's driver has no path for it yet
 Slider.isEnabled: ✅
 Slider.isFocusedChanged: ✅
+Slider.isFrameContent: not realized
+Slider.isGeometryReader: not realized
+Slider.isLayoutDecoration: not realized
 Slider.isVisible: ✅
 Slider.layoutDirection: cannot read layoutDirection of Slider - GTK's driver has no path for it yet
+Slider.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Slider.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Slider.maximumHeight: ✅
 Slider.maximumWidth: ✅
 Slider.minimumHeight: ✅
@@ -1078,30 +1806,53 @@ Slider.pivotY: cannot read pivotY of Slider - GTK's driver has no path for it ye
 Slider.rotation: cannot read rotation of Slider - GTK's driver has no path for it yet
 Slider.rotationX: cannot read rotationX of Slider - GTK's driver has no path for it yet
 Slider.rotationY: cannot read rotationY of Slider - GTK's driver has no path for it yet
+Slider.safeAreaInsetEdge: not realized
 Slider.scale: cannot read scale of Slider - GTK's driver has no path for it yet
 Slider.scaleX: cannot read scaleX of Slider - GTK's driver has no path for it yet
 Slider.scaleY: cannot read scaleY of Slider - GTK's driver has no path for it yet
+Slider.shadow: not realized
 Slider.style: ✅
+Slider.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Slider.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Slider.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Slider.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Slider.transition: cannot read transition of Slider - GTK's driver has no path for it yet
 Slider.translationX: cannot read translationX of Slider - GTK's driver has no path for it yet
 Slider.translationY: cannot read translationY of Slider - GTK's driver has no path for it yet
 Slider.unfocus: ✅
+Slider.verticalAlignmentDefault: not realized
 Slider.width: ✅
 Slider.zIndex: not realized
+Stepper.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Stepper.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Stepper - GTK's driver has no path for it yet
 Stepper.accessibilityHint: cannot read accessibilityHint of Stepper - GTK's driver has no path for it yet
 Stepper.accessibilityLabel: cannot read accessibilityLabel of Stepper - GTK's driver has no path for it yet
+Stepper.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Stepper.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Stepper - GTK's driver has no path for it yet
 Stepper.background: not realized
+Stepper.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Stepper.blur: not realized
+Stepper.compositingGroup: not realized
+Stepper.contentTransition: – GTK swaps a label's words with no transition yet.
+Stepper.drawingGroup: not realized
 Stepper.focus: ✅
 Stepper.frame: ✅
 Stepper.frameChanged: ✅
 Stepper.height: ✅
+Stepper.hint: cannot read hint of Stepper - GTK's driver has no path for it yet
+Stepper.hintKey: not realized
+Stepper.horizontalAlignmentDefault: not realized
 Stepper.ignoresInput: not realized
 Stepper.isAccessibilityHidden: cannot read isAccessibilityHidden of Stepper - GTK's driver has no path for it yet
 Stepper.isEnabled: ✅
 Stepper.isFocusedChanged: ✅
+Stepper.isFrameContent: not realized
+Stepper.isGeometryReader: not realized
+Stepper.isLayoutDecoration: not realized
 Stepper.isVisible: ✅
 Stepper.layoutDirection: cannot read layoutDirection of Stepper - GTK's driver has no path for it yet
+Stepper.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Stepper.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Stepper.maximumHeight: ✅
 Stepper.maximumWidth: ✅
 Stepper.minimumHeight: ✅
@@ -1112,30 +1863,53 @@ Stepper.pivotY: cannot read pivotY of Stepper - GTK's driver has no path for it 
 Stepper.rotation: cannot read rotation of Stepper - GTK's driver has no path for it yet
 Stepper.rotationX: cannot read rotationX of Stepper - GTK's driver has no path for it yet
 Stepper.rotationY: cannot read rotationY of Stepper - GTK's driver has no path for it yet
+Stepper.safeAreaInsetEdge: not realized
 Stepper.scale: cannot read scale of Stepper - GTK's driver has no path for it yet
 Stepper.scaleX: cannot read scaleX of Stepper - GTK's driver has no path for it yet
 Stepper.scaleY: cannot read scaleY of Stepper - GTK's driver has no path for it yet
+Stepper.shadow: not realized
 Stepper.style: ✅
+Stepper.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Stepper.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Stepper.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Stepper.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Stepper.transition: cannot read transition of Stepper - GTK's driver has no path for it yet
 Stepper.translationX: cannot read translationX of Stepper - GTK's driver has no path for it yet
 Stepper.translationY: cannot read translationY of Stepper - GTK's driver has no path for it yet
 Stepper.unfocus: ✅
+Stepper.verticalAlignmentDefault: not realized
 Stepper.width: ✅
 Stepper.zIndex: not realized
+Switch.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Switch.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Switch - GTK's driver has no path for it yet
 Switch.accessibilityHint: cannot read accessibilityHint of Switch - GTK's driver has no path for it yet
 Switch.accessibilityLabel: cannot read accessibilityLabel of Switch - GTK's driver has no path for it yet
+Switch.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Switch.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Switch - GTK's driver has no path for it yet
 Switch.background: not realized
+Switch.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Switch.blur: not realized
+Switch.compositingGroup: not realized
+Switch.contentTransition: – GTK swaps a label's words with no transition yet.
+Switch.drawingGroup: not realized
 Switch.focus: ✅
 Switch.frame: ✅
 Switch.frameChanged: ✅
 Switch.height: ✅
+Switch.hint: cannot read hint of Switch - GTK's driver has no path for it yet
+Switch.hintKey: not realized
+Switch.horizontalAlignmentDefault: not realized
 Switch.ignoresInput: not realized
 Switch.isAccessibilityHidden: cannot read isAccessibilityHidden of Switch - GTK's driver has no path for it yet
 Switch.isEnabled: ✅
 Switch.isFocusedChanged: ✅
+Switch.isFrameContent: not realized
+Switch.isGeometryReader: not realized
+Switch.isLayoutDecoration: not realized
 Switch.isVisible: ✅
 Switch.layoutDirection: cannot read layoutDirection of Switch - GTK's driver has no path for it yet
+Switch.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Switch.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Switch.maximumHeight: ✅
 Switch.maximumWidth: ✅
 Switch.minimumHeight: ✅
@@ -1146,30 +1920,53 @@ Switch.pivotY: cannot read pivotY of Switch - GTK's driver has no path for it ye
 Switch.rotation: cannot read rotation of Switch - GTK's driver has no path for it yet
 Switch.rotationX: cannot read rotationX of Switch - GTK's driver has no path for it yet
 Switch.rotationY: cannot read rotationY of Switch - GTK's driver has no path for it yet
+Switch.safeAreaInsetEdge: not realized
 Switch.scale: cannot read scale of Switch - GTK's driver has no path for it yet
 Switch.scaleX: cannot read scaleX of Switch - GTK's driver has no path for it yet
 Switch.scaleY: cannot read scaleY of Switch - GTK's driver has no path for it yet
+Switch.shadow: not realized
 Switch.style: ✅
+Switch.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Switch.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Switch.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Switch.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Switch.transition: cannot read transition of Switch - GTK's driver has no path for it yet
 Switch.translationX: cannot read translationX of Switch - GTK's driver has no path for it yet
 Switch.translationY: cannot read translationY of Switch - GTK's driver has no path for it yet
 Switch.unfocus: ✅
+Switch.verticalAlignmentDefault: not realized
 Switch.width: ✅
 Switch.zIndex: not realized
+Text.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 Text.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of Text - GTK's driver has no path for it yet
 Text.accessibilityHint: cannot read accessibilityHint of Text - GTK's driver has no path for it yet
 Text.accessibilityLabel: cannot read accessibilityLabel of Text - GTK's driver has no path for it yet
+Text.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 Text.automationExcludedWithChildren: cannot read automationExcludedWithChildren of Text - GTK's driver has no path for it yet
 Text.background: cannot read background of Text - GTK's driver has no path for it yet
+Text.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+Text.blur: not realized
+Text.compositingGroup: not realized
+Text.contentTransition: – GTK swaps a label's words with no transition yet.
+Text.drawingGroup: not realized
 Text.focus: – Text takes no keyboard focus here: it refuses it, and nothing is heard
 Text.frame: ✅
 Text.frameChanged: ✅
 Text.height: ✅
+Text.hint: cannot read hint of Text - GTK's driver has no path for it yet
+Text.hintKey: not realized
+Text.horizontalAlignmentDefault: not realized
 Text.ignoresInput: not realized
 Text.isAccessibilityHidden: cannot read isAccessibilityHidden of Text - GTK's driver has no path for it yet
 Text.isEnabled: ✅
 Text.isFocusedChanged: – Text takes no keyboard focus here: it refuses it, and nothing is heard
+Text.isFrameContent: not realized
+Text.isGeometryReader: not realized
+Text.isLayoutDecoration: not realized
 Text.isVisible: ✅
 Text.layoutDirection: cannot read layoutDirection of Text - GTK's driver has no path for it yet
+Text.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+Text.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 Text.maximumHeight: ✅
 Text.maximumWidth: ✅
 Text.minimumHeight: ✅
@@ -1180,30 +1977,53 @@ Text.pivotY: cannot read pivotY of Text - GTK's driver has no path for it yet
 Text.rotation: cannot read rotation of Text - GTK's driver has no path for it yet
 Text.rotationX: cannot read rotationX of Text - GTK's driver has no path for it yet
 Text.rotationY: cannot read rotationY of Text - GTK's driver has no path for it yet
+Text.safeAreaInsetEdge: not realized
 Text.scale: cannot read scale of Text - GTK's driver has no path for it yet
 Text.scaleX: cannot read scaleX of Text - GTK's driver has no path for it yet
 Text.scaleY: cannot read scaleY of Text - GTK's driver has no path for it yet
+Text.shadow: not realized
 Text.style: ✅
+Text.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+Text.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+Text.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+Text.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+Text.transition: cannot read transition of Text - GTK's driver has no path for it yet
 Text.translationX: cannot read translationX of Text - GTK's driver has no path for it yet
 Text.translationY: cannot read translationY of Text - GTK's driver has no path for it yet
 Text.unfocus: – Text takes no keyboard focus here: it refuses it, and nothing is heard
+Text.verticalAlignmentDefault: not realized
 Text.width: ✅
 Text.zIndex: not realized
+TextEditor.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 TextEditor.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of TextEditor - GTK's driver has no path for it yet
 TextEditor.accessibilityHint: cannot read accessibilityHint of TextEditor - GTK's driver has no path for it yet
 TextEditor.accessibilityLabel: cannot read accessibilityLabel of TextEditor - GTK's driver has no path for it yet
+TextEditor.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 TextEditor.automationExcludedWithChildren: cannot read automationExcludedWithChildren of TextEditor - GTK's driver has no path for it yet
 TextEditor.background: not realized
+TextEditor.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+TextEditor.blur: not realized
+TextEditor.compositingGroup: not realized
+TextEditor.contentTransition: – GTK swaps a label's words with no transition yet.
+TextEditor.drawingGroup: not realized
 TextEditor.focus: ✅
 TextEditor.frame: ✅
 TextEditor.frameChanged: ✅
 TextEditor.height: ✅
+TextEditor.hint: cannot read hint of TextEditor - GTK's driver has no path for it yet
+TextEditor.hintKey: not realized
+TextEditor.horizontalAlignmentDefault: not realized
 TextEditor.ignoresInput: not realized
 TextEditor.isAccessibilityHidden: cannot read isAccessibilityHidden of TextEditor - GTK's driver has no path for it yet
 TextEditor.isEnabled: ✅
 TextEditor.isFocusedChanged: ✅
+TextEditor.isFrameContent: not realized
+TextEditor.isGeometryReader: not realized
+TextEditor.isLayoutDecoration: not realized
 TextEditor.isVisible: ✅
 TextEditor.layoutDirection: cannot read layoutDirection of TextEditor - GTK's driver has no path for it yet
+TextEditor.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+TextEditor.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 TextEditor.maximumHeight: ✅
 TextEditor.maximumWidth: ✅
 TextEditor.minimumHeight: ✅
@@ -1214,30 +2034,53 @@ TextEditor.pivotY: cannot read pivotY of TextEditor - GTK's driver has no path f
 TextEditor.rotation: cannot read rotation of TextEditor - GTK's driver has no path for it yet
 TextEditor.rotationX: cannot read rotationX of TextEditor - GTK's driver has no path for it yet
 TextEditor.rotationY: cannot read rotationY of TextEditor - GTK's driver has no path for it yet
+TextEditor.safeAreaInsetEdge: not realized
 TextEditor.scale: cannot read scale of TextEditor - GTK's driver has no path for it yet
 TextEditor.scaleX: cannot read scaleX of TextEditor - GTK's driver has no path for it yet
 TextEditor.scaleY: cannot read scaleY of TextEditor - GTK's driver has no path for it yet
+TextEditor.shadow: not realized
 TextEditor.style: ✅
+TextEditor.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+TextEditor.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+TextEditor.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+TextEditor.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+TextEditor.transition: cannot read transition of TextEditor - GTK's driver has no path for it yet
 TextEditor.translationX: cannot read translationX of TextEditor - GTK's driver has no path for it yet
 TextEditor.translationY: cannot read translationY of TextEditor - GTK's driver has no path for it yet
 TextEditor.unfocus: ✅
+TextEditor.verticalAlignmentDefault: not realized
 TextEditor.width: ✅
 TextEditor.zIndex: not realized
+TextField.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 TextField.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of TextField - GTK's driver has no path for it yet
 TextField.accessibilityHint: cannot read accessibilityHint of TextField - GTK's driver has no path for it yet
 TextField.accessibilityLabel: cannot read accessibilityLabel of TextField - GTK's driver has no path for it yet
+TextField.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 TextField.automationExcludedWithChildren: cannot read automationExcludedWithChildren of TextField - GTK's driver has no path for it yet
 TextField.background: not realized
+TextField.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+TextField.blur: not realized
+TextField.compositingGroup: not realized
+TextField.contentTransition: – GTK swaps a label's words with no transition yet.
+TextField.drawingGroup: not realized
 TextField.focus: ✅
 TextField.frame: ✅
 TextField.frameChanged: ✅
 TextField.height: ✅
+TextField.hint: cannot read hint of TextField - GTK's driver has no path for it yet
+TextField.hintKey: not realized
+TextField.horizontalAlignmentDefault: not realized
 TextField.ignoresInput: not realized
 TextField.isAccessibilityHidden: cannot read isAccessibilityHidden of TextField - GTK's driver has no path for it yet
 TextField.isEnabled: ✅
 TextField.isFocusedChanged: ✅
+TextField.isFrameContent: not realized
+TextField.isGeometryReader: not realized
+TextField.isLayoutDecoration: not realized
 TextField.isVisible: ✅
 TextField.layoutDirection: cannot read layoutDirection of TextField - GTK's driver has no path for it yet
+TextField.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+TextField.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 TextField.maximumHeight: ✅
 TextField.maximumWidth: ✅
 TextField.minimumHeight: ✅
@@ -1248,30 +2091,53 @@ TextField.pivotY: cannot read pivotY of TextField - GTK's driver has no path for
 TextField.rotation: cannot read rotation of TextField - GTK's driver has no path for it yet
 TextField.rotationX: cannot read rotationX of TextField - GTK's driver has no path for it yet
 TextField.rotationY: cannot read rotationY of TextField - GTK's driver has no path for it yet
+TextField.safeAreaInsetEdge: not realized
 TextField.scale: cannot read scale of TextField - GTK's driver has no path for it yet
 TextField.scaleX: cannot read scaleX of TextField - GTK's driver has no path for it yet
 TextField.scaleY: cannot read scaleY of TextField - GTK's driver has no path for it yet
+TextField.shadow: not realized
 TextField.style: ✅
+TextField.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+TextField.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+TextField.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+TextField.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+TextField.transition: cannot read transition of TextField - GTK's driver has no path for it yet
 TextField.translationX: cannot read translationX of TextField - GTK's driver has no path for it yet
 TextField.translationY: cannot read translationY of TextField - GTK's driver has no path for it yet
 TextField.unfocus: ✅
+TextField.verticalAlignmentDefault: not realized
 TextField.width: ✅
 TextField.zIndex: not realized
+TimePicker.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 TimePicker.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of TimePicker - GTK's driver has no path for it yet
 TimePicker.accessibilityHint: cannot read accessibilityHint of TimePicker - GTK's driver has no path for it yet
 TimePicker.accessibilityLabel: cannot read accessibilityLabel of TimePicker - GTK's driver has no path for it yet
+TimePicker.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 TimePicker.automationExcludedWithChildren: cannot read automationExcludedWithChildren of TimePicker - GTK's driver has no path for it yet
 TimePicker.background: not realized
+TimePicker.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+TimePicker.blur: not realized
+TimePicker.compositingGroup: not realized
+TimePicker.contentTransition: – GTK swaps a label's words with no transition yet.
+TimePicker.drawingGroup: not realized
 TimePicker.focus: ✅
 TimePicker.frame: ✅
 TimePicker.frameChanged: ✅
 TimePicker.height: ✅
+TimePicker.hint: cannot read hint of TimePicker - GTK's driver has no path for it yet
+TimePicker.hintKey: not realized
+TimePicker.horizontalAlignmentDefault: not realized
 TimePicker.ignoresInput: not realized
 TimePicker.isAccessibilityHidden: cannot read isAccessibilityHidden of TimePicker - GTK's driver has no path for it yet
 TimePicker.isEnabled: ✅
 TimePicker.isFocusedChanged: ✅
+TimePicker.isFrameContent: not realized
+TimePicker.isGeometryReader: not realized
+TimePicker.isLayoutDecoration: not realized
 TimePicker.isVisible: ✅
 TimePicker.layoutDirection: cannot read layoutDirection of TimePicker - GTK's driver has no path for it yet
+TimePicker.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+TimePicker.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 TimePicker.maximumHeight: ✅
 TimePicker.maximumWidth: ✅
 TimePicker.minimumHeight: ✅
@@ -1282,30 +2148,53 @@ TimePicker.pivotY: cannot read pivotY of TimePicker - GTK's driver has no path f
 TimePicker.rotation: cannot read rotation of TimePicker - GTK's driver has no path for it yet
 TimePicker.rotationX: cannot read rotationX of TimePicker - GTK's driver has no path for it yet
 TimePicker.rotationY: cannot read rotationY of TimePicker - GTK's driver has no path for it yet
+TimePicker.safeAreaInsetEdge: not realized
 TimePicker.scale: cannot read scale of TimePicker - GTK's driver has no path for it yet
 TimePicker.scaleX: cannot read scaleX of TimePicker - GTK's driver has no path for it yet
 TimePicker.scaleY: cannot read scaleY of TimePicker - GTK's driver has no path for it yet
+TimePicker.shadow: not realized
 TimePicker.style: ✅
+TimePicker.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+TimePicker.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+TimePicker.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+TimePicker.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+TimePicker.transition: cannot read transition of TimePicker - GTK's driver has no path for it yet
 TimePicker.translationX: cannot read translationX of TimePicker - GTK's driver has no path for it yet
 TimePicker.translationY: cannot read translationY of TimePicker - GTK's driver has no path for it yet
 TimePicker.unfocus: ✅
+TimePicker.verticalAlignmentDefault: not realized
 TimePicker.width: ✅
 TimePicker.zIndex: not realized
+TitleBar.accessibilityChildBehavior: not realized
 TitleBar.accessibilityHeadingLevel: not realized
 TitleBar.accessibilityHint: not realized
 TitleBar.accessibilityLabel: not realized
+TitleBar.accessibilityTraits: not realized
 TitleBar.automationExcludedWithChildren: not realized
 TitleBar.background: cannot read background of TitleBar - GTK's driver has no path for it yet
+TitleBar.blendMode: not realized
+TitleBar.blur: not realized
+TitleBar.compositingGroup: not realized
+TitleBar.contentTransition: not realized
+TitleBar.drawingGroup: not realized
 TitleBar.focus: not realized
 TitleBar.frame: not realized
 TitleBar.frameChanged: not realized
 TitleBar.height: not realized
+TitleBar.hint: not realized
+TitleBar.hintKey: not realized
+TitleBar.horizontalAlignmentDefault: not realized
 TitleBar.ignoresInput: not realized
 TitleBar.isAccessibilityHidden: not realized
 TitleBar.isEnabled: not realized
 TitleBar.isFocusedChanged: not realized
+TitleBar.isFrameContent: not realized
+TitleBar.isGeometryReader: not realized
+TitleBar.isLayoutDecoration: not realized
 TitleBar.isVisible: not realized
 TitleBar.layoutDirection: not realized
+TitleBar.matchedGeometry: not realized
+TitleBar.matchedGeometrySource: not realized
 TitleBar.maximumHeight: not realized
 TitleBar.maximumWidth: not realized
 TitleBar.minimumHeight: not realized
@@ -1316,30 +2205,53 @@ TitleBar.pivotY: not realized
 TitleBar.rotation: not realized
 TitleBar.rotationX: not realized
 TitleBar.rotationY: not realized
+TitleBar.safeAreaInsetEdge: not realized
 TitleBar.scale: not realized
 TitleBar.scaleX: not realized
 TitleBar.scaleY: not realized
+TitleBar.shadow: not realized
 TitleBar.style: not realized
+TitleBar.symbolEffect: not realized
+TitleBar.symbolEffectActive: not realized
+TitleBar.symbolEffectOptions: not realized
+TitleBar.symbolEffectValue: not realized
+TitleBar.transition: not realized
 TitleBar.translationX: not realized
 TitleBar.translationY: not realized
 TitleBar.unfocus: not realized
+TitleBar.verticalAlignmentDefault: not realized
 TitleBar.width: not realized
 TitleBar.zIndex: not realized
+VStack.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 VStack.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of VStack - GTK's driver has no path for it yet
 VStack.accessibilityHint: cannot read accessibilityHint of VStack - GTK's driver has no path for it yet
 VStack.accessibilityLabel: cannot read accessibilityLabel of VStack - GTK's driver has no path for it yet
+VStack.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 VStack.automationExcludedWithChildren: cannot read automationExcludedWithChildren of VStack - GTK's driver has no path for it yet
 VStack.background: cannot read background of VStack - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its background; its drawing proves it
+VStack.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+VStack.blur: not realized
+VStack.compositingGroup: not realized
+VStack.contentTransition: – GTK swaps a label's words with no transition yet.
+VStack.drawingGroup: not realized
 VStack.focus: – VStack takes no keyboard focus here: it refuses it, and nothing is heard
 VStack.frame: ✅
 VStack.frameChanged: ✅
 VStack.height: ✅
+VStack.hint: cannot read hint of VStack - GTK's driver has no path for it yet
+VStack.hintKey: not realized
+VStack.horizontalAlignmentDefault: not realized
 VStack.ignoresInput: cannot read what reaches VStack - GTK's driver has no path for it yet
 VStack.isAccessibilityHidden: cannot read isAccessibilityHidden of VStack - GTK's driver has no path for it yet
 VStack.isEnabled: ✅
 VStack.isFocusedChanged: – VStack takes no keyboard focus here: it refuses it, and nothing is heard
+VStack.isFrameContent: not realized
+VStack.isGeometryReader: not realized
+VStack.isLayoutDecoration: not realized
 VStack.isVisible: ✅
 VStack.layoutDirection: cannot read layoutDirection of VStack - GTK's driver has no path for it yet
+VStack.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+VStack.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 VStack.maximumHeight: ✅
 VStack.maximumWidth: ✅
 VStack.minimumHeight: ✅
@@ -1350,30 +2262,53 @@ VStack.pivotY: cannot read pivotY of VStack - GTK's driver has no path for it ye
 VStack.rotation: cannot read rotation of VStack - GTK's driver has no path for it yet
 VStack.rotationX: cannot read rotationX of VStack - GTK's driver has no path for it yet
 VStack.rotationY: cannot read rotationY of VStack - GTK's driver has no path for it yet
+VStack.safeAreaInsetEdge: not realized
 VStack.scale: cannot read scale of VStack - GTK's driver has no path for it yet
 VStack.scaleX: cannot read scaleX of VStack - GTK's driver has no path for it yet
 VStack.scaleY: cannot read scaleY of VStack - GTK's driver has no path for it yet
+VStack.shadow: not realized
 VStack.style: ✅
+VStack.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+VStack.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+VStack.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+VStack.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+VStack.transition: cannot read transition of VStack - GTK's driver has no path for it yet
 VStack.translationX: cannot read translationX of VStack - GTK's driver has no path for it yet
 VStack.translationY: cannot read translationY of VStack - GTK's driver has no path for it yet
 VStack.unfocus: – VStack takes no keyboard focus here: it refuses it, and nothing is heard
+VStack.verticalAlignmentDefault: not realized
 VStack.width: ✅
 VStack.zIndex: not realized
+WebView.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 WebView.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of WebView - GTK's driver has no path for it yet
 WebView.accessibilityHint: cannot read accessibilityHint of WebView - GTK's driver has no path for it yet
 WebView.accessibilityLabel: cannot read accessibilityLabel of WebView - GTK's driver has no path for it yet
+WebView.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 WebView.automationExcludedWithChildren: cannot read automationExcludedWithChildren of WebView - GTK's driver has no path for it yet
 WebView.background: not realized
+WebView.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+WebView.blur: not realized
+WebView.compositingGroup: not realized
+WebView.contentTransition: – GTK swaps a label's words with no transition yet.
+WebView.drawingGroup: not realized
 WebView.focus: ✅
 WebView.frame: ✅
 WebView.frameChanged: ✅
 WebView.height: ✅
+WebView.hint: cannot read hint of WebView - GTK's driver has no path for it yet
+WebView.hintKey: not realized
+WebView.horizontalAlignmentDefault: not realized
 WebView.ignoresInput: not realized
 WebView.isAccessibilityHidden: cannot read isAccessibilityHidden of WebView - GTK's driver has no path for it yet
 WebView.isEnabled: ✅
 WebView.isFocusedChanged: ✅
+WebView.isFrameContent: not realized
+WebView.isGeometryReader: not realized
+WebView.isLayoutDecoration: not realized
 WebView.isVisible: ✅
 WebView.layoutDirection: cannot read layoutDirection of WebView - GTK's driver has no path for it yet
+WebView.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+WebView.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 WebView.maximumHeight: ✅
 WebView.maximumWidth: ✅
 WebView.minimumHeight: ✅
@@ -1384,30 +2319,53 @@ WebView.pivotY: cannot read pivotY of WebView - GTK's driver has no path for it 
 WebView.rotation: cannot read rotation of WebView - GTK's driver has no path for it yet
 WebView.rotationX: cannot read rotationX of WebView - GTK's driver has no path for it yet
 WebView.rotationY: cannot read rotationY of WebView - GTK's driver has no path for it yet
+WebView.safeAreaInsetEdge: not realized
 WebView.scale: cannot read scale of WebView - GTK's driver has no path for it yet
 WebView.scaleX: cannot read scaleX of WebView - GTK's driver has no path for it yet
 WebView.scaleY: cannot read scaleY of WebView - GTK's driver has no path for it yet
+WebView.shadow: not realized
 WebView.style: ✅
+WebView.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+WebView.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+WebView.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+WebView.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+WebView.transition: cannot read transition of WebView - GTK's driver has no path for it yet
 WebView.translationX: cannot read translationX of WebView - GTK's driver has no path for it yet
 WebView.translationY: cannot read translationY of WebView - GTK's driver has no path for it yet
 WebView.unfocus: ✅
+WebView.verticalAlignmentDefault: not realized
 WebView.width: ✅
 WebView.zIndex: not realized
+ZStack.accessibilityChildBehavior: – GTK's accessibility bridge answers no child behaviour yet.
 ZStack.accessibilityHeadingLevel: cannot read accessibilityHeadingLevel of ZStack - GTK's driver has no path for it yet
 ZStack.accessibilityHint: cannot read accessibilityHint of ZStack - GTK's driver has no path for it yet
 ZStack.accessibilityLabel: cannot read accessibilityLabel of ZStack - GTK's driver has no path for it yet
+ZStack.accessibilityTraits: – GTK's accessibility bridge answers no traits yet.
 ZStack.automationExcludedWithChildren: cannot read automationExcludedWithChildren of ZStack - GTK's driver has no path for it yet
 ZStack.background: cannot read background of ZStack - SwiftOmniUI draws a layout's box on GTK's snapshot, which holds none of its background; its drawing proves it
+ZStack.blendMode: – GTK composites every view normally; a blend pass over its own content draws nothing yet.
+ZStack.blur: not realized
+ZStack.compositingGroup: not realized
+ZStack.contentTransition: – GTK swaps a label's words with no transition yet.
+ZStack.drawingGroup: not realized
 ZStack.focus: – ZStack takes no keyboard focus here: it refuses it, and nothing is heard
 ZStack.frame: ✅
 ZStack.frameChanged: ✅
 ZStack.height: ✅
+ZStack.hint: cannot read hint of ZStack - GTK's driver has no path for it yet
+ZStack.hintKey: not realized
+ZStack.horizontalAlignmentDefault: not realized
 ZStack.ignoresInput: cannot read what reaches ZStack - GTK's driver has no path for it yet
 ZStack.isAccessibilityHidden: cannot read isAccessibilityHidden of ZStack - GTK's driver has no path for it yet
 ZStack.isEnabled: ✅
 ZStack.isFocusedChanged: – ZStack takes no keyboard focus here: it refuses it, and nothing is heard
+ZStack.isFrameContent: not realized
+ZStack.isGeometryReader: not realized
+ZStack.isLayoutDecoration: not realized
 ZStack.isVisible: ✅
 ZStack.layoutDirection: cannot read layoutDirection of ZStack - GTK's driver has no path for it yet
+ZStack.matchedGeometry: – GTK's layout motion flies no matched child into place yet.
+ZStack.matchedGeometrySource: – GTK's layout motion flies no matched child into place yet.
 ZStack.maximumHeight: ✅
 ZStack.maximumWidth: ✅
 ZStack.minimumHeight: ✅
@@ -1418,12 +2376,20 @@ ZStack.pivotY: cannot read pivotY of ZStack - GTK's driver has no path for it ye
 ZStack.rotation: cannot read rotation of ZStack - GTK's driver has no path for it yet
 ZStack.rotationX: cannot read rotationX of ZStack - GTK's driver has no path for it yet
 ZStack.rotationY: cannot read rotationY of ZStack - GTK's driver has no path for it yet
+ZStack.safeAreaInsetEdge: not realized
 ZStack.scale: cannot read scale of ZStack - GTK's driver has no path for it yet
 ZStack.scaleX: cannot read scaleX of ZStack - GTK's driver has no path for it yet
 ZStack.scaleY: cannot read scaleY of ZStack - GTK's driver has no path for it yet
+ZStack.shadow: not realized
 ZStack.style: ✅
+ZStack.symbolEffect: – GTK's pictures are painted, not animated as symbols.
+ZStack.symbolEffectActive: – GTK's pictures are painted, not animated as symbols.
+ZStack.symbolEffectOptions: – GTK's pictures are painted, not animated as symbols.
+ZStack.symbolEffectValue: – GTK's pictures are painted, not animated as symbols.
+ZStack.transition: cannot read transition of ZStack - GTK's driver has no path for it yet
 ZStack.translationX: cannot read translationX of ZStack - GTK's driver has no path for it yet
 ZStack.translationY: cannot read translationY of ZStack - GTK's driver has no path for it yet
 ZStack.unfocus: – ZStack takes no keyboard focus here: it refuses it, and nothing is heard
+ZStack.verticalAlignmentDefault: not realized
 ZStack.width: ✅
 ZStack.zIndex: not realized

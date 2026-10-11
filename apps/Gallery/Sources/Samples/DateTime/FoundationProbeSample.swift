@@ -32,7 +32,6 @@ struct FoundationProbeSample: SampleContent, ExampleContent {
         VStack {
             // The probe's answers are read here, so running it builds this
             // closure once.
-            DebugInfoLabel()
 
             ForEach(rows, id: \\.0) { row in
                 VStack {
@@ -116,7 +115,6 @@ struct FoundationProbeSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             ForEach(rows, id: \.0) { row in
                 VStack {

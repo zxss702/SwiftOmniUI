@@ -9,6 +9,13 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class ContractTests: XCTestCase {
+    /// Touches the shared renderer, whose init installs the UI thread's
+    /// executor before any task of this suite can be made - see UIThread.swift.
+    override func setUp() {
+        super.setUp()
+        Renderer.shared.clearInvalidation()
+    }
+
     /// A place a handler writes - a plain class captured in a test method,
     /// which is the capture that stays on this library's executor.
     private final class Heard {

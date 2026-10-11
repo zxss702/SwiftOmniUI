@@ -77,12 +77,4 @@ final class SessionStyle {
 
     /// The accent the gallery's bars are painted in.
     @State(sceneKey: .accent) var accent = AccentChoice.violet
-
-    /// Whether the Fonts and Colours windows hide while another gallery is the
-    /// one in front.
-    @State var hidesTools = false
-
-    /// Whether the Fonts and Colours windows float above the gallery's main
-    /// window rather than going under it.
-    @State var floatsTools = false
 }

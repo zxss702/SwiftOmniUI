@@ -51,7 +51,7 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Structure/WindowSceneCon
 | `minimumHeight` | property | `Double` | native |  | ✅ |  |  | not realized; GTK 4: not realized |
 | `minimumWidth` | property | `Double` | native |  | ✅ |  |  | not realized; GTK 4: not realized |
 | `modalPopped` | event | `Int` | adaptive | · | ✅ |  |  | cannot goBack on WindowScene - Android's driver has no path for it yet; GTK 4: not realized |
-| `resizability` | property | `WindowResizability` | adaptive |  |  |  |  |  |
+| `resizability` | property | `WindowResizability` | adaptive |  |  | · |  | GTK 4: cannot read resizability of WindowScene - GTK's driver has no path for it yet |
 | `resumed` | event |  | adaptive | 🔌 | ✅ |  |  | only through the host's own: minimize on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
 | `stopped` | event |  | adaptive | 🔌 | ✅ |  |  | only through the host's own: minimize on WindowScene: the host told the activity's phase, no activity moved; GTK 4: not realized |
 | `title` | property | `String` | native | · | ✅ |  |  | cannot read title of WindowScene - Android's driver has no path for it yet; GTK 4: not realized |
@@ -60,4 +60,4 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Structure/WindowSceneCon
 | `windowValue` | property | `String` | structure |  | ✅ |  |  | not realized; GTK 4: not realized |
 | `x` | property | `Double` | structure |  | ✅ |  |  | not realized; GTK 4: not realized |
 | `y` | property | `Double` | structure |  | ✅ |  |  | not realized; GTK 4: not realized |
-| `defaultPosition` | property | `UnitPoint` | adaptive |  |  |  |  |  |
+| `defaultPosition` | property | `UnitPoint` | adaptive |  |  |  |  | GTK 4: not realized |

@@ -97,7 +97,6 @@ struct SymbolSample: SampleContent, ExampleContent {
                     }
                 }
                 .spacing(8)
-                .horizontalAlignment(.center)
             }
         }
         .spacing(16)

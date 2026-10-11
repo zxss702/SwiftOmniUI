@@ -1,4 +1,6 @@
 # revision 1.1
 Menu: ✅
 Menu.isEnabled: ✅
+Menu.placement: not realized
 Menu.text: ✅
+Menu.textKey: not realized

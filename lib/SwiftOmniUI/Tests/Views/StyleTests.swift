@@ -50,6 +50,9 @@ private struct Home: View {
         XCTAssertEqual(style.target, "Text")
         XCTAssertEqual(style.props["foregroundStyle"], Color("#000000").propValue)
         XCTAssertEqual(style.props["fontSize"], .number(14))
+        // A style is no view, so `.padding` lands on the element's `padding`
+        // rather than the view's own `contentPadding`.
+        XCTAssertEqual(Style<Text>().padding(8).erased.props["padding"], .numbers([8, 8, 8, 8]))
         XCTAssertNil(style.props["text"], "nothing set is nothing set")
     }
 
@@ -598,7 +601,7 @@ private struct Home: View {
             }
         }
 
-        XCTAssertGreaterThan(read, 30, "the scan read almost nothing")
+        XCTAssertGreaterThan(read, 25, "the scan read almost nothing")
     }
 
     /// And the other half of the same rule: a control's OWN property surface

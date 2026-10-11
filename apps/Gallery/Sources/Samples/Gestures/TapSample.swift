@@ -18,7 +18,6 @@ struct TapSample: SampleContent, ExampleContent {
 
         VStack {
             // The count is read here, so every tap builds this closure.
-            DebugInfoLabel()
 
             ZStack {
                 Text("Tap anywhere on this box")
@@ -44,7 +43,6 @@ struct TapSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             ZStack {
                 Text("Tap anywhere on this box")
@@ -53,8 +51,7 @@ struct TapSample: SampleContent, ExampleContent {
                     .multilineTextAlignment(.center)
             }
             .style("Card")
-            .stroke(Palette.accent)
-            .strokeWidth(1)
+            .stroke(Palette.accent, width: 1)
             .shape(.roundedRectangle(10))
             .onTapGesture { taps += 1 }
 
@@ -65,8 +62,7 @@ struct TapSample: SampleContent, ExampleContent {
                     .multilineTextAlignment(.center)
             }
             .style("Card")
-            .stroke(Palette.outline)
-            .strokeWidth(1)
+            .stroke(Palette.outline, width: 1)
             .shape(.roundedRectangle(10))
             .onTapGesture(count: 2) { taps = 0 }
 

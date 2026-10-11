@@ -69,6 +69,15 @@ extension AndroidDriver {
             renderer?.setPhase(.inactive)
             renderer?.setPhase(.background)
             renderer?.destroying()
+        case (.dropFiles(let paths), _):
+            // The system's files let go on the element, at its middle: what a drop out of Files raises.
+            guard let target = element.native as? AndroidElement else { throw DriverCannot(act, on: element) }
+            let place = try place(of: element)
+            target.send(.dropPaths, [.strings(paths), .numbers([place.width / 2, place.height / 2])])
+        case (.openLink(let link), _):
+            // The platform handing the application a link - an intent's data brought in.
+            guard let runtime = renderer?.runtime else { throw DriverCannot(act, on: element) }
+            _ = runtime.core.raise(AppContract.urlOpened, link)
         default: throw DriverCannot(act, on: element)
         }
     }

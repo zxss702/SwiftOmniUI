@@ -114,9 +114,9 @@ final class ConformanceRunnerTests: XCTestCase {
         ], on: driver)
 
         XCTAssertEqual(HostVerdict.text(verdicts), """
-            Text: 🔌 tap on Text: handed to the recognizer
             Switch.isOn: 🔌 read isOn of Switch: a copy the host keeps
             Switch.toggled: ✅
+            Text: 🔌 tap on Text: handed to the recognizer
 
             """)
     }

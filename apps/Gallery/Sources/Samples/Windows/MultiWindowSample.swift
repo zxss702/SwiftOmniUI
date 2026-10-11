@@ -48,11 +48,7 @@ struct MultiWindowSample: SampleContent, ExampleContent {
             var windows: Windows {
                 Windows {
                     WindowGroup(.fonts) { FontsWindow() }
-                        .hidesWhenInactive(style.hidesTools)
-                        .floatsOnTop(style.floatsTools)
                     WindowGroup(.colours) { ColoursWindow() }
-                        .hidesWhenInactive(style.hidesTools)
-                        .floatsOnTop(style.floatsTools)
                     WindowGroup(.debugInspector) { DebugInspector() }
                     WindowGroup(.swatch, for: Int.self) { number in     // one per value,
                         SwatchWindow(number: number)                    // its value lent
@@ -68,8 +64,6 @@ struct MultiWindowSample: SampleContent, ExampleContent {
         final class SessionStyle {                      // kept WITH its gallery
             @State(sceneKey: .font) var font = ""
             @State(sceneKey: .accent) var accent = AccentChoice.violet
-            @State var hidesTools = false
-            @State var floatsTools = false
         }
 
         // Opening and closing this gallery's windows:
@@ -88,9 +82,6 @@ struct MultiWindowSample: SampleContent, ExampleContent {
         })
 
         Button("Close fonts", action: { try await scene.closeWindow(.fonts) })
-
-        SwitchRow("Hide them behind another gallery", style.$hidesTools)
-        SwitchRow("Keep them on top", style.$floatsTools)
 
         // And a window closes itself, from a page in it:
         //     @Environment private var window: WindowSession
@@ -113,7 +104,6 @@ struct MultiWindowSample: SampleContent, ExampleContent {
         VStack {
             // What the last button answered, and what is open - read here, so
             // a gallery or a window opening or closing builds this closure.
-            DebugInfoLabel()
             Text(said)
             Text("\\(application.scenes.count) galleries open")
             Text(scene.windows.map { $0.title ?? "untitled" }.joined(separator: " · "))
@@ -131,17 +121,14 @@ struct MultiWindowSample: SampleContent, ExampleContent {
                 opens("Colours", .colours)
             }
             .spacing(10)
-            .horizontalAlignment(.center)
 
             HStack {
                 closes("Close fonts", .fonts)
                 closes("Close colours", .colours)
             }
             .spacing(10)
-            .horizontalAlignment(.center)
 
             VStack {
-                DebugInfoLabel()
 
                 Text(said)
                     .font(.system(size: 13, design: .monospaced))
@@ -162,9 +149,6 @@ struct MultiWindowSample: SampleContent, ExampleContent {
             }
             .spacing(4)
 
-            SwitchRow("Hide them behind another gallery", style.$hidesTools)
-            SwitchRow("Keep them on top", style.$floatsTools)
-
             SectionTitle("A window per value")
 
             HStack {
@@ -173,12 +157,10 @@ struct MultiWindowSample: SampleContent, ExampleContent {
                 swatch(3)
             }
             .spacing(10)
-            .horizontalAlignment(.center)
 
             Button("Close swatch 2", action: { await closeSwatch(2) })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(14, 6))
-                .horizontalAlignment(.center)
                 
 
             SectionTitle("Another gallery")
@@ -188,14 +170,12 @@ struct MultiWindowSample: SampleContent, ExampleContent {
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 .accessibilityIdentifier("scene.open")
                 
 
             Button("Close this gallery", action: { await closeThis() })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(14, 6))
-                .horizontalAlignment(.center)
                 .accessibilityIdentifier("scene.close")
                 
         }

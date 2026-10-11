@@ -49,6 +49,7 @@ public struct _ViewModifier_Applied<Content: View, M: ViewModifier>: View {
     /// The modifier whose `body(content:)` composes here.
     let modifier: M
 
+    /// What the modifier composes from the view it was written on.
     public var body: some View {
         modifier.body(content: _ViewModifier_Content<M>(view: AnyView(content)))
     }

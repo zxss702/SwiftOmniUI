@@ -22,11 +22,17 @@ public struct Label: View {
 
     /// The title's key and fallback text, where the label was made from one -
     /// what `.tabItem` names a page's item with.
-    var titleText: (key: LocalizedStringKey, display: String)? = nil
+    private var titleText: (key: LocalizedStringKey, display: String)? = nil
 
     /// The icon as a source, where the label was made from one - a custom
     /// `icon:` view draws in the label but names no item.
-    var iconSource: ImageSource? = nil
+    private var iconSource: ImageSource? = nil
+
+    /// The caption and picture `.tabItem` reads, where the label's own
+    /// initializers carried them.
+    var semanticParts: (title: (key: LocalizedStringKey, display: String)?, icon: ImageSource?) {
+        (titleText, iconSource)
+    }
 
     /// Which halves draw - `.labelsHidden` above writes it.
     @Environment private var style: LabelStyle
@@ -72,11 +78,13 @@ public struct Label: View {
         iconSource = image
     }
 
-    /// The row itself.
+    /// The row itself. A label with no icon shows its title whatever the
+    /// style asks: `.iconOnly` hides words beside a picture, never the label.
     public var body: some View {
-        HStack {
+        let hasIcon = !(icon is EmptyView)
+        return HStack {
             if style.showsIcon { icon }
-            if style.showsTitle { title }
+            if style.showsTitle || !hasIcon { title }
         }
         .spacing(6)
     }

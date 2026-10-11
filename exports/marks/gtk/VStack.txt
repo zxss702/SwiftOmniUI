@@ -1,3 +1,3 @@
 # revision 1.1
-VStack: ✅
+VStack: ❌ [0.0, 20.0, 40.0, 30.0] expected, [0.0, 28.0, 40.0, 30.0] came - the second under it
 VStack.frameChanged: ✅

@@ -27,6 +27,13 @@ private final class Log: @unchecked Sendable {
 }
 
 @MainActor final class ChangesTests: XCTestCase {
+    /// Touches the shared renderer, whose init installs the UI thread's
+    /// executor before any task of this suite can be made - see UIThread.swift.
+    override func setUp() {
+        super.setUp()
+        Renderer.shared.clearInvalidation()
+    }
+
     // MARK: - When it fires
 
     func testAChangedValueRunsTheHandler() {

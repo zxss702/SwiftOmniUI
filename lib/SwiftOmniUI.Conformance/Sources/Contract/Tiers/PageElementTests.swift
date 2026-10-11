@@ -15,6 +15,18 @@
             [
                 inTab(PageElementContract.title, of: element, "Notes", then: "Drafts"),
                 inTab(PageElementContract.icon, of: element, "test_dot.png", then: "test_wide.png"),
+                inTab(PageElementContract.titleKey, of: element, "notes", then: "drafts"),
+                inTab(PageElementContract.subtitle, of: element, "One", then: "Two"),
+                inTab(PageElementContract.subtitleKey, of: element, "one", then: "two"),
+                inTab(PageElementContract.document, of: element, "A.txt", then: "B.txt"),
+                inTab(PageElementContract.badge, of: element, "1", then: "2"),
+                inTab(PageElementContract.presentationDetents, of: element, [.medium], then: [.large]),
+                inTab(PageElementContract.presentationDragIndicator, of: element, .hidden, then: .visible),
+                inTab(PageElementContract.interactiveDismissDisabled, of: element, false, then: true),
+                inTab(PageElementContract.preferredColumnWidth, of: element, [200], then: [300]),
+                inTab(PageElementContract.toolbarVisibility, of: element, .hidden, then: .visible),
+                inTab(PageElementContract.toolbarBackground, of: element, .hidden, then: .visible),
+                inTab(PageElementContract.windowBackground, of: element, .red, then: .blue),
             ]
         } + [titled]
     }

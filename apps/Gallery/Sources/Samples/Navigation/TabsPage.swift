@@ -37,7 +37,6 @@ struct TabsPage: View {
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
                     .padding(EdgeInsets(20, 10))
-                    .horizontalAlignment(.center)
                     
 
                 Text("Depth here: \(path.count)")
@@ -52,7 +51,6 @@ struct TabsPage: View {
                 // home from there.
                 Button("Back to the Navigation samples", action: { nav.openGroup("navigation") })
                     .padding(EdgeInsets(20, 10))
-                    .horizontalAlignment(.center)
                     
             }
             .spacing(14)

@@ -8,8 +8,6 @@ struct WindowSample: SampleContent, ExampleContent {
     @State private var maximizable = true
     @State private var minimizable = true
     @State private var translucent = false
-    @State private var width = 0.0
-    @State private var height = 0.0
 
     static let id = "window"
     static let title = "WindowScene"
@@ -40,7 +38,6 @@ struct WindowSample: SampleContent, ExampleContent {
         @State private var minimizable = true
         @State private var translucent = false
 
-        DebugInfoLabel()
 
         Button("Move to 80, 80", action: {
             window.x = 80
@@ -70,8 +67,8 @@ struct WindowSample: SampleContent, ExampleContent {
     var notes: (any View)? { nil }
 
     var body: some View {
-        VStack {
-            DebugInfoLabel()
+        GeometryReader { room in
+            VStack {
 
             Text(window.title ?? "Platform title")
                 .font(.system(size: 15))
@@ -122,18 +119,15 @@ struct WindowSample: SampleContent, ExampleContent {
                     window.isTranslucent = translucent
                 }
 
-            Text("Sample frame: \(Int(width)) × \(Int(height))")
+            Text("Sample frame: \(Int(room.size.width)) × \(Int(room.size.height))")
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.accent)
+            }
+            .spacing(12)
+            // The switch starts where the window stands - on, where the
+            // gallery's window opens translucent.
+            .onAppear { translucent = window.isTranslucent == true }
         }
-        .spacing(12)
-        .onFrameChanged(in: .global) { frame in
-            width = frame.width
-            height = frame.height
-        }
-        // The switch starts where the window stands - on, where the gallery's
-        // window opens translucent.
-        .onAppear { translucent = window.isTranslucent == true }
     }
 
     /// An action that writes the surrounding window session.
@@ -150,7 +144,7 @@ struct WindowSample: SampleContent, ExampleContent {
             Toggle(isOn: value)
                 .accessibilityIdentifier(id)
                 .accessibilityLabel(title)
-            Text(title).verticalAlignment(.center)
+            Text(title)
         }
         .spacing(8)
     }

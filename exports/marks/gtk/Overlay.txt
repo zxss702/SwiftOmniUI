@@ -1,2 +1,2 @@
 # revision 1.1
-Overlay: cannot read what reaches Text - GTK's driver has no path for it yet
+Overlay: cannot read what reaches Grid - GTK's driver has no path for it yet

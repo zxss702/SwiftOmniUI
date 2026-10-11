@@ -10,8 +10,11 @@
     public static let name = "LineHeightElement"
 
     public static var cases: [ConformanceCase] {
-        Specimens.wearing(LineHeightElementContract.self).map { element in
-            Aspects.holds(LineHeightElementContract.lineHeight, on: element, 1, then: 1.5, with: Words.on(element))
+        Specimens.wearing(LineHeightElementContract.self).flatMap { element in
+            [
+                Aspects.holds(LineHeightElementContract.lineHeight, on: element, 1, then: 1.5, with: Words.on(element)),
+                Aspects.holds(LineHeightElementContract.lineSpacing, on: element, 0, then: 4, with: Words.on(element)),
+            ]
         }
     }
 }

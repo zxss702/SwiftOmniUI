@@ -46,8 +46,13 @@ public enum TextContract: ElementContract {
     public static let textLayoutChanged = ElementEvent<Self, TextLayoutReport>(
         "textLayoutChanged", layer: .native)
 
+    /// The frame the words settled in, reported as `[x, y, w, h]` - a text's
+    /// position fed to its `Layout` answers without a geometry read.
+    public static let textFrameChanged = ElementEvent<Self, [Double]>(
+        "textFrameChanged", layer: .native)
+
     /// The element's own members.
     public static let members: [any ContractMember] = [
         lineBreak, lineLimit, minimumScaleFactor, selectable, textRenderer,
-        textLayoutChanged]
+        textLayoutChanged, textFrameChanged]
 }

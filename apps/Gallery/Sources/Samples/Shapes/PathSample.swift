@@ -59,9 +59,7 @@ private struct WrittenAsCalls: ExampleContent {
                     ])
                     path.closeSubpath()
                 }
-                .stroke(Palette.accent)
-                .strokeWidth(2)
-                .strokeLineJoin(.round)
+                .stroke(Palette.accent, style: StrokeStyle(lineWidth: 2, lineCap: .flat, lineJoin: .round))
                 .frame(width: 56)
                 .frame(height: 56)
             }
@@ -105,14 +103,11 @@ private struct WrittenAsCalls: ExampleContent {
                 ])
                 path.closeSubpath()
             }
-            .stroke(Palette.accent)
-            .strokeWidth(2)
-            .strokeLineJoin(.round)
+            .stroke(Palette.accent, style: StrokeStyle(lineWidth: 2, lineCap: .flat, lineJoin: .round))
             .frame(width: 56)
             .frame(height: 56)
         }
         .spacing(16)
-        .horizontalAlignment(.center)
     }
 
     var notes: (any View)? {
@@ -133,26 +128,22 @@ private struct MadeAndReused: ExampleContent {
             HStack {
                 // Whole outlines from an initializer.
                 Path(ellipseIn: Rect(2, 8, 52, 40))
-                    .stroke(Palette.accent)
-                    .strokeWidth(2)
+                    .stroke(Palette.accent, lineWidth: 2)
                     .frame(width: 56)
                     .frame(height: 56)
 
                 Path(roundedRect: Rect(4, 4, 48, 48), cornerRadius: 10)
-                    .stroke(Palette.accent)
-                    .strokeWidth(2)
+                    .stroke(Palette.accent, lineWidth: 2)
                     .frame(width: 56)
                     .frame(height: 56)
 
                 // A path is a value: the next one is made from it.
                 let card = Path(roundedRect: Rect(18, 8, 20, 40), cornerRadius: 4)
-                card.stroke(Palette.accent)
-                    .strokeWidth(2)
+                card.stroke(Palette.accent, lineWidth: 2)
                     .frame(width: 56)
                     .frame(height: 56)
                 card.applying(.skew(20, 0))
-                    .stroke(Palette.subtle)
-                    .strokeWidth(2)
+                    .stroke(Palette.subtle, lineWidth: 2)
                     .frame(width: 56)
                     .frame(height: 56)
 
@@ -172,26 +163,22 @@ private struct MadeAndReused: ExampleContent {
     var body: some View {
         HStack {
             Path(ellipseIn: Rect(2, 8, 52, 40))
-                .stroke(Palette.accent)
-                .strokeWidth(2)
+                .stroke(Palette.accent, lineWidth: 2)
                 .frame(width: 56)
                 .frame(height: 56)
 
             Path(roundedRect: Rect(4, 4, 48, 48), cornerRadius: 10)
-                .stroke(Palette.accent)
-                .strokeWidth(2)
+                .stroke(Palette.accent, lineWidth: 2)
                 .frame(width: 56)
                 .frame(height: 56)
 
             VStack(spacing: 0) {
                 let card = Path(roundedRect: Rect(18, 8, 20, 40), cornerRadius: 4)
-                card.stroke(Palette.accent)
-                    .strokeWidth(2)
+                card.stroke(Palette.accent, lineWidth: 2)
                     .frame(width: 56)
                     .frame(height: 28)
                 card.applying(.skew(20, 0))
-                    .stroke(Palette.subtle)
-                    .strokeWidth(2)
+                    .stroke(Palette.subtle, lineWidth: 2)
                     .frame(width: 56)
                     .frame(height: 28)
             }
@@ -208,7 +195,6 @@ private struct MadeAndReused: ExampleContent {
             }
         }
         .spacing(16)
-        .horizontalAlignment(.center)
     }
 
     var notes: (any View)? {

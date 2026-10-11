@@ -23,6 +23,13 @@ final class WinUIScrollDocument: WinUILayoutView {
         didSet { if orientation != oldValue { invalidateMeasurements() } }
     }
 
+    /// The scroller's own measure stands on this document: a change beneath forgets it too, or the presenter
+    /// keeps the extent it read last.
+    override func invalidateMeasurements() {
+        super.invalidateMeasurements()
+        scrollView?.scroller.invalidateMeasure()
+    }
+
     override func contentSize(width: Double?) -> LayoutSize {
         ScrollArithmetic.contentSize(of: items.first, padding: padding, orientation: orientation, width: width)
     }

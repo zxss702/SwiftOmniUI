@@ -5,6 +5,8 @@
 // Design: docs/design/types/transforms.md#the-arithmetic-is-in-the-core
 #if canImport(Android)
 import Android
+#elseif canImport(Darwin)
+import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(CRT)

@@ -19,13 +19,17 @@ final class AndroidConformanceTests: XCTestCase {
             ("testCheckBox", testCheckBox),
             ("testColorPicker", testColorPicker),
             ("testDatePicker", testDatePicker),
+            ("testCustomLayout", testCustomLayout),
+            ("testMasked", testMasked),
             ("testEllipse", testEllipse),
             ("testGrid", testGrid),
+            ("testGridRow", testGridRow),
             ("testHStack", testHStack),
             ("testImage", testImage),
             ("testText", testText),
             ("testLine", testLine),
             ("testMap", testMap),
+            ("testMenuButton", testMenuButton),
             ("testPath", testPath),
             ("testPicker", testPicker),
             ("testPopover", testPopover),
@@ -36,6 +40,10 @@ final class AndroidConformanceTests: XCTestCase {
             ("testRadioButton", testRadioButton),
             ("testRectangle", testRectangle),
             ("testScrollView", testScrollView),
+            ("testLazyHGrid", testLazyHGrid),
+            ("testLazyHStack", testLazyHStack),
+            ("testLazyVGrid", testLazyVGrid),
+            ("testLazyVStack", testLazyVStack),
             ("testList", testList),
             ("testSearchField", testSearchField),
             ("testSlider", testSlider),
@@ -69,6 +77,7 @@ final class AndroidConformanceTests: XCTestCase {
             ("testTitleView", testTitleView),
             ("testToolbarItem", testToolbarItem),
             ("testToolbarItems", testToolbarItems),
+            ("testToolbarSpacer", testToolbarSpacer),
             ("testTrailingContent", testTrailingContent),
             ("testWindow", testWindow),
             ("testPropertyContainer", testPropertyContainer),
@@ -91,6 +100,9 @@ final class AndroidConformanceTests: XCTestCase {
             ("testBarElement", testBarElement),
             ("testMenuItemElement", testMenuItemElement),
             ("testPageElement", testPageElement),
+            ("testControlSizeElement", testControlSizeElement),
+            ("testScrollContentElement", testScrollContentElement),
+            ("testPipelineMarks", testPipelineMarks),
         ]
     }
 
@@ -100,13 +112,17 @@ final class AndroidConformanceTests: XCTestCase {
     func testCheckBox() throws { try conform(CheckBoxTests.self) }
     func testColorPicker() throws { try conform(ColorPickerTests.self) }
     func testDatePicker() throws { try conform(DatePickerTests.self) }
+    func testCustomLayout() throws { try conform(CustomLayoutTests.self) }
+    func testMasked() throws { try conform(MaskedTests.self) }
     func testEllipse() throws { try conform(EllipseTests.self) }
     func testGrid() throws { try conform(GridTests.self) }
+    func testGridRow() throws { try conform(GridRowTests.self) }
     func testHStack() throws { try conform(HStackTests.self) }
     func testImage() throws { try conform(ImageTests.self) }
     func testText() throws { try conform(TextTests.self) }
     func testLine() throws { try conform(LineTests.self) }
     func testMap() throws { try conform(MapTests.self) }
+    func testMenuButton() throws { try conform(MenuButtonTests.self) }
     func testPath() throws { try conform(PathTests.self) }
     func testPicker() throws { try conform(PickerTests.self) }
     func testPopover() throws { try conform(PopoverTests.self) }
@@ -117,6 +133,10 @@ final class AndroidConformanceTests: XCTestCase {
     func testRadioButton() throws { try conform(RadioButtonTests.self) }
     func testRectangle() throws { try conform(RectangleTests.self) }
     func testScrollView() throws { try conform(ScrollViewTests.self) }
+    func testLazyHGrid() throws { try conform(LazyHGridTests.self) }
+    func testLazyHStack() throws { try conform(LazyHStackTests.self) }
+    func testLazyVGrid() throws { try conform(LazyVGridTests.self) }
+    func testLazyVStack() throws { try conform(LazyVStackTests.self) }
     func testList() throws { try conform(ListTests.self) }
     func testSearchField() throws { try conform(SearchFieldTests.self) }
     func testSlider() throws { try conform(SliderTests.self) }
@@ -150,6 +170,7 @@ final class AndroidConformanceTests: XCTestCase {
     func testTitleView() throws { try conform(TitleViewTests.self) }
     func testToolbarItem() throws { try conform(ToolbarItemTests.self) }
     func testToolbarItems() throws { try conform(ToolbarItemsTests.self) }
+    func testToolbarSpacer() throws { try conform(ToolbarSpacerTests.self) }
     func testTrailingContent() throws { try conform(TrailingContentTests.self) }
     func testWindow() throws { try conform(WindowTests.self) }
     func testPropertyContainer() throws { try conform(PropertyContainerTests.self) }
@@ -172,6 +193,9 @@ final class AndroidConformanceTests: XCTestCase {
     func testBarElement() throws { try conform(BarElementTests.self) }
     func testMenuItemElement() throws { try conform(MenuItemElementTests.self) }
     func testPageElement() throws { try conform(PageElementTests.self) }
+    func testControlSizeElement() throws { try conform(ControlSizeElementTests.self) }
+    func testScrollContentElement() throws { try conform(ScrollContentElementTests.self) }
+    func testPipelineMarks() throws { try conform(PipelineMarksTests.self) }
 
     /// The verdicts of a family run in parts, gathered until its last part writes them.
     nonisolated(unsafe) private static var gathered: [String: [HostVerdict]] = [:]

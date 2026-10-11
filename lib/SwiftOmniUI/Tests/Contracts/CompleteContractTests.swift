@@ -244,6 +244,13 @@ import XCTest
         // `.safeAreaInset` is written out as a VStack or an HStack holding
         // the view and its bar - the stacks' `spacing` is theirs to write.
         "View+SafeArea.swift": ["VStack", "HStack"],
+        // `.padding` writes the padding element's `contentPadding` too.
+        "View.swift": ["PaddingElement"],
+        // Builds its node through `Node(shape:)`, which the scan cannot read.
+        "UnevenRoundedRectangle.swift": ["Rectangle"],
+        // The producer writes the pipeline's own row-stack mark on a row's
+        // element - a PipelineMarks member, which no lazy stack's contract wears.
+        "LazyStacks.swift": ["PipelineMarks"],
     ]
 
     /// The contracts a source names by its protocols and extensions -

@@ -13,6 +13,7 @@
     public static var cases: [ConformanceCase] {
         [
             Aspects.standsAlone("List"),
+            Aspects.holds(ListContract.listStyle, on: "List", .automatic, then: .sidebar),
             ConformanceCase("onlyTheItemsInViewAreBuilt", proves: [
                 Covered(ListContract.items), Covered(ListContract.realizedChanged),
             ]) { s in

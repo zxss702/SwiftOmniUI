@@ -2,3 +2,4 @@
 ActivityIndicator: ✅
 ActivityIndicator.frameChanged: ✅
 ActivityIndicator.isRunning: ✅
+ActivityIndicator.progressStyle: not realized

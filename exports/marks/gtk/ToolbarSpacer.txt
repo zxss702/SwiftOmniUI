@@ -1,0 +1,4 @@
+# revision 1.1
+ToolbarSpacer: ✅
+ToolbarSpacer.placement: cannot read placement of ToolbarSpacer - GTK's driver has no path for it yet
+ToolbarSpacer.variant: cannot read variant of ToolbarSpacer - GTK's driver has no path for it yet

@@ -83,7 +83,6 @@ struct SplitViewSample: SampleContent, ExampleContent {
                 .font(.system(size: 14))
 
             SwitchRow("Menu open", nav.$menuOpen)
-                .horizontalAlignment(.center)
 
             HStack {
                 Toggle(isOn: nav.$listsHiddenRow)
@@ -94,13 +93,11 @@ struct SplitViewSample: SampleContent, ExampleContent {
                     ? "The menu lists \"Not in the list\""
                     : "The menu does not list it")
                     .font(.system(size: 14))
-                    .verticalAlignment(.center)
             }
             .spacing(10)
 
             Button("Go there anyway", action: { nav.open(.hidden) })
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(12)

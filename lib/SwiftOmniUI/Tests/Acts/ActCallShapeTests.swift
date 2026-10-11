@@ -15,6 +15,14 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class ActCallShapeTests: XCTestCase {
+    /// A test leaves the queue empty; emptying it also touches the shared
+    /// renderer, whose init installs the UI thread's executor before any
+    /// task of this suite can be made - see UIThread.swift.
+    override func setUp() {
+        super.setUp()
+        _ = drainedActs()
+    }
+
     private typealias Act<Value> = nonisolated(nonsending) () async throws -> Value
 
     /// Empties the shared queue, so a test starts from nothing.

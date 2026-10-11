@@ -1,0 +1,5 @@
+# revision 1.1
+LazyHStack: ✅
+LazyHStack.frameChanged: ✅
+LazyHStack.items: ❌ the driver cannot read items of Grid, and says nothing of why
+LazyHStack.realizedChanged: ✅

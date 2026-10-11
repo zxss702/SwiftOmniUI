@@ -40,7 +40,6 @@ struct IdentitySample: SampleContent, ExampleContent {
             VStack {
                 // The list is described again on every change, and the rows
                 // keep their controls through it - which is what identity is.
-                DebugInfoLabel()
 
                 ForEach(items) { item in
                     IdentityRow(item: item, items: $items)
@@ -51,16 +50,15 @@ struct IdentitySample: SampleContent, ExampleContent {
         private struct IdentityRow: View {
             let item: String
             @Binding var items: [String]
+            @State private var typed = ""
 
             var body: some View {
                 HStack {
                     Text(item)
                         .frame(width: 90)
-                        .verticalAlignment(.center)
 
-                    TextField()
-                        .placeholder("type here")
-                        .horizontalAlignment(.fill)
+                    TextField("type here", text: $typed)
+                        .frame(maxWidth: .infinity)
 
                     Button("Remove", action: {
                             items = items.filter { $0 != item }
@@ -105,7 +103,6 @@ struct IdentitySample: SampleContent, ExampleContent {
             // an inserted row would rewrite every row into the one below it.
             // A row may still write `.id()` of its own, and the author's wins.
             VStack {
-                DebugInfoLabel()
 
                 ForEach(items) { item in
                     IdentityRow(item: item, items: $items)                    
@@ -139,19 +136,18 @@ struct IdentitySample: SampleContent, ExampleContent {
 private struct IdentityRow: View {
     let item: String
     @Binding var items: [String]
+    @State private var typed = ""
 
     var body: some View {
         HStack {
             Text(item)
                 .font(.system(size: 15))
                 .frame(width: 90)
-                .verticalAlignment(.center)
 
-            TextField()
+            TextField("type here", text: $typed)
                 .accessibilityIdentifier("identity.typed")
                 .accessibilityLabel("Anything typed here")
-                .placeholder("type here")
-                .horizontalAlignment(.fill)
+                .frame(maxWidth: .infinity)
 
             Button("Remove", action: {
                     items = items.filter { $0 != item }

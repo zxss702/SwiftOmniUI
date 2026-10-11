@@ -19,13 +19,17 @@ final class WebConformanceTests: XCTestCase {
     func testCheckBox() { conform(CheckBoxTests.self) }
     func testColorPicker() { conform(ColorPickerTests.self) }
     func testDatePicker() { conform(DatePickerTests.self) }
+    func testCustomLayout() { conform(CustomLayoutTests.self) }
+    func testMasked() { conform(MaskedTests.self) }
     func testEllipse() { conform(EllipseTests.self) }
     func testGrid() { conform(GridTests.self) }
+    func testGridRow() { conform(GridRowTests.self) }
     func testHStack() { conform(HStackTests.self) }
     func testImage() { conform(ImageTests.self) }
     func testText() { conform(TextTests.self) }
     func testLine() { conform(LineTests.self) }
     func testMap() { conform(MapTests.self) }
+    func testMenuButton() { conform(MenuButtonTests.self) }
     func testPath() { conform(PathTests.self) }
     func testPicker() { conform(PickerTests.self) }
     func testPolygon() { conform(PolygonTests.self) }
@@ -35,6 +39,10 @@ final class WebConformanceTests: XCTestCase {
     func testRadioButton() { conform(RadioButtonTests.self) }
     func testRectangle() { conform(RectangleTests.self) }
     func testScrollView() { conform(ScrollViewTests.self) }
+    func testLazyHGrid() { conform(LazyHGridTests.self) }
+    func testLazyHStack() { conform(LazyHStackTests.self) }
+    func testLazyVGrid() { conform(LazyVGridTests.self) }
+    func testLazyVStack() { conform(LazyVStackTests.self) }
     func testList() { conform(ListTests.self) }
     func testSearchField() { conform(SearchFieldTests.self) }
     func testSlider() { conform(SliderTests.self) }
@@ -69,6 +77,7 @@ final class WebConformanceTests: XCTestCase {
     func testTitleView() { conform(TitleViewTests.self) }
     func testToolbarItem() { conform(ToolbarItemTests.self) }
     func testToolbarItems() { conform(ToolbarItemsTests.self) }
+    func testToolbarSpacer() { conform(ToolbarSpacerTests.self) }
     func testTrailingContent() { conform(TrailingContentTests.self) }
     func testWindow() { conform(WindowTests.self) }
     func testPropertyContainer() { conform(PropertyContainerTests.self) }
@@ -126,6 +135,9 @@ final class WebConformanceTests: XCTestCase {
     func testBarElement() { conform(BarElementTests.self) }
     func testMenuItemElement() { conform(MenuItemElementTests.self) }
     func testPageElement() { conform(PageElementTests.self) }
+    func testControlSizeElement() { conform(ControlSizeElementTests.self) }
+    func testScrollContentElement() { conform(ScrollContentElementTests.self) }
+    func testPipelineMarks() { conform(PipelineMarksTests.self) }
 
     /// Runs `family` - or `part` of it - on the Web, and holds its verdicts to the family's file of the Web's marks.
     /// A long family runs in parts, each a test of its own, so a part can be run alone and the parts side by side.

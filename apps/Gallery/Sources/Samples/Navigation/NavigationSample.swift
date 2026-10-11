@@ -41,19 +41,16 @@ struct NavigationSample: SampleContent, ExampleContent {
                     return MissingPage(id: id, nav: nav, path: $path)
                 }
 
-                return SamplePage.shown(sample, nav: nav, bar: AppColors.violet)
+                return SamplePage.shown(sample, nav: nav)
 
             case .level(let n):
                 return LevelPage(level: n, nav: nav, path: $path)
             }
         }
-        .barBackgroundColor(AppColors.violet)
-        .barForegroundColor(Palette.onBrand)
 
         // Every move there is, from this page. The stack and the arrivals are
         // read wherever they are printed, so that closure is what a push and
         // a pop build again.
-        DebugInfoLabel()
 
         Button("Push a page", action: { path.append(.level(1)) })
             
@@ -80,14 +77,12 @@ struct NavigationSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Button("Push a page", action: { nav.push(.level(1)) })
                 .background(Palette.accent)
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             // No act, no await, no question asked of the host: the answer is
@@ -102,7 +97,6 @@ struct NavigationSample: SampleContent, ExampleContent {
                     arrivals += 1
                 })
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             Text("Arrived home \(arrivals) time(s)")
@@ -111,7 +105,6 @@ struct NavigationSample: SampleContent, ExampleContent {
 
             Button("Empty the stack", action: { nav.path = [] })
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(12)

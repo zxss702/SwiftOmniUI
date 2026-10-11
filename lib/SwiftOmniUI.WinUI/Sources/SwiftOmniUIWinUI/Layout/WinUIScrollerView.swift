@@ -69,6 +69,13 @@ final class WinUIScrollerView: WinUIView {
         return (Point(x: values[0], y: values[1]), Point(x: values[2], y: values[3]))
     }
 
+    /// The presenter inside measures and arranges again too: it picks the anchor it holds the view by before the
+    /// document moves.
+    override func invalidateMeasure() {
+        super.invalidateMeasure()
+        swiftomniui_winui_scroller_invalidate_presenter(handle)
+    }
+
     override func held(_ holding: Bool) {
         onHeld?(holding)
     }

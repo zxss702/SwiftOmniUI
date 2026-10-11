@@ -1,0 +1,5 @@
+# revision 1.1
+LazyHStack: ✅
+LazyHStack.frameChanged: ✅
+LazyHStack.items: cannot read items of Grid - GTK's driver has no path for it yet
+LazyHStack.realizedChanged: ✅

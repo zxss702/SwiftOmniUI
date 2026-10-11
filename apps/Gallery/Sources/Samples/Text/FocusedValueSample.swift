@@ -73,7 +73,6 @@ struct FocusedValueSample: SampleContent, ExampleContent {
                 ?? "Nothing focused")
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.accent)
-                .horizontalAlignment(.center)
 
             TextField("Name", text: $name)
                 .focusedValue(\.field, "name")

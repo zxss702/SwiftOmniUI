@@ -26,8 +26,12 @@ that the application may not render for - a tab chosen, the sidebar shown:
   side, in their priority's order, those it places in overflow behind the
   bar's own "more"; an action with a picture shows the picture alone - the
   first of the files its name stands for that the application's pictures
-  hold ([pictures](controls.md#pictures)) - its words naming it to Narrator
-  and in its tip;
+  hold ([pictures](controls.md#pictures)), or the Fluent glyph its name is -
+  its words naming it to Narrator and in its tip. A `Button` an item carries
+  is the bar's own `AppBarToggleButton`, momentary until it wears `isOn`, a
+  `Menu` its `AppBarButton` with the menu as its flyout: its words its label,
+  a picture its icon, WinUI's own look under the pointer. Any other view
+  stands in an `AppBarElementContainer`;
 - the page's title view stands at the chrome's centre, where an application
   puts its search;
 - an authored `TitleBar` adds its leading, centre and trailing content, and

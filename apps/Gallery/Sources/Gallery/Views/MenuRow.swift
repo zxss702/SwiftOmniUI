@@ -71,7 +71,6 @@ struct MenuRow: View {
                 .frame(width: 20)
                 .frame(height: 20)
                 .hidden(picture.isEmpty)
-                .verticalAlignment(.center)
 
             // The style says what a row's caption is; the two lines under it
             // say what the CHOSEN one is. A control's own value wins over its

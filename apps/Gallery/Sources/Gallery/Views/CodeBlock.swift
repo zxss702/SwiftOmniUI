@@ -21,7 +21,6 @@ struct CodeBlock: View {
         .scrollIndicators(.hidden, axes: .vertical)
         .background(Palette.raised)
         .stroke(Palette.outline)
-        .strokeWidth(1)
         .shape(.roundedRectangle(8))
         // Code reads left to right in every language, from its first column.
         .layoutDirection(.leftToRight)
@@ -38,26 +37,21 @@ struct CodeBlock: View {
     /// per block rather than once per render.
     private var snippet: any View {
         VStack {
-            Text()
-                .spans {
-                    // Identified by OFFSET: two runs may be the same words
-                    // in the same colour, and the snippet never changes, so
-                    // the offsets never move.
-                    ForEach(
-                        Array(CodeHighlight.runs(in: code).enumerated()),
-                        id: \.offset
-                    ) { run in
-                        // The size goes on every run rather than on the
-                        // Text. A span carries font properties of its own,
-                        // and what an unset one falls back to is the
-                        // platform's business - one property per run costs
-                        // nothing and leaves nothing to it.
-                        TextSpan(run.element.text)
-                            .foregroundStyle(run.element.colour)
-                            .font(.system(size: size))
-                    }
-                }
-                .padding(14)
+            // One run per token, gathered into a single Text with `+` - the
+            // block is built once when described and carried whole after
+            // that, so the scan runs once per block rather than once per
+            // render.
+            CodeHighlight.runs(in: code).map { run in
+                // The size goes on every run rather than on the Text. A run
+                // carries font properties of its own, and what an unset one
+                // falls back to is the platform's business - one property
+                // per run costs nothing and leaves nothing to it.
+                Text(run.text)
+                    .foregroundStyle(run.colour)
+                    .font(.system(size: size))
+            }
+            .reduce(Text(""), +)
+            .padding(14)
         }
     }
 }

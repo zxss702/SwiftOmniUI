@@ -35,7 +35,6 @@ struct LifecycleSample: SampleContent, ExampleContent {
         }
 
         VStack {
-            DebugInfoLabel()
 
             ForEach(log.events) { row in
                 Text(row)
@@ -52,7 +51,6 @@ struct LifecycleSample: SampleContent, ExampleContent {
                 .foregroundStyle(Palette.subtle)
 
             VStack {
-                DebugInfoLabel()
 
                 if log.events.isEmpty {
                     Text("nothing yet - switch away and back")

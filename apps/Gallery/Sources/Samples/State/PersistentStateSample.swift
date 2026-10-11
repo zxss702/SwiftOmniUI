@@ -60,7 +60,6 @@ struct PersistentStateSample: SampleContent, ExampleContent {
         VStack {
             // Every one of the three kept values is read here, so this is what
             // a write rebuilds - and the reading names which one it was for.
-            DebugInfoLabel()
 
             Text("Pressed \\(visits) times, ever")
 
@@ -120,7 +119,6 @@ struct PersistentStateSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("Pressed \(visits) times, ever")
                 .font(.system(size: 22))
@@ -134,8 +132,7 @@ struct PersistentStateSample: SampleContent, ExampleContent {
                     
 
                 Button("Start over", action: { visits = 0 })
-                    .stroke(Palette.outline)
-                    .strokeWidth(1)
+                    .stroke(Palette.outline, width: 1)
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))
@@ -144,12 +141,10 @@ struct PersistentStateSample: SampleContent, ExampleContent {
                     
             }
             .spacing(12)
-            .horizontalAlignment(.center)
 
-            TextField($who)
+            TextField("Your name", text: $who)
                 .accessibilityIdentifier("persistent-state.who")
                 .accessibilityLabel("Your name")
-                .placeholder("Your name")
 
             Text(who.isEmpty ? "Welcome back" : "Welcome back, \(who)")
                 .font(.system(size: 17))
@@ -159,11 +154,9 @@ struct PersistentStateSample: SampleContent, ExampleContent {
             // with, so anything else that opens the store can read it.
             HStack {
                 Text("Shade")
-                    .verticalAlignment(.center)
 
                 Button(shade == .quiet ? "quiet" : "bold", action: { shade = shade == .quiet ? .bold : .quiet })
-                    .stroke(Palette.outline)
-                    .strokeWidth(1)
+                    .stroke(Palette.outline, width: 1)
                     .background(.transparent)
                     .foregroundStyle(Palette.subtle)
                     .shape(.roundedRectangle(8))

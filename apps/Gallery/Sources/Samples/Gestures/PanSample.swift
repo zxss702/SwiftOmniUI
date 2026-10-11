@@ -1,17 +1,13 @@
 import SwiftOmniUI
 
-/// A view dragged about under a finger, and the one write that must not travel.
+/// A view dragged about under a finger.
 struct PanSample: SampleContent, ExampleContent {
-    /// Where the box was left. Ordinary state: it changes once per gesture, so
-    /// describing it costs one render at the end of a drag.
+    /// Where the box was left - where the last drag ended.
     @State private var panX = 0.0
     @State private var panY = 0.0
 
-    /// Whether the reading written on every report is a SNAP.
-    @State private var snaps = true
-
-    /// Where the box IS, driven - the host reads the translation off these on
-    /// its own frames, so a drag costs the arithmetic and no renders at all.
+    /// Where the box IS right now: the committed place plus whatever the
+    /// finger has added since the drag began.
     @State private var liveX = 0.0
     @State private var liveY = 0.0
 
@@ -27,89 +23,42 @@ struct PanSample: SampleContent, ExampleContent {
     static let code = """
         @State private var panX = 0.0
         @State private var panY = 0.0
-
-        // Driven: the host reads the translation off these, so a drag renders
-        // nothing at all.
         @State private var liveX = 0.0
         @State private var liveY = 0.0
 
-        /// Whether the reading written on every report is a SNAP.
-        @State private var snaps = true
-
         VStack {
-            // The box is moved by DRIVEN states, so a drag builds nothing: the
-            // reading below is a CONVERSION of the same two, and the switch is
-            // handed its state - this stands at one build.
-            DebugInfoLabel()
-
-            // A fixed box for it to move inside, so the layout does not follow
-            // the view about.
             ZStack {
                 ColorPicker(Palette.accent)
                     .frame(width: 64)
                     .frame(height: 64)
-                    // DRIVEN, both of them.
-                    .offset(x: $liveX)
-                    .offset(y: $liveY)
-                    .onPanUpdated { update in
-                        switch update.phase {
-                        case .running:
-                            follow(panX + update.totalX, panY + update.totalY)
-                        case .completed:
-                            panX = $liveX.journey.value
-                            panY = $liveY.journey.value
-                        case .canceled:
-                            follow(panX, panY)
-                        case .started:
-                            break
-                        }
-                    }
+                    .offset(x: liveX, y: liveY)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                liveX = panX + value.translation.width
+                                liveY = panY + value.translation.height
+                            }
+                            .onEnded { _ in
+                                panX = liveX
+                                panY = liveY
+                            }
+                    )
             }
-            .style("Card")
             .frame(height: 200)
 
-            // Two states into one conversion: the host works the words out
-            // from where the box HAS GOT TO, on its own frames.
-            Text($liveX.journey.convert(with: $liveY.journey) { x, y in
-                "Moved \\(Int(x.value)), \\(Int(y.value))"
-            })
+            Text("Moved \\(Int(liveX)), \\(Int(liveY))")
 
-            SwitchRow("The drag snaps", $snaps)
-
-            // A SETPOINT, so the box travels home from wherever it was left.
-            Button("Put it back", action: {
+            Button("Put it back") {
                 panX = 0
                 panY = 0
                 liveX = 0
                 liveY = 0
-            })
-        }
-
-
-        /// The box under the finger.
-        ///
-        /// A READING WRITTEN ON EVERY REPORT IS A SNAP, and on a walked state
-        /// the snap is `$liveX.journey.snap(to:)` - where the box IS. The
-        /// state itself is where it is GOING, so writing that on every report
-        /// starts a fresh little journey the next report interrupts, and the
-        /// box trails the hand.
-        private func follow(_ x: Double, _ y: Double) {
-            if snaps {
-                // HERE, GOING NOWHERE, STANDING STILL - all three, so that
-                // `Put it back` has a destination to change.
-                $liveX.journey.snap(to: x)
-                $liveY.journey.snap(to: y)
-            } else {
-                liveX = x
-                liveY = y
             }
         }
         """
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
-
             // A fixed box for it to move inside, so the layout does not follow
             // the view about.
             ZStack {
@@ -117,40 +66,27 @@ struct PanSample: SampleContent, ExampleContent {
                     .cornerRadius(10)
                     .frame(width: 64)
                     .frame(height: 64)
-                    .horizontalAlignment(.center)
-                    .verticalAlignment(.center)
-                    // DRIVEN, both of them: the host reads the translation off
-                    // the state every frame, and no report renders anything.
-                    .offset(x: $liveX)
-                    .offset(y: $liveY)
-                    .onPanUpdated { update in
-                        switch update.phase {
-                        case .running:
-                            follow(panX + update.totalX, panY + update.totalY)
-                        case .completed:
-                            panX = $liveX.journey.value
-                            panY = $liveY.journey.value
-                        case .canceled:
-                            follow(panX, panY)
-                        case .started:
-                            break
-                        }
-                    }
+                    .offset(x: liveX, y: liveY)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                liveX = panX + value.translation.width
+                                liveY = panY + value.translation.height
+                            }
+                            .onEnded { _ in
+                                panX = liveX
+                                panY = liveY
+                            }
+                    )
             }
             .style("Card")
-            .stroke(Palette.outline)
-            .strokeWidth(1)
+            .stroke(Palette.outline, width: 1)
             .shape(.roundedRectangle(10))
             .frame(height: 200)
 
-            Text()
-                .text($liveX.journey.convert(with: $liveY.journey) { x, y in
-                    "Moved \(Int(x.value)), \(Int(y.value))"
-                })
+            Text("Moved \(Int(liveX)), \(Int(liveY))")
                 .font(.system(size: 15))
                 .multilineTextAlignment(.center)
-
-            SwitchRow("The drag snaps", $snaps)
 
             Button("Put it back", action: {
                     panX = 0
@@ -160,63 +96,20 @@ struct PanSample: SampleContent, ExampleContent {
                 })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(16, 6))
-                .horizontalAlignment(.center)
-                // A SETPOINT, so the box TRAVELS home from wherever it was
-                // left - the same two states, written the other way.
-                
         }
         .spacing(12)
-
-    }
-
-    /// The box under the finger.
-    ///
-    /// A READING WRITTEN ON EVERY REPORT IS A SNAP, and the snap is
-    /// `$liveX.journey.snap(to:)` - here, going nowhere, standing still.
-    /// Writing `$liveX.journey.value` alone would move the box and leave the
-    /// destination where it was, so `Put it back` would have nothing to
-    /// change. The state itself is where it is GOING, so writing THAT on every
-    /// report starts a fresh little journey the next report interrupts, which
-    /// is the lag the switch is here to show.
-    private func follow(_ x: Double, _ y: Double) {
-        if snaps {
-            $liveX.journey.snap(to: x)
-            $liveY.journey.snap(to: y)
-        } else {
-            liveX = x
-            liveY = y
-        }
     }
 
     var notes: (any View)? {
         VStack {
-            Text("The totals are measured from where the pan BEGAN, not from "
-                + "the last report - which is why the running case adds them to "
-                + "where the view was, and the completed case is what commits "
-                + "the move.")
+            Text("`translation` is measured from where the drag BEGAN, not from "
+                + "the last report - which is why `onChanged` adds it to where the "
+                + "view was left, and `onEnded` commits the move.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("`The drag snaps` is the whole lesson, and on a walked state it is "
-                + "the choice of which part to write. `$liveX.journey.snap(to:)` puts "
-                + "the box under the finger, going nowhere, standing still. The state "
-                + "itself is where it is GOING, so writing that on every report starts "
-                + "a journey the next report interrupts - turn the switch off and the "
-                + "box trails the hand.")
-                .font(.system(size: 12))
-                .foregroundStyle(Palette.subtle)
-
-            Text("`Put it back` writes the states instead, which is the same two "
-                + "states written the other way: the box travels home rather than "
-                + "jumping there.")
-                .font(.system(size: 12))
-                .foregroundStyle(Palette.subtle)
-
-            Text("Nothing on this page is described while the box moves. The "
-                + "translation is read off the state by the host, and the caption is a "
-                + "converted text over the same two states - so a drag of a hundred "
-                + "reports costs "
-                + "a hundred pieces of arithmetic and no renders.")
+            Text("Each report is a state write and a render; `Put it back` writes "
+                + "the same two states once, and the box jumps home.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
         }

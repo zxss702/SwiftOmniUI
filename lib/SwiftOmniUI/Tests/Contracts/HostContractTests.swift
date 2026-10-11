@@ -231,11 +231,11 @@ import XCTest
             vocabulary: "control",
             in: statusRows)
         assertDocumented(
-            Self.names(of: .property).sorted(),
+            Self.travelling(of: .property).sorted(),
             vocabulary: "property",
             in: statusRows)
         assertDocumented(
-            Self.names(of: .event).sorted(),
+            Self.travelling(of: .event).sorted(),
             vocabulary: "event",
             in: statusRows)
 
@@ -773,6 +773,18 @@ import XCTest
         Set(LibraryContracts.all.flatMap { contract in
             contract.members.compactMap { member in
                 (member as? any DeclaredMember)?.facts.kind == kind ? member.name : nil
+            }
+        })
+    }
+
+    /// Of those, the names that CROSS to a host: a member that does not travel
+    /// is the library's own, and no part of the host's vocabulary.
+    private static func travelling(of kind: MemberFacts.Kind) -> Set<String> {
+        Set(LibraryContracts.all.flatMap { contract in
+            contract.members.compactMap { member in
+                guard let facts = (member as? any DeclaredMember)?.facts,
+                      facts.kind == kind, facts.travels else { return nil }
+                return member.name
             }
         })
     }

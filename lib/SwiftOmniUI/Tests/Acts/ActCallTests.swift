@@ -13,6 +13,14 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class ActCallTests: XCTestCase {
+    /// A test leaves the queue empty; emptying it also touches the shared
+    /// renderer, whose init installs the UI thread's executor before any
+    /// task of this suite can be made - see UIThread.swift.
+    override func setUp() {
+        super.setUp()
+        _ = drainedActs()
+    }
+
     // MARK: - The name
 
     /// An act is never called a command. The queue and its take,

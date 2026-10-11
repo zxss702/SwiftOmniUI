@@ -13,24 +13,19 @@ struct StepperSample: SampleContent, ExampleContent {
 
         VStack {
             // The count is read here, so every step builds this closure.
-            DebugInfoLabel()
 
             Text("Servings: \\(Int(servings))")
 
             Stepper($servings, in: 1...12)
-                .step(1)
 
-            // The same value, stepped by five - and written back by hand,
-            // which is what the binding above does for you.
-            Stepper(servings, in: 1...12)
-                .step(5)
-                .onValueChanged { value in servings = value }
+            // The same value, stepped by five - the stride told in the
+            // initializer.
+            Stepper($servings, in: 1...12, step: 5)
         }
         """
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("Servings: \(Int(servings))")
                 .font(.system(size: 22))
@@ -39,17 +34,12 @@ struct StepperSample: SampleContent, ExampleContent {
             Stepper($servings, in: 1...12)
                 .accessibilityIdentifier("stepper.servings")
                 .accessibilityLabel("Servings")
-                .step(1)
-                .horizontalAlignment(.center)
 
             SectionTitle("A bigger step")
 
-            Stepper(servings, in: 1...12)
+            Stepper($servings, in: 1...12, step: 5)
                 .accessibilityIdentifier("stepper.servings.bigStep")
                 .accessibilityLabel("Servings, five at a time")
-                .step(5)
-                .horizontalAlignment(.center)
-                .onValueChanged { value in servings = value }
         }
         .spacing(12)
     }
@@ -63,7 +53,7 @@ struct StepperSample: SampleContent, ExampleContent {
                 .foregroundStyle(Palette.subtle)
 
             Text("The second holds the same value, stepped by five: `step` is how far "
-                + "one tap goes, and `minimum` and `maximum` are where the buttons stop.")
+                + "one tap goes, and the range is where the buttons stop.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
         }

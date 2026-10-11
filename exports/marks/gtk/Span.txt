@@ -1,4 +1,5 @@
 # revision 1.1
 Span: ✅
 Span.background: cannot read background of Span - GTK's driver has no path for it yet
+Span.image: not realized
 Span.text: ✅

@@ -33,7 +33,6 @@ struct SwatchPage: View {
             Text("Swatch \(number)")
                 .font(.system(size: 20))
                 .bold()
-                .horizontalAlignment(.center)
 
             HStack {
                 Button("Next", action: { number += 1 })
@@ -47,7 +46,6 @@ struct SwatchPage: View {
                     
             }
             .spacing(10)
-            .horizontalAlignment(.center)
         }
         .spacing(14)
         .onAppear {

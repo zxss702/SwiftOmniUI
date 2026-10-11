@@ -17,36 +17,31 @@ struct ContextMenuSample: SampleContent, ExampleContent {
         VStack {
             // The run and what was chosen are read here, so every menu item
             // that acts builds this closure.
-            DebugInfoLabel()
 
             ForEach(Array(items.enumerated()), id: \\.offset) { pair in
                 let (index, item) = pair
                 return Text(item)
                     .contextMenu {
-                        MenuItem("Duplicate")
-                            .onClicked {
+                        MenuItem("Duplicate") {
                                 items.insert(item + " copy", at: index + 1)
                                 chosen = "duplicated \\(item)"
                             }
 
                         Menu("Move") {
-                            MenuItem("To the top")
-                                .disabled(index <= 0)
-                                .onClicked {
+                            MenuItem("To the top", action: {
                                     items.remove(at: index)
                                     items.insert(item, at: 0)
                                     chosen = "moved \\(item) to the top"
-                                }
+                                })
+                                .disabled(index <= 0)
                         }
 
                         Divider()
 
-                        MenuItem("Remove")
-                            .isDestructive(true)
-                            .onClicked {
+                        MenuItem("Remove", role: .destructive, action: {
                                 items.remove(at: index)
                                 chosen = "removed \\(item)"
-                            }
+                            })
                     }
             }
 
@@ -62,7 +57,6 @@ struct ContextMenuSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             VStack {
                 ForEach(Array(items.enumerated()), id: \.offset) { pair in
@@ -72,30 +66,26 @@ struct ContextMenuSample: SampleContent, ExampleContent {
                         .padding(EdgeInsets(14, 10))
                         .background(Palette.raised)
                         .contextMenu {
-                            MenuItem("Duplicate")
-                                .onClicked {
-                                    items.insert(item + " copy", at: index + 1)
-                                    chosen = "duplicated \(item)"
-                                }
+                            MenuItem("Duplicate") {
+                                items.insert(item + " copy", at: index + 1)
+                                chosen = "duplicated \(item)"
+                            }
 
                             Menu("Move") {
-                                MenuItem("To the top")
-                                    .disabled(index <= 0)
-                                    .onClicked {
+                                MenuItem("To the top", action: {
                                         items.remove(at: index)
                                         items.insert(item, at: 0)
                                         chosen = "moved \(item) to the top"
-                                    }
+                                    })
+                                    .disabled(index <= 0)
                             }
 
                             Divider()
 
-                            MenuItem("Remove")
-                                .isDestructive(true)
-                                .onClicked {
+                            MenuItem("Remove", role: .destructive, action: {
                                     items.remove(at: index)
                                     chosen = "removed \(item)"
-                                }
+                                })
                         }
                 }
             }
@@ -110,7 +100,7 @@ struct ContextMenuSample: SampleContent, ExampleContent {
                     chosen = "nothing yet"
                 })
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.start)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 
         }
         .spacing(12)

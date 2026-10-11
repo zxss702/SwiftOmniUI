@@ -30,7 +30,6 @@ struct HostTimeSample: SampleContent, ExampleContent {
         VStack {
             // What the host answered is read here, so each ask builds this
             // closure once.
-            DebugInfoLabel()
 
             Text("Here: \\(zone)")
             Text(season)
@@ -88,7 +87,6 @@ struct HostTimeSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("Here: \(zone.isEmpty ? "…" : zone)")
                 .font(.system(size: 17))
@@ -102,12 +100,12 @@ struct HostTimeSample: SampleContent, ExampleContent {
                 HStack {
                     Text(clock.0)
                         .font(.system(size: 14))
-                        .horizontalAlignment(.start)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     Text(clock.1)
                         .font(.system(size: 14))
                         .foregroundStyle(Palette.accent)
-                        .horizontalAlignment(.end)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                         .multilineTextAlignment(.end)
                 }
                 .spacing(12)
@@ -116,7 +114,6 @@ struct HostTimeSample: SampleContent, ExampleContent {
             Button("Read again", action: { try await read() })
                 .font(.system(size: 13))
                 .padding(EdgeInsets(16, 6))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(10)

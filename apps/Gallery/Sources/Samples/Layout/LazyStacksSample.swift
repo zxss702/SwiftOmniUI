@@ -32,17 +32,15 @@ private struct LazyRows: ExampleContent {
                     Text("- the top -")
 
                     ForEach(shown) { row in
-                        Grid {
-                            Text("Row \\(row)").gridColumn(0)
+                        HStack {
+                            Text("Row \\(row)")
+                            Spacer()
                             Button("Delete", action: { gone.insert(row) })
-                                .gridColumn(1)
                         }
-                        .columns(.fill, .auto)
                         // The count is a reading taken as the host mounts and
                         // lets go - the window's reach is all that exists.
                         .onAppear { standing += 1 }
                         .onDisappear { standing -= 1 }
-                        .animation(.inherited)
                     }
 
                     Text("- the end -")
@@ -66,23 +64,20 @@ private struct LazyRows: ExampleContent {
                         .foregroundStyle(Palette.subtle)
 
                     ForEach(shown) { row in
-                        Grid {
+                        HStack {
                             Text("Row \(row)")
                                 .font(.system(size: 14))
-                                .verticalAlignment(.center)
-                                .gridColumn(0)
+
+                            Spacer()
 
                             Button("Delete", action: { gone.insert(row) })
                                 .font(.system(size: 12))
                                 .padding(EdgeInsets(10, 4))
-                                .gridColumn(1)
                         }
-                        .columns(.fill, .auto)
                         .padding(EdgeInsets(14, 4))
                         .background(Palette.raised)
                         .onAppear { standing += 1 }
                         .onDisappear { standing -= 1 }
-                        .animation(.inherited)
                     }
 
                     Text("- the end -")
@@ -158,7 +153,6 @@ private struct LazyTiles: ExampleContent {
                     ForEach(1...200) { tile in
                         Text("Tile \(tile)")
                             .font(.system(size: 14))
-                            .verticalAlignment(.center)
                             .frame(width: 140)
                             .frame(height: 160)
                             .background(Palette.surface)
@@ -274,14 +268,13 @@ private struct Shelf: View {
                 .font(.system(size: 12))
                 .bold()
                 .foregroundStyle(Palette.subtle)
-                .horizontalAlignment(.start)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 8) {
                     ForEach(0..<40) { tile in
                         Text("\(number).\(tile)")
                             .font(.system(size: 12))
-                            .verticalAlignment(.center)
                             .frame(width: 96)
                             .frame(height: 72)
                             .background(Palette.surface)
@@ -336,7 +329,6 @@ private struct LazyCells: ExampleContent {
                     ForEach(0..<500) { cell in
                         Text("\(cell)")
                             .font(.system(size: 13))
-                            .verticalAlignment(.center)
                             .frame(height: 64)
                             .frame(maxWidth: .infinity)
                             .background(Palette.surface)

@@ -136,6 +136,32 @@ public enum VisualElementContract: Contract {
     /// The keyed style the element wears, by its key.
     public static let style = ElementProperty<Self, Name>("style", layer: .structure)
 
+    /// The cross-axis alignment the element's container picks for it when the
+    /// element has not said one - `.overlay(alignment:)` and stacks write it.
+    public static let horizontalAlignmentDefault = ElementProperty<Self, AxisAlignment>(
+        "horizontalAlignmentDefault", layer: .structure, travels: false)
+
+    /// The same, down the stack's own axis.
+    public static let verticalAlignmentDefault = ElementProperty<Self, AxisAlignment>(
+        "verticalAlignmentDefault", layer: .structure, travels: false)
+
+    /// Whether the element is a layer taking no part in sizing - the decoration
+    /// an `.overlay` or `.background` draws.
+    public static let isLayoutDecoration = ElementProperty<Self, Bool>(
+        "isLayoutDecoration", layer: .structure, travels: false)
+
+    /// Whether the element is the framed content a `.frame` modifier wrapped.
+    public static let isFrameContent = ElementProperty<Self, Bool>(
+        "isFrameContent", layer: .structure, travels: false)
+
+    /// Whether the element stands in for a `GeometryReader`'s measure.
+    public static let isGeometryReader = ElementProperty<Self, Bool>(
+        "isGeometryReader", layer: .structure, travels: false)
+
+    /// Which edge's safe area the element is the inset bar of.
+    public static let safeAreaInsetEdge = ElementProperty<Self, Edge>(
+        "safeAreaInsetEdge", layer: .structure, travels: false)
+
     /// How far the element is moved across from where its layout put it.
     public static let translationX = ElementProperty<Self, Double>(
         "translationX", layer: .native, moves: .place)
@@ -219,12 +245,13 @@ public enum VisualElementContract: Contract {
         accessibilityChildBehavior, accessibilityHeadingLevel, accessibilityHint, accessibilityLabel,
         accessibilityTraits, automationExcludedWithChildren, background, blur, contentTransition,
         compositingGroup, drawingGroup, focus, frame, height, hint, hintKey,
-        ignoresInput,
-        isAccessibilityHidden, isEnabled, isFocusedChanged, isVisible, layoutDirection,
+        horizontalAlignmentDefault, ignoresInput,
+        isAccessibilityHidden, isEnabled, isFocusedChanged, isFrameContent, isGeometryReader,
+        isLayoutDecoration, isVisible, layoutDirection,
         matchedGeometry, matchedGeometrySource, maximumHeight, maximumWidth, minimumHeight,
         minimumWidth, opacity, pivotX, pivotY,
-        rotation, rotationX, rotationY, scale, scaleX, scaleY, shadow, style, symbolEffect,
+        rotation, rotationX, rotationY, safeAreaInsetEdge, scale, scaleX, scaleY, shadow, style, symbolEffect,
         symbolEffectActive, symbolEffectOptions, symbolEffectValue, transition, translationX,
-        translationY, unfocus, width, zIndex,
+        translationY, unfocus, verticalAlignmentDefault, width, zIndex,
     ]
 }

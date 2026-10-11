@@ -1,0 +1,8 @@
+# revision 1.1
+LazyHGrid: ✅
+LazyHGrid.columnSpacing: ❌ the driver cannot read columnSpacing of Grid, and says nothing of why
+LazyHGrid.flowRows: ❌ the driver cannot read flowRows of Grid, and says nothing of why
+LazyHGrid.frameChanged: ✅
+LazyHGrid.items: ❌ the driver cannot read items of Grid, and says nothing of why
+LazyHGrid.realizedChanged: ✅
+LazyHGrid.rowSpacing: ❌ the driver cannot read rowSpacing of Grid, and says nothing of why

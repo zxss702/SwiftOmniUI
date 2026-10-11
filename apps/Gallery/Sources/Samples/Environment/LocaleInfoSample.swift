@@ -20,7 +20,6 @@ struct LocaleInfoSample: SampleContent, ExampleContent {
                 VStack {
                     // The locale is read here, so a change to it builds this
                     // closure.
-                    DebugInfoLabel()
 
                     Text(locale.name)
                     Text("language · \\(locale.language)")
@@ -36,7 +35,6 @@ struct LocaleInfoSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text(locale.name.isEmpty ? "the host has not said" : locale.name)
                 .font(.system(size: 28))

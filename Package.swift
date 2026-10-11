@@ -12,23 +12,28 @@ var products: [Product] = [
     .library(name: "SwiftOmniUICore", targets: ["SwiftOmniUICore"]),
     .library(name: "SwiftOmniUIHost", targets: ["SwiftOmniUIHost"]),
     .library(name: "SwiftOmniUIFoundation", targets: ["SwiftOmniUIFoundation"]),
-    .library(name: "SwiftOmniUIJsonData", targets: ["SwiftOmniUIJsonData"]),
     .library(name: "SwiftOmniUIConformance", targets: ["SwiftOmniUIConformance"]),
     .library(name: "SwiftOmniUIHead", targets: ["SwiftOmniUIHead"]),
 ]
+
+// The facade's own dependencies: engine-bound only where the platform ships
+// no SwiftUI; on Apple platforms it depends on nothing at all.
+var facadeDependencies: [Target.Dependency] = [
+    .target(name: "SwiftOmniUICore", condition: .when(platforms: [.linux, .windows, .android, .wasi])),
+    .target(name: "SwiftOmniUIFoundation", condition: .when(platforms: [.linux, .windows, .android, .wasi])),
+]
+#if !os(macOS)
+facadeDependencies += [
+    .target(name: "SwiftOmniUIJsonData", condition: .when(platforms: [.linux, .windows, .android, .wasi])),
+]
+#endif
 
 var targets: [Target] = [
         // The facade an application imports: SwiftUI where the platform ships
         // it, the engine everywhere else - see Sources/SwiftOmniUI.
         .target(
             name: "SwiftOmniUI",
-            dependencies: [
-                // Engine-bound only where the platform ships no SwiftUI; on
-                // Apple platforms the facade depends on nothing at all.
-                .target(name: "SwiftOmniUICore", condition: .when(platforms: [.linux, .windows, .android, .wasi])),
-                .target(name: "SwiftOmniUIFoundation", condition: .when(platforms: [.linux, .windows, .android, .wasi])),
-                .target(name: "SwiftOmniUIJsonData", condition: .when(platforms: [.linux, .windows, .android, .wasi])),
-            ],
+            dependencies: facadeDependencies,
             path: "Sources/SwiftOmniUI",
             swiftSettings: settings
         ),
@@ -49,16 +54,6 @@ var targets: [Target] = [
             name: "SwiftOmniUIFoundation",
             dependencies: ["SwiftOmniUICore"],
             path: "lib/SwiftOmniUI.Foundation/Sources",
-            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
-        ),
-        .target(
-            name: "SwiftOmniUIJsonData",
-            dependencies: [
-                "SwiftOmniUICore",
-                // The same ordinary JsonData product applications consume.
-                .product(name: "JsonData", package: "JsonData"),
-            ],
-            path: "lib/SwiftOmniUI.JsonData/Sources",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
         .target(
@@ -104,12 +99,6 @@ if selectedHost != "Android" && selectedHost != "Web" {
             name: "SwiftOmniUIFoundationTests",
             dependencies: ["SwiftOmniUIFoundation"],
             path: "lib/SwiftOmniUI.Foundation/Tests",
-            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
-        ),
-        .testTarget(
-            name: "SwiftOmniUIJsonDataTests",
-            dependencies: ["SwiftOmniUIJsonData"],
-            path: "lib/SwiftOmniUI.JsonData/Tests",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
         .testTarget(
@@ -280,6 +269,37 @@ default:
     break
 }
 
+// The model-layer bridge: `JsonDataCore` only exists where SwiftData does
+// not, so the module has no meaning on an Apple host.
+#if !os(macOS)
+products += [.library(name: "SwiftOmniUIJsonData", targets: ["SwiftOmniUIJsonData"])]
+targets += [
+    .target(
+        name: "SwiftOmniUIJsonData",
+        dependencies: [
+            "SwiftOmniUICore",
+            // The same ordinary JsonData product applications consume.
+            .product(name: "JsonData", package: "JsonData"),
+        ],
+        path: "lib/SwiftOmniUI.JsonData/Sources",
+        swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
+    ),
+]
+if selectedHost != "Android" && selectedHost != "Web" {
+    targets += [
+        .testTarget(
+            name: "SwiftOmniUIJsonDataTests",
+            dependencies: ["SwiftOmniUIJsonData"],
+            path: "lib/SwiftOmniUI.JsonData/Tests",
+            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
+        ),
+    ]
+}
+#endif
+
+// An application outside this repository depends on the published package:
+//
+//     .package(url: "https://github.com/zxss702/SwiftOmniUI.git", exact: "0.5.2")
 let package = Package(
     name: "SwiftOmniUIRoot",
     platforms: [.iOS(.v26), .macCatalyst(.v26), .macOS(.v15)],

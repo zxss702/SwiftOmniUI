@@ -5,7 +5,9 @@ Picker.frameChanged: ✅
 Picker.isOpen: not realized
 Picker.opened: not realized
 Picker.options: ✅
+Picker.pickerStyle: cannot read pickerStyle of Picker - GTK's driver has no path for it yet
 Picker.selectedIndex: ✅
 Picker.selectedIndexChanged: ✅
 Picker.title: not realized
+Picker.titleKey: not realized
 Text.text: ✅

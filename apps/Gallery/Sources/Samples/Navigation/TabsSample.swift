@@ -46,8 +46,7 @@ struct TabsSample: SampleContent, ExampleContent {
                     // array the page it builds will be a member of.
                     page(for: route, path: $tabsPath)
                 }
-                .title("Stack")
-                .icon(ImageSource(light: "tab_bar.png", dark: "tab_bar_dark.png"))
+                .tabItem(Label("Stack", image: ImageSource(light: "tab_bar.png", dark: "tab_bar_dark.png")))
 
             case .second:
                 SecondTabPage(nav: nav)
@@ -57,7 +56,6 @@ struct TabsSample: SampleContent, ExampleContent {
             }
         }
         .selection($tab)
-        .barBackgroundColor(style.accent.color)
 
         // Changing the list is changing an array. The selection is untouched
         // by any of it - it names a TAB, not a position.
@@ -88,7 +86,6 @@ struct TabsSample: SampleContent, ExampleContent {
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
         }
         .spacing(12)

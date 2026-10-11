@@ -18,7 +18,6 @@ struct AppThemeSample: SampleContent, ExampleContent {
                 VStack {
                     // The color scheme is read here, so a change to it builds this
                     // closure.
-                    DebugInfoLabel()
 
                     Text("\\(app.colorScheme)")
 
@@ -35,7 +34,6 @@ struct AppThemeSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Text("\(app.colorScheme)")
                 .font(.system(size: 34))

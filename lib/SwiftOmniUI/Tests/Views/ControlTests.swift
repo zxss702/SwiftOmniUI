@@ -159,6 +159,7 @@ private struct ControlCase {
                     .onTextChanged { _ in })
         let case5 =             ControlCase("Image", source: "Image.swift",
                 Image("tab_list.png")
+                    .resizable()
                     .renderingMode(.original)
                     .aspect(.fill)
                     .isAnimating(true))
@@ -335,6 +336,7 @@ private struct ControlCase {
         let case21 =             ControlCase("VStack", source: "StackLayouts.swift",
                 VStack(alignment: .leading, spacing: 12) {
                     Text("One")
+                    Circle()
                 })
         let case22 =             ControlCase("HStack", source: "StackLayouts.swift",
                 HStack(alignment: .top, spacing: 6) {
@@ -742,6 +744,16 @@ private struct ControlCase {
                 .progressViewStyle(.linear)
         let case36 = ControlCase("Elements", sources: SourceTree.sharedTier, elv3)
 
+        // Tiers with no control of their own, each standing in for the marker
+        // its file writes: the reader's container, a layer's decoration flag
+        // and the edge an inset bar's stack answers.
+        let case36b = ControlCase("GeometryReader", source: "GeometryReader.swift",
+                GeometryReader { _ in Text("measured") }.node.built)
+        let case36c = ControlCase("Layered", source: "Layered.swift",
+                Text("base").overlay { Circle() }.node.built)
+        let case36d = ControlCase("SafeAreaInset", source: "View+SafeArea.swift",
+                Text("body").safeAreaInset(edge: VerticalEdge.bottom) { Text("bar") }.node.built)
+
         let case37 = ControlCase("MenuButton", source: "MenuBar.swift",
             Menu {
                 MenuItem("One")
@@ -769,7 +781,7 @@ private struct ControlCase {
                 .mask { RoundedRectangle(cornerRadius: 8).fill(.tomato) })
 
         return [
-            case0, case0b, case1, case2, case3, case4, case5, case6, case7, case8, case9, case10, case11, case12, case13, case14, case15, case16, case17, case18, case19, case20, case20a, case20b, case20c, case20d, case20e, case21, case22, case23, case24, case25, case26, case27, case28, case29, case30, case31, case32, case33, case34, case35, case36, case37, case38, case39,
+            case0, case0b, case1, case2, case3, case4, case5, case6, case7, case8, case9, case10, case11, case12, case13, case14, case15, case16, case17, case18, case19, case20, case20a, case20b, case20c, case20d, case20e, case21, case22, case23, case24, case25, case26, case27, case28, case29, case30, case31, case32, case33, case34, case35, case36, case36b, case36c, case36d, case37, case38, case39,
         ]
     }
 
@@ -862,6 +874,12 @@ private struct ControlCase {
     /// A modifier that no case uses is a modifier no patch here carries, which
     /// is a modifier a host can quietly not implement.
     func testEveryModifierIsExercised() throws {
+        // Written where no case can stand: `lazyRowStack` inside `LazyStacks`'
+        // `producer`, which runs when a host's window asks for rows, and
+        // `padding` on a `Style`, which is no element - StyleTests covers it.
+        let windowed: [String: Set<String>] = [
+            "LazyStacks.swift": ["lazyRowStack"], "View.swift": ["padding"],
+        ]
         var covered: [String: Set<String>] = [:]
 
         for control in Self.cases {
@@ -874,7 +892,7 @@ private struct ControlCase {
 
         for (source, keys) in covered.sorted(by: { $0.key < $1.key }) {
             let declared = try SourceTree.propertyKeys(in: source)
-            let missing = declared.subtracting(keys).sorted()
+            let missing = declared.subtracting(keys).subtracting(windowed[source] ?? []).sorted()
 
             read += declared.count
 
@@ -1023,6 +1041,9 @@ private struct ControlCase {
             // A lookup key beside its fallback, not a value to animate - the
             // driven half is the string member's own twin.
             "help", "placeholder",
+            // Structural marks a host reads at apply, not values animated
+            // from a state: a cell's span count and a tab's composed label.
+            "gridCellColumns", "tabItem",
         ]
         var values: Set<String> = []
         var twins: Set<String> = []
@@ -1143,17 +1164,27 @@ private struct ControlCase {
     }
 
     /// The shared tier, deliberately covered in one place rather than in every
-    /// control's case.
+    /// control's case - the one chain, plus the few tier cases whose spelling
+    /// no view's chain can write (a style's `padding` among them).
     func testTheSharedTierIsCoveredOnce() throws {
-        let tiers = try XCTUnwrap(Self.cases.first { $0.sources == SourceTree.sharedTier })
+        let tiers = Self.cases.filter { $0.sources == SourceTree.sharedTier }
+        XCTAssertFalse(tiers.isEmpty)
         let declared = try SourceTree.sharedTier.reduce(into: Set<String>()) {
             $0.formUnion(try SourceTree.propertyKeys(in: $1))
         }
 
+        let carried = tiers.reduce(into: Set<String>()) {
+            $0.formUnion(Self.propNames(in: $1.node))
+        }
+
+        // `padding` is a style's spelling - `View.swift`'s other branch, which
+        // no view's chain can carry; StyleTests asserts the write itself.
+        let viewless: Set<String> = ["padding"]
+
         // Worth stating rather than implying: this is a real number of
         // properties, and it is covered once.
         XCTAssertGreaterThan(declared.count, 30)
-        XCTAssertEqual(Self.propNames(in: tiers.node).intersection(declared), declared)
+        XCTAssertEqual(carried.intersection(declared), declared.subtracting(viewless))
     }
 
     /// EVERY PROPERTY OF EVERY CONTRACT IS CARRIED, read from the contracts

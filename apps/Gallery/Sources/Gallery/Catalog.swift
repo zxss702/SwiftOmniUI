@@ -21,13 +21,12 @@ import SwiftOmniUI
 /// Gallery/Navigation.swift), what it looks like, what its window's chrome
 /// says, and its window's lifecycle log. The samples that move the gallery or
 /// change its look are handed the means to.
-final class Catalog {
+@MainActor final class Catalog {
     let groups: [SampleGroup]
 
     init(
         nav: Navigation,
         style: SessionStyle,
-        bar: TitleBarState,
         log: WindowLog
     ) {
         var groups: [SampleGroup] = [
@@ -40,31 +39,10 @@ final class Catalog {
                 card: ImageSource("cat_fundamentals.png"),
                 samples: [
                     Sample(StateSample()),
-                    Sample(RebuildSample()),
-                    Sample(TwoLayersSample()),
-                    Sample(ReaderSample()),
-                    Sample(ConverterSample()),
                     Sample(BuilderSample()),
                     Sample(IdentitySample()),
                     Sample(LifetimeSample()),
                     Sample(SameInputsSample()),
-                ]),
-
-            SampleGroup(
-                route: "driven",
-                title: "Driven values",
-                summary: "The second layer: a value handed on with $ and carried by the "
-                    + "host on its own frames - engines follow it and nothing is "
-                    + "described. A layout placed by one is under Layout, as "
-                    + "PlacedLayout.",
-                icon: ImageSource(light: "nav_driven.png", dark: "nav_driven_dark.png"),
-                card: ImageSource("cat_driven.png"),
-                samples: [
-                    Sample(BindingReaderSample()),
-                    Sample(BoundPropertiesSample()),
-                    Sample(DrivenSample()),
-                    Sample(EngineSample()),
-                    Sample(DrivenReadingSample()),
                 ]),
 
             SampleGroup(
@@ -81,7 +59,6 @@ final class Catalog {
                     Sample(StateClassSample()),
                     Sample(PropertyReadsSample()),
                     Sample(PersistentStateSample()),
-                    Sample(PacedStateSample()),
                     Sample(ConcurrentStateSample()),
                     Sample(AppStorageSample()),
                     Sample(BindableSample()),
@@ -98,8 +75,6 @@ final class Catalog {
                 samples: [
                     Sample(JourneySample()),
                     Sample(AnimationSample()),
-                    Sample(AnimatedPropertySample()),
-                    Sample(AnimatedInputSample()),
                     Sample(ConcurrentAnimationSample()),
                     Sample(AnalogClockSample()),
                 ]),
@@ -156,7 +131,6 @@ final class Catalog {
                     Sample(StackLayoutSample()),
                     Sample(GridSample()),
                     Sample(ZStackSample()),
-                    Sample(PlacedSample()),
                     Sample(ScrollViewSample()),
                     Sample(LazyStacksSample()),
                     Sample(SizingSample()),
@@ -179,7 +153,6 @@ final class Catalog {
                 card: ImageSource("cat_styles.png"),
                 samples: [
                     Sample(StyleSample()),
-                    Sample(VisualStateSample()),
                     Sample(AppThemeSample()),
                 ]),
 
@@ -209,27 +182,21 @@ final class Catalog {
                 samples: [
                     Sample(ItemsViewSample()),
                     Sample(ChoosingItemsSample()),
-                    Sample(LoadingItemsSample()),
                     Sample(GalleryViewSample()),
-                    Sample(PositionIndicatorSample()),
                     Sample(ContentUnavailableSample()),
                 ]),
 
             SampleGroup(
                 route: "gestures",
                 title: "Gestures",
-                summary: "A gesture on any view that wants one - a tap, a drag, a swipe, "
-                    + "a pinch, a pointer, and carrying something from one view to another.",
+                summary: "A gesture on any view that wants one - a tap, a drag, "
+                    + "and carrying something from one view to another.",
                 icon: ImageSource(light: "nav_gestures.png", dark: "nav_gestures_dark.png"),
                 card: ImageSource("cat_gestures.png"),
                 samples: [
                     Sample(TapSample()),
                     Sample(PanSample()),
-                    Sample(SwipeSample()),
-                    Sample(PinchSample()),
-                    Sample(PointerSample()),
                     Sample(DragAndDropSample()),
-                    Sample(TouchThroughSample()),
                 ]),
 
             SampleGroup(
@@ -277,7 +244,6 @@ final class Catalog {
                 card: ImageSource("cat_windows.png"),
                 samples: [
                     Sample(WindowSample()),
-                    Sample(TitleBarSample(bar: bar)),
                     Sample(MultiWindowSample(style: style)),
                     Sample(WindowOverlaySample()),
                     Sample(LifecycleSample(log: log)),

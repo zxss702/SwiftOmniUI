@@ -11,6 +11,8 @@
 
     public static var cases: [ConformanceCase] {
         [
+            Aspects.holds(MenuContract.placement, on: "Menu", .saveItem, then: .newItem),
+            Aspects.holds(MenuContract.textKey, on: "Menu", "file", then: "edit"),
             ConformanceCase("aSubmenuStandsUnderItsCaptionHoldingItsEntries", proves: [
                 Covered(MenuContract.self), Covered(MenuContract.text),
             ]) { s in

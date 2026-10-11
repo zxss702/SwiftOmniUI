@@ -58,7 +58,6 @@ struct AnalogClockSample: SampleContent, ExampleContent {
         Grid {
             // The hands are driven, and nothing here reads them: this stays
             // at one build while the clock runs.
-            DebugInfoLabel()
 
             ZStack().style("Card")
                 .background(Palette.raised)
@@ -66,8 +65,6 @@ struct AnalogClockSample: SampleContent, ExampleContent {
                 .shape(.roundedRectangle(110))
                 .frame(width: 220)
                 .frame(height: 220)
-                .horizontalAlignment(.center)
-                .verticalAlignment(.center)
 
             // The marks are laid out, not rotated: a quarter gets a bar,
             // the other hours a dot, each pushed off centre by margins -
@@ -78,21 +75,17 @@ struct AnalogClockSample: SampleContent, ExampleContent {
                     .frame(width: wide)
                     .frame(height: tall)
                     .padding(EdgeInsets(2 * x, 2 * y, 0, 0))
-                    .horizontalAlignment(.center)
-                    .verticalAlignment(.center)
             }
 
-            hand($hAngle, length: 56, width: 6, color: Palette.text)
-            hand($mAngle, length: 84, width: 4, color: Palette.text)
-            hand($sAngle, length: 96, width: 2, color: Palette.accent)
+            hand(hAngle, length: 56, width: 6, color: Palette.text)
+            hand(mAngle, length: 84, width: 4, color: Palette.text)
+            hand(sAngle, length: 96, width: 2, color: Palette.accent)
 
             ZStack().style("Card")
                 .background(Palette.accent)
                 .shape(.roundedRectangle(6))
                 .frame(width: 12)
                 .frame(height: 12)
-                .horizontalAlignment(.center)
-                .verticalAlignment(.center)
         }
         .onAppear {
             // Each visit starts a loop of its own and retires the last. The
@@ -165,23 +158,18 @@ struct AnalogClockSample: SampleContent, ExampleContent {
             ticking = false
         }
 
-        /// One hand: bottom at the face's centre, rotating about that bottom.
-        /// The bottom margin equals the length, so centring the margin box puts
-        /// the hand's foot exactly on the middle - plain layout, no transforms.
-        /// `.rotationEffect(angle)` DRIVES the rotation from the state handed in,
-        /// which is what makes a movement on that state turn this hand.
+        /// One hand, turning about its foot. Rotating about `anchor: .bottom`
+        /// pins the hand's own bottom edge; the offset lifts that edge onto
+        /// the face's centre, so the hand sweeps the dial from its middle.
         private func hand(
-            _ angle: Binding<Double>,
+            _ angle: Double,
             length: Double, width: Double, color: Color
         ) -> some View {
             ColorPicker(color)
-                .rotationEffect(angle)
                 .frame(width: width)
                 .frame(height: length)
-                .padding(EdgeInsets(0, 0, 0, length))
-                .pivotY(1)
-                .horizontalAlignment(.center)
-                .verticalAlignment(.center)
+                .rotationEffect(.degrees(angle), anchor: .bottom)
+                .offset(y: -length / 2)
         }
 
         /// The forward distance to an angle within one turn, 0 up to but not
@@ -196,17 +184,13 @@ struct AnalogClockSample: SampleContent, ExampleContent {
 
     var body: some View {
         Grid {
-            DebugInfoLabel()
 
             ZStack().style("Card")
                 .background(Palette.raised)
-                .stroke(Palette.outline)
-                .strokeWidth(2)
+                .stroke(Palette.outline, width: 2)
                 .shape(.roundedRectangle(110))
                 .frame(width: 220)
                 .frame(height: 220)
-                .horizontalAlignment(.center)
-                .verticalAlignment(.center)
 
             ForEach(Array(Self.marks.enumerated()), id: \.offset) { pair in
                 let (x, y, wide, tall) = pair.element
@@ -214,13 +198,11 @@ struct AnalogClockSample: SampleContent, ExampleContent {
                     .frame(width: wide)
                     .frame(height: tall)
                     .padding(EdgeInsets(2 * x, 2 * y, 0, 0))
-                    .horizontalAlignment(.center)
-                    .verticalAlignment(.center)
             }
 
-            hand($hAngle, length: 56, width: 6, color: Palette.text)
-            hand($mAngle, length: 84, width: 4, color: Palette.text)
-            hand($sAngle, length: 96, width: 2, color: Palette.accent)
+            hand(hAngle, length: 56, width: 6, color: Palette.text)
+            hand(mAngle, length: 84, width: 4, color: Palette.text)
+            hand(sAngle, length: 96, width: 2, color: Palette.accent)
 
             ZStack().style("Card")
                 .background(Palette.accent)
@@ -228,10 +210,8 @@ struct AnalogClockSample: SampleContent, ExampleContent {
                 .shape(.roundedRectangle(6))
                 .frame(width: 12)
                 .frame(height: 12)
-                .horizontalAlignment(.center)
-                .verticalAlignment(.center)
         }
-        .horizontalAlignment(.fill)
+        .frame(maxWidth: .infinity)
         .onAppear {
             // Each visit starts a loop of its own and retires the last. The
             // hands come back at the angles the state kept, and the first
@@ -309,20 +289,19 @@ struct AnalogClockSample: SampleContent, ExampleContent {
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("Each hand is a box whose bottom sits at the face's centre - "
-                + "the bottom margin equals its length, so centring the margin "
-                + "box puts the foot on the middle - and pivotY(1) makes that "
-                + "foot the pivot.")
+            Text("Each hand turns about its own foot: `rotationEffect` about "
+                + "`anchor: .bottom` pins the bottom edge, and the `offset` lifts "
+                + "that edge onto the face's centre - so the hand sweeps the dial "
+                + "from its middle.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("A hand's rotation is DRIVEN - .rotationEffect($sAngle) over a state "
-                + "the host moves - so a tick is that state being sent somewhere "
-                + "and the hand springs there on the display's own frames, with "
-                + "nothing described in between. sAngle answers where "
-                + "the hand is GOING, which is what the next tick's arithmetic "
-                + "wants - it adds the FORWARD distance to the time, so the "
-                + "angles only grow and the hands never spin back.")
+            Text("A hand's angle is read from state, and a `journey` walks that "
+                + "state somewhere - so a tick is that state being sent somewhere "
+                + "and the hand springs there as the tree is redrawn. sAngle "
+                + "answers where the hand is GOING, which is what the next tick's "
+                + "arithmetic wants - it adds the FORWARD distance to the time, so "
+                + "the angles only grow and the hands never spin back.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
@@ -339,24 +318,18 @@ struct AnalogClockSample: SampleContent, ExampleContent {
         .spacing(12)
     }
 
-    /// One hand: bottom at the face's centre, rotating about that bottom.
-    /// The bottom margin equals the length, so centring the margin box puts
-    /// the hand's foot exactly on the middle - plain layout, no transforms.
-    /// `.rotationEffect(angle)` DRIVES the rotation from the state handed in, which
-    /// is what makes a movement on that state turn this hand - on the host's
-    /// own frames, with nothing described in between.
+    /// One hand, turning about its foot. Rotating about `anchor: .bottom`
+    /// pins the hand's own bottom edge; the offset lifts that edge onto the
+    /// face's centre, so the hand sweeps the dial from its middle.
     private func hand(
-        _ angle: Binding<Double>,
+        _ angle: Double,
         length: Double, width: Double, color: Color
     ) -> some View {
         ColorPicker(color)
-            .rotationEffect(angle)
             .frame(width: width)
             .frame(height: length)
-            .padding(EdgeInsets(0, 0, 0, length))
-            .pivotY(1)
-            .horizontalAlignment(.center)
-            .verticalAlignment(.center)
+            .rotationEffect(.degrees(angle), anchor: .bottom)
+            .offset(y: -length / 2)
     }
 }
 

@@ -29,14 +29,12 @@ struct SecondTabPage: View {
                     .foregroundStyle(.white)
                     .shape(.roundedRectangle(8))
                     .padding(EdgeInsets(20, 10))
-                    .horizontalAlignment(.center)
                     
 
                 TabsControls(nav: nav, thisTab: .second)
 
                 Button("Back to the Navigation samples", action: { nav.openGroup("navigation") })
                     .padding(EdgeInsets(20, 10))
-                    .horizontalAlignment(.center)
                     
             }
             .spacing(14)

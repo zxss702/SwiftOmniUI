@@ -109,6 +109,10 @@
             } detail: { VStack { [Text("Detail")] + others } })
         case "TabView":
             return dressing.wear(TabView([0, 1]) { tab in VStack { [Text("Tab \(tab)")] + (tab == 0 ? others : []) } })
+        case "GridRow":
+            return VStack { [Grid { GridRow { Text("Cell") }.id(dressing.id) }] + others }
+        case "ToolbarSpacer":
+            return VStack { [Text("Row").toolbar { dressing.wear(ToolbarSpacer()) }] + others }
         default:
             return VStack { [view(element, worn)] + others }
         }

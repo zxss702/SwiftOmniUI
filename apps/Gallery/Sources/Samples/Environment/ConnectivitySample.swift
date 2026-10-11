@@ -18,7 +18,6 @@ struct ConnectivitySample: SampleContent, ExampleContent {
                 VStack {
                     // The connection is read here, so a change to it builds
                     // this closure.
-                    DebugInfoLabel()
 
                     Text(connectivity.networkAccess == .internet
                         ? "online" : "offline · \\(connectivity.networkAccess)")
@@ -45,7 +44,6 @@ struct ConnectivitySample: SampleContent, ExampleContent {
             .joined(separator: ", ")
 
         return VStack {
-            DebugInfoLabel()
 
             Text(connectivity.networkAccess == .internet ? "online" : "offline")
                 .font(.system(size: 34))
@@ -63,7 +61,6 @@ struct ConnectivitySample: SampleContent, ExampleContent {
                 .foregroundStyle(.white)
                 .shape(.roundedRectangle(8))
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
         }
         .spacing(10)
     }

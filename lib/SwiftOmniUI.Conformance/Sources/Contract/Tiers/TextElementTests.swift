@@ -10,7 +10,13 @@
     public static let name = "TextElement"
 
     public static var cases: [ConformanceCase] {
-        Specimens.wearing(TextElementContract.self).flatMap { element in [words(element), cased(element)] }
+        Specimens.wearing(TextElementContract.self).flatMap { element in
+            [
+                words(element), cased(element),
+                Aspects.holds(TextElementContract.textKey, on: element, "greeting", then: "farewell"),
+                Aspects.holds(TextElementContract.baselineOffset, on: element, 2, then: -2, with: Words.on(element)),
+            ]
+        }
     }
 
     /// An element shows the words the tree gives it, and the words the tree changes them to.

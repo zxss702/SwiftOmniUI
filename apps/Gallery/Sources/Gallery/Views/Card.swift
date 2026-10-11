@@ -30,9 +30,9 @@ struct Card: View {
     /// A file in Resources/Images, or empty for no icon.
     private var picture: ImageSource = ""
 
-    /// How big the card is drawn, and what the press moves. DRIVEN: the host
-    /// carries the scale on its own frames and no render describes it, so a
-    /// press costs the arithmetic and nothing else.
+    /// How big the card is drawn, and what the press moves: a state read by
+    /// `scaleEffect` below, walked to 0.96 and back by a journey so the dip
+    /// draws as a motion rather than a switch.
     ///
     /// Per INSTANCE, the way state on a view is - every card on every page
     /// holds its own, so there is no name to compose and nothing to collide.
@@ -72,45 +72,41 @@ struct Card: View {
         let action = self.action
 
         return ZStack {
-            Grid {
-                Image(picture)
-                    .frame(width: 24)
-                    .frame(height: 24)
-                    .hidden(picture.isEmpty)
-                    .verticalAlignment(.center)
+            Grid(horizontalSpacing: 14, verticalSpacing: nil) {
+                GridRow {
+                    Image(picture)
+                        .frame(width: 24)
+                        .frame(height: 24)
+                        .hidden(picture.isEmpty)
 
-                VStack {
-                    Text(title)
-                        .font(.system(size: 17))
-                        .bold()
+                    // The TEXT claims the row's middle column: asking for the
+                    // whole width leaves the picture and the chevron their
+                    // own size at the two ends.
+                    VStack {
+                        Text(title)
+                            .font(.system(size: 17))
+                            .bold()
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text(summary)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Palette.subtle)
-                        .lineLimit(2)
+                        Text(summary)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Palette.subtle)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .spacing(2)
+                    .frame(maxWidth: .infinity)
+
+                    Text("›")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Palette.accent)
                 }
-                .gridColumn(1)
-                .spacing(2)
-                .horizontalAlignment(.fill)
-                .verticalAlignment(.center)
-
-                Text("›")
-                    .gridColumn(2)
-                    .font(.system(size: 22))
-                    .foregroundStyle(Palette.accent)
-                    .verticalAlignment(.center)
             }
-            .columnSpacing(14)
-            // The TEXT is the star column. An Auto column measures a Text at
-            // the width it would like - the whole summary on one line - so the
-            // text ran under the chevron and out through the outline, with an
-            // empty star column beside it holding the space it needed. A star
-            // column is given what the others left, and a Text given a width
-            // wraps to it.
-            .columns(.auto, .fill, .auto)
             .padding(EdgeInsets(16, 14))
         }
         .style("Card")
+        // What a card holds is cut to its corners: a picture reaches them.
+        .clipped()
         // A CARD IS A ZSTACK WITH A TAP ON IT, which no platform reads as a
         // control at all: the user who cannot see it would be handed a
         // picture, two Labels and a chevron with nothing saying they act
@@ -120,7 +116,7 @@ struct Card: View {
         .accessibilityIdentifier(handle("card", title))
         .accessibilityLabel(title)
         .accessibilityHint(summary)
-        .scaleEffect($dip)
+        .scaleEffect(dip.wrappedValue)
         // The press, said back: a ZStack with a TapGestureRecognizer draws
         // nothing on its own, unlike a Button, so without this a tap shows
         // nothing until the page changes. The DIP runs to the end before the
@@ -141,8 +137,8 @@ struct Card: View {
         // with the page reaches no control and lands on the spot. Nothing has
         // to put anything back afterwards.
         .onTapGesture {
-            try await dip.journey.move(to: 0.96, .eased(50, .cubicOut))
-            async let restored: Bool = dip.journey.move(to: 1, .eased(30, .cubicOut))
+            try await dip.journey.move(to: 0.96, .easeOut(duration: 0.05))
+            async let restored: Bool = dip.journey.move(to: 1, .easeInOut(duration: 0.03))
             try await action()
             _ = try await restored
         }

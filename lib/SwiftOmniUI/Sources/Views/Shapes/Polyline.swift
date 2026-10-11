@@ -53,4 +53,10 @@ public struct Polyline: Shape, PolylineProperties {
         node.write(PolylineContract.points, points)
     }
 
+    /// SwiftUI's `fill(_:style:)`: `fillStyle.isEOFilled` picks the even-odd
+    /// rule a self-crossing line is filled by.
+    public func fill(_ style: some ShapeStyle, style fillStyle: FillStyle) -> Modified {
+        fill(style).fillRule(fillStyle.isEOFilled ? .evenOdd : .nonzero)
+    }
+
 }

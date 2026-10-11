@@ -13,6 +13,12 @@
     public static var cases: [ConformanceCase] {
         [
             Aspects.standsAlone("ScrollView"),
+            Aspects.holds(ScrollViewContract.defaultScrollAnchor, on: "ScrollView", .top, then: .bottom),
+            Aspects.holds(ScrollViewContract.isScrollDisabled, on: "ScrollView", false, then: true),
+            Aspects.holds(ScrollViewContract.scrollBounceAxes, on: "ScrollView", [.vertical], then: [.horizontal]),
+            Aspects.holds(ScrollViewContract.scrollBounceBehavior, on: "ScrollView", .automatic, then: .always),
+            Aspects.holds(
+                ScrollViewContract.scrollTargetBehavior, on: "ScrollView", .viewAligned(), then: .paging),
             ConformanceCase("scrollingDownItsContentTakesItsWidth", proves: [
                 Covered(ScrollViewContract.orientation),
             ]) { s in
@@ -111,6 +117,33 @@
                 s.expect(heard.values, [200], "heard once, where it went")
                 s.expect(offset.wrappedValue, Point(0, 200), "and on the state")
                 s.expect(rests.values, [1], "at rest once")
+            },
+            ConformanceCase("anAimScrollsUntilTheNamedChildStandsInView", proves: [
+                Covered(ScrollViewContract.scrollToDescendant),
+            ], needs: [Covered(ButtonContract.clicked)]) { s in
+                let frames = Received<[Double]>()
+                s.start {
+                    ScrollViewReader { proxy in
+                        VStack {
+                            ScrollView {
+                                VStack {
+                                    ColorPicker(.red).frame(height: 400)
+                                    ColorPicker(.green).frame(height: 400)
+                                        .id("far")
+                                        .onEvent(ViewContract.frameChanged) { frames.values.append($0) }
+                                }
+                            }
+                            .frame(width: 200).frame(height: 300).id("scroller")
+                            Button("Go").onClicked { proxy.scrollTo("far") }.id("go")
+                        }
+                    }
+                    .horizontalAlignment(.start)
+                    .verticalAlignment(.start)
+                }
+
+                try s.perform(.activate, on: s.element("go"))
+                s.settle { frames.values.count > 1 && frames.values.last![1] < frames.values.first![1] }
+                s.expect(frames.values.last![1] < frames.values.first![1], true, "the far child moved into view")
             },
             ConformanceCase("theUsersScrollAcrossIsHeard", proves: [
                 Covered(ScrollViewContract.scrollXChanged), Covered(ScrollViewContract.orientation),

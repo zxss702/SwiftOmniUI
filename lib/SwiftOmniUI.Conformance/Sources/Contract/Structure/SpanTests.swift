@@ -11,6 +11,7 @@
 
     public static var cases: [ConformanceCase] {
         [
+            Aspects.holds(SpanContract.image, on: "Span", "test_dot.png", then: "test_wide.png"),
             ConformanceCase("aLabelsSpansAreItsWordsRunByRun", proves: [
                 Covered(SpanContract.self), Covered(TextElementContract.text, on: "Span"),
             ]) { s in

@@ -1,9 +1,57 @@
 # revision 1.1
+NavigationSplitView.badge: cannot read badge of NavigationSplitView - GTK's driver has no path for it yet
+NavigationSplitView.document: – GTK 4 names a window for a document in its title alone.
 NavigationSplitView.icon: not realized
+NavigationSplitView.interactiveDismissDisabled: – A GTK sheet is libadwaita's dialog: Escape and its close always take it.
+NavigationSplitView.preferredColumnWidth: cannot read preferredColumnWidth of NavigationSplitView - GTK's driver has no path for it yet
+NavigationSplitView.presentationDetents: – A GTK sheet is libadwaita's dialog, sized by what it shows - detents are not its to take.
+NavigationSplitView.presentationDragIndicator: – A GTK sheet is libadwaita's dialog, which draws no grabber of its own.
+NavigationSplitView.subtitle: cannot read subtitle of NavigationSplitView - GTK's driver has no path for it yet
+NavigationSplitView.subtitleKey: not realized
 NavigationSplitView.title: cannot read title of NavigationSplitView - GTK's driver has no path for it yet
+NavigationSplitView.titleKey: not realized
+NavigationSplitView.toolbarBackground: cannot read toolbarBackground of NavigationSplitView - GTK's driver has no path for it yet
+NavigationSplitView.toolbarVisibility: cannot read toolbarVisibility of NavigationSplitView - GTK's driver has no path for it yet
+NavigationSplitView.windowBackground: cannot read windowBackground of NavigationSplitView - GTK's driver has no path for it yet
+NavigationStack.badge: cannot read badge of NavigationStack - GTK's driver has no path for it yet
+NavigationStack.document: – GTK 4 names a window for a document in its title alone.
 NavigationStack.icon: not realized
+NavigationStack.interactiveDismissDisabled: – A GTK sheet is libadwaita's dialog: Escape and its close always take it.
+NavigationStack.preferredColumnWidth: cannot read preferredColumnWidth of NavigationStack - GTK's driver has no path for it yet
+NavigationStack.presentationDetents: – A GTK sheet is libadwaita's dialog, sized by what it shows - detents are not its to take.
+NavigationStack.presentationDragIndicator: – A GTK sheet is libadwaita's dialog, which draws no grabber of its own.
+NavigationStack.subtitle: cannot read subtitle of NavigationStack - GTK's driver has no path for it yet
+NavigationStack.subtitleKey: not realized
 NavigationStack.title: cannot read title of NavigationStack - GTK's driver has no path for it yet
+NavigationStack.titleKey: not realized
+NavigationStack.toolbarBackground: cannot read toolbarBackground of NavigationStack - GTK's driver has no path for it yet
+NavigationStack.toolbarVisibility: cannot read toolbarVisibility of NavigationStack - GTK's driver has no path for it yet
+NavigationStack.windowBackground: cannot read windowBackground of NavigationStack - GTK's driver has no path for it yet
+Page.badge: cannot read badge of Page - GTK's driver has no path for it yet
+Page.document: – GTK 4 names a window for a document in its title alone.
 Page.icon: not realized
+Page.interactiveDismissDisabled: – A GTK sheet is libadwaita's dialog: Escape and its close always take it.
+Page.preferredColumnWidth: cannot read preferredColumnWidth of Page - GTK's driver has no path for it yet
+Page.presentationDetents: – A GTK sheet is libadwaita's dialog, sized by what it shows - detents are not its to take.
+Page.presentationDragIndicator: – A GTK sheet is libadwaita's dialog, which draws no grabber of its own.
+Page.subtitle: cannot read subtitle of Page - GTK's driver has no path for it yet
+Page.subtitleKey: not realized
 Page.title: cannot read title of Page - GTK's driver has no path for it yet
+Page.titleKey: not realized
+Page.toolbarBackground: cannot read toolbarBackground of Page - GTK's driver has no path for it yet
+Page.toolbarVisibility: cannot read toolbarVisibility of Page - GTK's driver has no path for it yet
+Page.windowBackground: cannot read windowBackground of Page - GTK's driver has no path for it yet
+TabView.badge: cannot read badge of TabView - GTK's driver has no path for it yet
+TabView.document: – GTK 4 names a window for a document in its title alone.
 TabView.icon: not realized
+TabView.interactiveDismissDisabled: – A GTK sheet is libadwaita's dialog: Escape and its close always take it.
+TabView.preferredColumnWidth: cannot read preferredColumnWidth of TabView - GTK's driver has no path for it yet
+TabView.presentationDetents: – A GTK sheet is libadwaita's dialog, sized by what it shows - detents are not its to take.
+TabView.presentationDragIndicator: – A GTK sheet is libadwaita's dialog, which draws no grabber of its own.
+TabView.subtitle: cannot read subtitle of TabView - GTK's driver has no path for it yet
+TabView.subtitleKey: not realized
 TabView.title: cannot read title of TabView - GTK's driver has no path for it yet
+TabView.titleKey: not realized
+TabView.toolbarBackground: cannot read toolbarBackground of TabView - GTK's driver has no path for it yet
+TabView.toolbarVisibility: cannot read toolbarVisibility of TabView - GTK's driver has no path for it yet
+TabView.windowBackground: cannot read windowBackground of TabView - GTK's driver has no path for it yet

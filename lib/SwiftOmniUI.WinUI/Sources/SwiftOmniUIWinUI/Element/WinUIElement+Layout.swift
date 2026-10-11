@@ -41,7 +41,14 @@ extension WinUIElement {
 
         if let menu = view as? WinUIMenuButtonView {
             // The menu is a slot's - the layout never places it, so it is read among the element's own children.
-            menu.setFace(arranged.first?.view)
+            // On the bar, words name the button by its label; any other face stands in its icon's slot.
+            let face = arranged.first
+            if menu.isToolbarControl, face?.type == .text, let words = face?.value(.text)?.string {
+                menu.setLabel(words)
+                menu.setFace(nil)
+            } else {
+                menu.setFace(face?.view)
+            }
             menu.show(WinUIMenu(element.children.first { $0.type == .contextMenu }?.winUI))
             return
         }

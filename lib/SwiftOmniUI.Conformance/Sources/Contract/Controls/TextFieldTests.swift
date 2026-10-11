@@ -11,6 +11,7 @@
     public static var cases: [ConformanceCase] {
         [
             Aspects.standsAlone("TextField"),
+            Aspects.holds(TextFieldContract.textFieldStyle, on: "TextField", .plain, then: .roundedBorder),
             ConformanceCase("eachKeystrokeReachesTheStateAndTheGreeting", proves: [
                 Covered(TextElementContract.text, on: TextFieldContract.self),
                 Covered(TextElementContract.text, on: TextContract.self),

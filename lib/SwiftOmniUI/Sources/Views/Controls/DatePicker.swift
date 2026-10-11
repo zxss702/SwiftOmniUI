@@ -76,6 +76,17 @@ public struct DatePicker: VisualElement, TextStyleElement, FontElement, DatePick
         self = DatePicker().date(date)
     }
 
+    /// A two-way picker over `range` - SwiftUI's `DatePicker(selection:in:)`
+    /// with the bounds told once in the initializer.
+    public init(_ date: Binding<CalendarDate>, in range: ClosedRange<CalendarDate>) {
+        self = DatePicker(date).minimumDate(range.lowerBound).maximumDate(range.upperBound)
+    }
+
+    /// A one-way picker over `range`, reporting through `.onDateChanged`.
+    public init(_ date: CalendarDate, in range: ClosedRange<CalendarDate>) {
+        self = DatePicker(date).minimumDate(range.lowerBound).maximumDate(range.upperBound)
+    }
+
     // Design: docs/design/views/bindings.md#two-way-controls
     /// The same two-way date as `DatePicker($due)`, written as a modifier.
     ///

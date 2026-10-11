@@ -26,8 +26,8 @@ See [the dictionary](README.md) for how a mark is given.
 | Host | Created | Members (2) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
 | Android Views |  |  | `Toolbar` `MenuItem` | no run of it on these sources |
-| WinUI 3 |  |  | `CommandBar` `AppBarButton`; `AppBarSeparator` for a spacer | no run of it on these sources |
-| GTK 4 |  |  | `GtkButton` in `GtkHeaderBar`; a spacer packs a separator | no run of it on these sources |
+| WinUI 3 | ✅ |  | `CommandBar` `AppBarButton`; `AppBarSeparator` for a spacer |  |
+| GTK 4 | ✅ |  | `GtkButton` in `GtkHeaderBar`; a spacer packs a separator |  |
 | Web |  |  | `<button>` in an ARIA `toolbar` | no host yet |
 
 Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Menus/ToolbarSpacerContract.swift`.
@@ -36,5 +36,5 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Menus/ToolbarSpacerContr
 
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| `placement` | property | `ToolbarItemPlacement` | adaptive |  |  |  |  |  |
-| `variant` | property | `ToolbarSpacerVariant` | adaptive |  |  |  |  |  |
+| `placement` | property | `ToolbarItemPlacement` | adaptive |  | ❌ | · |  | WinUI 3: the driver cannot read placement of ToolbarSpacer, and says nothing of why; GTK 4: cannot read placement of ToolbarSpacer - GTK's driver has no path for it yet |
+| `variant` | property | `ToolbarSpacerVariant` | adaptive |  | ❌ | · |  | WinUI 3: the driver cannot read variant of ToolbarSpacer, and says nothing of why; GTK 4: cannot read variant of ToolbarSpacer - GTK's driver has no path for it yet |

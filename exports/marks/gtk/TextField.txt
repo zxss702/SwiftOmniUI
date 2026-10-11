@@ -7,3 +7,4 @@ TextField.showsClearButton: not realized
 TextField.submitLabel: not realized
 TextField.submitted: ✅
 TextField.text: ◐ cannot read isPassword of TextField - GTK's driver has no path for it yet
+TextField.textFieldStyle: cannot read textFieldStyle of TextField - GTK's driver has no path for it yet

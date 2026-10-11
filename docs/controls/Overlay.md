@@ -27,7 +27,7 @@ See [the dictionary](README.md) for how a mark is given.
 | --- | :---: | --- | --- | --- |
 | Android Views | · |  | top child of a `FrameLayout` | cannot read what reaches Text - Android's driver has no path for it yet |
 | WinUI 3 | ✅ |  | top layer of a root `Grid` |  |
-| GTK 4 | · |  | `GtkOverlay` | cannot read what reaches Text - GTK's driver has no path for it yet |
+| GTK 4 | · |  | `GtkOverlay` | cannot read what reaches Grid - GTK's driver has no path for it yet |
 | Web |  |  | positioned element above the page | no host yet |
 
 Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Slots/OverlayContract.swift`.

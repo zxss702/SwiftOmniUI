@@ -103,8 +103,13 @@ final class WinUILazyTests: XCTestCase {
                     XCTAssertEqual(lazy.cells.requests, requests)
                     for (identity, view) in retained { XCTAssertTrue(lazy.mounted[identity]?.view === view) }
                     var displayed = [Double](repeating: 0, count: 6)
-                    swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &displayed)
+                    // A program's move lands a few compositor ticks after it is asked (`ScrollTo`'s queue).
+                    host.settle {
+                        swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &displayed)
+                        return abs(-displayed[horizontal ? 4 : 5] - (start + 16)) < 1
+                    }
                     XCTAssertEqual(-displayed[horizontal ? 4 : 5], start + 16, accuracy: 1)
+                    XCTAssertEqual(lazy.cells.built, built)
                     let beforeBoundary = lazy.cells.measurements
                     let next = extent * 21 + 5
                     scroll.scroller.move(to: Point(horizontal ? next : 0, horizontal ? 0 : next))
@@ -865,12 +870,14 @@ final class WinUILazyTests: XCTestCase {
                     }
                     swiftomniui_winui_scroller_move(scroll.scroller.handle,
                                                    horizontal ? target : 0, horizontal ? 0 : target, true)
-                    for _ in 0..<80 {
+                    // The animation runs on the compositor's clock, not the test's steps: follow it until it lands.
+                    for _ in 0..<400 {
                         host.step()
                         let offset = horizontal ? scroll.scroller.standing.offset.x : scroll.scroller.standing.offset.y
                         XCTAssertGreaterThanOrEqual((offset - previousOffset) * (forward ? 1 : -1), -1,
                                                     "native scrolling must not jump backwards, kind \(kind)")
                         previousOffset = offset
+                        if abs(offset - target) < 0.5, !scroll.held { break }
                     }
                     probe.lock.lock()
                     let pixels = probe.samples.map(\.pixel)
@@ -1101,6 +1108,171 @@ final class WinUILazyTests: XCTestCase {
             let standing = host.views(WinUILabelView.self).map(\.text)
             XCTAssertFalse(standing.contains("Row 0"), "the first row was let go")
             XCTAssertLessThan(standing.count, 150, "still a window's reach")
+        }
+    }
+
+    func testZZTempTouchFlick() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { ExactLazyPage(kind: 0, count: 1_000, complex: true) }
+            for _ in 0..<12 { host.step() }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let title = "SOUITouchFlick"
+            try XCTUnwrap(host.window).setTitle(title)
+            let name = Array(title.utf16) + [0]
+            let hwnd = try XCTUnwrap(name.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+            _ = SetForegroundWindow(hwnd)
+            _ = SetWindowPos(hwnd, HWND(bitPattern: -1), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE))
+            defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE)) }
+            for _ in 0..<6 { host.step() }
+            let initial = try XCTUnwrap(lazy.mounted[lazy.cells.identities[0]])
+            let frame = scroll.scroller.laidOutFrame
+            let origin = scroll.scroller.origin
+            let cross = initial.view.origin.x - origin.x + initial.view.laidOutFrame.width - 3
+            let scale = Double(GetDpiForWindow(hwnd)) / 96
+            @MainActor func screen(_ x: Double, _ y: Double) -> POINT {
+                var p = POINT(x: LONG((origin.x + x) * scale), y: LONG((origin.y + y) * scale))
+                _ = ClientToScreen(hwnd, &p)
+                return p
+            }
+            let probe = WinUILazyScreenProbe(window: hwnd, points: [screen(cross, 3), screen(cross, frame.height - 3)])
+            let rawProbe = Unmanaged.passRetained(probe).toOpaque()
+            let thread = try XCTUnwrap(CreateThread(nil, 0, WinUILazyScreenProbe.entry, rawProbe, 0, nil))
+            XCTAssertTrue(InitializeTouchInjection(1, DWORD(TOUCH_FEEDBACK_NONE)))
+            var info = POINTER_TOUCH_INFO()
+            info.pointerInfo.pointerType = POINTER_INPUT_TYPE(PT_TOUCH.rawValue)
+            info.pointerInfo.pointerId = 0
+            var y = frame.height - 20
+            @MainActor func inject(_ flags: Int32) {
+                info.pointerInfo.ptPixelLocation = screen(cross - 20, y)
+                info.pointerInfo.pointerFlags = POINTER_FLAGS(flags)
+                if !InjectTouchInput(1, &info) { print("TMPFLICK inject failed \(GetLastError())") }
+            }
+            let t0 = WinUIFrameClock.monotonic()
+            var trace: [String] = []
+            @MainActor func note(_ what: String) {
+                trace.append("\(Int(WinUIFrameClock.monotonic() - t0)) \(what) y=\(Int(scroll.scroller.standing.offset.y)) held=\(scroll.held) span=\(lazy.span.map { "\(Int($0.lowerBound))" } ?? "-") built=\(lazy.cells.built)")
+            }
+            inject(Int32(POINTER_FLAG_DOWN | POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT))
+            host.step(); note("down")
+            for _ in 0..<8 {
+                y -= 22
+                inject(Int32(POINTER_FLAG_UPDATE | POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT))
+                host.step(); note("move")
+            }
+            inject(Int32(POINTER_FLAG_UP))
+            for _ in 0..<160 { host.step(); note("free") }
+            probe.lock.lock(); probe.stopped = true; probe.lock.unlock()
+            _ = WaitForSingleObject(thread, 2_000); _ = CloseHandle(thread)
+            let samples = probe.samples
+            print("TMPFLICK samples=\(samples.map { "\(Int($0.time - t0))\($0.edge == 0 ? "L" : "T")\((($0.pixel >> 8) & 255) >= 100 ? "W" : "")" })")
+            for line in trace { print("TMPFLICK \(line)") }
+            XCTFail("TMPSHOW")
+        }
+    }
+
+    /// The touchpad's own path: a wheel burst down a long lazy run, a
+    /// horizontal wheel on a vertical-only scroller, and a wheel on content
+    /// that fits - sampled at both edges and traced. Temporary instrument.
+    func testZZTempWheelFlick() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { ExactLazyPage(kind: 0, count: 1_000, complex: true) }
+            for _ in 0..<12 { host.step() }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let title = "SOUIWheelFlick"
+            try XCTUnwrap(host.window).setTitle(title)
+            let name = Array(title.utf16) + [0]
+            let hwnd = try XCTUnwrap(name.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+            _ = SetForegroundWindow(hwnd)
+            _ = SetWindowPos(hwnd, HWND(bitPattern: -1), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE))
+            defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE)) }
+            for _ in 0..<6 { host.step() }
+            let initial = try XCTUnwrap(lazy.mounted[lazy.cells.identities[0]])
+            let frame = scroll.scroller.laidOutFrame
+            let origin = scroll.scroller.origin
+            let cross = initial.view.origin.x - origin.x + initial.view.laidOutFrame.width - 3
+            let scale = Double(GetDpiForWindow(hwnd)) / 96
+            @MainActor func screen(_ x: Double, _ y: Double) -> POINT {
+                var p = POINT(x: LONG((origin.x + x) * scale), y: LONG((origin.y + y) * scale))
+                _ = ClientToScreen(hwnd, &p)
+                return p
+            }
+            let probe = WinUILazyScreenProbe(window: hwnd, points: [screen(cross, 3), screen(cross, frame.height - 3)])
+            let rawProbe = Unmanaged.passRetained(probe).toOpaque()
+            let thread = try XCTUnwrap(CreateThread(nil, 0, WinUILazyScreenProbe.entry, rawProbe, 0, nil))
+            let spot = screen(cross - 20, frame.height / 2)
+            @MainActor func wheel(_ delta: Int32, horizontal: Bool = false) {
+                let wp = WPARAM(UInt32(UInt16(truncatingIfNeeded: delta)) << 16)
+                let lp = LPARAM(Int32(bitPattern: (UInt32(UInt16(truncatingIfNeeded: spot.y)) << 16)
+                    | UInt32(UInt16(truncatingIfNeeded: spot.x))))
+                _ = PostMessageW(hwnd, UINT(horizontal ? 0x020E : 0x020A), wp, lp)
+            }
+            let t0 = WinUIFrameClock.monotonic()
+            var trace: [String] = []
+            @MainActor func note(_ what: String) {
+                trace.append("\(Int(WinUIFrameClock.monotonic() - t0)) \(what) x=\(Int(scroll.scroller.standing.offset.x)) y=\(Int(scroll.scroller.standing.offset.y)) held=\(scroll.held) span=\(lazy.span.map { "\(Int($0.lowerBound))" } ?? "-") built=\(lazy.cells.built)")
+            }
+            for _ in 0..<30 {
+                wheel(-40)
+                host.step(); note("wheel")
+            }
+            for _ in 0..<160 { host.step(); note("free") }
+            for _ in 0..<10 {
+                wheel(-40, horizontal: true)
+                host.step(); note("hwheel")
+            }
+            note("hwheel-done")
+            probe.lock.lock(); probe.stopped = true; probe.lock.unlock()
+            _ = WaitForSingleObject(thread, 2_000); _ = CloseHandle(thread)
+            let samples = probe.samples
+            print("TMPWHEEL samples=\(samples.map { "\(Int($0.time - t0))\($0.edge == 0 ? "L" : "T")\((($0.pixel >> 8) & 255) >= 100 ? "W" : "")" })")
+            for line in trace { print("TMPWHEEL \(line)") }
+            XCTFail("TMPSHOW")
+        }
+    }
+
+    /// A wheel over content that fits the room: `.automatic` must not move it.
+    func testZZTempWheelOnFittingContent() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                ScrollView { Color.red.frame(width: 200, height: 100) }.frame(width: 300, height: 200)
+            }
+            for _ in 0..<12 { host.step() }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let title = "SOUIWheelFits"
+            try XCTUnwrap(host.window).setTitle(title)
+            let name = Array(title.utf16) + [0]
+            let hwnd = try XCTUnwrap(name.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+            _ = SetForegroundWindow(hwnd)
+            _ = SetWindowPos(hwnd, HWND(bitPattern: -1), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE))
+            defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE)) }
+            for _ in 0..<6 { host.step() }
+            let frame = scroll.scroller.laidOutFrame
+            let origin = scroll.scroller.origin
+            let scale = Double(GetDpiForWindow(hwnd)) / 96
+            @MainActor func screen(_ x: Double, _ y: Double) -> POINT {
+                var p = POINT(x: LONG((origin.x + x) * scale), y: LONG((origin.y + y) * scale))
+                _ = ClientToScreen(hwnd, &p)
+                return p
+            }
+            let spot = screen(frame.width / 2, frame.height / 2)
+            @MainActor func wheel(_ delta: Int32, horizontal: Bool = false) {
+                let wp = WPARAM(UInt32(UInt16(truncatingIfNeeded: delta)) << 16)
+                let lp = LPARAM(Int32(bitPattern: (UInt32(UInt16(truncatingIfNeeded: spot.y)) << 16)
+                    | UInt32(UInt16(truncatingIfNeeded: spot.x))))
+                _ = PostMessageW(hwnd, UINT(horizontal ? 0x020E : 0x020A), wp, lp)
+            }
+            var peak = (x: 0.0, y: 0.0)
+            for _ in 0..<15 {
+                wheel(-40)
+                host.step()
+                let standing = scroll.scroller.standing.offset
+                peak = (min(peak.x, standing.x), min(peak.y, standing.y))
+            }
+            for _ in 0..<40 { host.step() }
+            print("TMPWHEELFITS reach=\(scroll.scroller.standing.reach) peak=\(peak) end=\(scroll.scroller.standing.offset)")
+            XCTFail("TMPSHOW")
         }
     }
 

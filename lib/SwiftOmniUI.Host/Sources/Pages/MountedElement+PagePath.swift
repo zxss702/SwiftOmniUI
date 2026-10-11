@@ -72,17 +72,21 @@ extension MountedElement {
     public func pageValue(_ prop: Prop) -> HostValue? {
         if let found = value(prop) { return found }
         guard type == .page else { return nil }
-        return currentChildren.lazy.compactMap { child in
-            NodeType.pageTypes.contains(child.type) ? nil : child.contentValue(prop)
-        }.first
+        return contentValueBelow(prop)
     }
 
     /// This element's `prop`, else the nearest one below it; slots and nested arrangements stand in no page's path.
     private func contentValue(_ prop: Prop) -> HostValue? {
-        if let found = value(prop) { return found }
-        return currentChildren.lazy.compactMap { child in
-            NodeType.pageTypes.contains(child.type) ? nil : child.contentValue(prop)
-        }.first
+        value(prop) ?? contentValueBelow(prop)
+    }
+
+    /// The nearest `prop` among the current children's content, walked in place - the walk runs every render.
+    private func contentValueBelow(_ prop: Prop) -> HostValue? {
+        for child in children where !child.isDeparting && !NodeType.slotTypes.contains(child.type)
+            && !NodeType.pageTypes.contains(child.type) {
+            if let found = child.contentValue(prop) { return found }
+        }
+        return nil
     }
 
     /// The stack around the visible page, where the path has one.

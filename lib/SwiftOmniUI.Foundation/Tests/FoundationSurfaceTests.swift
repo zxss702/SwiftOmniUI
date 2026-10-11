@@ -6,7 +6,7 @@ import Testing
 @testable import SwiftOmniUIFoundation
 import SwiftOmniUICore
 
-struct FoundationSurfaceTests {
+@MainActor struct FoundationSurfaceTests {
     /// An attributed string's runs land as spans, one per run, in order.
     @Test func attributedTextBecomesSpans() throws {
         var words = AttributedString("hello ")

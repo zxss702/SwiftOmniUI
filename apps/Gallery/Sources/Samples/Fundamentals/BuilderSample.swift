@@ -6,6 +6,8 @@ struct BuilderSample: SampleContent, ExampleContent {
     @State private var note = ""
     @State private var editing = false
     @State private var chosen = 2
+    @State private var name = ""
+    @State private var nickname = ""
 
     static let id = "builder"
     static let title = "Conditions and loops"
@@ -16,11 +18,12 @@ struct BuilderSample: SampleContent, ExampleContent {
         @State private var note = ""
         @State private var editing = false
         @State private var chosen = 2
+        @State private var name = ""
+        @State private var nickname = ""
 
         VStack {
             // The conditions and the choice are all read here, so THIS is
             // the closure a flip or a pick builds again.
-            DebugInfoLabel()
 
             Toggle(isOn: $signedIn)
 
@@ -37,9 +40,9 @@ struct BuilderSample: SampleContent, ExampleContent {
             // switching REPLACES the control rather than editing it, which is
             // what the author wrote.
             if editing {
-                TextField("name")
+                TextField("name", text: $name)
             } else {
-                TextField("nickname")
+                TextField("nickname", text: $nickname)
             }
 
             SwitchRow("Editing", $editing)
@@ -61,7 +64,6 @@ struct BuilderSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             HStack {
                 Toggle(isOn: $signedIn)
@@ -69,7 +71,6 @@ struct BuilderSample: SampleContent, ExampleContent {
                     .accessibilityLabel("Signed in")
 
                 Text("Signed in")
-                    .verticalAlignment(.center)
             }
             .spacing(12)
 
@@ -78,25 +79,22 @@ struct BuilderSample: SampleContent, ExampleContent {
                     .bold()
             }
 
-            TextField($note)
+            TextField("Type here, then flip the switch", text: $note)
                 .accessibilityIdentifier("builder.note")
                 .accessibilityLabel("Note")
-                .placeholder("Type here, then flip the switch")
 
             if editing {
-                TextField("name")
+                TextField("name", text: $name)
                     .accessibilityIdentifier("builder.name")
                     .accessibilityLabel("Name")
-                    .placeholder("name")
             } else {
-                TextField("nickname")
+                TextField("nickname", text: $nickname)
                     .accessibilityIdentifier("builder.nickname")
                     .accessibilityLabel("Nickname")
-                    .placeholder("nickname")
             }
 
             SwitchRow("Editing", $editing)
-                .horizontalAlignment(.start)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             ForEach(0..<5) { turn in
                 if turn == chosen {
@@ -107,7 +105,7 @@ struct BuilderSample: SampleContent, ExampleContent {
                     Button("turn \(turn)", action: { chosen = turn })
                         .font(.system(size: 13))
                         .padding(EdgeInsets(16, 6))
-                        .horizontalAlignment(.start)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         
                 }
             }

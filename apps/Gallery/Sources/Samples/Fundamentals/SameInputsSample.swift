@@ -18,7 +18,6 @@ struct SameInputsSample: SampleContent, ExampleContent {
             // This closure reads the count, so a press builds it again -
             // and constructs every view below afresh. Which of them is BUILT
             // is each view's own question.
-            DebugInfoLabel()
 
             Button("Count \\(counter)", action: { counter += 1 })
                 
@@ -49,7 +48,6 @@ struct SameInputsSample: SampleContent, ExampleContent {
             var body: some View {
                 VStack {
                     Text("built with \\(caption): \\(value)")
-                    DebugInfoLabel()
                 }
             }
         }
@@ -60,7 +58,6 @@ struct SameInputsSample: SampleContent, ExampleContent {
             var body: some View {
                 VStack {
                     Text("reads the count: \\(count)")
-                    DebugInfoLabel()
                 }
             }
         }
@@ -71,7 +68,6 @@ struct SameInputsSample: SampleContent, ExampleContent {
             var body: some View {
                 VStack {
                     Text(item)
-                    DebugInfoLabel()
                 }
             }
         }
@@ -82,11 +78,9 @@ struct SameInputsSample: SampleContent, ExampleContent {
             // This closure reads the count, so a press builds it again - and
             // constructs every view below afresh. Which of them is BUILT is
             // each view's own question.
-            DebugInfoLabel()
 
             Button("Count \(counter)", action: { counter += 1 })
                 .padding(EdgeInsets(20, 10))
-                .horizontalAlignment(.center)
                 
 
             // CARRIED: built with a constant, reading nothing.
@@ -170,7 +164,6 @@ private struct Block: View {
                 .font(.system(size: 20))
                 .bold()
 
-            DebugInfoLabel()
         }
         .spacing(4)
         .padding(14)
@@ -193,7 +186,6 @@ private struct Reads: View {
                 .font(.system(size: 20))
                 .bold()
 
-            DebugInfoLabel()
         }
         .spacing(4)
         .padding(14)
@@ -209,7 +201,6 @@ private struct Row: View {
             Text(item)
                 .font(.system(size: 15))
 
-            DebugInfoLabel()
         }
         .spacing(2)
         .padding(EdgeInsets(12, 8))

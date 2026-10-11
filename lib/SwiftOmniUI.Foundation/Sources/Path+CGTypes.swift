@@ -28,7 +28,7 @@ extension Rect {
     public init(_ value: CGRect) {
         self.init(
             x: Double(value.origin.x), y: Double(value.origin.y),
-            width: Double(value.width), height: Double(value.height))
+            width: Double(value.size.width), height: Double(value.size.height))
     }
 }
 

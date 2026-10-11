@@ -1,19 +1,26 @@
 # revision 1.1
 ActivityIndicator.allowDrop: not realized
-ActivityIndicator.area: ✅
+ActivityIndicator.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [16.0, 16.0, 16.0, 16.0] came - its room's lower right quarter
 ActivityIndicator.canDrag: not realized
+ActivityIndicator.coordinateSpaceName: not realized
 ActivityIndicator.dragLeave: not realized
 ActivityIndicator.dragOver: not realized
 ActivityIndicator.dragStarting: not realized
 ActivityIndicator.dragText: not realized
 ActivityIndicator.drop: not realized
 ActivityIndicator.dropCompleted: not realized
-ActivityIndicator.frameChanged: ✅
+ActivityIndicator.dropPaths: not realized
+ActivityIndicator.flex: not realized
+ActivityIndicator.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 ActivityIndicator.gridColumn: ✅
 ActivityIndicator.gridColumnSpan: ✅
 ActivityIndicator.gridRow: ✅
 ActivityIndicator.gridRowSpan: ✅
-ActivityIndicator.horizontalAlignment: ✅
+ActivityIndicator.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ActivityIndicator.horizontalContentAlignment: not realized
+ActivityIndicator.horizontalGuide: cannot read horizontalGuide of ActivityIndicator - GTK's driver has no path for it yet
+ActivityIndicator.layoutPriority: cannot read layoutPriority of ActivityIndicator - GTK's driver has no path for it yet
+ActivityIndicator.namedFramesChanged: not realized
 ActivityIndicator.padding: ✅
 ActivityIndicator.panTouchCount: cannot pan on ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.panUpdated: cannot pan on ActivityIndicator - GTK's driver has no path for it yet
@@ -25,27 +32,38 @@ ActivityIndicator.pointerExited: cannot hover on ActivityIndicator - GTK's drive
 ActivityIndicator.pointerMoved: cannot hover on ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.pointerPressed: cannot hover on ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.pointerReleased: cannot hover on ActivityIndicator - GTK's driver has no path for it yet
+ActivityIndicator.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 ActivityIndicator.swipeDirection: cannot pan on ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.swipeThreshold: cannot pan on ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.swiped: cannot pan on ActivityIndicator - GTK's driver has no path for it yet
+ActivityIndicator.tag: not realized
 ActivityIndicator.tapCount: cannot tap on ActivityIndicator - GTK's driver has no path for it yet
 ActivityIndicator.tapGesture: cannot tap on ActivityIndicator - GTK's driver has no path for it yet
-ActivityIndicator.verticalAlignment: ✅
+ActivityIndicator.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ActivityIndicator.verticalContentAlignment: not realized
+ActivityIndicator.verticalGuide: cannot read verticalGuide of ActivityIndicator - GTK's driver has no path for it yet
 Button.allowDrop: not realized
-Button.area: ✅
+Button.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [36.0, 34.0, 36.0, 34.0] came - its room's lower right quarter
 Button.canDrag: not realized
+Button.coordinateSpaceName: not realized
 Button.dragLeave: not realized
 Button.dragOver: not realized
 Button.dragStarting: not realized
 Button.dragText: not realized
 Button.drop: not realized
 Button.dropCompleted: not realized
-Button.frameChanged: ✅
+Button.dropPaths: not realized
+Button.flex: not realized
+Button.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Button.gridColumn: ✅
 Button.gridColumnSpan: ✅
 Button.gridRow: ✅
 Button.gridRowSpan: ✅
-Button.horizontalAlignment: ✅
+Button.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Button.horizontalContentAlignment: not realized
+Button.horizontalGuide: cannot read horizontalGuide of Button - GTK's driver has no path for it yet
+Button.layoutPriority: cannot read layoutPriority of Button - GTK's driver has no path for it yet
+Button.namedFramesChanged: not realized
 Button.padding: ✅
 Button.panTouchCount: cannot pan on Button - GTK's driver has no path for it yet
 Button.panUpdated: cannot pan on Button - GTK's driver has no path for it yet
@@ -57,27 +75,38 @@ Button.pointerExited: cannot hover on Button - GTK's driver has no path for it y
 Button.pointerMoved: cannot hover on Button - GTK's driver has no path for it yet
 Button.pointerPressed: cannot hover on Button - GTK's driver has no path for it yet
 Button.pointerReleased: cannot hover on Button - GTK's driver has no path for it yet
+Button.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Button.swipeDirection: cannot pan on Button - GTK's driver has no path for it yet
 Button.swipeThreshold: cannot pan on Button - GTK's driver has no path for it yet
 Button.swiped: cannot pan on Button - GTK's driver has no path for it yet
+Button.tag: not realized
 Button.tapCount: cannot tap on Button - GTK's driver has no path for it yet
 Button.tapGesture: cannot tap on Button - GTK's driver has no path for it yet
-Button.verticalAlignment: ✅
+Button.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Button.verticalContentAlignment: not realized
+Button.verticalGuide: cannot read verticalGuide of Button - GTK's driver has no path for it yet
 Canvas.allowDrop: not realized
 Canvas.area: ✅
 Canvas.canDrag: not realized
+Canvas.coordinateSpaceName: not realized
 Canvas.dragLeave: not realized
 Canvas.dragOver: not realized
 Canvas.dragStarting: not realized
 Canvas.dragText: not realized
 Canvas.drop: not realized
 Canvas.dropCompleted: not realized
-Canvas.frameChanged: ✅
+Canvas.dropPaths: not realized
+Canvas.flex: not realized
+Canvas.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Canvas.gridColumn: ✅
 Canvas.gridColumnSpan: ✅
 Canvas.gridRow: ✅
 Canvas.gridRowSpan: ✅
-Canvas.horizontalAlignment: ✅
+Canvas.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Canvas.horizontalContentAlignment: not realized
+Canvas.horizontalGuide: cannot read horizontalGuide of Canvas - GTK's driver has no path for it yet
+Canvas.layoutPriority: cannot read layoutPriority of Canvas - GTK's driver has no path for it yet
+Canvas.namedFramesChanged: not realized
 Canvas.padding: ✅
 Canvas.panTouchCount: cannot pan on Canvas - GTK's driver has no path for it yet
 Canvas.panUpdated: cannot pan on Canvas - GTK's driver has no path for it yet
@@ -89,27 +118,38 @@ Canvas.pointerExited: cannot hover on Canvas - GTK's driver has no path for it y
 Canvas.pointerMoved: cannot hover on Canvas - GTK's driver has no path for it yet
 Canvas.pointerPressed: cannot hover on Canvas - GTK's driver has no path for it yet
 Canvas.pointerReleased: cannot hover on Canvas - GTK's driver has no path for it yet
+Canvas.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Canvas.swipeDirection: cannot pan on Canvas - GTK's driver has no path for it yet
 Canvas.swipeThreshold: cannot pan on Canvas - GTK's driver has no path for it yet
 Canvas.swiped: cannot pan on Canvas - GTK's driver has no path for it yet
+Canvas.tag: not realized
 Canvas.tapCount: cannot tap on Canvas - GTK's driver has no path for it yet
 Canvas.tapGesture: cannot tap on Canvas - GTK's driver has no path for it yet
-Canvas.verticalAlignment: ✅
+Canvas.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Canvas.verticalContentAlignment: not realized
+Canvas.verticalGuide: cannot read verticalGuide of Canvas - GTK's driver has no path for it yet
 CheckBox.allowDrop: not realized
-CheckBox.area: ✅
+CheckBox.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [26.0, 26.0, 26.0, 26.0] came - its room's lower right quarter
 CheckBox.canDrag: not realized
+CheckBox.coordinateSpaceName: not realized
 CheckBox.dragLeave: not realized
 CheckBox.dragOver: not realized
 CheckBox.dragStarting: not realized
 CheckBox.dragText: not realized
 CheckBox.drop: not realized
 CheckBox.dropCompleted: not realized
-CheckBox.frameChanged: ✅
+CheckBox.dropPaths: not realized
+CheckBox.flex: not realized
+CheckBox.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 CheckBox.gridColumn: ✅
 CheckBox.gridColumnSpan: ✅
 CheckBox.gridRow: ✅
 CheckBox.gridRowSpan: ✅
-CheckBox.horizontalAlignment: ✅
+CheckBox.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+CheckBox.horizontalContentAlignment: not realized
+CheckBox.horizontalGuide: cannot read horizontalGuide of CheckBox - GTK's driver has no path for it yet
+CheckBox.layoutPriority: cannot read layoutPriority of CheckBox - GTK's driver has no path for it yet
+CheckBox.namedFramesChanged: not realized
 CheckBox.padding: ✅
 CheckBox.panTouchCount: cannot pan on CheckBox - GTK's driver has no path for it yet
 CheckBox.panUpdated: cannot pan on CheckBox - GTK's driver has no path for it yet
@@ -121,27 +161,38 @@ CheckBox.pointerExited: cannot hover on CheckBox - GTK's driver has no path for 
 CheckBox.pointerMoved: cannot hover on CheckBox - GTK's driver has no path for it yet
 CheckBox.pointerPressed: cannot hover on CheckBox - GTK's driver has no path for it yet
 CheckBox.pointerReleased: cannot hover on CheckBox - GTK's driver has no path for it yet
+CheckBox.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 CheckBox.swipeDirection: cannot pan on CheckBox - GTK's driver has no path for it yet
 CheckBox.swipeThreshold: cannot pan on CheckBox - GTK's driver has no path for it yet
 CheckBox.swiped: cannot pan on CheckBox - GTK's driver has no path for it yet
+CheckBox.tag: not realized
 CheckBox.tapCount: cannot tap on CheckBox - GTK's driver has no path for it yet
 CheckBox.tapGesture: cannot tap on CheckBox - GTK's driver has no path for it yet
-CheckBox.verticalAlignment: ✅
+CheckBox.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+CheckBox.verticalContentAlignment: not realized
+CheckBox.verticalGuide: cannot read verticalGuide of CheckBox - GTK's driver has no path for it yet
 ColorPicker.allowDrop: not realized
-ColorPicker.area: ✅
+ColorPicker.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [0.0, 0.0, 0.0, 0.0] came - its room's lower right quarter
 ColorPicker.canDrag: not realized
+ColorPicker.coordinateSpaceName: not realized
 ColorPicker.dragLeave: not realized
 ColorPicker.dragOver: not realized
 ColorPicker.dragStarting: not realized
 ColorPicker.dragText: not realized
 ColorPicker.drop: not realized
 ColorPicker.dropCompleted: not realized
-ColorPicker.frameChanged: ✅
+ColorPicker.dropPaths: not realized
+ColorPicker.flex: not realized
+ColorPicker.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 ColorPicker.gridColumn: ✅
 ColorPicker.gridColumnSpan: ✅
 ColorPicker.gridRow: ✅
 ColorPicker.gridRowSpan: ✅
-ColorPicker.horizontalAlignment: ✅
+ColorPicker.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ColorPicker.horizontalContentAlignment: not realized
+ColorPicker.horizontalGuide: cannot read horizontalGuide of ColorPicker - GTK's driver has no path for it yet
+ColorPicker.layoutPriority: cannot read layoutPriority of ColorPicker - GTK's driver has no path for it yet
+ColorPicker.namedFramesChanged: not realized
 ColorPicker.padding: ✅
 ColorPicker.panTouchCount: cannot pan on ColorPicker - GTK's driver has no path for it yet
 ColorPicker.panUpdated: cannot pan on ColorPicker - GTK's driver has no path for it yet
@@ -153,27 +204,38 @@ ColorPicker.pointerExited: cannot hover on ColorPicker - GTK's driver has no pat
 ColorPicker.pointerMoved: cannot hover on ColorPicker - GTK's driver has no path for it yet
 ColorPicker.pointerPressed: cannot hover on ColorPicker - GTK's driver has no path for it yet
 ColorPicker.pointerReleased: cannot hover on ColorPicker - GTK's driver has no path for it yet
+ColorPicker.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 ColorPicker.swipeDirection: cannot pan on ColorPicker - GTK's driver has no path for it yet
 ColorPicker.swipeThreshold: cannot pan on ColorPicker - GTK's driver has no path for it yet
 ColorPicker.swiped: cannot pan on ColorPicker - GTK's driver has no path for it yet
+ColorPicker.tag: not realized
 ColorPicker.tapCount: cannot tap on ColorPicker - GTK's driver has no path for it yet
 ColorPicker.tapGesture: cannot tap on ColorPicker - GTK's driver has no path for it yet
-ColorPicker.verticalAlignment: ✅
+ColorPicker.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ColorPicker.verticalContentAlignment: not realized
+ColorPicker.verticalGuide: cannot read verticalGuide of ColorPicker - GTK's driver has no path for it yet
 CustomLayout.allowDrop: not realized
-CustomLayout.area: ✅
+CustomLayout.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [28.0, 18.0, 28.0, 18.0] came - its room's lower right quarter
 CustomLayout.canDrag: not realized
+CustomLayout.coordinateSpaceName: not realized
 CustomLayout.dragLeave: not realized
 CustomLayout.dragOver: not realized
 CustomLayout.dragStarting: not realized
 CustomLayout.dragText: not realized
 CustomLayout.drop: not realized
 CustomLayout.dropCompleted: not realized
-CustomLayout.frameChanged: ✅
+CustomLayout.dropPaths: not realized
+CustomLayout.flex: not realized
+CustomLayout.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 CustomLayout.gridColumn: ✅
 CustomLayout.gridColumnSpan: ✅
 CustomLayout.gridRow: ✅
 CustomLayout.gridRowSpan: ✅
-CustomLayout.horizontalAlignment: ✅
+CustomLayout.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+CustomLayout.horizontalContentAlignment: not realized
+CustomLayout.horizontalGuide: cannot read horizontalGuide of CustomLayout - GTK's driver has no path for it yet
+CustomLayout.layoutPriority: cannot read layoutPriority of CustomLayout - GTK's driver has no path for it yet
+CustomLayout.namedFramesChanged: not realized
 CustomLayout.padding: ✅
 CustomLayout.panTouchCount: cannot pan on CustomLayout - GTK's driver has no path for it yet
 CustomLayout.panUpdated: cannot pan on CustomLayout - GTK's driver has no path for it yet
@@ -185,27 +247,38 @@ CustomLayout.pointerExited: cannot hover on CustomLayout - GTK's driver has no p
 CustomLayout.pointerMoved: cannot hover on CustomLayout - GTK's driver has no path for it yet
 CustomLayout.pointerPressed: cannot hover on CustomLayout - GTK's driver has no path for it yet
 CustomLayout.pointerReleased: cannot hover on CustomLayout - GTK's driver has no path for it yet
+CustomLayout.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 CustomLayout.swipeDirection: cannot pan on CustomLayout - GTK's driver has no path for it yet
 CustomLayout.swipeThreshold: cannot pan on CustomLayout - GTK's driver has no path for it yet
 CustomLayout.swiped: cannot pan on CustomLayout - GTK's driver has no path for it yet
+CustomLayout.tag: not realized
 CustomLayout.tapCount: cannot tap on CustomLayout - GTK's driver has no path for it yet
 CustomLayout.tapGesture: cannot tap on CustomLayout - GTK's driver has no path for it yet
-CustomLayout.verticalAlignment: ✅
+CustomLayout.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+CustomLayout.verticalContentAlignment: not realized
+CustomLayout.verticalGuide: cannot read verticalGuide of CustomLayout - GTK's driver has no path for it yet
 DatePicker.allowDrop: not realized
-DatePicker.area: ✅
+DatePicker.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [100.0, 34.0, 100.0, 34.0] came - its room's lower right quarter
 DatePicker.canDrag: not realized
+DatePicker.coordinateSpaceName: not realized
 DatePicker.dragLeave: not realized
 DatePicker.dragOver: not realized
 DatePicker.dragStarting: not realized
 DatePicker.dragText: not realized
 DatePicker.drop: not realized
 DatePicker.dropCompleted: not realized
-DatePicker.frameChanged: ✅
+DatePicker.dropPaths: not realized
+DatePicker.flex: not realized
+DatePicker.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 DatePicker.gridColumn: ✅
 DatePicker.gridColumnSpan: ✅
 DatePicker.gridRow: ✅
 DatePicker.gridRowSpan: ✅
-DatePicker.horizontalAlignment: ✅
+DatePicker.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+DatePicker.horizontalContentAlignment: not realized
+DatePicker.horizontalGuide: cannot read horizontalGuide of DatePicker - GTK's driver has no path for it yet
+DatePicker.layoutPriority: cannot read layoutPriority of DatePicker - GTK's driver has no path for it yet
+DatePicker.namedFramesChanged: not realized
 DatePicker.padding: ✅
 DatePicker.panTouchCount: cannot pan on DatePicker - GTK's driver has no path for it yet
 DatePicker.panUpdated: cannot pan on DatePicker - GTK's driver has no path for it yet
@@ -217,27 +290,38 @@ DatePicker.pointerExited: cannot hover on DatePicker - GTK's driver has no path 
 DatePicker.pointerMoved: cannot hover on DatePicker - GTK's driver has no path for it yet
 DatePicker.pointerPressed: cannot hover on DatePicker - GTK's driver has no path for it yet
 DatePicker.pointerReleased: cannot hover on DatePicker - GTK's driver has no path for it yet
+DatePicker.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 DatePicker.swipeDirection: cannot pan on DatePicker - GTK's driver has no path for it yet
 DatePicker.swipeThreshold: cannot pan on DatePicker - GTK's driver has no path for it yet
 DatePicker.swiped: cannot pan on DatePicker - GTK's driver has no path for it yet
+DatePicker.tag: not realized
 DatePicker.tapCount: cannot tap on DatePicker - GTK's driver has no path for it yet
 DatePicker.tapGesture: cannot tap on DatePicker - GTK's driver has no path for it yet
-DatePicker.verticalAlignment: ✅
+DatePicker.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+DatePicker.verticalContentAlignment: not realized
+DatePicker.verticalGuide: cannot read verticalGuide of DatePicker - GTK's driver has no path for it yet
 Ellipse.allowDrop: not realized
 Ellipse.area: ✅
 Ellipse.canDrag: not realized
+Ellipse.coordinateSpaceName: not realized
 Ellipse.dragLeave: not realized
 Ellipse.dragOver: not realized
 Ellipse.dragStarting: not realized
 Ellipse.dragText: not realized
 Ellipse.drop: not realized
 Ellipse.dropCompleted: not realized
-Ellipse.frameChanged: ✅
+Ellipse.dropPaths: not realized
+Ellipse.flex: not realized
+Ellipse.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Ellipse.gridColumn: ✅
 Ellipse.gridColumnSpan: ✅
 Ellipse.gridRow: ✅
 Ellipse.gridRowSpan: ✅
-Ellipse.horizontalAlignment: ✅
+Ellipse.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Ellipse.horizontalContentAlignment: not realized
+Ellipse.horizontalGuide: cannot read horizontalGuide of Ellipse - GTK's driver has no path for it yet
+Ellipse.layoutPriority: cannot read layoutPriority of Ellipse - GTK's driver has no path for it yet
+Ellipse.namedFramesChanged: not realized
 Ellipse.padding: ✅
 Ellipse.panTouchCount: cannot pan on Ellipse - GTK's driver has no path for it yet
 Ellipse.panUpdated: cannot pan on Ellipse - GTK's driver has no path for it yet
@@ -249,27 +333,38 @@ Ellipse.pointerExited: cannot hover on Ellipse - GTK's driver has no path for it
 Ellipse.pointerMoved: cannot hover on Ellipse - GTK's driver has no path for it yet
 Ellipse.pointerPressed: cannot hover on Ellipse - GTK's driver has no path for it yet
 Ellipse.pointerReleased: cannot hover on Ellipse - GTK's driver has no path for it yet
+Ellipse.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Ellipse.swipeDirection: cannot pan on Ellipse - GTK's driver has no path for it yet
 Ellipse.swipeThreshold: cannot pan on Ellipse - GTK's driver has no path for it yet
 Ellipse.swiped: cannot pan on Ellipse - GTK's driver has no path for it yet
+Ellipse.tag: not realized
 Ellipse.tapCount: cannot tap on Ellipse - GTK's driver has no path for it yet
 Ellipse.tapGesture: cannot tap on Ellipse - GTK's driver has no path for it yet
-Ellipse.verticalAlignment: ✅
+Ellipse.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Ellipse.verticalContentAlignment: not realized
+Ellipse.verticalGuide: cannot read verticalGuide of Ellipse - GTK's driver has no path for it yet
 Grid.allowDrop: not realized
-Grid.area: ✅
+Grid.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [0.0, 0.0, 0.0, 0.0] came - its room's lower right quarter
 Grid.canDrag: not realized
+Grid.coordinateSpaceName: not realized
 Grid.dragLeave: not realized
 Grid.dragOver: not realized
 Grid.dragStarting: not realized
 Grid.dragText: not realized
 Grid.drop: not realized
 Grid.dropCompleted: not realized
-Grid.frameChanged: ✅
+Grid.dropPaths: not realized
+Grid.flex: not realized
+Grid.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Grid.gridColumn: ✅
 Grid.gridColumnSpan: ✅
 Grid.gridRow: ✅
 Grid.gridRowSpan: ✅
-Grid.horizontalAlignment: ✅
+Grid.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Grid.horizontalContentAlignment: not realized
+Grid.horizontalGuide: cannot read horizontalGuide of Grid - GTK's driver has no path for it yet
+Grid.layoutPriority: cannot read layoutPriority of Grid - GTK's driver has no path for it yet
+Grid.namedFramesChanged: not realized
 Grid.padding: ✅
 Grid.panTouchCount: cannot pan on Grid - GTK's driver has no path for it yet
 Grid.panUpdated: cannot pan on Grid - GTK's driver has no path for it yet
@@ -281,27 +376,38 @@ Grid.pointerExited: cannot hover on Grid - GTK's driver has no path for it yet
 Grid.pointerMoved: cannot hover on Grid - GTK's driver has no path for it yet
 Grid.pointerPressed: cannot hover on Grid - GTK's driver has no path for it yet
 Grid.pointerReleased: cannot hover on Grid - GTK's driver has no path for it yet
+Grid.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Grid.swipeDirection: cannot pan on Grid - GTK's driver has no path for it yet
 Grid.swipeThreshold: cannot pan on Grid - GTK's driver has no path for it yet
 Grid.swiped: cannot pan on Grid - GTK's driver has no path for it yet
+Grid.tag: not realized
 Grid.tapCount: cannot tap on Grid - GTK's driver has no path for it yet
 Grid.tapGesture: cannot tap on Grid - GTK's driver has no path for it yet
-Grid.verticalAlignment: ✅
+Grid.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Grid.verticalContentAlignment: not realized
+Grid.verticalGuide: cannot read verticalGuide of Grid - GTK's driver has no path for it yet
 GridRow.allowDrop: not realized
 GridRow.area: not realized
 GridRow.canDrag: not realized
+GridRow.coordinateSpaceName: not realized
 GridRow.dragLeave: not realized
 GridRow.dragOver: not realized
 GridRow.dragStarting: not realized
 GridRow.dragText: not realized
 GridRow.drop: not realized
 GridRow.dropCompleted: not realized
+GridRow.dropPaths: not realized
+GridRow.flex: not realized
 GridRow.frameChanged: not realized
 GridRow.gridColumn: not realized
 GridRow.gridColumnSpan: not realized
 GridRow.gridRow: not realized
 GridRow.gridRowSpan: not realized
 GridRow.horizontalAlignment: not realized
+GridRow.horizontalContentAlignment: not realized
+GridRow.horizontalGuide: not realized
+GridRow.layoutPriority: not realized
+GridRow.namedFramesChanged: not realized
 GridRow.padding: not realized
 GridRow.panTouchCount: not realized
 GridRow.panUpdated: not realized
@@ -313,27 +419,38 @@ GridRow.pointerExited: not realized
 GridRow.pointerMoved: not realized
 GridRow.pointerPressed: not realized
 GridRow.pointerReleased: not realized
+GridRow.pointerStyle: not realized
 GridRow.swipeDirection: not realized
 GridRow.swipeThreshold: not realized
 GridRow.swiped: not realized
+GridRow.tag: not realized
 GridRow.tapCount: not realized
 GridRow.tapGesture: not realized
 GridRow.verticalAlignment: not realized
+GridRow.verticalContentAlignment: not realized
+GridRow.verticalGuide: not realized
 HStack.allowDrop: not realized
-HStack.area: ✅
+HStack.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [0.0, 0.0, 0.0, 0.0] came - its room's lower right quarter
 HStack.canDrag: not realized
+HStack.coordinateSpaceName: not realized
 HStack.dragLeave: not realized
 HStack.dragOver: not realized
 HStack.dragStarting: not realized
 HStack.dragText: not realized
 HStack.drop: not realized
 HStack.dropCompleted: not realized
-HStack.frameChanged: ✅
+HStack.dropPaths: not realized
+HStack.flex: not realized
+HStack.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 HStack.gridColumn: ✅
 HStack.gridColumnSpan: ✅
 HStack.gridRow: ✅
 HStack.gridRowSpan: ✅
-HStack.horizontalAlignment: ✅
+HStack.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+HStack.horizontalContentAlignment: not realized
+HStack.horizontalGuide: cannot read horizontalGuide of HStack - GTK's driver has no path for it yet
+HStack.layoutPriority: cannot read layoutPriority of HStack - GTK's driver has no path for it yet
+HStack.namedFramesChanged: not realized
 HStack.padding: ✅
 HStack.panTouchCount: cannot pan on HStack - GTK's driver has no path for it yet
 HStack.panUpdated: cannot pan on HStack - GTK's driver has no path for it yet
@@ -345,27 +462,38 @@ HStack.pointerExited: cannot hover on HStack - GTK's driver has no path for it y
 HStack.pointerMoved: cannot hover on HStack - GTK's driver has no path for it yet
 HStack.pointerPressed: cannot hover on HStack - GTK's driver has no path for it yet
 HStack.pointerReleased: cannot hover on HStack - GTK's driver has no path for it yet
+HStack.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 HStack.swipeDirection: cannot pan on HStack - GTK's driver has no path for it yet
 HStack.swipeThreshold: cannot pan on HStack - GTK's driver has no path for it yet
 HStack.swiped: cannot pan on HStack - GTK's driver has no path for it yet
+HStack.tag: not realized
 HStack.tapCount: cannot tap on HStack - GTK's driver has no path for it yet
 HStack.tapGesture: cannot tap on HStack - GTK's driver has no path for it yet
-HStack.verticalAlignment: ✅
+HStack.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+HStack.verticalContentAlignment: not realized
+HStack.verticalGuide: cannot read verticalGuide of HStack - GTK's driver has no path for it yet
 Image.allowDrop: not realized
-Image.area: ✅
+Image.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [0.0, 0.0, 0.0, 0.0] came - its room's lower right quarter
 Image.canDrag: not realized
+Image.coordinateSpaceName: not realized
 Image.dragLeave: not realized
 Image.dragOver: not realized
 Image.dragStarting: not realized
 Image.dragText: not realized
 Image.drop: not realized
 Image.dropCompleted: not realized
-Image.frameChanged: ✅
+Image.dropPaths: not realized
+Image.flex: not realized
+Image.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Image.gridColumn: ✅
 Image.gridColumnSpan: ✅
 Image.gridRow: ✅
 Image.gridRowSpan: ✅
-Image.horizontalAlignment: ✅
+Image.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Image.horizontalContentAlignment: not realized
+Image.horizontalGuide: cannot read horizontalGuide of Image - GTK's driver has no path for it yet
+Image.layoutPriority: cannot read layoutPriority of Image - GTK's driver has no path for it yet
+Image.namedFramesChanged: not realized
 Image.padding: ✅
 Image.panTouchCount: cannot pan on Image - GTK's driver has no path for it yet
 Image.panUpdated: cannot pan on Image - GTK's driver has no path for it yet
@@ -377,155 +505,210 @@ Image.pointerExited: cannot hover on Image - GTK's driver has no path for it yet
 Image.pointerMoved: cannot hover on Image - GTK's driver has no path for it yet
 Image.pointerPressed: cannot hover on Image - GTK's driver has no path for it yet
 Image.pointerReleased: cannot hover on Image - GTK's driver has no path for it yet
+Image.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Image.swipeDirection: cannot pan on Image - GTK's driver has no path for it yet
 Image.swipeThreshold: cannot pan on Image - GTK's driver has no path for it yet
 Image.swiped: cannot pan on Image - GTK's driver has no path for it yet
+Image.tag: not realized
 Image.tapCount: cannot tap on Image - GTK's driver has no path for it yet
 Image.tapGesture: cannot tap on Image - GTK's driver has no path for it yet
-Image.verticalAlignment: ✅
+Image.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Image.verticalContentAlignment: not realized
+Image.verticalGuide: cannot read verticalGuide of Image - GTK's driver has no path for it yet
 LazyHGrid.allowDrop: not realized
 LazyHGrid.area: ✅
 LazyHGrid.canDrag: not realized
+LazyHGrid.coordinateSpaceName: not realized
 LazyHGrid.dragLeave: not realized
 LazyHGrid.dragOver: not realized
 LazyHGrid.dragStarting: not realized
 LazyHGrid.dragText: not realized
 LazyHGrid.drop: not realized
 LazyHGrid.dropCompleted: not realized
-LazyHGrid.frameChanged: ✅
+LazyHGrid.dropPaths: not realized
+LazyHGrid.flex: not realized
+LazyHGrid.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 LazyHGrid.gridColumn: ✅
 LazyHGrid.gridColumnSpan: ✅
 LazyHGrid.gridRow: ✅
 LazyHGrid.gridRowSpan: ✅
-LazyHGrid.horizontalAlignment: ✅
+LazyHGrid.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+LazyHGrid.horizontalContentAlignment: not realized
+LazyHGrid.horizontalGuide: cannot read horizontalGuide of Grid - GTK's driver has no path for it yet
+LazyHGrid.layoutPriority: cannot read layoutPriority of Grid - GTK's driver has no path for it yet
+LazyHGrid.namedFramesChanged: not realized
 LazyHGrid.padding: ✅
-LazyHGrid.panTouchCount: cannot pan on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.panUpdated: cannot pan on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.panXChannel: cannot pan on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.panYChannel: cannot pan on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.pinchUpdated: cannot pinch on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.pointerEntered: cannot hover on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.pointerExited: cannot hover on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.pointerMoved: cannot hover on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.pointerPressed: cannot hover on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.pointerReleased: cannot hover on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.swipeDirection: cannot pan on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.swipeThreshold: cannot pan on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.swiped: cannot pan on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.tapCount: cannot tap on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.tapGesture: cannot tap on LazyHGrid - GTK's driver has no path for it yet
-LazyHGrid.verticalAlignment: ✅
+LazyHGrid.panTouchCount: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHGrid.panUpdated: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHGrid.panXChannel: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHGrid.panYChannel: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHGrid.pinchUpdated: cannot pinch on Grid - GTK's driver has no path for it yet
+LazyHGrid.pointerEntered: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHGrid.pointerExited: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHGrid.pointerMoved: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHGrid.pointerPressed: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHGrid.pointerReleased: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHGrid.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
+LazyHGrid.swipeDirection: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHGrid.swipeThreshold: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHGrid.swiped: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHGrid.tag: not realized
+LazyHGrid.tapCount: cannot tap on Grid - GTK's driver has no path for it yet
+LazyHGrid.tapGesture: cannot tap on Grid - GTK's driver has no path for it yet
+LazyHGrid.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+LazyHGrid.verticalContentAlignment: cannot read verticalContentAlignment of Grid - GTK's driver has no path for it yet
+LazyHGrid.verticalGuide: cannot read verticalGuide of Grid - GTK's driver has no path for it yet
 LazyHStack.allowDrop: not realized
 LazyHStack.area: ✅
 LazyHStack.canDrag: not realized
+LazyHStack.coordinateSpaceName: not realized
 LazyHStack.dragLeave: not realized
 LazyHStack.dragOver: not realized
 LazyHStack.dragStarting: not realized
 LazyHStack.dragText: not realized
 LazyHStack.drop: not realized
 LazyHStack.dropCompleted: not realized
-LazyHStack.frameChanged: ✅
+LazyHStack.dropPaths: not realized
+LazyHStack.flex: not realized
+LazyHStack.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 LazyHStack.gridColumn: ✅
 LazyHStack.gridColumnSpan: ✅
 LazyHStack.gridRow: ✅
 LazyHStack.gridRowSpan: ✅
-LazyHStack.horizontalAlignment: ✅
+LazyHStack.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+LazyHStack.horizontalContentAlignment: not realized
+LazyHStack.horizontalGuide: cannot read horizontalGuide of Grid - GTK's driver has no path for it yet
+LazyHStack.layoutPriority: cannot read layoutPriority of Grid - GTK's driver has no path for it yet
+LazyHStack.namedFramesChanged: not realized
 LazyHStack.padding: ✅
-LazyHStack.panTouchCount: cannot pan on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.panUpdated: cannot pan on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.panXChannel: cannot pan on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.panYChannel: cannot pan on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.pinchUpdated: cannot pinch on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.pointerEntered: cannot hover on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.pointerExited: cannot hover on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.pointerMoved: cannot hover on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.pointerPressed: cannot hover on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.pointerReleased: cannot hover on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.swipeDirection: cannot pan on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.swipeThreshold: cannot pan on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.swiped: cannot pan on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.tapCount: cannot tap on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.tapGesture: cannot tap on LazyHStack - GTK's driver has no path for it yet
-LazyHStack.verticalAlignment: ✅
+LazyHStack.panTouchCount: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHStack.panUpdated: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHStack.panXChannel: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHStack.panYChannel: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHStack.pinchUpdated: cannot pinch on Grid - GTK's driver has no path for it yet
+LazyHStack.pointerEntered: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHStack.pointerExited: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHStack.pointerMoved: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHStack.pointerPressed: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHStack.pointerReleased: cannot hover on Grid - GTK's driver has no path for it yet
+LazyHStack.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
+LazyHStack.swipeDirection: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHStack.swipeThreshold: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHStack.swiped: cannot pan on Grid - GTK's driver has no path for it yet
+LazyHStack.tag: not realized
+LazyHStack.tapCount: cannot tap on Grid - GTK's driver has no path for it yet
+LazyHStack.tapGesture: cannot tap on Grid - GTK's driver has no path for it yet
+LazyHStack.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+LazyHStack.verticalContentAlignment: not realized
+LazyHStack.verticalGuide: cannot read verticalGuide of Grid - GTK's driver has no path for it yet
 LazyVGrid.allowDrop: not realized
 LazyVGrid.area: ✅
 LazyVGrid.canDrag: not realized
+LazyVGrid.coordinateSpaceName: not realized
 LazyVGrid.dragLeave: not realized
 LazyVGrid.dragOver: not realized
 LazyVGrid.dragStarting: not realized
 LazyVGrid.dragText: not realized
 LazyVGrid.drop: not realized
 LazyVGrid.dropCompleted: not realized
-LazyVGrid.frameChanged: ✅
+LazyVGrid.dropPaths: not realized
+LazyVGrid.flex: not realized
+LazyVGrid.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 LazyVGrid.gridColumn: ✅
 LazyVGrid.gridColumnSpan: ✅
 LazyVGrid.gridRow: ✅
 LazyVGrid.gridRowSpan: ✅
-LazyVGrid.horizontalAlignment: ✅
+LazyVGrid.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+LazyVGrid.horizontalContentAlignment: cannot read horizontalContentAlignment of Grid - GTK's driver has no path for it yet
+LazyVGrid.horizontalGuide: cannot read horizontalGuide of Grid - GTK's driver has no path for it yet
+LazyVGrid.layoutPriority: cannot read layoutPriority of Grid - GTK's driver has no path for it yet
+LazyVGrid.namedFramesChanged: not realized
 LazyVGrid.padding: ✅
-LazyVGrid.panTouchCount: cannot pan on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.panUpdated: cannot pan on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.panXChannel: cannot pan on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.panYChannel: cannot pan on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.pinchUpdated: cannot pinch on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.pointerEntered: cannot hover on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.pointerExited: cannot hover on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.pointerMoved: cannot hover on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.pointerPressed: cannot hover on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.pointerReleased: cannot hover on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.swipeDirection: cannot pan on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.swipeThreshold: cannot pan on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.swiped: cannot pan on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.tapCount: cannot tap on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.tapGesture: cannot tap on LazyVGrid - GTK's driver has no path for it yet
-LazyVGrid.verticalAlignment: ✅
+LazyVGrid.panTouchCount: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVGrid.panUpdated: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVGrid.panXChannel: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVGrid.panYChannel: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVGrid.pinchUpdated: cannot pinch on Grid - GTK's driver has no path for it yet
+LazyVGrid.pointerEntered: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVGrid.pointerExited: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVGrid.pointerMoved: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVGrid.pointerPressed: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVGrid.pointerReleased: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVGrid.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
+LazyVGrid.swipeDirection: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVGrid.swipeThreshold: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVGrid.swiped: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVGrid.tag: not realized
+LazyVGrid.tapCount: cannot tap on Grid - GTK's driver has no path for it yet
+LazyVGrid.tapGesture: cannot tap on Grid - GTK's driver has no path for it yet
+LazyVGrid.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+LazyVGrid.verticalContentAlignment: not realized
+LazyVGrid.verticalGuide: cannot read verticalGuide of Grid - GTK's driver has no path for it yet
 LazyVStack.allowDrop: not realized
 LazyVStack.area: ✅
 LazyVStack.canDrag: not realized
+LazyVStack.coordinateSpaceName: not realized
 LazyVStack.dragLeave: not realized
 LazyVStack.dragOver: not realized
 LazyVStack.dragStarting: not realized
 LazyVStack.dragText: not realized
 LazyVStack.drop: not realized
 LazyVStack.dropCompleted: not realized
-LazyVStack.frameChanged: ✅
+LazyVStack.dropPaths: not realized
+LazyVStack.flex: not realized
+LazyVStack.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 LazyVStack.gridColumn: ✅
 LazyVStack.gridColumnSpan: ✅
 LazyVStack.gridRow: ✅
 LazyVStack.gridRowSpan: ✅
-LazyVStack.horizontalAlignment: ✅
+LazyVStack.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+LazyVStack.horizontalContentAlignment: not realized
+LazyVStack.horizontalGuide: cannot read horizontalGuide of Grid - GTK's driver has no path for it yet
+LazyVStack.layoutPriority: cannot read layoutPriority of Grid - GTK's driver has no path for it yet
+LazyVStack.namedFramesChanged: not realized
 LazyVStack.padding: ✅
-LazyVStack.panTouchCount: cannot pan on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.panUpdated: cannot pan on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.panXChannel: cannot pan on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.panYChannel: cannot pan on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.pinchUpdated: cannot pinch on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.pointerEntered: cannot hover on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.pointerExited: cannot hover on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.pointerMoved: cannot hover on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.pointerPressed: cannot hover on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.pointerReleased: cannot hover on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.swipeDirection: cannot pan on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.swipeThreshold: cannot pan on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.swiped: cannot pan on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.tapCount: cannot tap on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.tapGesture: cannot tap on LazyVStack - GTK's driver has no path for it yet
-LazyVStack.verticalAlignment: ✅
+LazyVStack.panTouchCount: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVStack.panUpdated: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVStack.panXChannel: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVStack.panYChannel: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVStack.pinchUpdated: cannot pinch on Grid - GTK's driver has no path for it yet
+LazyVStack.pointerEntered: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVStack.pointerExited: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVStack.pointerMoved: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVStack.pointerPressed: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVStack.pointerReleased: cannot hover on Grid - GTK's driver has no path for it yet
+LazyVStack.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
+LazyVStack.swipeDirection: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVStack.swipeThreshold: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVStack.swiped: cannot pan on Grid - GTK's driver has no path for it yet
+LazyVStack.tag: not realized
+LazyVStack.tapCount: cannot tap on Grid - GTK's driver has no path for it yet
+LazyVStack.tapGesture: cannot tap on Grid - GTK's driver has no path for it yet
+LazyVStack.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+LazyVStack.verticalContentAlignment: not realized
+LazyVStack.verticalGuide: cannot read verticalGuide of Grid - GTK's driver has no path for it yet
 Line.allowDrop: not realized
 Line.area: ✅
 Line.canDrag: not realized
+Line.coordinateSpaceName: not realized
 Line.dragLeave: not realized
 Line.dragOver: not realized
 Line.dragStarting: not realized
 Line.dragText: not realized
 Line.drop: not realized
 Line.dropCompleted: not realized
-Line.frameChanged: ✅
+Line.dropPaths: not realized
+Line.flex: not realized
+Line.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Line.gridColumn: ✅
 Line.gridColumnSpan: ✅
 Line.gridRow: ✅
 Line.gridRowSpan: ✅
-Line.horizontalAlignment: ✅
+Line.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Line.horizontalContentAlignment: not realized
+Line.horizontalGuide: cannot read horizontalGuide of Line - GTK's driver has no path for it yet
+Line.layoutPriority: cannot read layoutPriority of Line - GTK's driver has no path for it yet
+Line.namedFramesChanged: not realized
 Line.padding: ✅
 Line.panTouchCount: cannot pan on Line - GTK's driver has no path for it yet
 Line.panUpdated: cannot pan on Line - GTK's driver has no path for it yet
@@ -537,59 +720,81 @@ Line.pointerExited: cannot hover on Line - GTK's driver has no path for it yet
 Line.pointerMoved: cannot hover on Line - GTK's driver has no path for it yet
 Line.pointerPressed: cannot hover on Line - GTK's driver has no path for it yet
 Line.pointerReleased: cannot hover on Line - GTK's driver has no path for it yet
+Line.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Line.swipeDirection: cannot pan on Line - GTK's driver has no path for it yet
 Line.swipeThreshold: cannot pan on Line - GTK's driver has no path for it yet
 Line.swiped: cannot pan on Line - GTK's driver has no path for it yet
+Line.tag: not realized
 Line.tapCount: cannot tap on Line - GTK's driver has no path for it yet
 Line.tapGesture: cannot tap on Line - GTK's driver has no path for it yet
-Line.verticalAlignment: ✅
+Line.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Line.verticalContentAlignment: not realized
+Line.verticalGuide: cannot read verticalGuide of Line - GTK's driver has no path for it yet
 List.allowDrop: not realized
 List.area: ✅
 List.canDrag: not realized
+List.coordinateSpaceName: not realized
 List.dragLeave: not realized
 List.dragOver: not realized
 List.dragStarting: not realized
 List.dragText: not realized
 List.drop: not realized
 List.dropCompleted: not realized
-List.frameChanged: ✅
+List.dropPaths: not realized
+List.flex: not realized
+List.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 List.gridColumn: ✅
 List.gridColumnSpan: ✅
 List.gridRow: ✅
 List.gridRowSpan: ✅
-List.horizontalAlignment: ✅
+List.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+List.horizontalContentAlignment: not realized
+List.horizontalGuide: cannot read horizontalGuide of Grid - GTK's driver has no path for it yet
+List.layoutPriority: cannot read layoutPriority of Grid - GTK's driver has no path for it yet
+List.namedFramesChanged: not realized
 List.padding: ✅
-List.panTouchCount: cannot pan on List - GTK's driver has no path for it yet
-List.panUpdated: cannot pan on List - GTK's driver has no path for it yet
-List.panXChannel: cannot pan on List - GTK's driver has no path for it yet
-List.panYChannel: cannot pan on List - GTK's driver has no path for it yet
-List.pinchUpdated: cannot pinch on List - GTK's driver has no path for it yet
-List.pointerEntered: cannot hover on List - GTK's driver has no path for it yet
-List.pointerExited: cannot hover on List - GTK's driver has no path for it yet
-List.pointerMoved: cannot hover on List - GTK's driver has no path for it yet
-List.pointerPressed: cannot hover on List - GTK's driver has no path for it yet
-List.pointerReleased: cannot hover on List - GTK's driver has no path for it yet
-List.swipeDirection: cannot pan on List - GTK's driver has no path for it yet
-List.swipeThreshold: cannot pan on List - GTK's driver has no path for it yet
-List.swiped: cannot pan on List - GTK's driver has no path for it yet
-List.tapCount: cannot tap on List - GTK's driver has no path for it yet
-List.tapGesture: cannot tap on List - GTK's driver has no path for it yet
-List.verticalAlignment: ✅
+List.panTouchCount: cannot pan on Grid - GTK's driver has no path for it yet
+List.panUpdated: cannot pan on Grid - GTK's driver has no path for it yet
+List.panXChannel: cannot pan on Grid - GTK's driver has no path for it yet
+List.panYChannel: cannot pan on Grid - GTK's driver has no path for it yet
+List.pinchUpdated: cannot pinch on Grid - GTK's driver has no path for it yet
+List.pointerEntered: cannot hover on Grid - GTK's driver has no path for it yet
+List.pointerExited: cannot hover on Grid - GTK's driver has no path for it yet
+List.pointerMoved: cannot hover on Grid - GTK's driver has no path for it yet
+List.pointerPressed: cannot hover on Grid - GTK's driver has no path for it yet
+List.pointerReleased: cannot hover on Grid - GTK's driver has no path for it yet
+List.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
+List.swipeDirection: cannot pan on Grid - GTK's driver has no path for it yet
+List.swipeThreshold: cannot pan on Grid - GTK's driver has no path for it yet
+List.swiped: cannot pan on Grid - GTK's driver has no path for it yet
+List.tag: not realized
+List.tapCount: cannot tap on Grid - GTK's driver has no path for it yet
+List.tapGesture: cannot tap on Grid - GTK's driver has no path for it yet
+List.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+List.verticalContentAlignment: not realized
+List.verticalGuide: cannot read verticalGuide of Grid - GTK's driver has no path for it yet
 Map.allowDrop: not realized
 Map.area: not realized
 Map.canDrag: not realized
+Map.coordinateSpaceName: not realized
 Map.dragLeave: not realized
 Map.dragOver: not realized
 Map.dragStarting: not realized
 Map.dragText: not realized
 Map.drop: not realized
 Map.dropCompleted: not realized
+Map.dropPaths: not realized
+Map.flex: not realized
 Map.frameChanged: not realized
 Map.gridColumn: not realized
 Map.gridColumnSpan: not realized
 Map.gridRow: not realized
 Map.gridRowSpan: not realized
 Map.horizontalAlignment: not realized
+Map.horizontalContentAlignment: not realized
+Map.horizontalGuide: not realized
+Map.layoutPriority: not realized
+Map.namedFramesChanged: not realized
 Map.padding: not realized
 Map.panTouchCount: not realized
 Map.panUpdated: not realized
@@ -601,27 +806,38 @@ Map.pointerExited: not realized
 Map.pointerMoved: not realized
 Map.pointerPressed: not realized
 Map.pointerReleased: not realized
+Map.pointerStyle: not realized
 Map.swipeDirection: not realized
 Map.swipeThreshold: not realized
 Map.swiped: not realized
+Map.tag: not realized
 Map.tapCount: not realized
 Map.tapGesture: not realized
 Map.verticalAlignment: not realized
+Map.verticalContentAlignment: not realized
+Map.verticalGuide: not realized
 Masked.allowDrop: not realized
 Masked.area: ✅
 Masked.canDrag: not realized
+Masked.coordinateSpaceName: not realized
 Masked.dragLeave: not realized
 Masked.dragOver: not realized
 Masked.dragStarting: not realized
 Masked.dragText: not realized
 Masked.drop: not realized
 Masked.dropCompleted: not realized
-Masked.frameChanged: ✅
+Masked.dropPaths: not realized
+Masked.flex: not realized
+Masked.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Masked.gridColumn: ✅
 Masked.gridColumnSpan: ✅
 Masked.gridRow: ✅
 Masked.gridRowSpan: ✅
-Masked.horizontalAlignment: ✅
+Masked.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Masked.horizontalContentAlignment: not realized
+Masked.horizontalGuide: cannot read horizontalGuide of Masked - GTK's driver has no path for it yet
+Masked.layoutPriority: cannot read layoutPriority of Masked - GTK's driver has no path for it yet
+Masked.namedFramesChanged: not realized
 Masked.padding: ✅
 Masked.panTouchCount: cannot pan on Masked - GTK's driver has no path for it yet
 Masked.panUpdated: cannot pan on Masked - GTK's driver has no path for it yet
@@ -633,27 +849,38 @@ Masked.pointerExited: cannot hover on Masked - GTK's driver has no path for it y
 Masked.pointerMoved: cannot hover on Masked - GTK's driver has no path for it yet
 Masked.pointerPressed: cannot hover on Masked - GTK's driver has no path for it yet
 Masked.pointerReleased: cannot hover on Masked - GTK's driver has no path for it yet
+Masked.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Masked.swipeDirection: cannot pan on Masked - GTK's driver has no path for it yet
 Masked.swipeThreshold: cannot pan on Masked - GTK's driver has no path for it yet
 Masked.swiped: cannot pan on Masked - GTK's driver has no path for it yet
+Masked.tag: not realized
 Masked.tapCount: cannot tap on Masked - GTK's driver has no path for it yet
 Masked.tapGesture: cannot tap on Masked - GTK's driver has no path for it yet
-Masked.verticalAlignment: ✅
+Masked.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Masked.verticalContentAlignment: not realized
+Masked.verticalGuide: cannot read verticalGuide of Masked - GTK's driver has no path for it yet
 MenuButton.allowDrop: not realized
-MenuButton.area: ✅
+MenuButton.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [48.0, 34.0, 48.0, 34.0] came - its room's lower right quarter
 MenuButton.canDrag: not realized
+MenuButton.coordinateSpaceName: not realized
 MenuButton.dragLeave: not realized
 MenuButton.dragOver: not realized
 MenuButton.dragStarting: not realized
 MenuButton.dragText: not realized
 MenuButton.drop: not realized
 MenuButton.dropCompleted: not realized
-MenuButton.frameChanged: ✅
+MenuButton.dropPaths: not realized
+MenuButton.flex: not realized
+MenuButton.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 MenuButton.gridColumn: ✅
 MenuButton.gridColumnSpan: ✅
 MenuButton.gridRow: ✅
 MenuButton.gridRowSpan: ✅
-MenuButton.horizontalAlignment: ✅
+MenuButton.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+MenuButton.horizontalContentAlignment: not realized
+MenuButton.horizontalGuide: cannot read horizontalGuide of MenuButton - GTK's driver has no path for it yet
+MenuButton.layoutPriority: cannot read layoutPriority of MenuButton - GTK's driver has no path for it yet
+MenuButton.namedFramesChanged: not realized
 MenuButton.padding: ✅
 MenuButton.panTouchCount: cannot pan on MenuButton - GTK's driver has no path for it yet
 MenuButton.panUpdated: cannot pan on MenuButton - GTK's driver has no path for it yet
@@ -665,27 +892,38 @@ MenuButton.pointerExited: cannot hover on MenuButton - GTK's driver has no path 
 MenuButton.pointerMoved: cannot hover on MenuButton - GTK's driver has no path for it yet
 MenuButton.pointerPressed: cannot hover on MenuButton - GTK's driver has no path for it yet
 MenuButton.pointerReleased: cannot hover on MenuButton - GTK's driver has no path for it yet
+MenuButton.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 MenuButton.swipeDirection: cannot pan on MenuButton - GTK's driver has no path for it yet
 MenuButton.swipeThreshold: cannot pan on MenuButton - GTK's driver has no path for it yet
 MenuButton.swiped: cannot pan on MenuButton - GTK's driver has no path for it yet
+MenuButton.tag: not realized
 MenuButton.tapCount: cannot tap on MenuButton - GTK's driver has no path for it yet
 MenuButton.tapGesture: cannot tap on MenuButton - GTK's driver has no path for it yet
-MenuButton.verticalAlignment: ✅
+MenuButton.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+MenuButton.verticalContentAlignment: not realized
+MenuButton.verticalGuide: cannot read verticalGuide of MenuButton - GTK's driver has no path for it yet
 Path.allowDrop: not realized
 Path.area: ✅
 Path.canDrag: not realized
+Path.coordinateSpaceName: not realized
 Path.dragLeave: not realized
 Path.dragOver: not realized
 Path.dragStarting: not realized
 Path.dragText: not realized
 Path.drop: not realized
 Path.dropCompleted: not realized
-Path.frameChanged: ✅
+Path.dropPaths: not realized
+Path.flex: not realized
+Path.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Path.gridColumn: ✅
 Path.gridColumnSpan: ✅
 Path.gridRow: ✅
 Path.gridRowSpan: ✅
-Path.horizontalAlignment: ✅
+Path.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Path.horizontalContentAlignment: not realized
+Path.horizontalGuide: cannot read horizontalGuide of Path - GTK's driver has no path for it yet
+Path.layoutPriority: cannot read layoutPriority of Path - GTK's driver has no path for it yet
+Path.namedFramesChanged: not realized
 Path.padding: ✅
 Path.panTouchCount: cannot pan on Path - GTK's driver has no path for it yet
 Path.panUpdated: cannot pan on Path - GTK's driver has no path for it yet
@@ -697,27 +935,38 @@ Path.pointerExited: cannot hover on Path - GTK's driver has no path for it yet
 Path.pointerMoved: cannot hover on Path - GTK's driver has no path for it yet
 Path.pointerPressed: cannot hover on Path - GTK's driver has no path for it yet
 Path.pointerReleased: cannot hover on Path - GTK's driver has no path for it yet
+Path.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Path.swipeDirection: cannot pan on Path - GTK's driver has no path for it yet
 Path.swipeThreshold: cannot pan on Path - GTK's driver has no path for it yet
 Path.swiped: cannot pan on Path - GTK's driver has no path for it yet
+Path.tag: not realized
 Path.tapCount: cannot tap on Path - GTK's driver has no path for it yet
 Path.tapGesture: cannot tap on Path - GTK's driver has no path for it yet
-Path.verticalAlignment: ✅
+Path.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Path.verticalContentAlignment: not realized
+Path.verticalGuide: cannot read verticalGuide of Path - GTK's driver has no path for it yet
 Picker.allowDrop: not realized
-Picker.area: ✅
+Picker.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [89.0, 34.0, 89.0, 34.0] came - its room's lower right quarter
 Picker.canDrag: not realized
+Picker.coordinateSpaceName: not realized
 Picker.dragLeave: not realized
 Picker.dragOver: not realized
 Picker.dragStarting: not realized
 Picker.dragText: not realized
 Picker.drop: not realized
 Picker.dropCompleted: not realized
-Picker.frameChanged: ✅
+Picker.dropPaths: not realized
+Picker.flex: not realized
+Picker.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Picker.gridColumn: ✅
 Picker.gridColumnSpan: ✅
 Picker.gridRow: ✅
 Picker.gridRowSpan: ✅
-Picker.horizontalAlignment: ✅
+Picker.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Picker.horizontalContentAlignment: not realized
+Picker.horizontalGuide: cannot read horizontalGuide of Picker - GTK's driver has no path for it yet
+Picker.layoutPriority: cannot read layoutPriority of Picker - GTK's driver has no path for it yet
+Picker.namedFramesChanged: not realized
 Picker.padding: ✅
 Picker.panTouchCount: cannot pan on Picker - GTK's driver has no path for it yet
 Picker.panUpdated: cannot pan on Picker - GTK's driver has no path for it yet
@@ -729,27 +978,38 @@ Picker.pointerExited: cannot hover on Picker - GTK's driver has no path for it y
 Picker.pointerMoved: cannot hover on Picker - GTK's driver has no path for it yet
 Picker.pointerPressed: cannot hover on Picker - GTK's driver has no path for it yet
 Picker.pointerReleased: cannot hover on Picker - GTK's driver has no path for it yet
+Picker.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Picker.swipeDirection: cannot pan on Picker - GTK's driver has no path for it yet
 Picker.swipeThreshold: cannot pan on Picker - GTK's driver has no path for it yet
 Picker.swiped: cannot pan on Picker - GTK's driver has no path for it yet
+Picker.tag: not realized
 Picker.tapCount: cannot tap on Picker - GTK's driver has no path for it yet
 Picker.tapGesture: cannot tap on Picker - GTK's driver has no path for it yet
-Picker.verticalAlignment: ✅
+Picker.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Picker.verticalContentAlignment: not realized
+Picker.verticalGuide: cannot read verticalGuide of Picker - GTK's driver has no path for it yet
 Polygon.allowDrop: not realized
 Polygon.area: ✅
 Polygon.canDrag: not realized
+Polygon.coordinateSpaceName: not realized
 Polygon.dragLeave: not realized
 Polygon.dragOver: not realized
 Polygon.dragStarting: not realized
 Polygon.dragText: not realized
 Polygon.drop: not realized
 Polygon.dropCompleted: not realized
-Polygon.frameChanged: ✅
+Polygon.dropPaths: not realized
+Polygon.flex: not realized
+Polygon.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Polygon.gridColumn: ✅
 Polygon.gridColumnSpan: ✅
 Polygon.gridRow: ✅
 Polygon.gridRowSpan: ✅
-Polygon.horizontalAlignment: ✅
+Polygon.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Polygon.horizontalContentAlignment: not realized
+Polygon.horizontalGuide: cannot read horizontalGuide of Polygon - GTK's driver has no path for it yet
+Polygon.layoutPriority: cannot read layoutPriority of Polygon - GTK's driver has no path for it yet
+Polygon.namedFramesChanged: not realized
 Polygon.padding: ✅
 Polygon.panTouchCount: cannot pan on Polygon - GTK's driver has no path for it yet
 Polygon.panUpdated: cannot pan on Polygon - GTK's driver has no path for it yet
@@ -761,27 +1021,38 @@ Polygon.pointerExited: cannot hover on Polygon - GTK's driver has no path for it
 Polygon.pointerMoved: cannot hover on Polygon - GTK's driver has no path for it yet
 Polygon.pointerPressed: cannot hover on Polygon - GTK's driver has no path for it yet
 Polygon.pointerReleased: cannot hover on Polygon - GTK's driver has no path for it yet
+Polygon.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Polygon.swipeDirection: cannot pan on Polygon - GTK's driver has no path for it yet
 Polygon.swipeThreshold: cannot pan on Polygon - GTK's driver has no path for it yet
 Polygon.swiped: cannot pan on Polygon - GTK's driver has no path for it yet
+Polygon.tag: not realized
 Polygon.tapCount: cannot tap on Polygon - GTK's driver has no path for it yet
 Polygon.tapGesture: cannot tap on Polygon - GTK's driver has no path for it yet
-Polygon.verticalAlignment: ✅
+Polygon.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Polygon.verticalContentAlignment: not realized
+Polygon.verticalGuide: cannot read verticalGuide of Polygon - GTK's driver has no path for it yet
 Polyline.allowDrop: not realized
 Polyline.area: ✅
 Polyline.canDrag: not realized
+Polyline.coordinateSpaceName: not realized
 Polyline.dragLeave: not realized
 Polyline.dragOver: not realized
 Polyline.dragStarting: not realized
 Polyline.dragText: not realized
 Polyline.drop: not realized
 Polyline.dropCompleted: not realized
-Polyline.frameChanged: ✅
+Polyline.dropPaths: not realized
+Polyline.flex: not realized
+Polyline.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Polyline.gridColumn: ✅
 Polyline.gridColumnSpan: ✅
 Polyline.gridRow: ✅
 Polyline.gridRowSpan: ✅
-Polyline.horizontalAlignment: ✅
+Polyline.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Polyline.horizontalContentAlignment: not realized
+Polyline.horizontalGuide: cannot read horizontalGuide of Polyline - GTK's driver has no path for it yet
+Polyline.layoutPriority: cannot read layoutPriority of Polyline - GTK's driver has no path for it yet
+Polyline.namedFramesChanged: not realized
 Polyline.padding: ✅
 Polyline.panTouchCount: cannot pan on Polyline - GTK's driver has no path for it yet
 Polyline.panUpdated: cannot pan on Polyline - GTK's driver has no path for it yet
@@ -793,27 +1064,38 @@ Polyline.pointerExited: cannot hover on Polyline - GTK's driver has no path for 
 Polyline.pointerMoved: cannot hover on Polyline - GTK's driver has no path for it yet
 Polyline.pointerPressed: cannot hover on Polyline - GTK's driver has no path for it yet
 Polyline.pointerReleased: cannot hover on Polyline - GTK's driver has no path for it yet
+Polyline.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Polyline.swipeDirection: cannot pan on Polyline - GTK's driver has no path for it yet
 Polyline.swipeThreshold: cannot pan on Polyline - GTK's driver has no path for it yet
 Polyline.swiped: cannot pan on Polyline - GTK's driver has no path for it yet
+Polyline.tag: not realized
 Polyline.tapCount: cannot tap on Polyline - GTK's driver has no path for it yet
 Polyline.tapGesture: cannot tap on Polyline - GTK's driver has no path for it yet
-Polyline.verticalAlignment: ✅
+Polyline.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Polyline.verticalContentAlignment: not realized
+Polyline.verticalGuide: cannot read verticalGuide of Polyline - GTK's driver has no path for it yet
 PositionIndicator.allowDrop: not realized
 PositionIndicator.area: not realized
 PositionIndicator.canDrag: not realized
+PositionIndicator.coordinateSpaceName: not realized
 PositionIndicator.dragLeave: not realized
 PositionIndicator.dragOver: not realized
 PositionIndicator.dragStarting: not realized
 PositionIndicator.dragText: not realized
 PositionIndicator.drop: not realized
 PositionIndicator.dropCompleted: not realized
+PositionIndicator.dropPaths: not realized
+PositionIndicator.flex: not realized
 PositionIndicator.frameChanged: not realized
 PositionIndicator.gridColumn: not realized
 PositionIndicator.gridColumnSpan: not realized
 PositionIndicator.gridRow: not realized
 PositionIndicator.gridRowSpan: not realized
 PositionIndicator.horizontalAlignment: not realized
+PositionIndicator.horizontalContentAlignment: not realized
+PositionIndicator.horizontalGuide: not realized
+PositionIndicator.layoutPriority: not realized
+PositionIndicator.namedFramesChanged: not realized
 PositionIndicator.padding: not realized
 PositionIndicator.panTouchCount: not realized
 PositionIndicator.panUpdated: not realized
@@ -825,27 +1107,38 @@ PositionIndicator.pointerExited: not realized
 PositionIndicator.pointerMoved: not realized
 PositionIndicator.pointerPressed: not realized
 PositionIndicator.pointerReleased: not realized
+PositionIndicator.pointerStyle: not realized
 PositionIndicator.swipeDirection: not realized
 PositionIndicator.swipeThreshold: not realized
 PositionIndicator.swiped: not realized
+PositionIndicator.tag: not realized
 PositionIndicator.tapCount: not realized
 PositionIndicator.tapGesture: not realized
 PositionIndicator.verticalAlignment: not realized
+PositionIndicator.verticalContentAlignment: not realized
+PositionIndicator.verticalGuide: not realized
 ProgressBar.allowDrop: not realized
-ProgressBar.area: ✅
+ProgressBar.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [100.0, 8.0, 100.0, 8.0] came - its room's lower right quarter
 ProgressBar.canDrag: not realized
+ProgressBar.coordinateSpaceName: not realized
 ProgressBar.dragLeave: not realized
 ProgressBar.dragOver: not realized
 ProgressBar.dragStarting: not realized
 ProgressBar.dragText: not realized
 ProgressBar.drop: not realized
 ProgressBar.dropCompleted: not realized
-ProgressBar.frameChanged: ✅
+ProgressBar.dropPaths: not realized
+ProgressBar.flex: not realized
+ProgressBar.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 ProgressBar.gridColumn: ✅
 ProgressBar.gridColumnSpan: ✅
 ProgressBar.gridRow: ✅
 ProgressBar.gridRowSpan: ✅
-ProgressBar.horizontalAlignment: ✅
+ProgressBar.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ProgressBar.horizontalContentAlignment: not realized
+ProgressBar.horizontalGuide: cannot read horizontalGuide of ProgressBar - GTK's driver has no path for it yet
+ProgressBar.layoutPriority: cannot read layoutPriority of ProgressBar - GTK's driver has no path for it yet
+ProgressBar.namedFramesChanged: not realized
 ProgressBar.padding: ✅
 ProgressBar.panTouchCount: cannot pan on ProgressBar - GTK's driver has no path for it yet
 ProgressBar.panUpdated: cannot pan on ProgressBar - GTK's driver has no path for it yet
@@ -857,27 +1150,38 @@ ProgressBar.pointerExited: cannot hover on ProgressBar - GTK's driver has no pat
 ProgressBar.pointerMoved: cannot hover on ProgressBar - GTK's driver has no path for it yet
 ProgressBar.pointerPressed: cannot hover on ProgressBar - GTK's driver has no path for it yet
 ProgressBar.pointerReleased: cannot hover on ProgressBar - GTK's driver has no path for it yet
+ProgressBar.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 ProgressBar.swipeDirection: cannot pan on ProgressBar - GTK's driver has no path for it yet
 ProgressBar.swipeThreshold: cannot pan on ProgressBar - GTK's driver has no path for it yet
 ProgressBar.swiped: cannot pan on ProgressBar - GTK's driver has no path for it yet
+ProgressBar.tag: not realized
 ProgressBar.tapCount: cannot tap on ProgressBar - GTK's driver has no path for it yet
 ProgressBar.tapGesture: cannot tap on ProgressBar - GTK's driver has no path for it yet
-ProgressBar.verticalAlignment: ✅
+ProgressBar.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ProgressBar.verticalContentAlignment: not realized
+ProgressBar.verticalGuide: cannot read verticalGuide of ProgressBar - GTK's driver has no path for it yet
 RadioButton.allowDrop: not realized
-RadioButton.area: ✅
+RadioButton.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [26.0, 26.0, 26.0, 26.0] came - its room's lower right quarter
 RadioButton.canDrag: not realized
+RadioButton.coordinateSpaceName: not realized
 RadioButton.dragLeave: not realized
 RadioButton.dragOver: not realized
 RadioButton.dragStarting: not realized
 RadioButton.dragText: not realized
 RadioButton.drop: not realized
 RadioButton.dropCompleted: not realized
-RadioButton.frameChanged: ✅
+RadioButton.dropPaths: not realized
+RadioButton.flex: not realized
+RadioButton.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 RadioButton.gridColumn: ✅
 RadioButton.gridColumnSpan: ✅
 RadioButton.gridRow: ✅
 RadioButton.gridRowSpan: ✅
-RadioButton.horizontalAlignment: ✅
+RadioButton.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+RadioButton.horizontalContentAlignment: not realized
+RadioButton.horizontalGuide: cannot read horizontalGuide of RadioButton - GTK's driver has no path for it yet
+RadioButton.layoutPriority: cannot read layoutPriority of RadioButton - GTK's driver has no path for it yet
+RadioButton.namedFramesChanged: not realized
 RadioButton.padding: ✅
 RadioButton.panTouchCount: cannot pan on RadioButton - GTK's driver has no path for it yet
 RadioButton.panUpdated: cannot pan on RadioButton - GTK's driver has no path for it yet
@@ -889,27 +1193,38 @@ RadioButton.pointerExited: cannot hover on RadioButton - GTK's driver has no pat
 RadioButton.pointerMoved: cannot hover on RadioButton - GTK's driver has no path for it yet
 RadioButton.pointerPressed: cannot hover on RadioButton - GTK's driver has no path for it yet
 RadioButton.pointerReleased: cannot hover on RadioButton - GTK's driver has no path for it yet
+RadioButton.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 RadioButton.swipeDirection: cannot pan on RadioButton - GTK's driver has no path for it yet
 RadioButton.swipeThreshold: cannot pan on RadioButton - GTK's driver has no path for it yet
 RadioButton.swiped: cannot pan on RadioButton - GTK's driver has no path for it yet
+RadioButton.tag: not realized
 RadioButton.tapCount: cannot tap on RadioButton - GTK's driver has no path for it yet
 RadioButton.tapGesture: cannot tap on RadioButton - GTK's driver has no path for it yet
-RadioButton.verticalAlignment: ✅
+RadioButton.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+RadioButton.verticalContentAlignment: not realized
+RadioButton.verticalGuide: cannot read verticalGuide of RadioButton - GTK's driver has no path for it yet
 Rectangle.allowDrop: not realized
 Rectangle.area: ✅
 Rectangle.canDrag: not realized
+Rectangle.coordinateSpaceName: not realized
 Rectangle.dragLeave: not realized
 Rectangle.dragOver: not realized
 Rectangle.dragStarting: not realized
 Rectangle.dragText: not realized
 Rectangle.drop: not realized
 Rectangle.dropCompleted: not realized
-Rectangle.frameChanged: ✅
+Rectangle.dropPaths: not realized
+Rectangle.flex: not realized
+Rectangle.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Rectangle.gridColumn: ✅
 Rectangle.gridColumnSpan: ✅
 Rectangle.gridRow: ✅
 Rectangle.gridRowSpan: ✅
-Rectangle.horizontalAlignment: ✅
+Rectangle.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Rectangle.horizontalContentAlignment: not realized
+Rectangle.horizontalGuide: cannot read horizontalGuide of Rectangle - GTK's driver has no path for it yet
+Rectangle.layoutPriority: cannot read layoutPriority of Rectangle - GTK's driver has no path for it yet
+Rectangle.namedFramesChanged: not realized
 Rectangle.padding: ✅
 Rectangle.panTouchCount: cannot pan on Rectangle - GTK's driver has no path for it yet
 Rectangle.panUpdated: cannot pan on Rectangle - GTK's driver has no path for it yet
@@ -921,27 +1236,38 @@ Rectangle.pointerExited: cannot hover on Rectangle - GTK's driver has no path fo
 Rectangle.pointerMoved: cannot hover on Rectangle - GTK's driver has no path for it yet
 Rectangle.pointerPressed: cannot hover on Rectangle - GTK's driver has no path for it yet
 Rectangle.pointerReleased: cannot hover on Rectangle - GTK's driver has no path for it yet
+Rectangle.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Rectangle.swipeDirection: cannot pan on Rectangle - GTK's driver has no path for it yet
 Rectangle.swipeThreshold: cannot pan on Rectangle - GTK's driver has no path for it yet
 Rectangle.swiped: cannot pan on Rectangle - GTK's driver has no path for it yet
+Rectangle.tag: not realized
 Rectangle.tapCount: cannot tap on Rectangle - GTK's driver has no path for it yet
 Rectangle.tapGesture: cannot tap on Rectangle - GTK's driver has no path for it yet
-Rectangle.verticalAlignment: ✅
+Rectangle.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Rectangle.verticalContentAlignment: not realized
+Rectangle.verticalGuide: cannot read verticalGuide of Rectangle - GTK's driver has no path for it yet
 ScrollView.allowDrop: not realized
 ScrollView.area: ✅
 ScrollView.canDrag: not realized
+ScrollView.coordinateSpaceName: not realized
 ScrollView.dragLeave: not realized
 ScrollView.dragOver: not realized
 ScrollView.dragStarting: not realized
 ScrollView.dragText: not realized
 ScrollView.drop: not realized
 ScrollView.dropCompleted: not realized
-ScrollView.frameChanged: ✅
+ScrollView.dropPaths: not realized
+ScrollView.flex: not realized
+ScrollView.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 ScrollView.gridColumn: ✅
 ScrollView.gridColumnSpan: ✅
 ScrollView.gridRow: ✅
 ScrollView.gridRowSpan: ✅
-ScrollView.horizontalAlignment: ✅
+ScrollView.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ScrollView.horizontalContentAlignment: not realized
+ScrollView.horizontalGuide: cannot read horizontalGuide of ScrollView - GTK's driver has no path for it yet
+ScrollView.layoutPriority: cannot read layoutPriority of ScrollView - GTK's driver has no path for it yet
+ScrollView.namedFramesChanged: not realized
 ScrollView.padding: ✅
 ScrollView.panTouchCount: cannot pan on ScrollView - GTK's driver has no path for it yet
 ScrollView.panUpdated: cannot pan on ScrollView - GTK's driver has no path for it yet
@@ -953,27 +1279,38 @@ ScrollView.pointerExited: cannot hover on ScrollView - GTK's driver has no path 
 ScrollView.pointerMoved: cannot hover on ScrollView - GTK's driver has no path for it yet
 ScrollView.pointerPressed: cannot hover on ScrollView - GTK's driver has no path for it yet
 ScrollView.pointerReleased: cannot hover on ScrollView - GTK's driver has no path for it yet
+ScrollView.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 ScrollView.swipeDirection: cannot pan on ScrollView - GTK's driver has no path for it yet
 ScrollView.swipeThreshold: cannot pan on ScrollView - GTK's driver has no path for it yet
 ScrollView.swiped: cannot pan on ScrollView - GTK's driver has no path for it yet
+ScrollView.tag: not realized
 ScrollView.tapCount: cannot tap on ScrollView - GTK's driver has no path for it yet
 ScrollView.tapGesture: cannot tap on ScrollView - GTK's driver has no path for it yet
-ScrollView.verticalAlignment: ✅
+ScrollView.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ScrollView.verticalContentAlignment: not realized
+ScrollView.verticalGuide: cannot read verticalGuide of ScrollView - GTK's driver has no path for it yet
 SearchField.allowDrop: not realized
-SearchField.area: ✅
+SearchField.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [100.0, 34.0, 100.0, 34.0] came - its room's lower right quarter
 SearchField.canDrag: not realized
+SearchField.coordinateSpaceName: not realized
 SearchField.dragLeave: not realized
 SearchField.dragOver: not realized
 SearchField.dragStarting: not realized
 SearchField.dragText: not realized
 SearchField.drop: not realized
 SearchField.dropCompleted: not realized
-SearchField.frameChanged: ✅
+SearchField.dropPaths: not realized
+SearchField.flex: not realized
+SearchField.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 SearchField.gridColumn: ✅
 SearchField.gridColumnSpan: ✅
 SearchField.gridRow: ✅
 SearchField.gridRowSpan: ✅
-SearchField.horizontalAlignment: ✅
+SearchField.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+SearchField.horizontalContentAlignment: not realized
+SearchField.horizontalGuide: cannot read horizontalGuide of SearchField - GTK's driver has no path for it yet
+SearchField.layoutPriority: cannot read layoutPriority of SearchField - GTK's driver has no path for it yet
+SearchField.namedFramesChanged: not realized
 SearchField.padding: ✅
 SearchField.panTouchCount: cannot pan on SearchField - GTK's driver has no path for it yet
 SearchField.panUpdated: cannot pan on SearchField - GTK's driver has no path for it yet
@@ -985,27 +1322,38 @@ SearchField.pointerExited: cannot hover on SearchField - GTK's driver has no pat
 SearchField.pointerMoved: cannot hover on SearchField - GTK's driver has no path for it yet
 SearchField.pointerPressed: cannot hover on SearchField - GTK's driver has no path for it yet
 SearchField.pointerReleased: cannot hover on SearchField - GTK's driver has no path for it yet
+SearchField.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 SearchField.swipeDirection: cannot pan on SearchField - GTK's driver has no path for it yet
 SearchField.swipeThreshold: cannot pan on SearchField - GTK's driver has no path for it yet
 SearchField.swiped: cannot pan on SearchField - GTK's driver has no path for it yet
+SearchField.tag: not realized
 SearchField.tapCount: cannot tap on SearchField - GTK's driver has no path for it yet
 SearchField.tapGesture: cannot tap on SearchField - GTK's driver has no path for it yet
-SearchField.verticalAlignment: ✅
+SearchField.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+SearchField.verticalContentAlignment: not realized
+SearchField.verticalGuide: cannot read verticalGuide of SearchField - GTK's driver has no path for it yet
 Slider.allowDrop: not realized
-Slider.area: ✅
+Slider.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [34.0, 34.0, 34.0, 34.0] came - its room's lower right quarter
 Slider.canDrag: not realized
+Slider.coordinateSpaceName: not realized
 Slider.dragLeave: not realized
 Slider.dragOver: not realized
 Slider.dragStarting: not realized
 Slider.dragText: not realized
 Slider.drop: not realized
 Slider.dropCompleted: not realized
-Slider.frameChanged: ✅
+Slider.dropPaths: not realized
+Slider.flex: not realized
+Slider.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Slider.gridColumn: ✅
 Slider.gridColumnSpan: ✅
 Slider.gridRow: ✅
 Slider.gridRowSpan: ✅
-Slider.horizontalAlignment: ✅
+Slider.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Slider.horizontalContentAlignment: not realized
+Slider.horizontalGuide: cannot read horizontalGuide of Slider - GTK's driver has no path for it yet
+Slider.layoutPriority: cannot read layoutPriority of Slider - GTK's driver has no path for it yet
+Slider.namedFramesChanged: not realized
 Slider.padding: ✅
 Slider.panTouchCount: cannot pan on Slider - GTK's driver has no path for it yet
 Slider.panUpdated: cannot pan on Slider - GTK's driver has no path for it yet
@@ -1017,27 +1365,38 @@ Slider.pointerExited: cannot hover on Slider - GTK's driver has no path for it y
 Slider.pointerMoved: cannot hover on Slider - GTK's driver has no path for it yet
 Slider.pointerPressed: cannot hover on Slider - GTK's driver has no path for it yet
 Slider.pointerReleased: cannot hover on Slider - GTK's driver has no path for it yet
+Slider.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Slider.swipeDirection: cannot pan on Slider - GTK's driver has no path for it yet
 Slider.swipeThreshold: cannot pan on Slider - GTK's driver has no path for it yet
 Slider.swiped: cannot pan on Slider - GTK's driver has no path for it yet
+Slider.tag: not realized
 Slider.tapCount: cannot tap on Slider - GTK's driver has no path for it yet
 Slider.tapGesture: cannot tap on Slider - GTK's driver has no path for it yet
-Slider.verticalAlignment: ✅
+Slider.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Slider.verticalContentAlignment: not realized
+Slider.verticalGuide: cannot read verticalGuide of Slider - GTK's driver has no path for it yet
 Stepper.allowDrop: not realized
-Stepper.area: ✅
+Stepper.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [100.0, 34.0, 100.0, 34.0] came - its room's lower right quarter
 Stepper.canDrag: not realized
+Stepper.coordinateSpaceName: not realized
 Stepper.dragLeave: not realized
 Stepper.dragOver: not realized
 Stepper.dragStarting: not realized
 Stepper.dragText: not realized
 Stepper.drop: not realized
 Stepper.dropCompleted: not realized
-Stepper.frameChanged: ✅
+Stepper.dropPaths: not realized
+Stepper.flex: not realized
+Stepper.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Stepper.gridColumn: ✅
 Stepper.gridColumnSpan: ✅
 Stepper.gridRow: ✅
 Stepper.gridRowSpan: ✅
-Stepper.horizontalAlignment: ✅
+Stepper.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Stepper.horizontalContentAlignment: not realized
+Stepper.horizontalGuide: cannot read horizontalGuide of Stepper - GTK's driver has no path for it yet
+Stepper.layoutPriority: cannot read layoutPriority of Stepper - GTK's driver has no path for it yet
+Stepper.namedFramesChanged: not realized
 Stepper.padding: ✅
 Stepper.panTouchCount: cannot pan on Stepper - GTK's driver has no path for it yet
 Stepper.panUpdated: cannot pan on Stepper - GTK's driver has no path for it yet
@@ -1049,27 +1408,38 @@ Stepper.pointerExited: cannot hover on Stepper - GTK's driver has no path for it
 Stepper.pointerMoved: cannot hover on Stepper - GTK's driver has no path for it yet
 Stepper.pointerPressed: cannot hover on Stepper - GTK's driver has no path for it yet
 Stepper.pointerReleased: cannot hover on Stepper - GTK's driver has no path for it yet
+Stepper.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Stepper.swipeDirection: cannot pan on Stepper - GTK's driver has no path for it yet
 Stepper.swipeThreshold: cannot pan on Stepper - GTK's driver has no path for it yet
 Stepper.swiped: cannot pan on Stepper - GTK's driver has no path for it yet
+Stepper.tag: not realized
 Stepper.tapCount: cannot tap on Stepper - GTK's driver has no path for it yet
 Stepper.tapGesture: cannot tap on Stepper - GTK's driver has no path for it yet
-Stepper.verticalAlignment: ✅
+Stepper.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Stepper.verticalContentAlignment: not realized
+Stepper.verticalGuide: cannot read verticalGuide of Stepper - GTK's driver has no path for it yet
 Switch.allowDrop: not realized
-Switch.area: ✅
+Switch.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [46.0, 26.0, 46.0, 26.0] came - its room's lower right quarter
 Switch.canDrag: not realized
+Switch.coordinateSpaceName: not realized
 Switch.dragLeave: not realized
 Switch.dragOver: not realized
 Switch.dragStarting: not realized
 Switch.dragText: not realized
 Switch.drop: not realized
 Switch.dropCompleted: not realized
-Switch.frameChanged: ✅
+Switch.dropPaths: not realized
+Switch.flex: not realized
+Switch.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Switch.gridColumn: ✅
 Switch.gridColumnSpan: ✅
 Switch.gridRow: ✅
 Switch.gridRowSpan: ✅
-Switch.horizontalAlignment: ✅
+Switch.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Switch.horizontalContentAlignment: not realized
+Switch.horizontalGuide: cannot read horizontalGuide of Switch - GTK's driver has no path for it yet
+Switch.layoutPriority: cannot read layoutPriority of Switch - GTK's driver has no path for it yet
+Switch.namedFramesChanged: not realized
 Switch.padding: ✅
 Switch.panTouchCount: cannot pan on Switch - GTK's driver has no path for it yet
 Switch.panUpdated: cannot pan on Switch - GTK's driver has no path for it yet
@@ -1081,27 +1451,38 @@ Switch.pointerExited: cannot hover on Switch - GTK's driver has no path for it y
 Switch.pointerMoved: cannot hover on Switch - GTK's driver has no path for it yet
 Switch.pointerPressed: cannot hover on Switch - GTK's driver has no path for it yet
 Switch.pointerReleased: cannot hover on Switch - GTK's driver has no path for it yet
+Switch.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Switch.swipeDirection: cannot pan on Switch - GTK's driver has no path for it yet
 Switch.swipeThreshold: cannot pan on Switch - GTK's driver has no path for it yet
 Switch.swiped: cannot pan on Switch - GTK's driver has no path for it yet
+Switch.tag: not realized
 Switch.tapCount: cannot tap on Switch - GTK's driver has no path for it yet
 Switch.tapGesture: cannot tap on Switch - GTK's driver has no path for it yet
-Switch.verticalAlignment: ✅
+Switch.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Switch.verticalContentAlignment: not realized
+Switch.verticalGuide: cannot read verticalGuide of Switch - GTK's driver has no path for it yet
 Text.allowDrop: not realized
-Text.area: ✅
+Text.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [0.0, 18.0, 0.0, 18.0] came - its room's lower right quarter
 Text.canDrag: not realized
+Text.coordinateSpaceName: not realized
 Text.dragLeave: not realized
 Text.dragOver: not realized
 Text.dragStarting: not realized
 Text.dragText: not realized
 Text.drop: not realized
 Text.dropCompleted: not realized
-Text.frameChanged: ✅
+Text.dropPaths: not realized
+Text.flex: not realized
+Text.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 Text.gridColumn: ✅
 Text.gridColumnSpan: ✅
 Text.gridRow: ✅
 Text.gridRowSpan: ✅
-Text.horizontalAlignment: ✅
+Text.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Text.horizontalContentAlignment: cannot read horizontalContentAlignment of Text - GTK's driver has no path for it yet
+Text.horizontalGuide: cannot read horizontalGuide of Text - GTK's driver has no path for it yet
+Text.layoutPriority: cannot read layoutPriority of Text - GTK's driver has no path for it yet
+Text.namedFramesChanged: not realized
 Text.padding: ✅
 Text.panTouchCount: cannot pan on Text - GTK's driver has no path for it yet
 Text.panUpdated: cannot pan on Text - GTK's driver has no path for it yet
@@ -1113,27 +1494,38 @@ Text.pointerExited: cannot hover on Text - GTK's driver has no path for it yet
 Text.pointerMoved: cannot hover on Text - GTK's driver has no path for it yet
 Text.pointerPressed: cannot hover on Text - GTK's driver has no path for it yet
 Text.pointerReleased: cannot hover on Text - GTK's driver has no path for it yet
+Text.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 Text.swipeDirection: cannot pan on Text - GTK's driver has no path for it yet
 Text.swipeThreshold: cannot pan on Text - GTK's driver has no path for it yet
 Text.swiped: cannot pan on Text - GTK's driver has no path for it yet
+Text.tag: not realized
 Text.tapCount: cannot tap on Text - GTK's driver has no path for it yet
 Text.tapGesture: cannot tap on Text - GTK's driver has no path for it yet
-Text.verticalAlignment: ✅
+Text.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+Text.verticalContentAlignment: cannot read verticalContentAlignment of Text - GTK's driver has no path for it yet
+Text.verticalGuide: cannot read verticalGuide of Text - GTK's driver has no path for it yet
 TextEditor.allowDrop: not realized
 TextEditor.area: ✅
 TextEditor.canDrag: not realized
+TextEditor.coordinateSpaceName: not realized
 TextEditor.dragLeave: not realized
 TextEditor.dragOver: not realized
 TextEditor.dragStarting: not realized
 TextEditor.dragText: not realized
 TextEditor.drop: not realized
 TextEditor.dropCompleted: not realized
-TextEditor.frameChanged: ✅
+TextEditor.dropPaths: not realized
+TextEditor.flex: not realized
+TextEditor.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 TextEditor.gridColumn: ✅
 TextEditor.gridColumnSpan: ✅
 TextEditor.gridRow: ✅
 TextEditor.gridRowSpan: ✅
-TextEditor.horizontalAlignment: ✅
+TextEditor.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+TextEditor.horizontalContentAlignment: not realized
+TextEditor.horizontalGuide: cannot read horizontalGuide of TextEditor - GTK's driver has no path for it yet
+TextEditor.layoutPriority: cannot read layoutPriority of TextEditor - GTK's driver has no path for it yet
+TextEditor.namedFramesChanged: not realized
 TextEditor.padding: ✅
 TextEditor.panTouchCount: cannot pan on TextEditor - GTK's driver has no path for it yet
 TextEditor.panUpdated: cannot pan on TextEditor - GTK's driver has no path for it yet
@@ -1145,27 +1537,38 @@ TextEditor.pointerExited: cannot hover on TextEditor - GTK's driver has no path 
 TextEditor.pointerMoved: cannot hover on TextEditor - GTK's driver has no path for it yet
 TextEditor.pointerPressed: cannot hover on TextEditor - GTK's driver has no path for it yet
 TextEditor.pointerReleased: cannot hover on TextEditor - GTK's driver has no path for it yet
+TextEditor.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 TextEditor.swipeDirection: cannot pan on TextEditor - GTK's driver has no path for it yet
 TextEditor.swipeThreshold: cannot pan on TextEditor - GTK's driver has no path for it yet
 TextEditor.swiped: cannot pan on TextEditor - GTK's driver has no path for it yet
+TextEditor.tag: not realized
 TextEditor.tapCount: cannot tap on TextEditor - GTK's driver has no path for it yet
 TextEditor.tapGesture: cannot tap on TextEditor - GTK's driver has no path for it yet
-TextEditor.verticalAlignment: ✅
+TextEditor.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+TextEditor.verticalContentAlignment: not realized
+TextEditor.verticalGuide: cannot read verticalGuide of TextEditor - GTK's driver has no path for it yet
 TextField.allowDrop: not realized
-TextField.area: ✅
+TextField.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [100.0, 34.0, 100.0, 34.0] came - its room's lower right quarter
 TextField.canDrag: not realized
+TextField.coordinateSpaceName: not realized
 TextField.dragLeave: not realized
 TextField.dragOver: not realized
 TextField.dragStarting: not realized
 TextField.dragText: not realized
 TextField.drop: not realized
 TextField.dropCompleted: not realized
-TextField.frameChanged: ✅
+TextField.dropPaths: not realized
+TextField.flex: not realized
+TextField.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 TextField.gridColumn: ✅
 TextField.gridColumnSpan: ✅
 TextField.gridRow: ✅
 TextField.gridRowSpan: ✅
-TextField.horizontalAlignment: ✅
+TextField.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+TextField.horizontalContentAlignment: not realized
+TextField.horizontalGuide: cannot read horizontalGuide of TextField - GTK's driver has no path for it yet
+TextField.layoutPriority: cannot read layoutPriority of TextField - GTK's driver has no path for it yet
+TextField.namedFramesChanged: not realized
 TextField.padding: ✅
 TextField.panTouchCount: cannot pan on TextField - GTK's driver has no path for it yet
 TextField.panUpdated: cannot pan on TextField - GTK's driver has no path for it yet
@@ -1177,27 +1580,38 @@ TextField.pointerExited: cannot hover on TextField - GTK's driver has no path fo
 TextField.pointerMoved: cannot hover on TextField - GTK's driver has no path for it yet
 TextField.pointerPressed: cannot hover on TextField - GTK's driver has no path for it yet
 TextField.pointerReleased: cannot hover on TextField - GTK's driver has no path for it yet
+TextField.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 TextField.swipeDirection: cannot pan on TextField - GTK's driver has no path for it yet
 TextField.swipeThreshold: cannot pan on TextField - GTK's driver has no path for it yet
 TextField.swiped: cannot pan on TextField - GTK's driver has no path for it yet
+TextField.tag: not realized
 TextField.tapCount: cannot tap on TextField - GTK's driver has no path for it yet
 TextField.tapGesture: cannot tap on TextField - GTK's driver has no path for it yet
-TextField.verticalAlignment: ✅
+TextField.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+TextField.verticalContentAlignment: not realized
+TextField.verticalGuide: cannot read verticalGuide of TextField - GTK's driver has no path for it yet
 TimePicker.allowDrop: not realized
-TimePicker.area: ✅
+TimePicker.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [92.0, 34.0, 92.0, 34.0] came - its room's lower right quarter
 TimePicker.canDrag: not realized
+TimePicker.coordinateSpaceName: not realized
 TimePicker.dragLeave: not realized
 TimePicker.dragOver: not realized
 TimePicker.dragStarting: not realized
 TimePicker.dragText: not realized
 TimePicker.drop: not realized
 TimePicker.dropCompleted: not realized
-TimePicker.frameChanged: ✅
+TimePicker.dropPaths: not realized
+TimePicker.flex: not realized
+TimePicker.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 TimePicker.gridColumn: ✅
 TimePicker.gridColumnSpan: ✅
 TimePicker.gridRow: ✅
 TimePicker.gridRowSpan: ✅
-TimePicker.horizontalAlignment: ✅
+TimePicker.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+TimePicker.horizontalContentAlignment: not realized
+TimePicker.horizontalGuide: cannot read horizontalGuide of TimePicker - GTK's driver has no path for it yet
+TimePicker.layoutPriority: cannot read layoutPriority of TimePicker - GTK's driver has no path for it yet
+TimePicker.namedFramesChanged: not realized
 TimePicker.padding: ✅
 TimePicker.panTouchCount: cannot pan on TimePicker - GTK's driver has no path for it yet
 TimePicker.panUpdated: cannot pan on TimePicker - GTK's driver has no path for it yet
@@ -1209,27 +1623,38 @@ TimePicker.pointerExited: cannot hover on TimePicker - GTK's driver has no path 
 TimePicker.pointerMoved: cannot hover on TimePicker - GTK's driver has no path for it yet
 TimePicker.pointerPressed: cannot hover on TimePicker - GTK's driver has no path for it yet
 TimePicker.pointerReleased: cannot hover on TimePicker - GTK's driver has no path for it yet
+TimePicker.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 TimePicker.swipeDirection: cannot pan on TimePicker - GTK's driver has no path for it yet
 TimePicker.swipeThreshold: cannot pan on TimePicker - GTK's driver has no path for it yet
 TimePicker.swiped: cannot pan on TimePicker - GTK's driver has no path for it yet
+TimePicker.tag: not realized
 TimePicker.tapCount: cannot tap on TimePicker - GTK's driver has no path for it yet
 TimePicker.tapGesture: cannot tap on TimePicker - GTK's driver has no path for it yet
-TimePicker.verticalAlignment: ✅
+TimePicker.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+TimePicker.verticalContentAlignment: not realized
+TimePicker.verticalGuide: cannot read verticalGuide of TimePicker - GTK's driver has no path for it yet
 TitleBar.allowDrop: not realized
 TitleBar.area: not realized
 TitleBar.canDrag: not realized
+TitleBar.coordinateSpaceName: not realized
 TitleBar.dragLeave: not realized
 TitleBar.dragOver: not realized
 TitleBar.dragStarting: not realized
 TitleBar.dragText: not realized
 TitleBar.drop: not realized
 TitleBar.dropCompleted: not realized
+TitleBar.dropPaths: not realized
+TitleBar.flex: not realized
 TitleBar.frameChanged: not realized
 TitleBar.gridColumn: not realized
 TitleBar.gridColumnSpan: not realized
 TitleBar.gridRow: not realized
 TitleBar.gridRowSpan: not realized
 TitleBar.horizontalAlignment: not realized
+TitleBar.horizontalContentAlignment: not realized
+TitleBar.horizontalGuide: not realized
+TitleBar.layoutPriority: not realized
+TitleBar.namedFramesChanged: not realized
 TitleBar.padding: not realized
 TitleBar.panTouchCount: not realized
 TitleBar.panUpdated: not realized
@@ -1241,27 +1666,38 @@ TitleBar.pointerExited: not realized
 TitleBar.pointerMoved: not realized
 TitleBar.pointerPressed: not realized
 TitleBar.pointerReleased: not realized
+TitleBar.pointerStyle: not realized
 TitleBar.swipeDirection: not realized
 TitleBar.swipeThreshold: not realized
 TitleBar.swiped: not realized
+TitleBar.tag: not realized
 TitleBar.tapCount: not realized
 TitleBar.tapGesture: not realized
 TitleBar.verticalAlignment: not realized
+TitleBar.verticalContentAlignment: not realized
+TitleBar.verticalGuide: not realized
 VStack.allowDrop: not realized
-VStack.area: ✅
+VStack.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [0.0, 0.0, 0.0, 0.0] came - its room's lower right quarter
 VStack.canDrag: not realized
+VStack.coordinateSpaceName: not realized
 VStack.dragLeave: not realized
 VStack.dragOver: not realized
 VStack.dragStarting: not realized
 VStack.dragText: not realized
 VStack.drop: not realized
 VStack.dropCompleted: not realized
-VStack.frameChanged: ✅
+VStack.dropPaths: not realized
+VStack.flex: not realized
+VStack.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 VStack.gridColumn: ✅
 VStack.gridColumnSpan: ✅
 VStack.gridRow: ✅
 VStack.gridRowSpan: ✅
-VStack.horizontalAlignment: ✅
+VStack.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+VStack.horizontalContentAlignment: not realized
+VStack.horizontalGuide: cannot read horizontalGuide of VStack - GTK's driver has no path for it yet
+VStack.layoutPriority: cannot read layoutPriority of VStack - GTK's driver has no path for it yet
+VStack.namedFramesChanged: not realized
 VStack.padding: ✅
 VStack.panTouchCount: cannot pan on VStack - GTK's driver has no path for it yet
 VStack.panUpdated: cannot pan on VStack - GTK's driver has no path for it yet
@@ -1273,27 +1709,38 @@ VStack.pointerExited: cannot hover on VStack - GTK's driver has no path for it y
 VStack.pointerMoved: cannot hover on VStack - GTK's driver has no path for it yet
 VStack.pointerPressed: cannot hover on VStack - GTK's driver has no path for it yet
 VStack.pointerReleased: cannot hover on VStack - GTK's driver has no path for it yet
+VStack.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 VStack.swipeDirection: cannot pan on VStack - GTK's driver has no path for it yet
 VStack.swipeThreshold: cannot pan on VStack - GTK's driver has no path for it yet
 VStack.swiped: cannot pan on VStack - GTK's driver has no path for it yet
+VStack.tag: not realized
 VStack.tapCount: cannot tap on VStack - GTK's driver has no path for it yet
 VStack.tapGesture: cannot tap on VStack - GTK's driver has no path for it yet
-VStack.verticalAlignment: ✅
+VStack.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+VStack.verticalContentAlignment: not realized
+VStack.verticalGuide: cannot read verticalGuide of VStack - GTK's driver has no path for it yet
 WebView.allowDrop: not realized
 WebView.area: ✅
 WebView.canDrag: not realized
+WebView.coordinateSpaceName: not realized
 WebView.dragLeave: not realized
 WebView.dragOver: not realized
 WebView.dragStarting: not realized
 WebView.dragText: not realized
 WebView.drop: not realized
 WebView.dropCompleted: not realized
-WebView.frameChanged: ✅
+WebView.dropPaths: not realized
+WebView.flex: not realized
+WebView.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 WebView.gridColumn: ✅
 WebView.gridColumnSpan: ✅
 WebView.gridRow: ✅
 WebView.gridRowSpan: ✅
-WebView.horizontalAlignment: ✅
+WebView.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+WebView.horizontalContentAlignment: not realized
+WebView.horizontalGuide: cannot read horizontalGuide of WebView - GTK's driver has no path for it yet
+WebView.layoutPriority: cannot read layoutPriority of WebView - GTK's driver has no path for it yet
+WebView.namedFramesChanged: not realized
 WebView.padding: ✅
 WebView.panTouchCount: cannot pan on WebView - GTK's driver has no path for it yet
 WebView.panUpdated: cannot pan on WebView - GTK's driver has no path for it yet
@@ -1305,27 +1752,38 @@ WebView.pointerExited: cannot hover on WebView - GTK's driver has no path for it
 WebView.pointerMoved: cannot hover on WebView - GTK's driver has no path for it yet
 WebView.pointerPressed: cannot hover on WebView - GTK's driver has no path for it yet
 WebView.pointerReleased: cannot hover on WebView - GTK's driver has no path for it yet
+WebView.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 WebView.swipeDirection: cannot pan on WebView - GTK's driver has no path for it yet
 WebView.swipeThreshold: cannot pan on WebView - GTK's driver has no path for it yet
 WebView.swiped: cannot pan on WebView - GTK's driver has no path for it yet
+WebView.tag: not realized
 WebView.tapCount: cannot tap on WebView - GTK's driver has no path for it yet
 WebView.tapGesture: cannot tap on WebView - GTK's driver has no path for it yet
-WebView.verticalAlignment: ✅
+WebView.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+WebView.verticalContentAlignment: not realized
+WebView.verticalGuide: cannot read verticalGuide of WebView - GTK's driver has no path for it yet
 ZStack.allowDrop: not realized
-ZStack.area: ✅
+ZStack.area: ❌ [100.0, 100.0, 100.0, 100.0] expected, [0.0, 0.0, 0.0, 0.0] came - its room's lower right quarter
 ZStack.canDrag: not realized
+ZStack.coordinateSpaceName: not realized
 ZStack.dragLeave: not realized
 ZStack.dragOver: not realized
 ZStack.dragStarting: not realized
 ZStack.dragText: not realized
 ZStack.drop: not realized
 ZStack.dropCompleted: not realized
-ZStack.frameChanged: ✅
+ZStack.dropPaths: not realized
+ZStack.flex: not realized
+ZStack.frameChanged: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
 ZStack.gridColumn: ✅
 ZStack.gridColumnSpan: ✅
 ZStack.gridRow: ✅
 ZStack.gridRowSpan: ✅
-ZStack.horizontalAlignment: ✅
+ZStack.horizontalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ZStack.horizontalContentAlignment: not realized
+ZStack.horizontalGuide: cannot read horizontalGuide of ZStack - GTK's driver has no path for it yet
+ZStack.layoutPriority: cannot read layoutPriority of ZStack - GTK's driver has no path for it yet
+ZStack.namedFramesChanged: not realized
 ZStack.padding: ✅
 ZStack.panTouchCount: cannot pan on ZStack - GTK's driver has no path for it yet
 ZStack.panUpdated: cannot pan on ZStack - GTK's driver has no path for it yet
@@ -1337,9 +1795,13 @@ ZStack.pointerExited: cannot hover on ZStack - GTK's driver has no path for it y
 ZStack.pointerMoved: cannot hover on ZStack - GTK's driver has no path for it yet
 ZStack.pointerPressed: cannot hover on ZStack - GTK's driver has no path for it yet
 ZStack.pointerReleased: cannot hover on ZStack - GTK's driver has no path for it yet
+ZStack.pointerStyle: – GTK sets a widget's cursor only through the frame's display, which the element layer does not own yet.
 ZStack.swipeDirection: cannot pan on ZStack - GTK's driver has no path for it yet
 ZStack.swipeThreshold: cannot pan on ZStack - GTK's driver has no path for it yet
 ZStack.swiped: cannot pan on ZStack - GTK's driver has no path for it yet
+ZStack.tag: not realized
 ZStack.tapCount: cannot tap on ZStack - GTK's driver has no path for it yet
 ZStack.tapGesture: cannot tap on ZStack - GTK's driver has no path for it yet
-ZStack.verticalAlignment: ✅
+ZStack.verticalAlignment: ❌ 200.0 expected, 0.0 came - at the end of a room 300 wide
+ZStack.verticalContentAlignment: not realized
+ZStack.verticalGuide: cannot read verticalGuide of ZStack - GTK's driver has no path for it yet

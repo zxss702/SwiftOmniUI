@@ -468,10 +468,18 @@ private final class Built {
         XCTAssertEqual(shade(of: -2), 0, accuracy: 0.001, "and below is none of it")
     }
 
+    /// The width a dealt card cell carries - the first a patch names; the
+    /// box inside it changes nothing, so a patch names the cell alone.
+    private func dealtWidth(_ node: HostPatch) -> Double? {
+        if let width = node.props[.width]?.number { return width }
+
+        return node.children.lazy.compactMap(dealtWidth).first
+    }
+
     /// The distance a card is worth along the run: the content is the room
     /// plus that much per card past the first.
     private func travel(_ patch: HostPatch, cards: Int) -> Double? {
-        guard let width = find(.colorPicker, in: patch)?.props[.width]?.number else { return nil }
+        guard let width = dealtWidth(patch) else { return nil }
 
         return (width - room.width) / Double(cards - 1)
     }
@@ -483,7 +491,7 @@ private final class Built {
         func length(_ count: Int) throws -> Double {
             let showing = laid(Renders(), { self.gallery(count).node })
 
-            return try XCTUnwrap(find(.colorPicker, in: showing.patch)?.props[.width]?.number)
+            return try XCTUnwrap(dealtWidth(showing.patch))
         }
 
         let two = try length(2)
@@ -619,7 +627,18 @@ private final class Built {
 
         XCTAssertTrue(renders.fire(tap))
 
-        XCTAssertEqual(faces(in: renders.render(view.node)).first, .number(0.96))
+        // The press answers through the executor: the handler's dip writes
+        // are jobs until they run.
+        var dip: PropValue?
+        let shown = Date().addingTimeInterval(2)
+
+        while Date() < shown, dip == nil {
+            stateUIRunJobs()
+            try? await Task.sleep(nanoseconds: 5_000_000)
+            dip = faces(in: renders.render(view.node)).first
+        }
+
+        XCTAssertEqual(dip, .number(0.96))
 
         // AND IT LETS GO BY ITSELF. Drained to the end rather than left
         // holding: a handler still part-way through is a job queued on this
@@ -628,7 +647,10 @@ private final class Built {
         var back: PropValue?
         let deadline = Date().addingTimeInterval(2)
 
-        while Date() < deadline, back == nil {
+        // The dip itself may land inside this wait - the press answers
+        // through the executor now - so the wait ends on the release, not on
+        // the first scale it sees.
+        while Date() < deadline, back != .number(1) {
             stateUIRunJobs()
             try? await Task.sleep(nanoseconds: 5_000_000)
             back = faces(in: renders.render(view.node)).first

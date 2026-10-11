@@ -468,27 +468,27 @@ extension View {
     ///
     ///     Button("Save").horizontalAlignment(.center)
     @_disfavoredOverload
-    public func horizontalAlignment(_ value: AxisAlignment) -> ModifiedContent {
+    @_spi(Host) public func horizontalAlignment(_ value: AxisAlignment) -> ModifiedContent {
         setting(ViewContract.horizontalAlignment, value)
     }
 
     /// The same, for the height.
     @_disfavoredOverload
-    public func verticalAlignment(_ value: AxisAlignment) -> ModifiedContent {
+    @_spi(Host) public func verticalAlignment(_ value: AxisAlignment) -> ModifiedContent {
         setting(ViewContract.verticalAlignment, value)
     }
 
     /// `horizontalAlignment` from a state, `$x`: the host sets each new value
     /// as it stands, and no view is rebuilt for it.
     @_disfavoredOverload
-    public func horizontalAlignment(_ state: Binding<AxisAlignment>) -> ModifiedContent {
+    @_spi(Host) public func horizontalAlignment(_ state: Binding<AxisAlignment>) -> ModifiedContent {
         revised { $0.drivePlain(ViewContract.horizontalAlignment, by: state) }
     }
 
     /// `verticalAlignment` from a state, `$x`: the host sets each new value as
     /// it stands, and no view is rebuilt for it.
     @_disfavoredOverload
-    public func verticalAlignment(_ state: Binding<AxisAlignment>) -> ModifiedContent {
+    @_spi(Host) public func verticalAlignment(_ state: Binding<AxisAlignment>) -> ModifiedContent {
         revised { $0.drivePlain(ViewContract.verticalAlignment, by: state) }
     }
 

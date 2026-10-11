@@ -41,18 +41,19 @@ struct TransformSample: SampleContent, ExampleContent {
             HStack {
                 Text(transformed ? "every transform on" : "plain squares")
 
-                DebugInfoLabel()
             }
 
-            // ONE TRANSFORM, in the order it is written: the same two parts,
-            // and the move lands somewhere else - written after the turn it
-            // is a plain move right, written before it is swung round by it.
+            // THE SAME TWO MODIFIERS, in the order they are written: the move
+            // lands somewhere else - written after the turn it is a plain
+            // move right, written before it, the turn's centre moved with it.
             HStack {
                 box(Family.order)
-                    .transformEffect(transformed ? .rotate(45).translate(28, 0) : .identity)
+                    .rotationEffect(transformed ? 45 : 0)
+                    .offset(x: transformed ? 28 : 0)
 
                 box(Family.order)
-                    .transformEffect(transformed ? .translate(28, 0).rotate(45) : .identity)
+                    .offset(x: transformed ? 28 : 0)
+                    .rotationEffect(transformed ? 45 : 0)
             }
 
             HStack {
@@ -62,18 +63,16 @@ struct TransformSample: SampleContent, ExampleContent {
 
                 // Tipped about the horizontal axis: the top goes away.
                 box(Family.turn)
-                    .rotation3DEffect(x: transformed ? 55 : 0)
+                    .rotation3DEffect(transformed ? 55 : 0, axis: (x: 1, y: 0, z: 0))
 
                 // Turned about the vertical axis: one side goes away.
                 box(Family.turn)
-                    .rotation3DEffect(y: transformed ? 55 : 0)
+                    .rotation3DEffect(transformed ? 55 : 0, axis: (x: 0, y: 1, z: 0))
 
                 // The same turn about the top left corner instead of the
                 // middle, which is what an anchor moves.
                 box(Family.turn)
-                    .rotationEffect(transformed ? 20 : 0)
-                    .pivotX(0)
-                    .pivotY(0)
+                    .rotationEffect(transformed ? 20 : 0, anchor: .topLeading)
             }
 
             // A WIDER GAP than the rows above: a scaled box is drawn outside
@@ -126,42 +125,38 @@ struct TransformSample: SampleContent, ExampleContent {
                 Text(transformed ? "every transform on" : "plain squares")
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.subtle)
-                    .verticalAlignment(.center)
 
-                DebugInfoLabel()
             }
             .spacing(10)
-            .horizontalAlignment(.center)
 
-            // The same two parts in both chains; only the order differs, so
-            // the only thing the row shows is that order is what a chain MEANS.
+            // The same two modifiers in both chains; only the order differs,
+            // so the only thing the row shows is that order is what a chain
+            // MEANS.
             HStack {
                 piece(
                     box(Family.order)
-                        .transformEffect(transformed ? .rotate(45).translate(28, 0) : .identity),
+                        .rotationEffect(transformed ? 45 : 0)
+                        .offset(x: transformed ? 28 : 0),
                     "rotate, then move")
 
                 piece(
                     box(Family.order)
-                        .transformEffect(transformed ? .translate(28, 0).rotate(45) : .identity),
+                        .offset(x: transformed ? 28 : 0)
+                        .rotationEffect(transformed ? 45 : 0),
                     "move, then rotate")
             }
             .spacing(44)
-            .horizontalAlignment(.center)
 
             HStack {
                 piece(box(Family.turn).rotationEffect(transformed ? 20 : 0), "rotation")
-                piece(box(Family.turn).rotation3DEffect(x: transformed ? 55 : 0), "rotationX")
-                piece(box(Family.turn).rotation3DEffect(y: transformed ? 55 : 0), "rotationY")
+                piece(box(Family.turn).rotation3DEffect(transformed ? 55 : 0, axis: (x: 1, y: 0, z: 0)), "rotationX")
+                piece(box(Family.turn).rotation3DEffect(transformed ? 55 : 0, axis: (x: 0, y: 1, z: 0)), "rotationY")
                 piece(
                     box(Family.turn)
-                        .rotationEffect(transformed ? 20 : 0)
-                        .pivotX(0)
-                        .pivotY(0),
-                    "anchor 0,0")
+                        .rotationEffect(transformed ? 20 : 0, anchor: .topLeading),
+                    "top leading")
             }
             .spacing(24)
-            .horizontalAlignment(.center)
 
             // The same square and the same factor three times, so the only
             // thing the row shows is which axis each modifier reaches - and a
@@ -173,7 +168,6 @@ struct TransformSample: SampleContent, ExampleContent {
                 piece(box(Family.size).scaleEffect(y: transformed ? 1.6 : 1), "scaleY")
             }
             .spacing(44)
-            .horizontalAlignment(.center)
         }
         .spacing(22)
     }
@@ -186,18 +180,18 @@ struct TransformSample: SampleContent, ExampleContent {
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("`.transformEffect(_:)` is one transform in the order it is written, about the "
-                + "view's centre: `.rotate(45).translate(28, 0)` moves the turned box a plain "
-                + "28 to the right, while `.translate(28, 0).rotate(45)` swings that move "
-                + "round with the turn. That is the orange row.")
+            Text("Modifiers compose in the order they are written. The orange row writes "
+                + "the same rotation and the same offset both ways: written after the turn "
+                + "the move is a plain 28 to the right; written before it, the turn moves "
+                + "the moved square's own centre.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("`rotation` turns a view within the plane of the screen, so a square stays "
-                + "square; `rotationX` and `rotationY` tip it out of that plane, so it becomes "
-                + "a trapezium. All of them pivot about the anchor, the middle until it is "
-                + "moved: 0 is the left edge or the top, 1 the right edge or the bottom. The "
-                + "fourth violet box turns about its top left corner.")
+            Text("`rotationEffect` turns a view within the plane of the screen, so a square "
+                + "stays square; `rotation3DEffect` with an `x` or `y` axis tips it out of "
+                + "that plane, so it becomes a trapezium. All of them turn about the "
+                + "anchor, the middle until it is moved - the fourth violet box turns "
+                + "about its top leading corner.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 

@@ -278,13 +278,18 @@ extern "C" void swiftomniui_winui_show_file_dialog(SwiftOmniUIObjectRef handle, 
 }
 
 extern "C" void swiftomniui_winui_read_file(int64_t ticket, char const *path) {
-    std::thread([ticket, path = std::string(path ? path : "")] {
-        auto bytes = std::make_shared<std::vector<uint8_t>>();
-        auto why = read(path, *bytes);
-        runOnUIThread([ticket, bytes, why] {
-            callbacks.fileRead(ticket, bytes->data(), static_cast<int64_t>(bytes->size()), why.empty() ? nullptr : why.c_str());
-        });
-    }).detach();
+    try {
+        std::thread([ticket, path = std::string(path ? path : "")] {
+            auto bytes = std::make_shared<std::vector<uint8_t>>();
+            auto why = read(path, *bytes);
+            runOnUIThread([ticket, bytes, why] {
+                callbacks.fileRead(ticket, bytes->data(), static_cast<int64_t>(bytes->size()), why.empty() ? nullptr : why.c_str());
+            });
+        }).detach();
+    } catch (...) {
+        report("starting a file's read");
+        callbacks.fileRead(ticket, nullptr, 0, "the read could not start");
+    }
 }
 
 extern "C" void swiftomniui_winui_launch(int64_t ticket, char const *target, bool file) {
@@ -324,11 +329,19 @@ extern "C" void swiftomniui_winui_launch(int64_t ticket, char const *target, boo
 }
 
 extern "C" void swiftomniui_winui_hold_launches(bool held) {
-    launchesHeld = held;
+    try {
+        launchesHeld = held;
+    } catch (...) {
+        report("holding launches");
+    }
 }
 
 extern "C" void swiftomniui_winui_keep_test_files_in(char const *folder) {
-    testFolder = text(folder);
+    try {
+        testFolder = text(folder);
+    } catch (...) {
+        report("keeping test files in a folder");
+    }
 }
 
 namespace swiftomniui {

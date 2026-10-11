@@ -14,7 +14,6 @@ struct RadioButtonSample: SampleContent, ExampleContent {
 
         VStack {
             // The chosen one is read here, so picking builds this closure.
-            DebugInfoLabel()
 
             // A Picker IS the exclusive choice - .radioGroup is how the
             // platform draws it standing on the page.
@@ -31,7 +30,6 @@ struct RadioButtonSample: SampleContent, ExampleContent {
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             Picker("Size", selection: $size) {
                 Text("Small").tag("Small")

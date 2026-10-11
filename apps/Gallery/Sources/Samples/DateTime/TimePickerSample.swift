@@ -16,7 +16,6 @@ struct TimePickerSample: SampleContent, ExampleContent {
         VStack {
             // `alarm` is printed below, so picking a time builds this closure;
             // the picker itself is handed the state.
-            DebugInfoLabel()
 
             TimePicker($alarm)
                 .format("t")
@@ -34,25 +33,20 @@ struct TimePickerSample: SampleContent, ExampleContent {
                     
             }
 
-            // The same time, one-way: `.time` is what puts it in the field,
-            // and the write back is by hand.
-            TimePicker()
-                .time(alarm)
+            // The same time, bound the same way - and `onChange` is how a
+            // write is HEARD, whichever side made it.
+            TimePicker($alarm)
                 .format("t")
-                .onTimeChanged { time in
-                    alarm = time
-                    picks += 1
-                }
+                .onChange(of: alarm) { picks += 1 }
 
             Text(picks == 0
-                ? "onTimeChanged has not fired"
-                : "onTimeChanged: \\(alarm.text), \\(picks) so far")
+                ? "onChange has not fired"
+                : "onChange: \\(alarm.text), \\(picks) so far")
         }
         """
 
     var body: some View {
         VStack {
-            DebugInfoLabel()
 
             TimePicker($alarm)
                 .accessibilityIdentifier("timePicker.alarm")
@@ -80,23 +74,18 @@ struct TimePickerSample: SampleContent, ExampleContent {
                     
             }
             .spacing(10)
-            .horizontalAlignment(.center)
 
-            SectionTitle("One-way, written back by hand")
+            SectionTitle("Changes heard with onChange")
 
-            TimePicker()
-                .accessibilityIdentifier("timePicker.alarm.oneWay")
-                .accessibilityLabel("Alarm, written back by hand")
-                .time(alarm)
+            TimePicker($alarm)
+                .accessibilityIdentifier("timePicker.alarm.counted")
+                .accessibilityLabel("Alarm, counted")
                 .format("t")
-                .onTimeChanged { time in
-                    alarm = time
-                    picks += 1
-                }
+                .onChange(of: alarm) { picks += 1 }
 
             Text(picks == 0
-                ? "onTimeChanged has not fired"
-                : "onTimeChanged: \(alarm.text), \(picks) so far")
+                ? "onChange has not fired"
+                : "onChange: \(alarm.text), \(picks) so far")
                 .font(.system(size: 13))
                 .multilineTextAlignment(.center)
         }
@@ -113,16 +102,13 @@ struct TimePickerSample: SampleContent, ExampleContent {
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("`TimePicker()` says nothing about a time, so `.time` is what puts one "
-                + "in the field - the form a `Style<TimePicker>` or a picker built "
-                + "elsewhere has to use. Nothing comes back on its own either: the "
-                + "`alarm = time` in `onTimeChanged` is exactly the write the binding "
-                + "above makes for you, which is why both fields move together.")
+            Text("`TimePicker($alarm)` is the two-way binding: the field shows the "
+                + "state and a pick writes it, which is why both fields move together.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
 
-            Text("The count answers the USER: the three buttons write `alarm` from the "
-                + "tree, both fields follow, and no event fires.")
+            Text("`.onChange(of: alarm)` hears every write - the buttons count too, "
+                + "since a write is a write no matter which side made it.")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.subtle)
         }

@@ -7,6 +7,8 @@
 
 #if canImport(WinSDK)
 import WinSDK
+#elseif canImport(Darwin)
+import Darwin
 #elseif canImport(Android)
 import Android
 #elseif canImport(Glibc)

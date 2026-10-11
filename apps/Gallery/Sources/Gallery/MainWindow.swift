@@ -33,17 +33,9 @@ struct MainWindow: WindowScene {
     /// the tabs.
     let nav: Navigation
 
-    /// What the gallery looks like - its bars are painted in its accent, which
-    /// the Colours window chooses.
-    let style: SessionStyle
-
     /// The gallery's log of this window's lifecycle - the state is
     /// `GalleryScene`'s, the moments are this window's.
     let log: WindowLog
-
-    /// What the window's chrome says - the TitleBar sample writes it. See
-    /// Samples/Windows/TitleBarSample.swift.
-    let bar: TitleBarState
 
     // MARK: - The window itself
 
@@ -83,10 +75,10 @@ struct MainWindow: WindowScene {
             window.isMaximizable = true
             window.isMinimizable = true
 
-            // Authored window chrome is meaningful on a desktop host, and
-            // there the menu is a sidebar beside the page.
+            // Native chrome is meaningful on a desktop host, and there the
+            // menu is a sidebar beside the page.
             if device.formFactor == .desktop {
-                window.titleBar = chrome
+                window.titleBar = TitleBar("SwiftOmniUI")
                 nav.menuOverlays = false
             }
 
@@ -107,25 +99,6 @@ struct MainWindow: WindowScene {
             if let name = ProcessInfo.processInfo.environment["GALLERY_SAMPLE"] {
                 nav.openGroup("layout")
                 nav.push(.sample(name))
-            }
-        }
-        // The chrome is painted in the gallery's accent, which the Colours
-        // window chooses - so the bar is written again when it moves.
-        .onChange(of: style.accent.color) {
-            if device.formFactor == .desktop {
-                window.titleBar = chrome
-            }
-        }
-        .onChange(of: bar.subtitle) {
-            if device.formFactor == .desktop {
-                window.titleBar = chrome
-            }
-        }
-        // And again when the desktop starts or stops showing through the
-        // window, the bars letting it through with the rest.
-        .onChange(of: window.isTranslucent) {
-            if device.formFactor == .desktop {
-                window.titleBar = chrome
             }
         }
     }
@@ -149,10 +122,6 @@ struct MainWindow: WindowScene {
         } destination: { route in
             page(for: route, path: nav.$path)
         }
-        // The bar belongs to the navigation arrangement, not one page on it.
-        // Its foreground stays white against the gallery accent in both themes.
-        .barBackgroundColor(barColour)
-        .barForegroundColor(Palette.onBrand)
     }
 
     /// The page under everything, for the section the menu chose.
@@ -199,7 +168,7 @@ struct MainWindow: WindowScene {
                 return MissingPage(id: id, nav: nav, path: path)
             }
 
-            return SamplePage.shown(sample, nav: nav, bar: barColour)
+            return SamplePage.shown(sample, nav: nav)
 
         case .level(let level):
             return LevelPage(level: level, nav: nav, path: path)
@@ -230,10 +199,8 @@ struct MainWindow: WindowScene {
                 // page here is the stack rather than what is inside it -
                 // measured, and it is where the first live run showed no icons
                 // at all.
-                .title("Stack")
-                .icon(ImageSource(light: "tab_bar.png", dark: "tab_bar_dark.png"))
-                .barBackgroundColor(barColour)
-                .barForegroundColor(Palette.onBrand)
+                .tabItem(Label("Stack",
+                    image: ImageSource(light: "tab_bar.png", dark: "tab_bar_dark.png")))
 
             case .second:
                 return SecondTabPage(nav: nav)
@@ -243,57 +210,5 @@ struct MainWindow: WindowScene {
             }
         }
         .selection(nav.$tab)
-        .barBackgroundColor(barColour)
-    }
-
-    // MARK: - The window's own chrome
-
-    /// What the bars are painted in: the gallery's accent, with three fifths
-    /// let through while the desktop shows through the window.
-    private var barColour: Color {
-        window.isTranslucent == true ? style.accent.translucentColor : style.accent.color
-    }
-
-    /// Native desktop chrome whose values and slot contents are described by
-    /// the gallery scene. See Samples/Windows/TitleBarSample.swift.
-    private var chrome: TitleBar {
-        TitleBar("SwiftOmniUI")
-            .subtitle(bar.subtitle)
-            .icon("swiftomniui_mark.png")
-            .background(barColour)
-            .barForegroundColor(Palette.onBrand)
-            .trailingContent {
-                ChromeEnd(bar: bar, nav: nav, catalog: catalog)
-            }
-    }
-}
-
-/// The optional action at the trailing edge of the native title area.
-private struct ChromeEnd: View {
-    /// What the chrome says - the TitleBar sample writes it.
-    let bar: TitleBarState
-
-    /// Where the gallery is - what "Surprise me" moves.
-    let nav: Navigation
-
-    /// Everything the gallery shows - what "Surprise me" picks from.
-    let catalog: Catalog
-
-    /// Which kind of device this is, so the pick leaves out what it cannot show.
-    @Environment private var device: DeviceInfo
-
-    var body: some View {
-        HStack {
-            if bar.showsSurprise {
-                Button("Surprise me", action: { nav.surprise(from: catalog, on: device.formFactor) })
-                    .icon("nav_surprise_chrome.png")
-                    .iconPosition(.leading)
-                    .iconSpacing(5)
-                    .style("ChromeChip")
-                    .verticalAlignment(.center)
-                    
-            }
-        }
-        .padding(EdgeInsets(0, 0, 5, 0))
     }
 }

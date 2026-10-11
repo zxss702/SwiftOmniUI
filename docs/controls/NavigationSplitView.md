@@ -27,7 +27,7 @@ See [the dictionary](README.md) for how a mark is given.
 | --- | :---: | --- | --- | --- |
 | Android Views | ✅ | 1 ✅ | custom `ViewGroup`: a drawer where narrow, beside where wide |  |
 | WinUI 3 | ✅ | 4 ✅ | `NavigationSplitView` |  |
-| GTK 4 | ✅ |  | `GtkPaned`; libadwaita `AdwOverlaySplitView` |  |
+| GTK 4 | ✅ | 4 – | `GtkPaned`; libadwaita `AdwOverlaySplitView` |  |
 | Web |  |  | `<aside>` | no host yet |
 
 Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Navigation/NavigationSplitViewContract.swift`.
@@ -38,8 +38,8 @@ Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Navigation/NavigationSpl
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
 | `isSidebarVisible` | property | `Bool` | native | 🔌 | ✅ | · |  | only through the host's own: read isSidebarVisible of NavigationSplitView: the split's own flag; the drawer slides on it; GTK 4: cannot read isSidebarVisible of NavigationSplitView - GTK's driver has no path for it yet |
 | `isSidebarVisibleChanged` | event | `Bool` | adaptive | 🔌 | ✅ |  |  | only through the host's own: toggle on NavigationSplitView: the host's own entry the scrim's tap and the bar's button call; GTK 4: not realized |
-| `columnVisibility` | property | `NavigationSplitViewVisibility` | native |  |  |  |  |  |
-| `columnVisibilityChanged` | event | `NavigationSplitViewVisibility` | adaptive |  |  |  |  |  |
+| `columnVisibility` | property | `NavigationSplitViewVisibility` | native |  |  | · |  | GTK 4: cannot read columnVisibility of NavigationSplitView - GTK's driver has no path for it yet |
+| `columnVisibilityChanged` | event | `NavigationSplitViewVisibility` | adaptive |  |  | · |  | GTK 4: cannot toggle on NavigationSplitView - GTK's driver has no path for it yet |
 
 ## From [PropertyContainer](tiers/PropertyContainer.md)
 
@@ -55,17 +55,17 @@ What a page shows about itself where another container presents it as an item - 
 
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| `badge` | property | `String` | native |  |  |  |  |  |
-| `document` | property | `String` | adaptive |  |  |  |  |  |
+| `badge` | property | `String` | native |  |  | · |  | GTK 4: cannot read badge of NavigationSplitView - GTK's driver has no path for it yet |
+| `document` | property | `String` | adaptive |  |  | – |  | GTK 4: GTK 4 names a window for a document in its title alone. |
 | `icon` | property | `ImageSource` | adaptive | · |  |  |  | cannot read icon of NavigationSplitView - Android's driver has no path for it yet; WinUI 3: not realized; GTK 4: not realized |
-| `interactiveDismissDisabled` | property | `Bool` | native |  |  |  |  |  |
-| `preferredColumnWidth` | property | `[Double]` | adaptive |  |  |  |  |  |
-| `presentationDetents` | property | `[PresentationDetent]` | native |  |  |  |  |  |
-| `presentationDragIndicator` | property | `Visibility` | native |  |  |  |  |  |
-| `subtitle` | property | `String` | adaptive |  |  |  |  |  |
-| `subtitleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
+| `interactiveDismissDisabled` | property | `Bool` | native |  |  | – |  | GTK 4: A GTK sheet is libadwaita's dialog: Escape and its close always take it. |
+| `preferredColumnWidth` | property | `[Double]` | adaptive |  |  | · |  | GTK 4: cannot read preferredColumnWidth of NavigationSplitView - GTK's driver has no path for it yet |
+| `presentationDetents` | property | `[PresentationDetent]` | native |  |  | – |  | GTK 4: A GTK sheet is libadwaita's dialog, sized by what it shows - detents are not its to take. |
+| `presentationDragIndicator` | property | `Visibility` | native |  |  | – |  | GTK 4: A GTK sheet is libadwaita's dialog, which draws no grabber of its own. |
+| `subtitle` | property | `String` | adaptive |  |  | · |  | GTK 4: cannot read subtitle of NavigationSplitView - GTK's driver has no path for it yet |
+| `subtitleKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |
 | `title` | property | `String` | native | · | ✅ | · |  | cannot read title of NavigationSplitView - Android's driver has no path for it yet; GTK 4: cannot read title of NavigationSplitView - GTK's driver has no path for it yet |
-| `titleKey` | property | `LocalizedStringKey` | native |  |  |  |  |  |
-| `toolbarBackground` | property | `Visibility` | adaptive |  |  |  |  |  |
-| `toolbarVisibility` | property | `Visibility` | adaptive |  |  |  |  |  |
-| `windowBackground` | property | `Color` | adaptive |  |  |  |  |  |
+| `titleKey` | property | `LocalizedStringKey` | native |  |  |  |  | GTK 4: not realized |
+| `toolbarBackground` | property | `Visibility` | adaptive |  |  | · |  | GTK 4: cannot read toolbarBackground of NavigationSplitView - GTK's driver has no path for it yet |
+| `toolbarVisibility` | property | `Visibility` | adaptive |  |  | · |  | GTK 4: cannot read toolbarVisibility of NavigationSplitView - GTK's driver has no path for it yet |
+| `windowBackground` | property | `Color` | adaptive |  |  | · |  | GTK 4: cannot read windowBackground of NavigationSplitView - GTK's driver has no path for it yet |

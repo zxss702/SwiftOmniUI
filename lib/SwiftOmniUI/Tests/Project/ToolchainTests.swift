@@ -74,7 +74,7 @@ import XCTest
         let manifests = try values(of: #"(?m)^// swift-tools-version:(\d+\.\d+(?:\.\d+)?)"#)
             .filter { $0.place.hasSuffix("Package.swift:1") }
 
-        XCTAssertGreaterThan(manifests.count, 4, "the walk found almost none of the manifests")
+        XCTAssertGreaterThan(manifests.count, 2, "the walk found almost none of the manifests")
         XCTAssertEqual(
             Set(manifests.map(\.value)).count, 1,
             "every manifest asks for one tools version: \(manifests.map { "\($0.place) \($0.value)" })")

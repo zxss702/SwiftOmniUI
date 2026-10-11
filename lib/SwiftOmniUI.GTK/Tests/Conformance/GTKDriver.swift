@@ -162,6 +162,15 @@ final class GTKDriver: HostDriver {
             ProgramWrite.perform { times.setTime(time) }
             GTKTestHost.emit(times.minutes.opaque, "value-changed")
         case (.activate, _) where element.type == .menuItem: try chooseMenuItem(element)
+        case (.dropFiles(let paths), _):
+            // The system's files let go on the element, at its middle: what a drop out of Files raises.
+            guard let target = element.native as? GTKElement else { throw DriverCannot(act, on: element) }
+            let place = try place(of: element)
+            target.send(.dropPaths, [.strings(paths), .numbers([place.width / 2, place.height / 2])])
+        case (.openLink(let link), _):
+            // The platform handing the application a link, as opening one from Files or a browser raises it.
+            guard let runtime = renderer?.runtime else { throw DriverCannot(act, on: element) }
+            runtime.core.raise(AppContract.urlOpened, link)
         default: throw DriverCannot(act, on: element)
         }
     }

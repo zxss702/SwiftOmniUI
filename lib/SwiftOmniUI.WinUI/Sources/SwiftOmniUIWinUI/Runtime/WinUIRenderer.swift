@@ -163,6 +163,7 @@ final class WinUIRenderer {
             controller.present(element, in: runtime, keepingSizing: keepingSizing,
                                windowOf: { [roster] in roster.controller(of: $0)?.window })
         }
+        runtime.tree.chromeMayChange = false
     }
 
     /// Composes every window's chrome again from what it shows now.
