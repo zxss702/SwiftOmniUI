@@ -445,9 +445,12 @@ void swiftomniui_winui_text_set_decorations(SwiftOmniUIObjectRef text, bool unde
 
 SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view);
 
-/// A toolbar's own button - the platform's own at heart, dressed as the bar's: no ground at rest, the system's
-/// subtle fills under the pointer and pressed. `button_set_on` gives it a state to keep.
+/// A toolbar's own button - WinUI's AppBarToggleButton, momentary until `button_set_on` has it keep a state.
 SwiftOmniUIObjectRef swiftomniui_winui_toolbar_button_make(int64_t view);
+
+/// The picture in a toolbar button's icon slot: the first of the newline-separated `icons` files the pictures
+/// hold, else the Fluent glyph `symbol` is; both empty for none. Pictured, its words move to its tip.
+void swiftomniui_winui_toolbar_button_set_icon(SwiftOmniUIObjectRef button, char const *symbol, char const *icons);
 
 /// The words a button or a radio button shows.
 void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef control, char const *utf8);

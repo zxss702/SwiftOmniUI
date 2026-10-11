@@ -209,6 +209,45 @@ extern "C" int32_t swiftomniui_winui_title_bar_words(SwiftOmniUIObjectRef handle
     }
 }
 
+namespace {
+    /// The picture a bar's button shows: the first of its files the application's pictures hold, else the Fluent
+    /// glyph its symbol is; none for words alone.
+    controls::IconElement barIcon(char const *symbol, char const *icons) {
+        if (auto file = pictureFile(icons); !file.empty()) {
+            controls::ImageIcon image;
+            image.Source(pictureSource(file));
+            image.Tag(winrt::box_value(winrt::hstring(file)));
+            return image;
+        }
+        if (symbol && *symbol) {
+            controls::FontIcon glyph;
+            glyph.FontFamily(media::FontFamily(L"Segoe Fluent Icons"));
+            glyph.Glyph(text(symbol));
+            return glyph;
+        }
+        return nullptr;
+    }
+}
+
+extern "C" void swiftomniui_winui_toolbar_button_set_icon(SwiftOmniUIObjectRef handle, char const *symbol, char const *icons) {
+    try {
+        // A picture stands in the icon slot and the words move to the tip; words alone are the label.
+        auto icon = barIcon(symbol, icons);
+        auto control = borrow<controls::Control>(handle);
+        auto place = [&](auto const &command) {
+            command.Icon(icon);
+            auto words = command.Label();
+            command.LabelPosition(icon || words.empty() ? controls::CommandBarLabelPosition::Collapsed
+                                                        : controls::CommandBarLabelPosition::Default);
+            if (icon && !words.empty()) controls::ToolTipService::SetToolTip(command, winrt::box_value(words));
+        };
+        if (auto toggle = control.try_as<controls::AppBarToggleButton>()) return place(toggle);
+        if (auto command = control.try_as<controls::AppBarButton>()) return place(command);
+    } catch (...) {
+        report("giving a toolbar button its icon");
+    }
+}
+
 extern "C" void swiftomniui_winui_title_bar_set_actions(
     SwiftOmniUIObjectRef handle, char const *const *texts, char const *const *identifiers, char const *const *icons,
     char const *const *symbols, bool const *overflows, bool const *enabled, SwiftOmniUIObjectRef const *contents,
@@ -233,11 +272,17 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
                 commands.Append(controls::AppBarSeparator());
                 continue;
             }
-            // A view the item carries stands in the button's place, in a container the bar knows.
+            // A view the item carries stands in the button's place: the bar's own button as a command, any other in
+            // a container the bar knows.
             if (contents[index]) {
+                auto content = borrow<xaml::UIElement>(contents[index]);
+                if (auto command = content.try_as<controls::ICommandBarElement>()) {
+                    commands.Append(command);
+                    continue;
+                }
                 controls::AppBarElementContainer container;
                 container.VerticalContentAlignment(xaml::VerticalAlignment::Center);
-                container.Content(borrow<xaml::UIElement>(contents[index]));
+                container.Content(content);
                 commands.Append(container);
                 continue;
             }
@@ -249,18 +294,7 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
             }
             // An action with a picture shows the picture alone; its words name it to Narrator and in its tip. A
             // symbol is a Segoe Fluent glyph, as an Image draws one.
-            controls::IconElement icon{nullptr};
-            if (auto file = pictureFile(icons[index]); !file.empty()) {
-                controls::ImageIcon image;
-                image.Source(pictureSource(file));
-                image.Tag(winrt::box_value(winrt::hstring(file)));
-                icon = image;
-            } else if (symbols[index] && *symbols[index]) {
-                controls::FontIcon glyph;
-                glyph.FontFamily(media::FontFamily(L"Segoe Fluent Icons"));
-                glyph.Glyph(text(symbols[index]));
-                icon = glyph;
-            }
+            auto icon = barIcon(symbols[index], icons[index]);
             if (icon) {
                 button.Icon(icon);
                 button.LabelPosition(controls::CommandBarLabelPosition::Collapsed);

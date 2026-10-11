@@ -19,8 +19,7 @@ final class WinUIButtonView: WinUIView {
     /// worn on the element at all makes it one.
     var onToggled: ((Bool) -> Void)?
 
-    /// The platform's button, or - `toolbar` - the same button dressed as the bar's: no ground of its own, the
-    /// bar's faint fill under the pointer.
+    /// The platform's button, or - `toolbar` - the bar's own, whose icon slot and label WinUI draws.
     init(toolbar: Bool = false) {
         super.init { number in toolbar ? swiftomniui_winui_toolbar_button_make(number) : swiftomniui_winui_button_make(number) }
         isToolbarControl = toolbar
@@ -29,6 +28,14 @@ final class WinUIButtonView: WinUIView {
     /// The caption.
     func setText(_ text: String) {
         swiftomniui_winui_set_caption(handle, text)
+    }
+
+    /// The picture in the bar's button's icon slot - a Fluent glyph or a picture's file; its words move to its
+    /// tip. The platform's own button draws no picture.
+    func setIcon(_ picture: ImageSource?) {
+        guard isToolbarControl else { return }
+        let files = picture.map(\.file).flatMap { $0.isEmpty ? nil : PictureArithmetic.files(for: $0) } ?? []
+        swiftomniui_winui_toolbar_button_set_icon(handle, picture?.symbol ?? "", files.map { $0 + "\n" }.joined())
     }
 
     /// The caption the button shows now, read back from WinUI.
@@ -48,7 +55,7 @@ final class WinUIButtonView: WinUIView {
         let (fill, outline) = (WinUIBrush(background), WinUIBrush(stroke))
         let width = BoxArithmetic.outlineWidth(stroke: stroke, width: strokeWidth)
         paint("look", followsSize: fill.followsSize || outline.followsSize) { [weak self, handle] size in
-            // The bar's button keeps the look the bar dressed it in.
+            // The bar's button keeps WinUI's own look.
             if self?.isToolbarControl == true { return }
             fill.withRelayBrush(over: size) { fill in
                 outline.withRelayBrush(over: size) { outline in

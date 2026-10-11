@@ -29,8 +29,9 @@ extension WinUIElement {
     }
 
     func makeView() -> WinUIView? {
-        if type == .button, standsInToolbar {
-            // The bar's own button, made here as the list is: the registration's members still reach it.
+        if type == .button, standsInToolbar, element.value(.icon) != nil || element.value(.text) != nil {
+            // The bar's own button, made here as the list is: the registration's members still reach it. A button
+            // with only a view of the author's for a label is the platform's, carried in the bar's container.
             let button = WinUIButtonView(toolbar: true)
             button.onClicked = { [weak self] in self?.send(.clicked, []) }
             button.onToggled = { [weak self] on in self?.report(.isOn, .toggled, .bool(on)) }

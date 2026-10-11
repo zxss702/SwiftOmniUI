@@ -34,8 +34,11 @@ extension WinUIElement {
         }
         let arranged = (type == .navigationStack ? element.stackedChildren : element.arrangedChildren).map(\.winUI)
 
-        if let button = view as? WinUIButtonView, let face = arranged.first?.view {
-            swiftomniui_winui_button_set_face(button.handle, face.handle)
+        if let button = view as? WinUIButtonView {
+            // The bar's button draws its picture in its own icon slot: the label child stands nowhere.
+            if !button.isToolbarControl, let face = arranged.first?.view {
+                swiftomniui_winui_button_set_face(button.handle, face.handle)
+            }
             return
         }
 

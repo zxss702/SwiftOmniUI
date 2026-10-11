@@ -177,11 +177,12 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view) {
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_toolbar_button_make(int64_t view) {
     try {
-        // The bar's own button: the platform's momentary button at heart - a press on one that keeps nothing is
-        // taken back at once - wearing no ground of its own, so the bar shows through it.
-        primitives::ToggleButton button;
+        // The bar's own button, WinUI's AppBarToggleButton: momentary until `button_set_on` has it keep a state -
+        // a press on one that keeps nothing is taken back at once. Its icon slot and label are what it shows;
+        // `toolbar_button_set_icon` and `set_caption` fill them.
+        controls::AppBarToggleButton button;
+        button.LabelPosition(controls::CommandBarLabelPosition::Collapsed);
         wireButton(button, view);
-        barLook(button);
         return detach(button);
     } catch (...) {
         report("making a toolbar button");
@@ -248,6 +249,16 @@ extern "C" void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef handle, char 
     try {
         auto control = as<controls::ContentControl>(handle);
         auto words = text(utf8);
+        // The bar's button is named by its label; with a picture in its icon slot the words move to its tip.
+        auto place = [&](auto const &command) {
+            bool pictured = command.Icon() != nullptr;
+            command.Label(words);
+            command.LabelPosition(words.empty() || pictured ? controls::CommandBarLabelPosition::Collapsed
+                                                            : controls::CommandBarLabelPosition::Default);
+            if (pictured && !words.empty()) controls::ToolTipService::SetToolTip(command, winrt::box_value(words));
+        };
+        if (auto toggle = control.try_as<controls::AppBarToggleButton>()) return place(toggle);
+        if (auto command = control.try_as<controls::AppBarButton>()) return place(command);
         control.Content(winrt::box_value(words));
     } catch (...) {
         report("setting a caption");

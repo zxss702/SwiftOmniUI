@@ -647,7 +647,8 @@ final class WinUILazyTests: XCTestCase {
                     let span = try XCTUnwrap(lazy.span)
                     let first = Int((span.lowerBound / extent).rounded(.down))
                     let last = Int((span.upperBound / extent).rounded(.up))
-                    let expected = max(0, first - 1) * perRun..<min(1_000, (last + 1) * perRun)
+                    let margin = Int(viewport / extent)
+                    let expected = max(0, first - 1 - margin) * perRun..<min(1_000, (last + 1 + margin) * perRun)
                     XCTAssertEqual(lazy.cells.built, expected, "kind \(kind), offset \(offset)")
                     XCTAssertEqual(lazy.mounted.count, expected.count)
                     for (identity, item) in lazy.mounted {
@@ -749,7 +750,8 @@ final class WinUILazyTests: XCTestCase {
                             let span = try XCTUnwrap(lazy.span)
                             let first = Int((span.lowerBound / extent).rounded(.down))
                             let last = Int((span.upperBound / extent).rounded(.up))
-                            let expected = max(0, first - 1) * perRun..<min(count, (last + 1) * perRun)
+                            let margin = Int((horizontal ? frame.width : frame.height) / extent)
+                            let expected = max(0, first - 1 - margin) * perRun..<min(count, (last + 1 + margin) * perRun)
                             XCTAssertEqual(lazy.cells.built, expected, "kind \(kind), step \(step)")
                             XCTAssertEqual(lazy.mounted.count, expected.count)
                         }

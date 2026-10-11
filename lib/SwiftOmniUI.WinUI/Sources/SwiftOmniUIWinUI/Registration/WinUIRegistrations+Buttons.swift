@@ -53,6 +53,9 @@ extension WinUIRegistrations {
             button.property(ButtonContract.isOn) { view, on in
                 view.setOn(on)
             }
+            button.property(ButtonContract.icon) { view, icon in
+                view.setIcon(icon)
+            }
             button.raises(ButtonContract.clicked)
             button.raises(ButtonContract.pressed)
             button.raises(ButtonContract.released)
