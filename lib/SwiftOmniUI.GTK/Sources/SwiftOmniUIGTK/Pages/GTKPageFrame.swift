@@ -78,8 +78,8 @@ final class GTKPageFrame {
             // header here; source inset modifiers reserve their own bars.
             let headerHeight = self.chrome.showsBar ? Double(gtk_widget_get_height(self.header)) : 0
             let tabsHeight = self.tabsBar.map { Double(gtk_widget_get_height($0)) } ?? 0
-            return SafeAreaContext(bounds: bounds, container: bounds.inset(
-                EdgeInsets(top: headerHeight + tabsHeight, leading: 0, bottom: 0, trailing: 0)))
+            return SafeAreaContext(bounds: bounds).padding(
+                EdgeInsets(top: headerHeight + tabsHeight, leading: 0, bottom: 0, trailing: 0))
         }
     }
 

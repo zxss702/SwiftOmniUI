@@ -67,7 +67,7 @@ class WinUIZStackView: WinUITravellingLayout {
             let physicalEdge = SafeAreaArithmetic.physicalEdge(edge, direction: direction)
             let bar = current[1]
             let barPlace = bar.isShown
-                ? SafeAreaArithmetic.bar(of: bar, edge: physicalEdge, in: context, direction: direction) : .zero
+                ? SafeAreaArithmetic.bar(of: bar, edge: physicalEdge, in: context, direction: direction) : Rect(0, 0, 0, 0)
             let extent = edge == .top || edge == .bottom
                 ? barPlace.height + bar.values.margin.top + bar.values.margin.bottom
                 : barPlace.width + bar.values.margin.left + bar.values.margin.right
