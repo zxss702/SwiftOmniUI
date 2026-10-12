@@ -50,13 +50,19 @@ step of the layout it causes.
 
 ## Frame reader
 
-`GeometryReader` is composed over the modifier, and earns its place by what the
-modifier cannot do: its content is built from the measurement. It holds the
-last frame in a `@State` of its own, in a `Grid` that fills the offered space
-and reports its own frame, so the closure runs again whenever the frame
-settles somewhere new; the measurement arrives through the same channel as
-every other report, and nothing about it exists in the host. Before the first
-layout the closure is given a zero rectangle.
+`GeometryReader` builds its content from its last frame report, held in a
+`@State`. Its internal Grid has an independent geometry-reader layout role:
+children do not determine its natural size, finite proposals are accepted,
+and unspecified axes have an ideal extent of ten. Children stack from the
+leading top corner with the allocated proposal.
+
+The ten-number report still carries parent frame, window origin and safe
+rectangle. GTK and WinUI use actual native dimensions and the same remaining
+safe region that placed the view; `geometry.size` is its allocated size and
+`safeAreaInsets` is the intersection with that view's bounds. A reader
+already placed clear of a bar, or inside a scroll document that consumed it,
+reports zero for that contribution. `onGeometryChange` uses the same report.
+Before first allocation the closure still receives a zero rectangle.
 
 ## A frame feed
 

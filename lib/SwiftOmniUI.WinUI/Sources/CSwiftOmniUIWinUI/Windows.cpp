@@ -14,6 +14,7 @@
 #include <cstring>
 
 #include <winrt/Windows.System.h>
+#include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Input.h>
 #include <winrt/Microsoft.UI.Windowing.h>
@@ -218,15 +219,18 @@ extern "C" void swiftomniui_winui_window_set_safe_area_bars(
             layer.Children().Append(edge);
             children.Append(layer);
         }
-        // Match chrome's explicit background; an unsaid background stays
-        // transparent over the same window Mica surface as TitleBar.
+        // Share the TitleBar's effective background, including the native
+        // default; authored backgrounds stay on each original bar view.
         if (hasBackground) {
             winrt::Windows::UI::Color color{static_cast<uint8_t>(background >> 24),
                 static_cast<uint8_t>(background >> 16), static_cast<uint8_t>(background >> 8),
                 static_cast<uint8_t>(background)};
             layer.Background(xaml::Media::SolidColorBrush(color));
         } else {
-            layer.Background(nullptr);
+            xaml::Media::Brush background{nullptr};
+            for (auto const &child : children)
+                if (auto title = child.try_as<controls::TitleBar>()) { background = title.Background(); break; }
+            layer.Background(background);
         }
         auto held = layer.Children().GetAt(0).as<controls::StackPanel>().Children();
         bool same = held.Size() == static_cast<uint32_t>(count);

@@ -83,8 +83,8 @@ final class GTKPageFrame {
         }
     }
 
-    /// Lets go of the toolbar view and nothing in it: a page popped still slides away in it, and GTK lets it go once
-    /// the slide is over.
+    /// Returns promoted bars to local placement before releasing the frame.
+    /// GTK can still own the departing page through its navigation slide.
     isolated deinit {
         page.rootSafeAreaContext = nil
         for host in safeBars {

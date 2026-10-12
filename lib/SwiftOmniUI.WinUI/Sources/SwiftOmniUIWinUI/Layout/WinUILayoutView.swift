@@ -209,6 +209,7 @@ class WinUILayoutView: WinUIView {
         WinUIDoorbell.afterPass { [weak self, weak placingLayout] in
             guard let self else { return }
             self.sizeFeedbackPending = false
+            guard self.placingLayout === placingLayout else { return }
             placingLayout?.invalidateMeasurements()
         }
     }

@@ -73,7 +73,7 @@ namespace swiftomniui {
                 UnhandledException([](IInspectable const &, xaml::UnhandledExceptionEventArgs const &args) {
                     auto message = winrt::to_string(args.Message());
                     std::fprintf(stderr, "SwiftOmniUI: unhandled XAML exception HRESULT=0x%08lx: %s\n",
-                        static_cast<unsigned long>(args.Exception().value), message.c_str());
+                        static_cast<unsigned long>(static_cast<int32_t>(args.Exception())), message.c_str());
                     std::fflush(stderr);
                     // Preserve XAML's original termination behaviour. This is
                     // diagnostics, not recovery from an unknown layout failure.

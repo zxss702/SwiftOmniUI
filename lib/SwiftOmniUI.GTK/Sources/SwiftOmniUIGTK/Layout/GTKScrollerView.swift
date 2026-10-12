@@ -100,10 +100,13 @@ final class GTKScrollerView: GTKView {
     /// edge goes on the indicator's margin there, the document's room untouched.
     private var indicatorMargins: [GTKWidget: EdgeInsets] = [:]
     private var indicatorInsets: EdgeInsets?
+    private var indicatorDirection: GtkTextDirection?
 
     func insetScrollbars(_ insets: EdgeInsets) {
-        guard insets != indicatorInsets else { return }
+        let direction = gtk_widget_get_direction(widget)
+        guard insets != indicatorInsets || direction != indicatorDirection else { return }
         indicatorInsets = insets
+        indicatorDirection = direction
         let bars = [gtk_scrolled_window_get_vscrollbar(scrolled), gtk_scrolled_window_get_hscrollbar(scrolled)]
         for (index, candidate) in bars.enumerated() {
             guard let bar = candidate else { continue }
@@ -115,8 +118,10 @@ final class GTKScrollerView: GTKView {
                 gtk_widget_set_margin_top(bar, Int32(max(0, original.top + insets.top).rounded()))
                 gtk_widget_set_margin_bottom(bar, Int32(max(0, original.bottom + insets.bottom).rounded()))
             } else {
-                gtk_widget_set_margin_start(bar, Int32(max(0, original.left + insets.left).rounded()))
-                gtk_widget_set_margin_end(bar, Int32(max(0, original.right + insets.right).rounded()))
+                let start = direction == GTK_TEXT_DIR_RTL ? insets.right : insets.left
+                let end = direction == GTK_TEXT_DIR_RTL ? insets.left : insets.right
+                gtk_widget_set_margin_start(bar, Int32(max(0, original.left + start).rounded()))
+                gtk_widget_set_margin_end(bar, Int32(max(0, original.right + end).rounded()))
             }
         }
     }

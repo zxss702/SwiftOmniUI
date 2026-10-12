@@ -31,6 +31,7 @@ class GTKView {
     func recordSafeBarPlace(_ place: Rect, context: SafeAreaContext) {
         placed = place
         safeAreaContext = context
+        (nativeSafeBarOwner as? GTKSafeAreaBarHost)?.sourcePlaced(place)
         updateSafeBarDrawing()
     }
 
@@ -41,6 +42,8 @@ class GTKView {
 
     func updateSafeBarDrawing() {
         guard nativeSafeBarOwner != nil else { return }
+        (nativeSafeBarOwner as? GTKView)?.setIgnoresInput(sourceElement?.safeBarAllowsInput == false)
+        (nativeSafeBarOwner as? GTKView)?.setEnabled(sourceElement?.safeBarIsEnabled ?? true)
         var matrix = HostMatrix.identity
         var opacity = 1.0
         var x = placedFrame.x, y = placedFrame.y
@@ -291,7 +294,10 @@ class GTKView {
         if let local = safeAreaContext?.safe {
             safeArea = Rect(corner.x + local.x, corner.y + local.y, local.width, local.height)
         }
-        return MountedElement.frameNumbers(place: placedFrame, corner: corner, safeArea: safeArea)
+        var frame = placedFrame
+        frame.width = Double(gtk_widget_get_width(widget))
+        frame.height = Double(gtk_widget_get_height(widget))
+        return MountedElement.frameNumbers(place: frame, corner: corner, safeArea: safeArea)
     }
 
     /// The widget's frame in its window, in logical pixels; nil in no window.

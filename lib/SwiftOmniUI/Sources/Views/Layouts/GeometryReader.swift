@@ -178,8 +178,8 @@ public struct GeometryProxy: Sendable {
 ///     }
 ///
 /// The closure runs again whenever the frame settles somewhere new; before the
-/// first layout it reads a zero size; native hosts settle that report before painting. Several views stack on top of each
-/// other, as in a `Grid`. To report a frame rather than build from it, write
+/// first layout it reads a zero size; native hosts settle that report before painting. Several views stack from the leading top
+/// corner. Content does not determine the reader's natural size. To report a frame rather than build from it, write
 /// `.onFrameChanged` on the view.
 public struct GeometryReader: View {
     /// The last report the layout settled on - zero until the first one.

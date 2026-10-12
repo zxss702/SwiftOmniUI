@@ -9,6 +9,9 @@
 @MainActor
 final class WinUISafeAreaBarHost: WinUILayoutView {
     let bar: WinUIView
+    private var contribution: [Double] = []
+    private var measurePending = false
+    private var released = false
     var spacing: Double {
         max(0, bar.sourceElement?.parent?.number(.spacing) ?? 0)
     }
@@ -20,6 +23,22 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
         bar.nativeSafeBarOwner = self
         bar.placingLayout?.holdChildren()
         setChildren([bar])
+    }
+
+    /// Logical contribution changes are committed outside native layout.
+    func sourcePlaced(_ frame: Rect) {
+        let metric = [frame.width, frame.height, spacing]
+        guard metric != contribution else { return }
+        contribution = metric
+        guard !measurePending else { return }
+        measurePending = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.measurePending = false
+            guard !self.released else { return }
+            self.direction = self.bar.sourceElement?.layoutDirection ?? .leftToRight
+            self.invalidateMeasurements()
+        }
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
@@ -39,6 +58,7 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     /// Detach from the native toolbar before returning ownership to the
     /// logical panel. Never insert one control into two native parents.
     func releaseBar() {
+        released = true
         setChildren([])
         bar.nativeSafeBarOwner = nil
         bar.clearSafeBarDrawing()

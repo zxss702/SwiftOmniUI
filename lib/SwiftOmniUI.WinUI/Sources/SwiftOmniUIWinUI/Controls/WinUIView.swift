@@ -31,6 +31,7 @@ class WinUIView {
     func recordSafeBarPlace(_ place: Rect, context: SafeAreaContext) {
         placed = place
         safeAreaContext = context
+        (nativeSafeBarOwner as? WinUISafeAreaBarHost)?.sourcePlaced(place)
         updateSafeBarDrawing()
     }
 
@@ -42,6 +43,7 @@ class WinUIView {
 
     func updateSafeBarDrawing() {
         guard nativeSafeBarOwner != nil else { return }
+        (nativeSafeBarOwner as? WinUIView)?.setIgnoresInput(sourceElement?.safeBarAllowsInput == false)
         var matrix = HostMatrix.identity
         var opacity = 1.0
         var x = placedFrame.x, y = placedFrame.y
@@ -377,7 +379,11 @@ class WinUIView {
         let corner = origin
         let local = safeAreaContext?.safe
         let safe = local.map { Rect(corner.x + $0.x, corner.y + $0.y, $0.width, $0.height) } ?? safeArea
-        return MountedElement.frameNumbers(place: placedFrame, corner: corner, safeArea: safe)
+        var frame = placedFrame
+        let actual = laidOutFrame
+        frame.width = actual.width
+        frame.height = actual.height
+        return MountedElement.frameNumbers(place: frame, corner: corner, safeArea: safe)
     }
 
     /// Where WinUI laid the element out in its parent, in DIPs.

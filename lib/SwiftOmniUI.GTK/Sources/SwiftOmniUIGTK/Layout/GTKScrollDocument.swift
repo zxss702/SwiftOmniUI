@@ -17,6 +17,7 @@ final class GTKScrollDocument: GTKLayoutView {
 
     /// The pass's resolved padding; assigning it has no native side effects.
     var layoutPadding = EdgeInsets(0)
+    var consumedInsets = EdgeInsets(0)
 
     var orientation = Axis.vertical {
         didSet { if orientation != oldValue { invalidateMeasurements() } }
@@ -38,7 +39,7 @@ final class GTKScrollDocument: GTKLayoutView {
         // The document's margins consumed the viewport's contributions.
         // Scrolling cannot make those contributions reappear in inner readers.
         SafeAreaContext(bounds: Rect(0, 0, place.width, place.height),
-                        consumed: padding)
+                        consumed: consumedInsets)
     }
 
 }

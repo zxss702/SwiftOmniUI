@@ -201,6 +201,14 @@ into the `fontTextStyle`/`fontSize`/`fontFamily`/`fontWeight`/
 and never one `font` object. Such a modifier has no binding twin: there is
 no one property a binding would drive.
 
+`safeAreaInset` also uses a composed boundary, tagged with its edge, rather
+than ordinary overlay placement. Its bar is excluded from generic ZStack
+sizing but reduces the safe proposal for subsequent content. `safeAreaPadding`
+and `ignoresSafeArea` create ordered wrappers; they do not overwrite a
+ScrollView's content padding. Their order therefore changes the proposal and
+where an inset is placed. The legacy host SPI that installs a window overlay
+remains window-scoped; it is distinct from the SwiftUI-shaped public overloads.
+
 ## Environment
 
 `.environment(_:)` provides an object to a view and everything under it,

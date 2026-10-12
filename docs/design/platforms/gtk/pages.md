@@ -16,6 +16,19 @@ what it no longer shows. The frame lets go of nothing in
 it as it goes: a page popped still slides away in it, and GTK lets the whole
 of it go once the slide is over.
 
+Page-level top inset surfaces are added after the native header and tabs in
+the same `AdwToolbarView`. Content extends to its top edge, while the placement
+context reserves only the native header/tabs there; each source inset reserves
+its own extent once. The native toolbar owns the combined backdrop and lower
+undershoot edge. Bottom, side and local insets remain transparent layouts.
+
+A promoted authored widget has one native parent. Its logical source and
+placing layout remain unchanged, retaining ancestor animation matrices,
+opacity, hit-testing scope, named spaces and parent-coordinate reports. Native
+hosting releases it before returning it to the logical panel. On frame
+teardown, content extension is reset and the bar returns to local placement,
+so a departing navigation page can remain owned by GTK through its slide.
+
 ## The chrome
 
 The chrome is composed by one function from what the window shows, after

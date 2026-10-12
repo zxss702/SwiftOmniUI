@@ -10,6 +10,9 @@ import CSwiftOmniUIGTK
 @MainActor
 final class GTKSafeAreaBarHost: GTKLayoutView {
     let bar: GTKView
+    private var contribution: [Double] = []
+    private var measurePending = false
+    private var released = false
     var spacing: Double {
         max(0, bar.sourceElement?.parent?.number(.spacing) ?? 0)
     }
@@ -23,6 +26,22 @@ final class GTKSafeAreaBarHost: GTKLayoutView {
         setChildren([bar])
         gtk_widget_add_css_class(widget, "toolbar")
         gtk_widget_add_css_class(widget, GTKStyleSheet.safeAreaBar)
+    }
+
+    /// Logical contribution changes are committed outside native layout.
+    func sourcePlaced(_ frame: Rect) {
+        let metric = [frame.width, frame.height, spacing]
+        guard metric != contribution else { return }
+        contribution = metric
+        guard !measurePending else { return }
+        measurePending = true
+        GTKDoorbell.afterLayout { [weak self] in
+            guard let self else { return }
+            self.measurePending = false
+            guard !self.released else { return }
+            self.direction = self.bar.sourceElement?.layoutDirection ?? .leftToRight
+            self.invalidateMeasurements()
+        }
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
@@ -42,6 +61,7 @@ final class GTKSafeAreaBarHost: GTKLayoutView {
     /// Detach from the native toolbar before returning ownership to the
     /// logical panel. Never insert one control into two native parents.
     func releaseBar() {
+        released = true
         setChildren([])
         bar.nativeSafeBarOwner = nil
         bar.clearSafeBarDrawing()

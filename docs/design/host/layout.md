@@ -192,15 +192,27 @@ keeps nine tenths of its opacity under the pointer and eight tenths pressed
 
 ## The safe area
 
-A window with bars and a notch over its screen - a phone's, a tablet's -
-stands a page's content clear of them, in the safe area. Where the content's
-own layout lets itself under them on an edge - `.none`, edge to edge, or
-`.keyboard`, clear of the keyboard alone - its page reaches out to the
-screen's edge there (`SafeAreaArithmetic.room`), so a background or a
-gradient runs behind the status bar. A bar of the page's own - a stack's, the
-tabs - is no part of the safe area to give: content never runs under one. The
-page's background stands behind the bars either way. A desktop window has no safe area: its content stands in its
-whole room.
+GTK and WinUI carry an internal `SafeAreaContext` with each placement. It
+contains the current proposal, separate container and keyboard regions, and
+consumed margins. Layout, frame reports, scroll margins and native bars use
+that result; geometry readers receive no special addition to their report.
+
+An ordered `safeAreaInset` boundary places its bar at the incoming safe edge
+and reduces the region passed to the base by the extent and spacing. Another
+inset sees that reduced region, so bars on one edge stack and different edges
+coexist. Ordinary content occupies the remaining proposal. A scroller keeps
+the original viewport and resolves the unsafe strips into document and
+indicator margins. Its document passes a consumed context to descendants,
+so an inner reader or scroller cannot count the same bar again.
+
+`safeAreaPadding` has its own ordered wrapper; it is not content padding.
+`ignoresSafeArea` clears only the requested region and edges. Container and
+keyboard regions stay independent, with no synthetic keyboard strip on hosts
+that have not supplied one. Leading/trailing contributions follow layout
+direction. Ordinary overlays never contribute avoidance.
+
+See [safe-area placement](safe-area-context.md) for native ownership, the FO
+layout path and the limits of this source-only change.
 
 ## Words on a painted band
 

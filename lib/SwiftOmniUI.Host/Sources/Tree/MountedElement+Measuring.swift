@@ -13,6 +13,7 @@ extension MountedElement {
         .minimumWidth, .minimumHeight,
         .maximumWidth, .maximumHeight,
         .isVisible,
+        .isGeometryReader, .safeAreaInsetEdge, .ignoresSafeArea, Prop("safeAreaPadding"),
         .gridRow, .gridColumn, .gridRowSpan, .gridColumnSpan,
         .area,
     ]

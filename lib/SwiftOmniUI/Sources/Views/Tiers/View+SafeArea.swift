@@ -1,11 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-// `.safeAreaInset(edge:) {}` floats a bar over an edge of the view it was
-// written on: the content keeps the whole room - a scroll view inside draws
-// its background under the bar and scrolls beneath it - and the bar's extent
-// is told in the content's safe area all the same, so a scroller can inset
-// its document clear of the bar.
+// `.safeAreaInset(edge:) {}` places a bar in the incoming safe region and
+// reduces the region passed to its base. Ordinary content avoids that region;
+// a ScrollView extends its native viewport behind it and consumes it as margins.
 // Design: docs/design/views/modifiers.md#composed-modifiers
 
 extension View {
@@ -13,11 +11,11 @@ extension View {
     ///
     ///     page.safeAreaInset(edge: .top) { Header() }
     ///
-    /// The content keeps the whole room - a scroll view inside draws its
-    /// background beneath the bar and scrolls its content under it, inset so
-    /// the last of it stands clear. `content` sits at `alignment` across the
-    /// bar; `spacing` adds to the room the bar keeps clear past its extent.
-    /// The bar draws no background of its own.
+    /// The bar reduces the safe region offered to subsequent content. Several
+    /// bars reserve their edges in modifier order. A ScrollView can draw and
+    /// scroll beneath them while keeping its first and last content clear.
+    /// `spacing` reserves additional room after the bar. Page-level top bars
+    /// share native toolbar backing; other bars add no implicit background.
     ///
     /// - Parameters:
     ///   - edge: `.top` or `.bottom`.
@@ -79,9 +77,9 @@ private struct SafeAreaInsetContent<Base: View, Bar: View>: View {
         stack.node.write(StackBaseContract.spacing, spacing)
         stack.node.props[.safeAreaInsetEdge] = edge.propValue
         stack.node.producer = {
-            // The content fills the whole room; the bar takes only what it
-            // takes at the edge, standing over it - the last of the two
-            // children so it draws on top, a decoration no part of the room.
+            // The host recognizes this boundary and places the two children
+            // with one SafeAreaContext. The decoration flag excludes the bar
+            // from ordinary ZStack sizing; it still reserves safe layout room.
             var bar = inset.node
             bar.props[.isLayoutDecoration] = true.propValue
             switch edge {

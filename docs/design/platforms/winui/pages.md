@@ -7,6 +7,22 @@ navigation pane, and the way back the mouse and the keyboard offer. SwiftOmniUI
 keeps every page, the path and the selection; WinUI is given no second
 navigation model to reconcile with them.
 
+## Page-level safe bars
+
+Top inset surfaces occupy a native Grid/StackPanel overlay in the existing
+content row, directly beneath TitleBar, menus and tabs. They do not create an
+auto row or shrink the ScrollView viewport. The common surface takes the
+TitleBar background and uses a native theme brush for the lower scroll edge;
+sheets and authored window overlays remain above it. Explicit bar backgrounds
+stay on their original views.
+
+Only the uninterrupted page-root modifier chain is promoted. Local layouts,
+finite frames, clipping, side boundaries and negative spacing retain ordinary
+local hosting. The mounted source keeps geometry, animation and coordinate
+ancestry while native ownership changes are coalesced after layout. Old hosts
+release their children before new ones attach them; weak queued callbacks do
+nothing after release or window teardown.
+
 ## The window's chrome
 
 A window has one chrome: WinUI's `TitleBar`, across the top of a window

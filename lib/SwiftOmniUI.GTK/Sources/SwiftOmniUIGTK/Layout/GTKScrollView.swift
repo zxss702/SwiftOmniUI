@@ -120,7 +120,8 @@ final class GTKScrollView: GTKLayoutView {
         let viewport = box.clips ? bounds : context.viewport(in: bounds, axes: orientation)
         let insets = SafeAreaContext.insets(of: context.safe, in: viewport)
         barsInsets = insets
-        let padding = writtenPadding + insets
+        document.consumedInsets = context.consumed + insets
+        let padding = SafeAreaArithmetic.physicalInsets(writtenPadding, direction: direction) + insets
         if document.layoutPadding != padding {
             document.layoutPadding = padding
             document.forgetMeasurements()
@@ -134,7 +135,7 @@ final class GTKScrollView: GTKLayoutView {
                 self.commitPending = false
                 guard !self.detached, let insets = self.pendingInsets else { return }
                 self.pendingInsets = nil
-                self.document.padding = self.writtenPadding + insets
+                self.document.padding = SafeAreaArithmetic.physicalInsets(self.writtenPadding, direction: self.direction) + insets
                 self.scroller.insetScrollbars(insets)
             }
         }

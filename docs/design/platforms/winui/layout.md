@@ -140,14 +140,21 @@ room in the directions it scrolls: it measures its document without bound
 there itself, so the extent is the document's, and asking for no room it
 stands exactly where the layout places it.
 
-A safe-area bar floats over the scroller's whole room: the view draws its
-background under the bar, and the content scrolls beneath it. The document
-insets the content by the bars' extents, measured up the tree from its first
-child and added to the padding the tree wrote, so the last of the content
-draws clear; a way the view does not scroll is inert room instead. The
-indicators keep clear of a bar too, its extent put on the template
-`ScrollBar`'s `Margin` on its own edge - the track starts past the bar while
-the document's room is untouched.
+A ScrollView reads the placement's `SafeAreaContext`, extends its native
+viewport beneath unsafe strips, and adds the remaining insets to document
+padding. Content receives a consumed context, so nested scrollers and inner
+GeometryReaders do not repeat those margins. The scroll background covers
+that viewport; explicit clipping limits the extension. `scrollTo` anchors
+against the visible region after margins, with first and last content able to
+scroll clear of the bars.
+
+Measurement calculates sizes only: resolved document padding is arithmetic
+state, while native padding invalidation, scrollbar margin writes and bar
+ownership changes commit after the pass. A template search skips document
+content and nested scrollers, retaining each indicator's original margin.
+Template reloads reapply the current contribution without accumulating it.
+Native scroller proposals first encountered during arrangement are prepared
+after the pass. Size feedback to a placing layout is deferred as well.
 
 The scroller says where its view stands through `ViewChanged`, and that the
 user holds it through `DirectManipulationStarted` and `Completed`. The user's

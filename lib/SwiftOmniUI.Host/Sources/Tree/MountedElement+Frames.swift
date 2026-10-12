@@ -6,19 +6,16 @@
 /// Where an element stands, said to the tree that reads it, the same on every host.
 /// Design: docs/design/host/runtime.md#where-a-view-stands
 extension MountedElement {
-    /// Insets reserved above this reader, measured in the same native layout as its frame.
+    /// Compatibility helper for hosts without placement contexts. GTK and
+    /// WinUI report their resolved SafeAreaContext directly for every view.
     public func contentSafeAreaInsets(frameOf: (MountedElement) -> Rect?) -> EdgeInsets {
         return ancestorSafeAreaInsets { element, edge in
             frameOf(element).map { edge == .top || edge == .bottom ? $0.height : $0.width }
         }
     }
 
-    /// The bars over this element, edge by edge: every `.safeAreaInset` ancestor's bar - the
-    /// stack's last child, the content its first, this element's way up lying in the first -
-    /// its extent on the edge's axis answered by the caller, a frame stood or a measure taken,
-    /// with the stack's spacing. A bar floats over the content's whole room and adds itself to
-    /// the safe area the content reads: an `ignoresSafeArea` lets the frame under it, the
-    /// contribution it tells unchanged.
+    /// Legacy tree measurement, scoped to the nearest scroll document. Native
+    /// GTK/WinUI layout uses ordered placement contexts rather than this sum.
     public func ancestorSafeAreaInsets(extentOf: (MountedElement, Edge) -> Double?) -> EdgeInsets {
         var insets = EdgeInsets(0), child = self
         while let parent = child.parent {

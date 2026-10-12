@@ -7,13 +7,15 @@
 /// carry this with placement; geometry and scrolling read the same result.
 @_spi(Host) public struct SafeAreaContext: Equatable, Sendable {
     public var bounds: Rect
+    public var layout: Rect
     public var container: Rect
     public var keyboard: Rect
     public var consumed: EdgeInsets
 
-    public init(bounds: Rect, container: Rect? = nil, keyboard: Rect? = nil,
+    public init(bounds: Rect, layout: Rect? = nil, container: Rect? = nil, keyboard: Rect? = nil,
                 consumed: EdgeInsets = EdgeInsets(0)) {
         self.bounds = bounds
+        self.layout = layout ?? bounds
         self.container = container ?? bounds
         self.keyboard = keyboard ?? bounds
         self.consumed = consumed
@@ -21,7 +23,7 @@
 
     public var safe: Rect { Self.intersection(container, keyboard) }
 
-    public var insets: EdgeInsets { Self.insets(of: safe, in: bounds) }
+    public var insets: EdgeInsets { Self.insets(of: safe, in: layout) }
 
     /// A child keeps the enclosing proposal's unsafe strips only at edges where
     /// it touches the safe region. A local card cannot acquire a window-wide bar.
@@ -37,6 +39,7 @@
             Rect(rect.x - frame.x, rect.y - frame.y, rect.width, rect.height)
         }
         return Self(bounds: local(Rect(left, top, max(0, right - left), max(0, bottom - top))),
+                    layout: Rect(0, 0, frame.width, frame.height),
                     container: local(container), keyboard: local(keyboard), consumed: consumed)
     }
 
@@ -68,10 +71,10 @@
         case .edges(let left, let top, let right, let bottom): sides = [left, top, right, bottom]
         }
         func cleared(_ rect: Rect, bit: Int32) -> Rect {
-            let left = sides[0].rawValue & bit == 0 ? bounds.x : rect.x
-            let top = sides[1].rawValue & bit == 0 ? bounds.y : rect.y
-            let right = sides[2].rawValue & bit == 0 ? bounds.x + bounds.width : rect.x + rect.width
-            let bottom = sides[3].rawValue & bit == 0 ? bounds.y + bounds.height : rect.y + rect.height
+            let left = (sides[0].rawValue & bit) == 0 ? bounds.x : rect.x
+            let top = (sides[1].rawValue & bit) == 0 ? bounds.y : rect.y
+            let right = (sides[2].rawValue & bit) == 0 ? bounds.x + bounds.width : rect.x + rect.width
+            let bottom = (sides[3].rawValue & bit) == 0 ? bounds.y + bounds.height : rect.y + rect.height
             return Rect(left, top, max(0, right - left), max(0, bottom - top))
         }
         var result = self
@@ -80,7 +83,7 @@
         return result
     }
 
-    /// A scroller can extend its native viewport on its scrolling axes while
+    /// A scroller can extend its native viewport on all four edges while
     /// keeping its own layout frame in the safe proposal.
     public func viewport(in frame: Rect, axes: Axis) -> Rect {
         // All four margins belong to the scroll container. Orientation controls
@@ -116,6 +119,25 @@ extension MountedElement {
         safeAreaInsetEdge != nil || safeAreaPadding != nil || ignoresSafeArea != nil
     }
 
+    public var safeBarAllowsInput: Bool {
+        var next: MountedElement? = self
+        while let element = next {
+            if element.isDeparting || element.value(.ignoresInput)?.bool == true
+                || element.value(.isEnabled)?.bool == false || element.value(.isVisible)?.bool == false { return false }
+            next = element.parent
+        }
+        return true
+    }
+
+    public var safeBarIsEnabled: Bool {
+        var next: MountedElement? = self
+        while let element = next {
+            if element.value(.isEnabled)?.bool == false { return false }
+            next = element.parent
+        }
+        return true
+    }
+
     /// Only the page's uninterrupted root modifier chain joins native chrome.
     /// GeometryReader, scrolling, stacks and sized/padded local frames end it.
     public var pageTopSafeAreaBars: [MountedElement] {
@@ -123,7 +145,7 @@ extension MountedElement {
         var next: MountedElement? = self
         while let element = next {
             guard element.value(.isVisible)?.bool != false, element.value(.clipsContent)?.bool != true else { break }
-            let children = element.type == .page ? element.arrangedChildren : element.currentChildren
+            let children = element.currentChildren
             if let edge = element.safeAreaInsetEdge, children.count == 2 {
                 guard edge == .top else { break }
                 if (element.number(.spacing) ?? 0) < 0 { return [] }
@@ -139,8 +161,8 @@ extension MountedElement {
                   element.number(.maximumWidth).map({ !$0.isFinite || $0 < 0 }) ?? true,
                   element.number(.maximumHeight).map({ !$0.isFinite || $0 < 0 }) ?? true,
                   element.insets(.padding) == EdgeInsets(0), element.insets(.contentPadding) == EdgeInsets(0),
-                  element.type == .page || (element.type == .grid && children.count == 1
-                      && children[0].value(.isFrameContent)?.bool == true)
+                  element.type == .page || (children.count == 1 && (!element.native.presentsView
+                      || (element.type == .grid && children[0].value(.isFrameContent)?.bool == true)))
             else { break }
             next = children.first
         }

@@ -34,6 +34,20 @@
 }
 
 extension SafeAreaArithmetic {
+    public static func physicalEdge(_ edge: Edge, direction: LayoutDirection) -> Edge {
+        guard direction == .rightToLeft else { return edge }
+        switch edge {
+        case .leading: return .trailing
+        case .trailing: return .leading
+        default: return edge
+        }
+    }
+
+    public static func physicalInsets(_ insets: EdgeInsets, direction: LayoutDirection) -> EdgeInsets {
+        guard direction == .rightToLeft else { return insets }
+        return EdgeInsets(top: insets.top, leading: insets.right, bottom: insets.bottom, trailing: insets.left)
+    }
+
     /// Ordered inset placement. The bar occupies the incoming safe region's
     /// edge; only the base receives the reduced region.
     @MainActor public static func bar<Child: LayoutChild>(of item: Child, edge: Edge,
