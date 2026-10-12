@@ -188,8 +188,8 @@ struct LazyHStackElement: StackBase {
 ///
 /// A `ForEach` - alone, or a statement among others - is a `LazyRows`: it
 /// names every row without building any, and its rows are made one at a
-/// time, only for the identities the host asks for. Anything else is read
-/// eagerly, and the laziness is in mounting alone.
+/// time, only for the identities the host asks for. Transparent groups and
+/// node modifiers keep those sources. Other content is lazy in mounting alone.
 @MainActor final class LazyChildren {
     /// One flat piece of a lazy container's content.
     private enum Segment {
@@ -216,14 +216,20 @@ struct LazyHStackElement: StackBase {
         var segments: [Segment] = []
         var children: [Node] = []
 
-        for element in (content as? TupleView)?.lazyElements ?? [content] {
+        func append(_ element: Element) {
             if let rows = element as? any LazyRows {
                 if !children.isEmpty { segments.append(.nodes(children)); children = [] }
                 segments.append(.rows(rows))
             } else {
-                children.append(contentsOf: element.node.asChildren)
+                let described = element.node
+                if let elements = described.lazyElements {
+                    for element in elements { append(element) }
+                } else {
+                    children.append(contentsOf: described.asChildren)
+                }
             }
         }
+        for element in (content as? TupleView)?.lazyElements ?? [content] { append(element) }
         if !children.isEmpty { segments.append(.nodes(children)) }
 
         // Comparing an unchanged range or value collection avoids stringifying
@@ -302,6 +308,7 @@ struct LazyHStackElement: StackBase {
                 case .rows(let rows):
                     child = rows.lazyRow(at: owner.local).node
                 }
+                if child.type == .fragment { child.materialize() }
                 // A builder fragment has no box. Apply the container's defaults to its actual
                 // children, where explicit alignment and flexible frame modifiers are visible.
                 if child.type == .fragment, child.children.count == 1 {

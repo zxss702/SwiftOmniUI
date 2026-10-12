@@ -5,8 +5,8 @@
 /// container asks of its content before anything is made. `ForEach` is the
 /// one: it keeps its items and the row closure, so a lazy stack learns every
 /// identity up front and runs the closure only for the ones a scroller's
-/// window asks for. Any other content is read eagerly - the laziness then is
-/// in mounting, not in building.
+/// window asks for. Transparent fragments and their node modifiers retain
+/// this source; other content is lazy in mounting, not in building.
 protocol LazyRows: Element {
     /// The rows' nodes, all of them - the eager reading, for a container that
     /// does not ask lazily.
@@ -26,6 +26,74 @@ protocol LazyRows: Element {
     func lazyRow(at index: Int) -> any Element
 }
 
+extension Node {
+    /// Opens transparent composition without expanding a row source. The fragment's
+    /// writes are retained on each piece, including content added as a slot.
+    @MainActor var lazyElements: [Element]? {
+        guard type == .fragment, let lazyContent else { return nil }
+        var writes = self
+        writes.lazyContent = nil
+        writes.producer = nil
+        writes.children = []
+
+        func dressed(_ node: Node) -> Node {
+            var node = node
+            for (property, member) in writes.inheritedMembers { node.inherit(property, member: member) }
+            node.absorbFragmentWrites(of: writes)
+            return node
+        }
+
+        var elements: [Element]
+        switch lazyContent {
+        case .rows(let rows):
+            elements = [ModifiedLazyRows(rows: rows, writes: writes)]
+        case .elements(let source):
+            elements = source.flatMap { element -> [Element] in
+                let child = dressed(element.node)
+                return child.lazyElements ?? child.asChildren.map { $0 as Element }
+            }
+        }
+        elements += children.flatMap { child -> [Element] in
+            let child = dressed(child)
+            return child.lazyElements ?? child.asChildren.map { $0 as Element }
+        }
+        return elements
+    }
+}
+
+/// Node modifiers describe a fragment once; each requested row takes those writes
+/// when it is built. Modifier values change builders, never the identity index.
+private struct ModifiedLazyRows: LazyRows {
+    let rows: any LazyRows
+    let writes: Node
+
+    var node: Node {
+        var node = Node(type: .fragment)
+        node.lazyContent = .rows(self)
+        node.producer = { self.lazyChildren }
+        return node
+    }
+
+    var lazyChildren: [Node] { rows.lazyChildren.flatMap { dressed($0).asChildren } }
+    var lazyRowCount: Int { rows.lazyRowCount }
+
+    func lazyRowIdentity(at index: Int) -> String? { rows.lazyRowIdentity(at: index) }
+
+    func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
+        guard let other = other as? Self else { return false }
+        return rows.hasSameLazyIdentities(as: other.rows)
+    }
+
+    func lazyRow(at index: Int) -> any Element { dressed(rows.lazyRow(at: index).node) }
+
+    private func dressed(_ node: Node) -> Node {
+        var node = node
+        for (property, member) in writes.inheritedMembers { node.inherit(property, member: member) }
+        node.absorbFragmentWrites(of: writes)
+        return node
+    }
+}
+
 /// A `LazyRows` under one more path segment - a statement's number, or a
 /// branch's name, on the front of every row's key.
 struct LazyKeyed: LazyRows {
@@ -33,14 +101,19 @@ struct LazyKeyed: LazyRows {
     let rows: any LazyRows
 
     var node: Node {
-        Node(type: .fragment, children: rows.lazyChildren.map { child in
+        var node = Node(type: .fragment)
+        node.lazyContent = .rows(self)
+        node.producer = { self.lazyChildren }
+        return node
+    }
+
+    var lazyChildren: [Node] {
+        rows.lazyChildren.map { child in
             var child = child
             child.key = child.key.map { "\(segment).\($0)" } ?? segment
             return child
-        })
+        }
     }
-
-    var lazyChildren: [Node] { node.asChildren }
 
     var lazyRowCount: Int { rows.lazyRowCount }
 
@@ -68,6 +141,7 @@ private struct SegmentKeyed: Element {
     var node: Node {
         var node = raw.node
         if node.type == .fragment {
+            node.materialize()
             node.children = node.children.map { child in
                 var child = child
                 child.key = child.key.map { "\(segment).\($0)" } ?? segment

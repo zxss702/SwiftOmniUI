@@ -11,7 +11,30 @@
 import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
+private final class NodeReads {
+    var count = 0
+}
+
+private struct CountedNodeView: View {
+    let reads: NodeReads
+
+    var node: Node {
+        reads.count += 1
+        return Text("Counted").node
+    }
+}
+
 @MainActor final class BuilderTests: XCTestCase {
+    func testAStatementIsDescribedOncePerBuild() {
+        let reads = NodeReads()
+        let patch = Renders().render(VStack {
+            CountedNodeView(reads: reads)
+            Text("Sibling")
+        }.node)
+        XCTAssertEqual(reads.count, 1, "builder classification and later tuple expansion share one node")
+        XCTAssertEqual(patch.children.compactMap { $0.props[.text]?.string }, ["Counted", "Sibling"])
+    }
+
     // MARK: - Reading a patch
 
     /// The first patch describing an element of this type, at any depth.

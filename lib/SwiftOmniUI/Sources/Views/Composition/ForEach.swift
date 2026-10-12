@@ -33,12 +33,13 @@ public struct ForEach<Items: RandomAccessCollection, Id: Hashable, Content: View
     /// The row each item builds, kept and run on asking.
     private let content: (Items.Element) -> Content
 
-    /// One view per item, each wearing its item's identity - a fragment whose
-    /// children the differ splices into the parent element's list.
+    /// A fragment retaining the rows until a container asks for them. Reading the
+    /// node to apply a modifier does not execute the row closure.
     public var node: Node {
-        Node(type: .fragment, children: items.map { item in
-            Identified(identity: String(describing: item[keyPath: identity]), element: content(item)).node
-        })
+        var node = Node(type: .fragment)
+        node.lazyContent = .rows(self)
+        node.producer = { self.lazyChildren }
+        return node
     }
 
     /// One view per item, the item its identity.
@@ -98,7 +99,11 @@ extension ForEach where Items.Element: Identifiable, Items.Element.ID == Id {
 }
 
 extension ForEach: LazyRows {
-    var lazyChildren: [Node] { node.asChildren }
+    var lazyChildren: [Node] {
+        items.flatMap { item in
+            Identified(identity: String(describing: item[keyPath: identity]), element: content(item)).node.asChildren
+        }
+    }
 
     var lazyRowCount: Int { items.count }
 
@@ -133,6 +138,7 @@ private struct KeyedRow: Element {
     /// its children's, since the fragment splices away.
     var node: Node {
         var node = element.node
+        if node.type == .fragment { node.materialize() }
 
         guard node.type == .fragment else {
             if node.id == nil {
@@ -172,6 +178,7 @@ struct Identified: Element {
     /// since the fragment itself splices away.
     var node: Node {
         var node = element.node
+        if node.type == .fragment { node.materialize() }
 
         guard node.type == .fragment else {
             if node.id == nil {

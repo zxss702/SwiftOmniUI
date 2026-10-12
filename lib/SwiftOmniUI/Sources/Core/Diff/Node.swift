@@ -287,11 +287,20 @@ public struct Node {
     /// Design: docs/design/core/identity-and-diffing.md#containers-run-their-own-content
     var producer: (() -> [Node])?
 
+    /// A transparent fragment's content before it is expanded. Node modifiers keep this
+    /// source, so a lazy container can still ask for individual rows through them.
+    enum LazyContent {
+        case rows(any LazyRows)
+        case elements([Element])
+    }
+    var lazyContent: LazyContent?
+
     /// Only this state changing can reuse a lazy container's prepared source.
     var lazyWindow: ObjectIdentifier?
 
     /// Runs the producer, if pending, filing its nodes ahead of the slots. Idempotent.
     mutating func materialize() {
+        lazyContent = nil
         if let make = producer {
             producer = nil
             children = make() + children

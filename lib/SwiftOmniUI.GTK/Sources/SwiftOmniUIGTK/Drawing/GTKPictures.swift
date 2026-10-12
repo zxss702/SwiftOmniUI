@@ -15,14 +15,26 @@ enum GTKPictures {
     static var folders = besideExecutable()
 
     /// The pixels of the picture `name` names: premultiplied RGBA rows as `PicturePixels` hands back; nil for no
-    /// picture, or one the platform's loaders do not read - an SVG with no loader installed.
+    /// picture, or one the platform's loaders do not read - an SVG with no loader installed. A pixbuf's bytes
+    /// are RGB, plus a straight alpha where it has one; the readback premultiplies.
     static func pixels(of name: String) -> PicturePixels? {
-        guard let path = path(of: name), let texture = gdk_texture_new_from_filename(path, nil) else { return nil }
-        defer { g_object_unref(UnsafeMutableRawPointer(texture)) }
-        let width = Int(gdk_texture_get_width(texture)), height = Int(gdk_texture_get_height(texture))
-        guard width > 0, height > 0 else { return nil }
+        guard let path = path(of: name), let pixbuf = gdk_pixbuf_new_from_file(path, nil) else { return nil }
+        defer { g_object_unref(UnsafeMutableRawPointer(pixbuf)) }
+        let width = Int(gdk_pixbuf_get_width(pixbuf)), height = Int(gdk_pixbuf_get_height(pixbuf)),
+            channels = Int(gdk_pixbuf_get_n_channels(pixbuf)), stride = Int(gdk_pixbuf_get_rowstride(pixbuf))
+        guard width > 0, height > 0, channels >= 3, let data = gdk_pixbuf_get_pixels(pixbuf)
+        else { return nil }
         var rgba = [UInt8](repeating: 0, count: width * height * 4)
-        gdk_texture_download(texture, &rgba, gsize(width * 4))
+        for y in 0..<height {
+            for x in 0..<width {
+                let source = y * stride + x * channels, at = (y * width + x) * 4
+                let alpha = channels == 4 ? Int(data[source + 3]) : 255
+                rgba[at] = UInt8(Int(data[source]) * alpha / 255)
+                rgba[at + 1] = UInt8(Int(data[source + 1]) * alpha / 255)
+                rgba[at + 2] = UInt8(Int(data[source + 2]) * alpha / 255)
+                rgba[at + 3] = UInt8(alpha)
+            }
+        }
         return PicturePixels(width: width, height: height, rgba: rgba)
     }
 

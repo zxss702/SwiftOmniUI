@@ -8,9 +8,130 @@ import SwiftOmniUIConformance
 import XCTest
 import CSwiftOmniUIGTK
 
+/// The modified source mirrors a file tree beside an ordinary settings card.
+@MainActor private final class ModifiedLazyBuilds {
+    var numbers: Set<Int> = []
+    var rows: [Int: ModifiedLazyInputRow] = [:]
+}
+
+private struct ModifiedLazyInputRow: View {
+    let number: Int
+    @State var words: String
+    @FocusState var focused: Bool
+
+    init(number: Int) {
+        self.number = number
+        _words = State(wrappedValue: "Row \(number)")
+    }
+
+    var body: some View {
+        TextField("", text: $words)
+            .focused($focused)
+            .frame(height: 40)
+            .id("row-\(number)")
+    }
+}
+
+private struct ModifiedLazyPage: View {
+    let items: [Int]
+    let builds: ModifiedLazyBuilds
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                Text("Settings")
+                VStack(spacing: 4) {
+                    ForEach(0..<2) { group in
+                        Picker("Model \(group)", selection: Binding(get: { 0 }, set: { _ in })) {
+                            ForEach(0..<12) { option in Text("Option \(option)").tag(option) }
+                                .transition(.opacity)
+                        }
+                    }
+                }
+                .frame(height: 64)
+                ForEach(items) { number in
+                    builds.numbers.insert(number)
+                    let row = ModifiedLazyInputRow(number: number)
+                    builds.rows[number] = row
+                    return row
+                }
+                .transition(.blur.combined(with: .offset(y: -48)))
+            }
+            .padding(8)
+        }
+        .frame(width: 320, height: 320)
+    }
+}
+
 /// A `LazyVStack` on GTK answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class GTKLazyTests: XCTestCase {
+    func testModifiedSourcesStayWindowedAcrossRepeatedPageSwitches() throws {
+        try onUIThread {
+            let showing = State(wrappedValue: true)
+            let builds = ModifiedLazyBuilds()
+            let host = GTKRenderer.running(reducesMotion: true) {
+                if showing.wrappedValue {
+                    ModifiedLazyPage(items: Array(0..<10_000), builds: builds)
+                } else {
+                    Text("Other page")
+                }
+            }
+            for _ in 0..<8 { host.step() }
+            for visit in 0..<3 {
+                if visit > 0 {
+                    showing.wrappedValue = false
+                    for _ in 0..<8 { host.step() }
+                    XCTAssertTrue(host.views(GTKTextFieldView.self).isEmpty)
+                    builds.numbers.removeAll()
+                    showing.wrappedValue = true
+                    for _ in 0..<8 { host.step() }
+                }
+                XCTAssertFalse(builds.numbers.isEmpty)
+                XCTAssertLessThan(builds.numbers.count, 80, "each visit builds a viewport, not ten thousand rows")
+                XCTAssertEqual(host.views(GTKPickerView.self).count, 2, "ordinary grouped controls still expand")
+                let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
+                XCTAssertEqual(lazy.cells.identities.count, 10_002)
+                XCTAssertLessThan(lazy.mounted.count, 80)
+                let work = [lazy.cells.requests, lazy.cells.measurements]
+                for _ in 0..<4 { host.step() }
+                XCTAssertEqual([lazy.cells.requests, lazy.cells.measurements], work, "idle layout reuses the window")
+            }
+        }
+    }
+
+    func testModifiedSourceUpdatesKeepNativeInputStateAndFocus() throws {
+        try onUIThread {
+            let original = Array(0..<10_000)
+            let items = State(wrappedValue: original)
+            let builds = ModifiedLazyBuilds()
+            let host = GTKRenderer.running(reducesMotion: true) {
+                ModifiedLazyPage(items: items.wrappedValue, builds: builds)
+            }
+            for _ in 0..<8 { host.step() }
+            let field = try XCTUnwrap(host.views(GTKTextFieldView.self).first { $0.text == "Row 1" })
+            XCTAssertNotEqual(gtk_widget_grab_focus(field.widget), 0)
+            host.settle { builds.rows[1]?.focused == true }
+            field.type("Edited")
+            for _ in 0..<8 { host.step() }
+            XCTAssertEqual(builds.rows[1]?.words, "Edited")
+
+            for changed in [[0, 1, 10_000, 10_001] + Array(2..<10_000), original, [0, 2, 1] + Array(3..<10_000)] {
+                builds.numbers.removeAll()
+                items.wrappedValue = changed
+                for _ in 0..<8 { host.step() }
+                XCTAssertLessThan(builds.numbers.count, 80, "updates do not build the offscreen source")
+                XCTAssertTrue(host.views(GTKTextFieldView.self).contains { $0 === field })
+                XCTAssertEqual(field.text, "Edited")
+                XCTAssertEqual(builds.rows[1]?.words, "Edited")
+                XCTAssertEqual(builds.rows[1]?.focused, true)
+                let root = try XCTUnwrap(gtk_widget_get_root(field.widget))
+                let focused = try XCTUnwrap(gtk_root_get_focus(root))
+                XCTAssertTrue(focused == field.widget || gtk_widget_is_ancestor(focused, field.widget) != 0)
+            }
+        }
+    }
+
     func testAddingToAnEmptyLazyStackRunsTheInsertionTransition() throws {
         try onUIThread {
             let clock = TestClock()

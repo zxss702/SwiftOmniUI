@@ -295,6 +295,7 @@ extension Node {
         /// root - or onto each of them, when the body is a fragment of several.
         func expand(over written: Node) -> Node {
             var node = build()
+            if node.type == .fragment { node.materialize() }
             if node.type == .fragment, node.children.count > 1, written.lazyIdentity != nil,
                let stack = written.props[.lazyRowStack]?.numbers, stack.count == 2 {
                 let children = node.asChildren
@@ -473,9 +474,11 @@ extension Node {
     var asChildren: [Node] {
         guard type == .fragment else { return [self] }
 
-        return children.flatMap { child -> [Node] in
+        var fragment = self
+        fragment.materialize()
+        return fragment.children.flatMap { child -> [Node] in
             var child = child
-            child.absorbFragmentWrites(of: self)
+            child.absorbFragmentWrites(of: fragment)
             return child.asChildren
         }
     }

@@ -15,6 +15,21 @@ private final class Built {
     var numbers: [Int: Int] = [:]
     var appeared: [Int] = []
     var disappeared: [Int] = []
+    var rows: [Int: OwnedLazyRow] = [:]
+}
+
+private final class LazyRowContext {
+    let prefix: String
+    init(_ prefix: String) { self.prefix = prefix }
+}
+
+private struct OwnedLazyRow: View {
+    let number: Int
+    @State var counter = 0
+    @FocusState var focused: Bool
+    @Environment private var context: LazyRowContext?
+
+    var body: some View { Text("\(context?.prefix ?? "missing"):\(number):\(counter):\(focused)") }
 }
 
 private struct CountedLazyIdentity: Hashable, CustomStringConvertible {
@@ -65,6 +80,194 @@ private struct LazyPage: View {
         let handler = try XCTUnwrap(list.events?[.realizedChanged], "the lazy stack hears no realizedChanged")
         renders.fire(handler, with: [.strings(identities)])
         return renders.revisit(changed: Renderer.shared.pendingChanges)
+    }
+
+    func testModifiedSourcesBuildOnlyRequestedRowsInEveryLazyContainer() throws {
+        for type in [NodeType.lazyVStack, .lazyHStack, .lazyVGrid, .lazyHGrid] {
+            let built = Built()
+            let renders = Renders()
+            let page = LazyPage {
+                let content = ForEach(0..<10_000) { number in
+                    built.numbers[number, default: 0] += 1
+                    return OwnedLazyRow(number: number)
+                }
+                .transition(.blur.combined(with: .offset(y: -48)))
+                .opacity(0.75)
+                .environment(LazyRowContext("configured"))
+                switch type {
+                case .lazyVStack: LazyVStack { content }
+                case .lazyHStack: LazyHStack { content }
+                case .lazyVGrid: LazyVGrid(columns: [GridItem()]) { content }
+                default: LazyHGrid(rows: [GridItem()]) { content }
+                }
+            }
+            let container = try lazy(type, in: renders.render(page.node))
+            let ids = try XCTUnwrap(container.props[.items]?.strings)
+            XCTAssertEqual(ids.count, 10_000)
+            XCTAssertTrue(built.numbers.isEmpty, "node modifiers must not execute offscreen row closures")
+
+            let shown = try lazy(type, in: realize([ids[20], ids[21]], in: renders, lazy: container))
+            XCTAssertEqual(Set(built.numbers.keys), [20, 21])
+            for child in shown.children {
+                XCTAssertEqual(child.props[.opacity], .number(0.75))
+                XCTAssertNotNil(child.props[.transition])
+                XCTAssertTrue(child.props[.text]?.string?.hasPrefix("configured:") == true)
+            }
+        }
+    }
+
+    func testModifiedGroupsAndBranchesKeepSourcesAndStatementKeys() throws {
+        let built = Built()
+        let renders = Renders()
+        let container = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack {
+                Text("Before")
+                Group {
+                    Text("Section")
+                    if true {
+                        ForEach(0..<10_000) { number in
+                            built.numbers[number, default: 0] += 1
+                            return Text("Row \(number)").id("row-\(number)")
+                        }
+                        .transition(.opacity)
+                    }
+                }
+                .opacity(0.5)
+                Text("After")
+            }
+        }.node))
+        let ids = try XCTUnwrap(container.props[.items]?.strings)
+        XCTAssertEqual(ids.count, 10_003)
+        XCTAssertEqual(ids.first, "#0")
+        XCTAssertEqual(ids.last, "#2")
+        XCTAssertTrue(ids[2].hasPrefix("1."), "group rows keep their statement and branch scope")
+        XCTAssertTrue(built.numbers.isEmpty)
+
+        let shown = try lazy(.lazyVStack, in: realize([ids[0], ids[1], ids[44], ids.last!], in: renders, lazy: container))
+        XCTAssertEqual(Set(built.numbers.keys), [42])
+        let row = try XCTUnwrap(shown.child("row-42"))
+        XCTAssertEqual(row.lazyIdentity, ids[44])
+        XCTAssertEqual(row.props[.opacity], .number(0.5))
+        XCTAssertNotNil(row.props[.transition])
+        XCTAssertEqual(shown.children.compactMap { $0.props[.text]?.string }, ["Before", "Section", "Row 42", "After"])
+    }
+
+    func testModifiedSourcesKeepOwnedStateAndFocusDuringExpansionAndReordering() throws {
+        let built = Built()
+        let renders = Renders()
+        func tree(_ items: [Int], version: Int) -> Node {
+            LazyPage {
+                LazyVStack {
+                    Text("Header")
+                    ForEach(items) { number in
+                        built.numbers[number, default: 0] += 1
+                        let row = OwnedLazyRow(number: number)
+                        built.rows[number] = row
+                        return row
+                    }
+                    .environment(LazyRowContext("v\(version)"))
+                    .transition(.opacity)
+                }
+            }.node
+        }
+        let items = Array(0..<10_000)
+        let container = try lazy(.lazyVStack, in: renders.render(tree(items, version: 0)))
+        let ids = try XCTUnwrap(container.props[.items]?.strings)
+        _ = try realize([ids[1], ids[2]], in: renders, lazy: container)
+        let first = try XCTUnwrap(built.rows[1])
+        first.counter = 7
+        first.focused = true
+
+        let changes = [[0, 1, 10_000, 10_001] + Array(2..<10_000), items, [0, 2, 1] + Array(3..<10_000)]
+        for (version, changedItems) in changes.enumerated() {
+            let updated = try lazy(.lazyVStack, in: renders.render(
+                tree(changedItems, version: version + 1), changed: Renderer.shared.pendingChanges))
+            let retained = try XCTUnwrap(built.rows[1])
+            XCTAssertEqual(retained.counter, 7)
+            XCTAssertTrue(retained.focused)
+            XCTAssertEqual(Set(built.numbers.keys), [0, 1], "expansion and moves do not execute offscreen builders")
+            let row = try XCTUnwrap(updated.child(ids[2]))
+            XCTAssertFalse(row.replace)
+            XCTAssertEqual(row.props[.text], .string("v\(version + 1):1:7:true"))
+        }
+    }
+
+    func testModifiedSourcesReuseIdentityIndexesButRefreshRowsAndModifiers() throws {
+        let built = Built()
+        let items = (0..<10_000).map { CountedLazyIdentity(value: $0, built: built) }
+        let renders = Renders()
+        var ids: [String] = []
+        for version in 0..<3 {
+            let before = built.count
+            let container = try lazy(.lazyVStack, in: renders.render(LazyPage {
+                LazyVStack {
+                    ForEach(items) { item in Text("v\(version):\(item.value)") }
+                        .opacity(version == 0 ? 1 : 0.5)
+                        .transition(.opacity)
+                }
+            }.node))
+            if version == 0 {
+                ids = try XCTUnwrap(container.props[.items]?.strings)
+                XCTAssertEqual(built.count, 10_000)
+                _ = try realize([ids[3], ids[4]], in: renders, lazy: container)
+            } else {
+                XCTAssertEqual(built.count - before, 2, "parent updates reuse the prepared identity index")
+                XCTAssertEqual(container.child(ids[3])?.props[.text], .string("v\(version):3"))
+                if version == 1 { XCTAssertEqual(container.child(ids[3])?.props[.opacity], .number(0.5)) }
+            }
+        }
+    }
+
+    func testOrdinaryContainersAndPickersStillExpandModifiedSources() throws {
+        let built = Built()
+        let renders = Renders()
+        let stack = renders.render(VStack {
+            ForEach([3, 1, 2]) { number in
+                built.numbers[number, default: 0] += 1
+                return Text("Row \(number)")
+            }
+            .opacity(0.5)
+            .transition(.opacity)
+        }.node)
+        XCTAssertEqual(stack.children.compactMap { $0.props[.text]?.string }, ["Row 3", "Row 1", "Row 2"])
+        XCTAssertEqual(built.numbers, [3: 1, 1: 1, 2: 1])
+        for row in stack.children {
+            XCTAssertEqual(row.props[.opacity], .number(0.5))
+            XCTAssertNotNil(row.props[.transition])
+        }
+
+        let selection = State(wrappedValue: 1)
+        let picker = Picker("Choice", selection: selection.projectedValue) {
+            ForEach([3, 1, 2]) { number in Text("Choice \(number)").tag(number) }
+                .transition(.opacity)
+        }
+        let pickerRenders = Renders()
+        let patch = pickerRenders.render(picker.node)
+        XCTAssertEqual(patch.props[.options], .strings(["Choice 3", "Choice 1", "Choice 2"]))
+        XCTAssertEqual(patch.props[.selectedIndex], .number(1))
+        let changed = try XCTUnwrap(patch.events?[.selectedIndexChanged])
+        pickerRenders.fire(changed, with: [.number(2)])
+        XCTAssertEqual(selection.wrappedValue, 2, "tags still write the selected value back")
+    }
+
+    func testDeferredFragmentsKeepEveryChildOfACompositeRow() {
+        let patch = Renders().render(VStack {
+            Group {
+                ForEach([0, 1]) { number in
+                    Text("Heading \(number)")
+                    Text("Detail \(number)")
+                }
+                .transition(.opacity)
+            }
+            .opacity(0.5)
+        }.node)
+        XCTAssertEqual(patch.children.compactMap { $0.props[.text]?.string },
+                       ["Heading 0", "Detail 0", "Heading 1", "Detail 1"])
+        XCTAssertEqual(Set(patch.children.map(\.id)).count, 4, "composite rows keep distinct child paths")
+        for child in patch.children {
+            XCTAssertEqual(child.props[.opacity], .number(0.5))
+            XCTAssertNotNil(child.props[.transition])
+        }
     }
 
     func testLazyDefaultsRespectFramesAndAlignmentInsideBuilderFragments() throws {

@@ -19,9 +19,14 @@ public struct TupleView: View {
     /// elements where it has them, its node where it does not.
     private var stored: Node?
 
-    /// The children, each a node - a fragment among them already unwrapped.
+    /// A transparent fragment that keeps its statements until a container asks for them.
     public var node: Node {
-        stored ?? Node(type: .fragment, children: (elements ?? []).flatMap { $0.node.asChildren })
+        if let stored { return stored }
+        let elements = elements ?? []
+        var node = Node(type: .fragment)
+        node.lazyContent = .elements(elements)
+        node.producer = { elements.flatMap { $0.node.asChildren } }
+        return node
     }
 
     /// A tuple view of the statements' own views.
@@ -37,8 +42,12 @@ public struct TupleView: View {
 
     /// `element` under `segment`'s path, its laziness kept.
     static func keyed(_ segment: String, _ element: Element) -> Element {
-        (element as? any LazyRows).map { LazyKeyed(segment: segment, rows: $0) }
-            ?? Keyed(segment: segment, raw: element)
+        if let rows = element as? any LazyRows { return LazyKeyed(segment: segment, rows: rows) }
+        let node = element.node
+        if let elements = node.lazyElements {
+            return TupleView(elements.map { keyed(segment, $0) })
+        }
+        return Keyed(segment: segment, raw: element, described: node)
     }
 
     /// One more segment on each child's path: the differ knows the child by
@@ -49,6 +58,10 @@ public struct TupleView: View {
         }
 
         var tagged = node
+        if let elements = tagged.lazyElements {
+            return TupleView(elements.map { Self.keyed(segment, $0) })
+        }
+        tagged.materialize()
         tagged.children = tagged.children.map { child in
             var child = child
             child.key = child.key.map { "\(segment).\($0)" } ?? segment
@@ -81,7 +94,8 @@ public struct Group<Content: View>: View {
 
     /// The group's views.
     public init(@ViewBuilder content: () -> Content) {
-        node = Node(type: .fragment, children: content().node.asChildren)
+        let content = content().node
+        node = content.type == .fragment ? content : Node(type: .fragment, children: [content])
     }
 }
 

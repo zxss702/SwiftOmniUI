@@ -56,7 +56,11 @@ public enum ViewBuilder {
     }
 
     /// The statements of the closure, in the order they are written, each
-    /// keyed by its statement's number whatever the others produce.
+    /// keyed by its statement's number whatever the others produce. Disfavored
+    /// next to the single-statement overload so a lone view keeps its own type
+    /// - a `Color` written alone binds as `Color`, not `TupleView`, letting
+    /// builder parameters constrain to `ShapeStyle` and the like.
+    @_disfavoredOverload
     public static func buildBlock(_ components: (any View)...) -> TupleView {
         let components = Carry(components)
         return onMain {
@@ -82,6 +86,13 @@ public enum ViewBuilder {
         return onMain { component.value.map { tagged("some", $0) } ?? TupleView([]) }
     }
 
+    /// The same, its body having produced a bare `any View` - an existential
+    /// no `Content: View` can hold.
+    public static func buildOptional(_ component: (any View)?) -> TupleView {
+        let component = Carry(component)
+        return onMain { component.value.map { tagged("some", $0) } ?? TupleView([]) }
+    }
+
     /// The `if` branch of an if/else.
     public static func buildEither(first component: TupleView) -> TupleView {
         let component = Carry(component)
@@ -90,6 +101,12 @@ public enum ViewBuilder {
 
     /// The same, the branch having built a lone view rather than a tuple.
     public static func buildEither<Content: View>(first component: Content) -> TupleView {
+        let component = Carry(component)
+        return onMain { tagged("if", component.value) }
+    }
+
+    /// The same, the branch having produced a bare `any View`.
+    public static func buildEither(first component: any View) -> TupleView {
         let component = Carry(component)
         return onMain { tagged("if", component.value) }
     }
@@ -107,13 +124,25 @@ public enum ViewBuilder {
         return onMain { tagged("else", component.value) }
     }
 
+    /// The same, the branch having produced a bare `any View`.
+    public static func buildEither(second component: any View) -> TupleView {
+        let component = Carry(component)
+        return onMain { tagged("else", component.value) }
+    }
+
     /// A `for` statement's turns, each keyed by its turn number.
     public static func buildArray(_ components: [TupleView]) -> TupleView {
         let components = Carry(components)
         return onMain { TupleView(components.value.enumerated().flatMap { turn in
-            let segment = String(turn.offset)
-            return turn.element.lazyElements?.map { TupleView.keyed(segment, $0) }
-                ?? turn.element.node.asChildren.map { Keyed(segment: segment, raw: $0) }
+            slice(turn.offset, turn.element)
+        }) }
+    }
+
+    /// The same, its turns having each produced a bare `any View`.
+    public static func buildArray(_ components: [any View]) -> TupleView {
+        let components = Carry(components)
+        return onMain { TupleView(components.value.enumerated().flatMap {
+            at($0.offset, $0.element)
         }) }
     }
 
@@ -140,6 +169,12 @@ public enum ViewBuilder {
         return onMain { tagged("available", component.value) }
     }
 
+    /// The same, its body having produced a bare `any View`.
+    public static func buildLimitedAvailability(_ component: any View) -> TupleView {
+        let component = Carry(component)
+        return onMain { tagged("available", component.value) }
+    }
+
     /// Any view under `segment`'s path - what the conditional builders write
     /// for a branch that produced a lone view.
     @MainActor private static func tagged(_ segment: String, _ view: any View) -> TupleView {
@@ -147,7 +182,11 @@ public enum ViewBuilder {
         if let rows = view as? any LazyRows {
             return TupleView([LazyKeyed(segment: segment, rows: rows)])
         }
-        return TupleView(view.node.asChildren.map { Keyed(segment: segment, raw: $0) })
+        let node = view.node
+        if let elements = node.lazyElements {
+            return TupleView(elements.map { TupleView.keyed(segment, $0) })
+        }
+        return TupleView(node.asChildren.map { Keyed(segment: segment, raw: $0) })
     }
 
     /// The views written under one statement, keyed by the statement's number.
@@ -177,9 +216,13 @@ public enum ViewBuilder {
     /// the view, not just its node - its nodes otherwise, each keyed by its
     /// own number.
     @MainActor private static func leaf(_ segment: String, _ view: any View) -> [Element] {
-        let nodes = view.node.asChildren
-        if view.node.type != .fragment || nodes.isEmpty {
-            return [Keyed(segment: segment, raw: view)]
+        let node = view.node
+        if let elements = node.lazyElements {
+            return elements.map { TupleView.keyed(segment, $0) }
+        }
+        let nodes = node.asChildren
+        if node.type != .fragment || nodes.isEmpty {
+            return [Keyed(segment: segment, raw: view, described: node)]
         }
         guard nodes.count > 1 else {
             return nodes.map { Keyed(segment: segment, raw: $0) }
@@ -197,9 +240,19 @@ struct Keyed: Element {
     /// The element the statement produced.
     let raw: Element
 
+    /// A builder has already described this statement. Keep the original view for
+    /// label readers, but do not repeat its node getter or state scan.
+    private let described: Node?
+
+    init(segment: String, raw: Element, described: Node? = nil) {
+        self.segment = segment
+        self.raw = raw
+        self.described = described
+    }
+
     /// The same node, with the segment on the front of its path.
     var node: Node {
-        var node = raw.node
+        var node = described ?? raw.node
         node.key = node.key.map { "\(segment).\($0)" } ?? segment
         return node
     }
