@@ -22,6 +22,8 @@ extension WinUIElement {
     var standsInToolbar: Bool {
         var ancestor = element.parent
         while let each = ancestor {
+            // A popover's card is no part of the bar its anchor stands on.
+            if each.type == .popover { return false }
             if each.type == .toolbarItems || each.type == .titleView { return true }
             ancestor = each.parent
         }
@@ -69,6 +71,7 @@ extension WinUIElement {
             reporting: { [weak self] property, event, value in self?.report(property, event, value) }
         ) {
             if let scroll = registered as? WinUIScrollView { follow(scroll) }
+            if let popover = registered as? WinUIPopoverView { popover.anchor = { [weak self] in self?.popoverAnchor } }
             return registered
         }
         guard !NodeType.viewlessTypes.contains(type) else { return nil }
@@ -144,6 +147,8 @@ extension WinUIElement {
             }
             (each.view as? WinUILayoutView)?.forgetMeasurements()
             each.view?.invalidateMeasure()
+            // A popover's card is its own room: nothing its content asks reaches the layout its anchor stands in.
+            if each.type == .popover { break }
             element = each.parent
         }
 
@@ -169,5 +174,14 @@ extension WinUIElement {
     /// The view of this element or the nearest one above it.
     var nearestView: WinUIView? {
         view ?? parent?.nearestView
+    }
+
+    /// The view a popover's card stands beside: what the element it hangs off shows - that element's view, else
+    /// the first view of its content, else the nearest view above it.
+    var popoverAnchor: WinUIView? {
+        guard let parent else { return nil }
+        if let view = parent.view { return view }
+        return parent.element.arrangedChildren.lazy.compactMap(\.presentingElement).first?.winUI.view
+            ?? parent.nearestView
     }
 }

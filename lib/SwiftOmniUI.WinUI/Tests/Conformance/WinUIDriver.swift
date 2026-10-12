@@ -112,6 +112,7 @@ final class WinUIDriver: HostDriver {
         case (.close, let picker as WinUIPickerView): swiftomniui_winui_picker_open_as_user(picker.handle, false)
         case (.open, let picker as WinUIDatePickerView): swiftomniui_winui_date_set_open(picker.handle, true)
         case (.close, let picker as WinUIDatePickerView): swiftomniui_winui_date_set_open(picker.handle, false)
+        case (.close, let popover as WinUIPopoverView): popover.dismissAsUser()
         case (.pickDate(let day), let picker as WinUIDatePickerView):
             swiftomniui_winui_date_pick_as_user(picker.handle, Int32(day.year), Int32(day.month), Int32(day.day))
         case (.pickTime(let time), let picker as WinUITimePickerView):

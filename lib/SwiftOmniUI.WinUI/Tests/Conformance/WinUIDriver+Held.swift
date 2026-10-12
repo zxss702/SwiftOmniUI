@@ -301,6 +301,8 @@ extension WinUIDriver {
         case ("title", let picker as WinUIPickerView): return .string(try read(picker, "placeholder"))
         case ("isOpen", let picker as WinUIPickerView): return picker.isOpen.propValue
         case ("isOpen", let picker as WinUIDatePickerView): return picker.isOpen.propValue
+        case ("isOpen", let popover as WinUIPopoverView): return popover.showsCard.propValue
+        case ("arrowEdge", let popover as WinUIPopoverView): return popover.edge.propValue
         case ("date", let picker as WinUIDatePickerView): return picker.date?.propValue
         case ("minimumDate", let picker as WinUIDatePickerView): return Self.day(try read(picker, "minimumDate"))?.propValue
         case ("maximumDate", let picker as WinUIDatePickerView): return Self.day(try read(picker, "maximumDate"))?.propValue

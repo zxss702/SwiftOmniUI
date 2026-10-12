@@ -192,7 +192,9 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_toolbar_button_make(int64_t vi
 
 extern "C" void swiftomniui_winui_button_set_on(SwiftOmniUIObjectRef handle, int32_t toggleable, int32_t on) {
     try {
-        auto button = borrow<primitives::ToggleButton>(handle);
+        // Asked for, not borrowed: the bar's button is an AppBarToggleButton, whose default interface is not
+        // ToggleButton's - IsChecked read through it calls another method of its table.
+        auto button = as<primitives::ToggleButton>(handle);
         // The mark of a staying-pressed button, read by the checks above.
         button.Tag(winrt::box_value(toggleable != 0));
         auto want = toggleable != 0 && on != 0;
@@ -209,7 +211,7 @@ extern "C" void swiftomniui_winui_button_set_look(
     double underPointer, double pressed
 ) {
     try {
-        auto button = borrow<primitives::ToggleButton>(handle);
+        auto button = as<primitives::ToggleButton>(handle);
         auto resources = button.Resources();
         // Under the pointer and pressed, the fill is drawn a little fainter each time, as WinUI's own buttons draw it.
         auto fill = brush(background);
@@ -241,7 +243,7 @@ extern "C" void swiftomniui_winui_button_set_look(
 
 extern "C" void swiftomniui_winui_button_set_face(SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef content) {
     try {
-        borrow<controls::ContentControl>(handle).Content(content ? as<xaml::UIElement>(content) : nullptr);
+        as<controls::ContentControl>(handle).Content(content ? as<xaml::UIElement>(content) : nullptr);
     } catch (...) { report("giving a button its label view"); }
 }
 
@@ -279,7 +281,7 @@ extern "C" void swiftomniui_winui_toolbar_button_set_look(SwiftOmniUIObjectRef h
 
 extern "C" void swiftomniui_winui_button_set_style(SwiftOmniUIObjectRef handle, int kind) {
     try {
-        auto button = borrow<primitives::ToggleButton>(handle);
+        auto button = as<primitives::ToggleButton>(handle);
         auto resources = button.Resources();
         // The kind is logical: the button is a toggle at heart, whose template reads
         // the `ToggleButton*` look keys, so each kind writes the look directly -
@@ -316,7 +318,7 @@ extern "C" void swiftomniui_winui_button_set_style(SwiftOmniUIObjectRef handle, 
 extern "C" void swiftomniui_winui_button_invoke(SwiftOmniUIObjectRef handle) {
     try {
         pattern<provider::IToggleProvider>(
-            borrow<primitives::ToggleButton>(handle), PatternInterface::Toggle).Toggle();
+            as<primitives::ToggleButton>(handle), PatternInterface::Toggle).Toggle();
     } catch (...) {
         report("pressing a button");
     }
@@ -324,7 +326,7 @@ extern "C" void swiftomniui_winui_button_invoke(SwiftOmniUIObjectRef handle) {
 
 extern "C" void swiftomniui_winui_button_set_shortcut(SwiftOmniUIObjectRef handle, int32_t key, int32_t modifiers) {
     try {
-        auto button = borrow<primitives::ToggleButton>(handle);
+        auto button = as<primitives::ToggleButton>(handle);
         // No key takes the shortcut away; any other is a Windows virtual key
         // the Swift side chose, the modifiers its flags in the same order.
         auto accelerators = button.KeyboardAccelerators();

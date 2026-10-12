@@ -507,6 +507,16 @@ void swiftomniui_winui_window_set_overlay(SwiftOmniUIObjectRef window, SwiftOmni
 /// How many sheets a window shows - what a test reads.
 int32_t swiftomniui_winui_window_sheets(SwiftOmniUIObjectRef window);
 
+/// A popover: a `Flyout` whose content is the element `content` - the popover's own layout, sized as it says. Its
+/// closing, of the user's accord or the host's, told through `presented` as false under the number `view`.
+SwiftOmniUIObjectRef swiftomniui_winui_popover_make(int64_t view, SwiftOmniUIObjectRef content);
+/// Opens the popover beside `anchor`, on the edge `edge` names - `Edge`'s raw values - where there is room; an
+/// anchor not yet in its window, once it is.
+void swiftomniui_winui_popover_show(SwiftOmniUIObjectRef popover, SwiftOmniUIObjectRef anchor, int32_t edge);
+void swiftomniui_winui_popover_hide(SwiftOmniUIObjectRef popover);
+/// Whether the popover shows - what a test reads.
+bool swiftomniui_winui_popover_is_open(SwiftOmniUIObjectRef popover);
+
 /// A view's context menu: `count` entries, each `kinds`' 0 an item, 1 a separator, 2 a submenu opening, 3 it closing,
 /// with its caption, whether it can be chosen and the identifier automation finds it by (empty for none); an item's
 /// choice told through `menuChosen` by its place among the items. None takes the menu away.

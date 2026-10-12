@@ -84,6 +84,8 @@ extension WinUIElement {
 
     /// What this element gives the layout it stands in: its view, or the first view of an element drawn by its parent.
     var layoutItem: WinUILayoutItem? {
+        // A popover's card stands in no layout: its flyout holds it.
+        guard type != .popover else { return nil }
         guard let view else { return children.lazy.compactMap(\.layoutItem).first }
 
         var item = WinUILayoutItem(view: view, values: element.layoutValues, isShown: isShown)
