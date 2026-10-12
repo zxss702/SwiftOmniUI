@@ -250,13 +250,13 @@ extension Color {
             case .sRGB:
                 return (red, green, blue)
             case .sRGBLinear:
-                return (encoded(red), encoded(green), encoded(blue))
+                return (Self.encoded(red), Self.encoded(green), Self.encoded(blue))
             case .displayP3:
-                let (r, g, b) = (decoded(red), decoded(green), decoded(blue))
+                let (r, g, b) = (Self.decoded(red), Self.decoded(green), Self.decoded(blue))
                 return (
-                    encoded(1.2249402 * r - 0.2249404 * g),
-                    encoded(-0.0420569 * r + 1.0420571 * g),
-                    encoded(-0.0196376 * r - 0.0786361 * g + 1.0982735 * b))
+                    Self.encoded(1.2249402 * r - 0.2249404 * g),
+                    Self.encoded(-0.0420569 * r + 1.0420571 * g),
+                    Self.encoded(-0.0196376 * r - 0.0786361 * g + 1.0982735 * b))
             }
         }
 
