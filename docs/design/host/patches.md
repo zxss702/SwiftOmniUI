@@ -42,36 +42,8 @@ patch is read off no buffer, so its read time is nothing. While no inspector
 records there is no tally: each count is one test of a nil, and no clock is
 read.
 
-## What a runtime writes out
+## Runtime output
 
-Two switches in the process's environment make a runtime write text for
-whoever reads its log rather than its screen, on the standard error - which an
-Android runtime sends to logcat. `SWIFTOMNIUI_TALLY=1` writes the running totals:
-the messages applied, the elements they walked, made and kept, the core's
-renders, empty renders, refused writes and live elements (the core's tally),
-and the apply's average, worst and total time. The totals run from the start,
-so a run is read as the difference between two lines. A line is written after
-a message that stands alone - a third of a second after the one before it,
-which is what one action earns - and at most every tenth of a second in a
-burst, since writing after every message moves the timing it measures.
-`SWIFTOMNIUI_INSPECT=1` starts the inspector's recording with the tree and writes
-every pass once the host has reported on it, the way the inspector shows it.
-`DiagnosticText` reads both switches, keeps the totals and writes; the tree
-hands it each message's tally.
-
-The tally also writes `SwiftOmniUI timings:` lines for the turn, core render,
-patch application and window presentation. WinUI adds native view creation,
-native Measure calls, panel MeasureOverride, ArrangeOverride, effective
-viewport callbacks, window sizing and chrome measurement.
-WinUI also records native property application, synchronous image loading
-and additional SVG raster preparation as `winui.properties`,
-`winui.imageLoad` and `winui.imageDraw`.
-`winui.nativeApply` covers the complete native update, `winui.children` its
-child arrangements, and `winui.font` the native font application. These split
-view construction from the work that follows it in a large lazy patch.
-Those phases cover work outside patch application, including XAML's later layout passes. Each
-line contains cumulative call counts, outer call counts (`roots`), and the
-outer calls' average, worst and total time. Recursive calls of the same phase
-are counted but timed only once; different phases can contain each other, so
-their times must not be added. Lines are throttled to one per tenth of a
-second while work continues. With the tally disabled, no timing clock is read.
+Runtime logs report operational failures. Timings and render records remain
+in the interactive inspector; they are not written automatically. Temporary
+debug output belongs behind `#if DEBUG`, without runtime environment switches.

@@ -126,8 +126,7 @@ their places.
 
 A placed layout given no placement state places nothing: its views lie over
 one another, each across the whole layout, as a ZStack's children do when they
-name no area. It says so with a complaint, because the screen alone reads as a
-view that failed to draw.
+name no area.
 
 ## Bounded arithmetic
 
@@ -246,8 +245,8 @@ shows whatever is behind it, which in the wheel and the fan is the next card
 rather than the page; a shade darkens what is there, and the card in front
 wears none of it. With a shade the fade drops to a quarter: a card that only
 darkens reads as lit differently rather than as further away, and a little fade
-is what puts it behind. A strength out of range is held to 0...1 with a
-complaint rather than refused, so a gallery still being written keeps working.
+is what puts it behind. A strength out of range is held to 0...1 so the
+gallery keeps working.
 
 The wheel's turn is drawn flat, `ViewTransform.turn`, the same picture on every
 platform (modifiers.md, turning out of the screen plane).

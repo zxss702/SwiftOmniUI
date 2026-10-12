@@ -20,9 +20,8 @@
 # address - and what the browser keeps for it - stays the same, on every
 # interface of this machine, so a tablet on its network opens it too; a server this
 # script started for the application before is stopped first. Once the server
-# listens, <app-dir>/.build/web/server.json says where. Every SWIFTOMNIUI_ variable
-# of the calling shell - SWIFTOMNIUI_TALLY=1 - reaches the application as a
-# parameter of the page's address.
+# listens, <app-dir>/.build/web/server.json says where. SWIFTOMNIUI_ variables
+# of the calling shell reach the application as parameters of the page's address.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

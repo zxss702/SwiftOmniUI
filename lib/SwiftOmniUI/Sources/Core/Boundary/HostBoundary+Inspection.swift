@@ -7,9 +7,6 @@
     /// Whether an inspector records.
     public static var inspecting: Bool { Inspection.recording }
 
-    /// Every pass reported on since the last take, as text; the first take starts the recording for good.
-    public static func takeInspectionLog() -> String { Inspection.takeLog() }
-
     /// Tells the inspector what applying the message of `generation` cost: each scene's part by its key, in
     /// microseconds, then the whole - its time, the nodes it walked and the controls it had to build.
     @MainActor

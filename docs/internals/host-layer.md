@@ -549,12 +549,9 @@ and nothing more.
 - **`HostLog`** writes one line a message, begun by `SwiftOmniUI` and the host's
   name, to standard error, which nothing buffers; a platform whose log is its
   own is handed the lines. ([The log](../design/host/runtime.md#the-log))
-- **`DiagnosticText`** and **`RenderTally`** write the running tally
-  (`SWIFTOMNIUI_TALLY=1`) and every inspected pass (`SWIFTOMNIUI_INSPECT=1`) as text,
-  and count what applying one message costs. The mounted tree keeps them; the
-  host adds nothing.
-  ([What a message costs](../design/host/patches.md#what-a-message-costs),
-  [what a runtime writes out](../design/host/patches.md#what-a-runtime-writes-out))
+- **`RenderTally`** counts what applying one message costs while an inspector
+  records. The mounted tree reports it to the inspector without writing a log.
+  ([What a message costs](../design/host/patches.md#what-a-message-costs))
 
 ## Testing
 

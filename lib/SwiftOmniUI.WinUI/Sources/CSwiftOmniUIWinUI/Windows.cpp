@@ -174,7 +174,7 @@ extern "C" void swiftomniui_winui_window_set_overlay(SwiftOmniUIObjectRef handle
             layer = controls::Grid();
             layer.Tag(winrt::box_value(L"overlay"));
             controls::Grid::SetRow(layer, 3);
-            controls::Canvas::SetZIndex(layer, 1);
+            controls::Canvas::SetZIndex(layer, 3);
             children.Append(layer);
         }
         layer.Children().Clear();
@@ -182,6 +182,84 @@ extern "C" void swiftomniui_winui_window_set_overlay(SwiftOmniUIObjectRef handle
         else if (uint32_t index; children.IndexOf(layer, index)) children.RemoveAt(index);
     } catch (...) {
         report("laying the overlay over a window");
+    }
+}
+
+extern "C" void swiftomniui_winui_window_set_safe_area_bars(
+    SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef const *bars, int32_t count,
+    bool hasBackground, uint32_t background
+) {
+    try {
+        auto children = root(borrow<xaml::Window>(handle)).Children();
+        controls::Grid layer{nullptr};
+        for (auto const &child : children)
+            if (auto panel = child.try_as<controls::Grid>(); panel
+                && winrt::unbox_value_or<winrt::hstring>(panel.Tag(), L"") == L"safeAreaBars") layer = panel;
+        if (!layer && count == 0) return;
+        if (!layer) {
+            layer = controls::Grid();
+            layer.Tag(winrt::box_value(L"safeAreaBars"));
+            layer.VerticalAlignment(xaml::VerticalAlignment::Top);
+            controls::Grid::SetRow(layer, 3);
+            controls::Canvas::SetZIndex(layer, 1);
+            controls::StackPanel stack;
+            stack.Tag(winrt::box_value(L"safeAreaBarContent"));
+            layer.Children().Append(stack);
+            controls::Border edge;
+            edge.Tag(winrt::box_value(L"safeAreaBarEdge"));
+            edge.Height(1);
+            edge.VerticalAlignment(xaml::VerticalAlignment::Bottom);
+            edge.IsHitTestVisible(false);
+            edge.Opacity(0);
+            auto resources = xaml::Application::Current().Resources();
+            auto key = winrt::box_value(L"ControlStrokeColorDefaultBrush");
+            if (resources.HasKey(key)) edge.Background(resources.Lookup(key).try_as<xaml::Media::Brush>());
+            else edge.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{48, 128, 128, 128}));
+            layer.Children().Append(edge);
+            children.Append(layer);
+        }
+        // Match chrome's explicit background; an unsaid background stays
+        // transparent over the same window Mica surface as TitleBar.
+        if (hasBackground) {
+            winrt::Windows::UI::Color color{static_cast<uint8_t>(background >> 24),
+                static_cast<uint8_t>(background >> 16), static_cast<uint8_t>(background >> 8),
+                static_cast<uint8_t>(background)};
+            layer.Background(xaml::Media::SolidColorBrush(color));
+        } else {
+            layer.Background(nullptr);
+        }
+        auto held = layer.Children().GetAt(0).as<controls::StackPanel>().Children();
+        bool same = held.Size() == static_cast<uint32_t>(count);
+        for (int32_t index = 0; same && index < count; ++index)
+            same = held.GetAt(index) == as<xaml::UIElement>(bars[index]);
+        if (!same) {
+            held.Clear();
+            for (int32_t index = 0; index < count; ++index) held.Append(as<xaml::UIElement>(bars[index]));
+        }
+        if (count == 0) {
+            uint32_t index;
+            if (children.IndexOf(layer, index)) children.RemoveAt(index);
+        }
+    } catch (...) { report("hosting a page's safe area bars"); }
+}
+
+void swiftomniui::refreshSafeAreaScrollEdge(controls::ScrollView const &scroller) {
+    // A nested document has its own edge effects; it cannot change the
+    // page-level chrome. Walk native ancestors, never unrelated windows.
+    auto ancestor = xaml::Media::VisualTreeHelper::GetParent(scroller);
+    while (ancestor) {
+        if (ancestor.try_as<controls::ScrollView>() || ancestor.try_as<controls::ScrollViewer>()) return;
+        if (auto grid = ancestor.try_as<controls::Grid>()) {
+            for (auto const &child : grid.Children()) {
+                auto layer = child.try_as<controls::Grid>();
+                if (!layer || winrt::unbox_value_or<winrt::hstring>(layer.Tag(), L"") != L"safeAreaBars") continue;
+                auto edge = layer.Children().GetAt(1).as<controls::Border>();
+                auto opacity = scroller.VerticalOffset() > 0.5 ? 1.0 : 0.0;
+                if (edge.Opacity() != opacity) edge.Opacity(opacity);
+                return;
+            }
+        }
+        ancestor = xaml::Media::VisualTreeHelper::GetParent(ancestor);
     }
 }
 

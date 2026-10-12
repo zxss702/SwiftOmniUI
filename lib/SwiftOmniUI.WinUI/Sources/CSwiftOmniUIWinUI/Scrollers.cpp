@@ -10,15 +10,84 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <iterator>
 #include <unordered_map>
 #include <vector>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Numerics.h>
 
 using namespace swiftomniui;
 
 namespace {
+    using NativeScrollBar = xaml::Controls::Primitives::ScrollBar;
+    struct IndicatorMargin {
+        winrt::weak_ref<NativeScrollBar> bar;
+        xaml::Thickness original{}, applied{};
+    };
+    struct ScrollerInsets {
+        xaml::Thickness region{};
+        std::vector<IndicatorMargin> indicators;
+        bool pending = false;
+    };
+    std::unordered_map<void *, std::weak_ptr<ScrollerInsets>> insetStates;
+
+    bool sameMargin(xaml::Thickness const &a, xaml::Thickness const &b) {
+        return a.Left == b.Left && a.Top == b.Top && a.Right == b.Right && a.Bottom == b.Bottom;
+    }
+
+    void applyInsets(controls::ScrollView const &scroller, ScrollerInsets &state) {
+        auto content = scroller.Content().try_as<xaml::DependencyObject>();
+        state.indicators.erase(std::remove_if(state.indicators.begin(), state.indicators.end(),
+            [](auto const &entry) { return !entry.bar.get(); }), state.indicators.end());
+        std::vector<xaml::DependencyObject> pending{scroller};
+        while (!pending.empty()) {
+            auto at = pending.back();
+            pending.pop_back();
+            // Only this scroller's template parts. The content can contain its
+            // own ScrollViews, ScrollViewers and scrollbars with other margins.
+            if (at == content || (at != scroller
+                && (at.try_as<controls::ScrollView>() || at.try_as<controls::ScrollViewer>()))) continue;
+            if (auto bar = at.try_as<NativeScrollBar>()) {
+                auto current = bar.Margin();
+                auto found = std::find_if(state.indicators.begin(), state.indicators.end(),
+                    [&](auto const &entry) { return entry.bar.get() == bar; });
+                if (found == state.indicators.end()) {
+                    state.indicators.push_back({winrt::make_weak(bar), current, current});
+                    found = std::prev(state.indicators.end());
+                } else if (!sameMargin(current, found->applied)) {
+                    // A theme/template update supplied new native margins.
+                    found->original = current;
+                }
+                auto margin = found->original;
+                if (bar.Orientation() == controls::Orientation::Vertical) {
+                    margin.Top += state.region.Top;
+                    margin.Bottom += state.region.Bottom;
+                } else {
+                    margin.Left += state.region.Left;
+                    margin.Right += state.region.Right;
+                }
+                found->applied = margin;
+                if (!sameMargin(current, margin)) bar.Margin(margin);
+                continue;
+            }
+            for (int32_t index = 0, count = xaml::Media::VisualTreeHelper::GetChildrenCount(at);
+                 index < count; ++index) pending.push_back(xaml::Media::VisualTreeHelper::GetChild(at, index));
+        }
+        if (state.region.Top > 0) refreshSafeAreaScrollEdge(scroller);
+    }
+
+    void queueInsets(controls::ScrollView const &scroller, std::shared_ptr<ScrollerInsets> const &state) {
+        if (state->pending) return;
+        state->pending = true;
+        auto weak = winrt::make_weak(scroller);
+        auto queue = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
+        if (!queue || !queue.TryEnqueue(guarded("committing scroller margins", [weak, state] {
+            state->pending = false;
+            if (auto scroller = weak.get()) applyInsets(scroller, *state);
+        }))) state->pending = false;
+    }
     controls::ScrollingScrollBarVisibility visibility(bool scrolls, int32_t bar) {
         if (!scrolls) return controls::ScrollingScrollBarVisibility::Hidden;
         switch (bar) {
@@ -105,12 +174,24 @@ namespace {
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
     try {
         controls::ScrollView scroller;
+        auto insets = std::make_shared<ScrollerInsets>();
+        for (auto at = insetStates.begin(); at != insetStates.end();) {
+            if (at->second.expired()) at = insetStates.erase(at); else ++at;
+        }
+        insetStates[winrt::get_abi(scroller)] = insets;
+        scroller.Loaded(guarded("preparing scroller margins", [insets](IInspectable const &sender, auto const &) {
+            queueInsets(sender.as<controls::ScrollView>(), insets);
+        }));
+        scroller.LayoutUpdated(guarded("refreshing scroller template margins", [weak = winrt::make_weak(scroller), insets](auto const &, auto const &) {
+            if (auto scroller = weak.get()) queueInsets(scroller, insets);
+        }));
         auto flight = std::make_shared<ScrollerFlight>();
         scroller.ZoomMode(controls::ScrollingZoomMode::Disabled);
         // The InteractionTracker's word of the view, every frame it moves: the
         // ear hears where it stands now paired with where an animation lands.
         scroller.ViewChanged(guarded("handling ViewChanged",
             [view, flight](controls::ScrollView const &scroller, IInspectable const &) {
+            refreshSafeAreaScrollEdge(scroller);
             double x = scroller.HorizontalOffset(), y = scroller.VerticalOffset();
             callbacks.scrolling(view, x, y,
                 std::isnan(flight->x) ? x : flight->x, std::isnan(flight->y) ? y : flight->y);
@@ -240,6 +321,9 @@ extern "C" void swiftomniui_winui_scroller_place_for(
             winrt::Windows::Foundation::Rect(
                 0, 0, (float)element.ActualWidth(), (float)element.ActualHeight()));
 
+        xaml::Thickness insets{};
+        if (auto found = insetStates.find(winrt::get_abi(scroller)); found != insetStates.end())
+            if (auto state = found->second.lock()) insets = state->region;
         auto nearest = [](double start, double length, double room, double now) {
             if (start >= now && start + length <= now + room) return now;
             return start < now ? start : start + length - room;
@@ -249,13 +333,17 @@ extern "C" void swiftomniui_winui_scroller_place_for(
         double y = scroller.VerticalOffset();
         if (scroller.ComputedHorizontalScrollMode() == controls::ScrollingScrollMode::Enabled) {
             x = std::isnan(anchorX)
-                ? nearest(bounds.X, bounds.Width, scroller.ViewportWidth(), x)
-                : bounds.X + anchorX * bounds.Width - anchorX * scroller.ViewportWidth();
+                ? nearest(bounds.X - insets.Left, bounds.Width,
+                    std::max(0.0, scroller.ViewportWidth() - insets.Left - insets.Right), x)
+                : bounds.X - insets.Left + anchorX * bounds.Width
+                    - anchorX * std::max(0.0, scroller.ViewportWidth() - insets.Left - insets.Right);
         }
         if (scroller.ComputedVerticalScrollMode() == controls::ScrollingScrollMode::Enabled) {
             y = std::isnan(anchorY)
-                ? nearest(bounds.Y, bounds.Height, scroller.ViewportHeight(), y)
-                : bounds.Y + anchorY * bounds.Height - anchorY * scroller.ViewportHeight();
+                ? nearest(bounds.Y - insets.Top, bounds.Height,
+                    std::max(0.0, scroller.ViewportHeight() - insets.Top - insets.Bottom), y)
+                : bounds.Y - insets.Top + anchorY * bounds.Height
+                    - anchorY * std::max(0.0, scroller.ViewportHeight() - insets.Top - insets.Bottom);
         }
         place[0] = x;
         place[1] = y;
@@ -283,24 +371,11 @@ extern "C" void swiftomniui_winui_scroller_insets(
 ) {
     try {
         auto scroller = borrow<controls::ScrollView>(handle);
-        // The indicators are template parts: each bar's extent goes on its own
-        // edge's margin, found again while the scroller's template reloads.
-        std::vector<xaml::DependencyObject> pending{scroller};
-        while (!pending.empty()) {
-            auto at = pending.back();
-            pending.pop_back();
-            if (auto bar = at.try_as<xaml::Controls::Primitives::ScrollBar>()) {
-                auto margin = bar.Orientation() == controls::Orientation::Vertical
-                    ? xaml::Thickness{0, top, 0, bottom}
-                    : xaml::Thickness{left, 0, right, 0};
-                auto current = bar.Margin();
-                if (current.Left != margin.Left || current.Top != margin.Top
-                    || current.Right != margin.Right || current.Bottom != margin.Bottom)
-                    bar.Margin(margin);
-            }
-            for (int32_t index = 0, count = xaml::Media::VisualTreeHelper::GetChildrenCount(at);
-                 index < count; ++index)
-                pending.push_back(xaml::Media::VisualTreeHelper::GetChild(at, index));
+        auto found = insetStates.find(winrt::get_abi(scroller));
+        if (found == insetStates.end()) return;
+        if (auto state = found->second.lock()) {
+            state->region = xaml::Thickness{left, top, right, bottom};
+            queueInsets(scroller, state);
         }
     } catch (...) {
         report("insetting a scroller's bars");

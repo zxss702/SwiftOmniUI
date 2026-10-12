@@ -520,11 +520,6 @@ extension Differ {
         // Design: docs/design/core/identity-and-diffing.md#created-and-destroying
         if previous == nil {
             node.created.forEach(fire)
-
-            // A node type the host does not realize is said once, with near misses.
-            if let unrealized = HostRealizations.unrealized(node.type) {
-                complain(unrealized)
-            }
         }
 
         // Every property when there is nothing to compare against, or on a resync.
@@ -594,16 +589,7 @@ extension Differ {
             // stays on the state and is read at the crossing.
             let mine = travel(key.facts.moves.union(registration.values))
 
-            if let already = state.inheritedBy, already != id, state.inherited != mine {
-                complain("""
-                    \(key.name) is driven by a value two elements answer \
-                    differently for. The one described LAST says how it \
-                    travels.
-                    """)
-            }
-
             state.inherited = mine
-            state.inheritedBy = id
             state.door = registration.kind
 
             driven[key] = StateEntry(

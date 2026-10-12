@@ -186,9 +186,7 @@ stripped, with the unstripped copies kept in `.build/android/symbols/` for
 `Resources/Images` are drawn for it as the APK is built: an SVG three times
 over, as a PNG, which `Image("mark.png")` finds as it finds the SVG on every
 other host. An application's `print` reaches logcat under the
-tag `SwiftOmniUI`, and so does what `SWIFTOMNIUI_TALLY=1` and `SWIFTOMNIUI_INSPECT=1`
-write: `run-app.sh` hands every `SWIFTOMNIUI_` variable of the shell that runs it
-to the application's environment. A head's manifest asks for
+tag `SwiftOmniUI`. A head's manifest asks for
 `ACCESS_NETWORK_STATE`, which the host needs to report the network to the
 application's views.
 

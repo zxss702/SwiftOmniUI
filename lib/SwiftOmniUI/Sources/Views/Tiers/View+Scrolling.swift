@@ -114,8 +114,7 @@ extension View {
         revised { $0.writeInherited(ScrollViewContract.defaultScrollAnchor, anchor) }
     }
 
-    /// Room kept inside the view's own edges, between them and its content -
-    /// the SwiftUI spelling for what `contentPadding` names:
+    /// Adds room to the safe region passed to this view's content.
     ///
     ///     TextEditor(text: $body).safeAreaPadding(.vertical, 12)
     ///
@@ -129,7 +128,10 @@ extension View {
         if edges.contains(.top) { insets.top = inset }
         if edges.contains(.trailing) { insets.right = inset }
         if edges.contains(.bottom) { insets.bottom = inset }
-        return revised { $0.writeInherited(PaddingElementContract.contentPadding, insets) }
+        return revised {
+            $0.wrapPaddedFrame()
+            $0.props[.safeAreaPadding] = insets.propValue
+        }
     }
 
     /// Scrolls so the child `.id` names stands at `anchor`, every time `id`

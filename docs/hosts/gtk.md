@@ -165,8 +165,7 @@ named by the application's ID and installed for the user in
 `~/.local/share/icons` and `~/.local/share/applications`. GNOME finds a
 window's icon through that entry. `release` builds the optimized head, `--detach` returns once
 the application has started, and `--build-only` builds it and starts
-nothing. Every `SWIFTOMNIUI_` variable of the shell that runs it -
-`SWIFTOMNIUI_TALLY=1`, `SWIFTOMNIUI_INSPECT=1` - reaches the application.
+nothing.
 
 In VS Code, with **GTK** chosen in the status bar, **SwiftOmniUI: Debug** builds
 the head with `run-app.sh --build-only` and starts it under `lldb-dap`, so a

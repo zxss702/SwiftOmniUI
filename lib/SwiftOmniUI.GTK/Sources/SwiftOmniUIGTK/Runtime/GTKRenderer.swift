@@ -28,8 +28,7 @@ final class GTKRenderer {
     private(set) lazy var runtime = HostRuntime(
         clock: frameClock, reducesMotion: reducesMotion,
         makeNative: { [unowned self] element in GTKElement(element, host: self) }, log: { GTKRenderer.log.error($0) },
-        localization: { key in GTKStrings.resolve(key) },
-        views: { GTKView.liveCount })
+        localization: { key in GTKStrings.resolve(key) })
 
     /// What performs the acts the application calls, and answers them.
     private(set) lazy var acts = GTKActPerformer(core: runtime.core)

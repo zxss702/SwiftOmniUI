@@ -22,8 +22,7 @@ extension WinUIElement: FrameReporter {
             return Rect(x: origin.x, y: origin.y, width: frame.width, height: frame.height)
         }
         element.reportFrame(
-            view.frameReport(safeArea: host.safeArea(of: element)), named: named, in: host.runtime,
-            contentInsets: element.contentSafeAreaInsets { ($0.native as? WinUIElement)?.view?.placedFrame })
+            view.frameReport(safeArea: host.safeArea(of: element)), named: named, in: host.runtime)
     }
 }
 

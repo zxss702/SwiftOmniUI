@@ -188,7 +188,7 @@ public final class WindowSession {
                 } else {
                     try record.closeWindow(key: key)
                 }
-            } catch { complain("Could not dismiss window: \(error).") }
+            } catch { reportFailure("Could not dismiss window: \(error).") }
         }
     }
 

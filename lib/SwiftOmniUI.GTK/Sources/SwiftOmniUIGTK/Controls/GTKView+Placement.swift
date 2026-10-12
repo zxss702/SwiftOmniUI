@@ -15,7 +15,11 @@ extension GTKView {
     /// place travels.
     /// Design: docs/design/platforms/gtk/layout.md#a-place-between-passes
     func layout(_ place: Rect) {
-        placed = place
+        if nativeSafeBarOwner == nil, let placingLayout {
+            safeAreaContext = placingLayout.context(for: self, at: place)
+                .ignoring(sourceElement?.ignoresSafeArea)
+        }
+        if nativeSafeBarOwner == nil { placed = place }
         guard Self.allocating > 0 else {
             if let placingLayout { gtk_widget_queue_allocate(placingLayout.widget) }
             return
@@ -35,7 +39,10 @@ extension GTKView {
     func setTransform(_ transform: HostDrawingTransform) {
         guard transform != self.transform else { return }
         self.transform = transform
-        if let placingLayout { gtk_widget_queue_allocate(placingLayout.widget) }
+        refreshNativeSafeBarDrawing()
+        if let layout = (nativeSafeBarOwner as? GTKLayoutView) ?? placingLayout {
+            gtk_widget_queue_allocate(layout.widget)
+        }
     }
 
     /// The place's corner, then the view's own transform drawn under a placing run's (`HostDrawingTransform.under`):
@@ -45,8 +52,8 @@ extension GTKView {
         var corner = graphene_point_t(x: Float(place.x), y: Float(place.y))
         let moved = gsk_transform_translate(nil, &corner)
         let drawn = transform.under(placedDrawing)
-        guard !drawn.isIdentity else { return moved }
-        var matrix = Self.graphene(drawn.matrix(width: width, height: height))
+        guard !drawn.isIdentity || safeBarDrawing != nil else { return moved }
+        var matrix = Self.graphene(drawn.matrix(width: width, height: height) * (safeBarDrawing ?? .identity))
         return gsk_transform_matrix(moved, &matrix)
     }
 

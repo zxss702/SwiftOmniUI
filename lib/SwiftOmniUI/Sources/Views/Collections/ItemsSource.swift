@@ -81,7 +81,6 @@ protocol ItemsViews: AnyObject, Sendable {
     /// `.id()` is.
     private func unique(_ identity: String) -> String {
         guard places[identity] != nil else { return identity }
-        complain("two items of an List describe as \"\(identity)\"; give each its own identity")
         var variant = 1
         while places["\(identity)\u{0}\(variant)"] != nil { variant += 1 }
         return "\(identity)\u{0}\(variant)"

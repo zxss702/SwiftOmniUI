@@ -39,6 +39,9 @@ final class GTKPageFrame {
     /// The bar beneath the header bar holding a tabbed view's switcher, where the page has one.
     private var tabsBar: GTKWidget?
 
+    private var safeBars: [GTKSafeAreaBarHost] = []
+    private var refreshingSafeBars = false
+
     /// The style sheet's class painting the header bar, and the tabs' bar with it.
     private var barClass: String?
     private(set) var overflowButtons: [GTKButtonView] = []
@@ -67,11 +70,28 @@ final class GTKPageFrame {
             previous = gtk_widget_get_parent(parent)
         }
         adw_toolbar_view_set_content(widget.opaque, page.widget)
+        page.rootSafeAreaContext = { [weak self] bounds in
+            guard let self else { return SafeAreaContext(bounds: bounds) }
+            self.requestSafeBars()
+            guard !self.safeBars.isEmpty else { return SafeAreaContext(bounds: bounds) }
+            // The content extends below all top bars. Reserve the native
+            // header here; source inset modifiers reserve their own bars.
+            let headerHeight = self.chrome.showsBar ? Double(gtk_widget_get_height(self.header)) : 0
+            let tabsHeight = self.tabsBar.map { Double(gtk_widget_get_height($0)) } ?? 0
+            return SafeAreaContext(bounds: bounds, container: bounds.inset(
+                EdgeInsets(top: headerHeight + tabsHeight, leading: 0, bottom: 0, trailing: 0)))
+        }
     }
 
     /// Lets go of the toolbar view and nothing in it: a page popped still slides away in it, and GTK lets it go once
     /// the slide is over.
     isolated deinit {
+        page.rootSafeAreaContext = nil
+        for host in safeBars {
+            adw_toolbar_view_remove(widget.opaque, host.widget)
+            host.releaseBar()
+        }
+        adw_toolbar_view_set_extend_content_to_top_edge(widget.opaque, 0)
         g_object_unref(heading)
         g_object_unref(widget)
     }
@@ -86,7 +106,8 @@ final class GTKPageFrame {
             adw_header_bar_set_title_widget(header.opaque, chrome.titleView?.widget ?? heading)
         }
         if chrome.showsBar != self.chrome.showsBar {
-            adw_toolbar_view_set_reveal_top_bars(widget.opaque, chrome.showsBar ? 1 : 0)
+            gtk_widget_set_visible(header, chrome.showsBar ? 1 : 0)
+            adw_toolbar_view_set_reveal_top_bars(widget.opaque, chrome.showsBar || !safeBars.isEmpty ? 1 : 0)
         }
         if chrome.offersBack != self.chrome.offersBack {
             adw_header_bar_set_show_back_button(header.opaque, chrome.offersBack ? 1 : 0)
@@ -100,6 +121,34 @@ final class GTKPageFrame {
         showSidebarButton(chrome.sidebar)
         showActions(leading: chrome.leadingActions, chrome.actions, overflow: chrome.overflow)
         self.chrome = chrome
+        refreshSafeBars()
+    }
+
+    private func requestSafeBars() {
+        guard !refreshingSafeBars else { return }
+        refreshingSafeBars = true
+        GTKDoorbell.afterLayout { [weak self] in
+            guard let self else { return }
+            self.refreshingSafeBars = false
+            self.refreshSafeBars()
+        }
+    }
+
+    private func refreshSafeBars() {
+        let bars = page.sourceElement?.pageTopSafeAreaBars.compactMap { $0.gtk.view } ?? []
+        guard bars.count != safeBars.count || !zip(bars, safeBars).allSatisfy({ $0 === $1.bar }) else { return }
+        for host in safeBars {
+            adw_toolbar_view_remove(widget.opaque, host.widget)
+            host.releaseBar()
+        }
+        safeBars = bars.map { GTKSafeAreaBarHost(bar: $0) }
+        for host in safeBars {
+            if let barClass { gtk_widget_add_css_class(host.widget, barClass) }
+            adw_toolbar_view_add_top_bar(widget.opaque, host.widget)
+        }
+        adw_toolbar_view_set_extend_content_to_top_edge(widget.opaque, safeBars.isEmpty ? 0 : 1)
+        adw_toolbar_view_set_reveal_top_bars(widget.opaque, chrome.showsBar || !safeBars.isEmpty ? 1 : 0)
+        (page as? GTKLayoutView)?.invalidateMeasurements()
     }
 
     /// The scene's commands in the window's app menu - a menu button at the
@@ -130,7 +179,7 @@ final class GTKPageFrame {
     private func paintBar(background: HostValue?, foreground: HostValue?) {
         let painted = GTKStyleSheet.bar(
             background: GTKBrush(background).firstColor, foreground: foreground.flatMap(GTKBrush.rgba))
-        for bar in [header] + (tabsBar.map { [$0] } ?? []) {
+        for bar in [header] + (tabsBar.map { [$0] } ?? []) + safeBars.map(\.widget) {
             if let barClass { gtk_widget_remove_css_class(bar, barClass) }
             if let painted { gtk_widget_add_css_class(bar, painted) }
         }

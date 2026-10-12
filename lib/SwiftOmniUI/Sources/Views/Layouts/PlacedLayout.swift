@@ -153,11 +153,7 @@ public struct PlacedLayout<Items: RandomAccessCollection, Id: Hashable>: View {
         .animation(travel)
 
         guard let number = run else {
-            // With no placement state the views lie over one another: said out
-            // loud, since the screen alone reads as a view that failed to draw.
-            complain("PlacedLayout was given no .placement(_:), so nothing "
-                + "says where its views go. They are drawn over one another, each across the whole layout.")
-
+            // With no placement state the views lie over one another.
             return views
         }
 

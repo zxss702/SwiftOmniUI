@@ -45,6 +45,9 @@ namespace swiftomniui {
     /// WinUI's own brush for a brush as the host hands it; null for none.
     xaml::Media::Brush brush(SwiftOmniUIBrush const &brush);
 
+    /// The merged native top surface draws its edge only while its page scrolls.
+    void refreshSafeAreaScrollEdge(controls::ScrollView const &scroller);
+
     /// Whether the view numbered `view` listens for taps; and a press assistive technology made on it, told as
     /// a tap.
     bool hearsTaps(int64_t view);
@@ -189,7 +192,7 @@ namespace swiftomniui {
     /// Whether `element` is one of a window's layers over its rows - its sheets or its overlay - and no row's own.
     inline bool isLayer(xaml::FrameworkElement const &element) {
         auto name = winrt::unbox_value_or<winrt::hstring>(element.Tag(), L"");
-        return name == L"sheets" || name == L"overlay";
+        return name == L"sheets" || name == L"overlay" || name == L"safeAreaBars";
     }
 
     /// Stands `element` in `row` of `grid` in place of what stood there; nothing for null.

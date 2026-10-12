@@ -62,30 +62,22 @@ enum WinUICallbacks {
                 nonisolated(unsafe) let size = size
                 MainActor.assumeIsolated {
                     guard let layout = WinUIView.find(view) as? WinUILayoutView, let size else { return }
-                    let measured = WinUIRenderer.timed("winui.panelMeasure") {
-                        layout.measure(width: width, height: height)
-                    }
+                    let measured = layout.measure(width: width, height: height)
                     size[0] = measured.width
                     size[1] = measured.height
                 }
             },
             arrange: { view, width, height in
                 MainActor.assumeIsolated {
-                    WinUIRenderer.timed("winui.arrange") {
-                        (WinUIView.find(view) as? WinUILayoutView)?.arrange(width: width, height: height)
-                    }
+                    (WinUIView.find(view) as? WinUILayoutView)?.arrange(width: width, height: height)
                     WinUIRenderer.shared?.runtime.frames.laidOut()
-                    WinUIRenderer.writeTimings()
                 }
             },
             viewportChanged: { view, x, y, width, height, bringX, bringY in
                 MainActor.assumeIsolated {
-                    WinUIRenderer.timed("winui.viewport") {
-                        (WinUIView.find(view) as? WinUILazyView)?.viewportChanged(
-                            Rect(x: x, y: y, width: width, height: height),
-                            bring: Point(x: bringX, y: bringY))
-                    }
-                    WinUIRenderer.writeTimings()
+                    (WinUIView.find(view) as? WinUILazyView)?.viewportChanged(
+                        Rect(x: x, y: y, width: width, height: height),
+                        bring: Point(x: bringX, y: bringY))
                 }
             },
             clicked: { view in

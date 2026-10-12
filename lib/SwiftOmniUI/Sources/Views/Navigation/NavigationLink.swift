@@ -24,9 +24,7 @@ struct PushPageAction: Sendable {
 
 /// `\.pushPage` reads a `PushPageAction`.
 struct PushPageKey: EnvironmentKey {
-    static let defaultValue = PushPageAction { _ in
-        complain("@Environment(\\.pushPage) ran where no navigation stack holds the view.")
-    }
+    static let defaultValue = PushPageAction { _ in }
 }
 
 extension EnvironmentValues {

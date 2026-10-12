@@ -58,9 +58,6 @@ extension PropertyContainer {
     /// the reports rebuild nothing.
     func driven<Value: StateValue>(_ property: Prop, by state: Binding<Value>) -> Modified {
         guard let image = state.image else {
-            complain("`\(property.name)` was told to report into a part of a state, or a "
-                + "binding made from closures, which the host cannot carry. Report "
-                + "into the whole state.")
             return modified { _ in }
         }
 
@@ -78,9 +75,6 @@ extension PropertyContainer {
     ) -> Modified {
         // The image, never the value: nothing is read at build.
         guard let image = state.image else {
-            complain("`\(property.name)` was driven from a part of a state, or a binding "
-                + "made from closures, which the host cannot carry. Drive it from "
-                + "the whole state.")
             return modified { _ in }
         }
 
@@ -107,9 +101,6 @@ extension PropertyContainer {
     ) -> Modified {
         guard kind == .property else {
             guard let image = state.image else {
-                complain("`\(property.name)` was driven from a part of a state, or a binding "
-                    + "made from closures, which the host cannot carry. Drive it from "
-                    + "the whole state.")
                 return modified { _ in }
             }
 
@@ -120,9 +111,6 @@ extension PropertyContainer {
         }
 
         guard let image = state.journeyImage else {
-            complain("`\(property.name)` was handed a part of a state, a binding made from "
-                + "closures, or a state the host already carries in another shape, "
-                + "none of which it can walk. Hand it the whole state.")
             return modified { _ in }
         }
 
@@ -158,10 +146,6 @@ extension PropertyContainer {
     /// Design: docs/design/views/bindings.md#binding-twins
     func journey<Value: Walked>(_ property: Prop, by state: Binding<Value>) -> Modified {
         guard let image = state.journeyImage else {
-            complain("`\(property.name)` was handed a part of a state, a binding made from "
-                + "closures, or a state the host already carries in another shape, "
-                + "none of which it can walk. Hand it the whole state, declared for "
-                + "it.")
             return modified { _ in }
         }
 

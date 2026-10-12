@@ -259,10 +259,10 @@ struct FrameReport: Equatable, Sendable {
     /// side the view reaches past it.
     var safeAreaInsets: EdgeInsets {
         EdgeInsets(
-            top: max(0, safeAreaRect.y - global.y),
-            leading: max(0, safeAreaRect.x - global.x),
-            bottom: max(0, global.y + frame.height - safeAreaRect.y - safeAreaRect.height),
-            trailing: max(0, global.x + frame.width - safeAreaRect.x - safeAreaRect.width))
+            top: min(frame.height, max(0, safeAreaRect.y - global.y)),
+            leading: min(frame.width, max(0, safeAreaRect.x - global.x)),
+            bottom: min(frame.height, max(0, global.y + frame.height - safeAreaRect.y - safeAreaRect.height)),
+            trailing: min(frame.width, max(0, global.x + frame.width - safeAreaRect.x - safeAreaRect.width)))
     }
 
     /// Reads the ten numbers of one report - x, y, width, height, windowX,
@@ -343,7 +343,6 @@ extension View {
     /// - Parameter space: The space to declare.
     public func coordinateSpace(_ space: CoordinateSpace) -> ModifiedContent {
         guard case .named(let name) = space else {
-            complain("`coordinateSpace` declares named spaces only - the fixed ones need no declaring")
             return revised { _ in }
         }
         return setting(ViewContract.coordinateSpaceName, name)

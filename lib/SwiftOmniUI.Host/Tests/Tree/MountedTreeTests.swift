@@ -4,9 +4,6 @@
 import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 @_spi(Host) @testable import SwiftOmniUIHost
-#if os(Windows)
-import CRT
-#endif
 
 /// The mounted tree every Swift runtime shares: patches, drift, leaving and the frame walk.
 final class MountedTreeTests: XCTestCase {
@@ -187,57 +184,33 @@ final class MountedTreeTests: XCTestCase {
         XCTAssertEqual(log.arranged, ["stack"])
     }
 
-    /// With the tally on, a message that stands alone writes the running totals; one right behind it writes
-    /// nothing, and the next after a quiet spell writes them all again.
+    /// An open inspector receives the host's measurement for the recorded pass.
     @MainActor
-    func testTheTallyIsWrittenAfterAMessageThatStandsAlone() {
-        var written: [String] = []
-        var clock = 0.0
-        let (tree, _) = Self.tree(
-            diagnostics: DiagnosticText(tallies: true, inspects: false) { written.append($0) }, now: { clock })
-
-        tree.apply(Self.stack("stack", ["a", "b"]), complete: true)
-        tree.apply(Self.stack("stack", ["a", "b", "c"]), complete: false)
-        clock = 400
-        tree.apply(Self.stack("stack", ["a"]), complete: false)
-
-        XCTAssertEqual(written.count, 2, written.joined())
-        XCTAssertTrue(written[0].hasPrefix("SwiftOmniUI tally: applies 1  nodes 3  made 3  kept 0  renders "), written[0])
-        XCTAssertTrue(written[1].hasPrefix("SwiftOmniUI tally: applies 3  nodes 9  made 4  kept 5  renders "), written[1])
-        XCTAssertTrue(written[1].hasSuffix(" ms total\n"), written[1])
-    }
-
-    /// With the passes asked for, the tree starts the inspector's recording, and each message applied writes
-    /// the pass it ended as text.
-    @MainActor
-    func testEveryPassIsWrittenAsTextWhenAskedFor() {
-        defer {
-            Inspection.logging = false
-            Inspection.stop()
-        }
-        var written: [String] = []
-        let (tree, _) = Self.tree(diagnostics: DiagnosticText(tallies: false, inspects: true) { written.append($0) })
-        XCTAssertTrue(Inspection.recording, "the tree starts the recording itself")
+    func testAnOpenInspectorReceivesTheHostMeasurement() throws {
+        Inspection.start()
+        defer { Inspection.stop() }
+        let (tree, _) = Self.tree()
 
         Inspection.begin(road: .build, causes: ["count"])
         Inspection.end(generation: 1, describe: 12, keep: true)
         tree.intake.take(Self.stack("stack", ["a"]), generation: 1) { tree.apply($0, complete: true) }
 
-        XCTAssertEqual(written.count, 1)
-        XCTAssertTrue(written.first?.contains(" build ") ?? false, written.joined())
-        XCTAssertTrue(written.first?.contains(" for count · Swift 12 µs · host ") ?? false, written.joined())
-        XCTAssertTrue(written.first?.contains(" 2 nodes, 2 made, 0 kept") ?? false, written.joined())
+        let pass = try XCTUnwrap(Inspection.passes.last)
+        let host = try XCTUnwrap(pass.host)
+        XCTAssertEqual(pass.generation, 1)
+        XCTAssertEqual(pass.causes, ["count"])
+        XCTAssertEqual(host.nodes, 2)
+        XCTAssertEqual(host.made, 2)
+        XCTAssertEqual(host.kept, 0)
     }
 
-    /// The switches are read off the process's environment: `1` turns one on, anything else leaves it off.
-    func testTheSwitchesAreReadOffTheProcesssEnvironment() {
-        defer { Self.setEnvironment("SWIFTOMNIUI_TALLY", nil) }
-
-        Self.setEnvironment("SWIFTOMNIUI_TALLY", "1")
-        XCTAssertTrue(DiagnosticText.environment.tallies)
-
-        Self.setEnvironment("SWIFTOMNIUI_TALLY", "0")
-        XCTAssertFalse(DiagnosticText.environment.tallies)
+    @MainActor
+    func testAClosedInspectorDoesNotCollectHostMeasurements() {
+        Inspection.stop()
+        let (tree, _) = Self.tree()
+        tree.apply(Self.stack("stack", ["a"]), complete: true)
+        XCTAssertNil(tree.tally)
+        XCTAssertFalse(Inspection.recording, "constructing a tree must not enable recording")
     }
 
     /// A frame arranges a parent once when a child's place changed; an element without a view passes it up.
@@ -603,7 +576,6 @@ final class MountedTreeTests: XCTestCase {
     @MainActor
     private static func tree(
         viewless: Set<String> = [],
-        diagnostics: DiagnosticText = DiagnosticText(tallies: false, inspects: false) { _ in },
         now: @escaping () -> Double = { 0 }
     ) -> (MountedTree, NativeLog) {
         let animator = Animator()
@@ -616,7 +588,6 @@ final class MountedTreeTests: XCTestCase {
             layoutMotion: LayoutMotion(animator: animator, now: { 0 }, reducesMotion: { false }),
             now: now,
             reducesMotion: { false },
-            diagnostics: diagnostics,
             makeNative: { RecordingNative($0, log: log, viewless: viewless) })
         return (tree, log)
     }
@@ -625,15 +596,6 @@ final class MountedTreeTests: XCTestCase {
         var stack = HostPatch(id: .manual(id), type: .vStack)
         stack.children = .arranged(children.map { HostPatch(id: .manual($0), type: .text) })
         return stack
-    }
-
-    /// Sets `name` in this process's environment, or removes it for nil.
-    private static func setEnvironment(_ name: String, _ value: String?) {
-        #if os(Windows)
-        _ = _putenv_s(name, value ?? "")
-        #else
-        if let value { setenv(name, value, 1) } else { unsetenv(name) }
-        #endif
     }
 
     private static func layer(_ id: String, _ zIndex: Double) -> HostPatch {

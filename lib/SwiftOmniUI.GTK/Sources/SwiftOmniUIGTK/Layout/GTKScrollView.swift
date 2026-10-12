@@ -36,15 +36,13 @@ final class GTKScrollView: GTKLayoutView {
     /// The offset the tree writes, kept for the first layout where it comes before it.
     private var writtenOffset = WrittenScrollOffset()
 
-    /// The element the content's first child mounts; the bars over the
-    /// scroller's room are read up the tree from it.
-    private weak var contentElement: MountedElement?
-
-    /// The padding the tree wrote, and the room the bars floating over the
-    /// scroller keep clear of the document's content, added to it: a bar lets
-    /// the content scroll under it, the last of the content drawing clear.
+    /// Content and indicators resolve the same remaining region. These are
+    /// arithmetic values; native margin writes are committed after layout.
     private var writtenPadding = EdgeInsets(0)
     private var barsInsets = EdgeInsets(0)
+    private var pendingInsets: EdgeInsets?
+    private var commitPending = false
+    private var detached = false
 
     private var bars = (vertical: ScrollIndicatorVisibility.automatic, horizontal: ScrollIndicatorVisibility.automatic)
 
@@ -62,7 +60,6 @@ final class GTKScrollView: GTKLayoutView {
     /// The content: one child, or several stacked down.
     @discardableResult
     override func setItems(_ items: [GTKLayoutItem]) -> Bool {
-        contentElement = items.first?.element
         if items.count > 1 { wraps = true }
 
         var changed = false
@@ -100,7 +97,7 @@ final class GTKScrollView: GTKLayoutView {
             configure()
         }
         writtenPadding = padding
-        document.padding = padding + barsInsets
+        document.layoutPadding = padding + barsInsets
         document.orientation = orientation
         if let defaultAnchor { self.defaultAnchor = (defaultAnchor.x, defaultAnchor.y) }
 
@@ -110,32 +107,48 @@ final class GTKScrollView: GTKLayoutView {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        refreshBarsInsets(width: width)
+        // No native properties, parent relationships, or invalidations here.
         return document.contentSize(width: width)
     }
 
-    /// The insets the bars over this scroller keep inside the room: each bar's
-    /// extent measured at the room's width, a bar's height or its width by its
-    /// edge. A bar standing later is caught the next pass; one already stood
-    /// answers now.
-    private func refreshBarsInsets(width: Double?) {
-        let insets = contentElement?.ancestorSafeAreaInsets { bar, edge in
-            edge == .top || edge == .bottom
-                ? bar.gtk.view?.measure(width: width, height: nil).height
-                : bar.gtk.view?.measure(width: nil, height: nil).width
-        } ?? EdgeInsets(0)
-        if insets != barsInsets {
-            barsInsets = insets
-            document.padding = writtenPadding + insets
-        }
-        scroller.insetScrollbars(insets)
+    override func backgroundBounds(in bounds: Rect) -> Rect {
+        box.clips ? bounds : layoutSafeArea(in: bounds).viewport(in: bounds, axes: orientation)
     }
 
-    /// Stands GTK's scroller over the whole of the room, then an offset the tree wrote before there was one - or,
-    /// first time only, the default anchor a reader asked it to open at.
+    private func resolve(in bounds: Rect) -> Rect {
+        let context = layoutSafeArea(in: bounds)
+        let viewport = box.clips ? bounds : context.viewport(in: bounds, axes: orientation)
+        let insets = SafeAreaContext.insets(of: context.safe, in: viewport)
+        barsInsets = insets
+        let padding = writtenPadding + insets
+        if document.layoutPadding != padding {
+            document.layoutPadding = padding
+            document.forgetMeasurements()
+            wrapper.forgetMeasurements()
+        }
+        pendingInsets = insets
+        if !commitPending {
+            commitPending = true
+            GTKDoorbell.afterLayout { [weak self] in
+                guard let self else { return }
+                self.commitPending = false
+                guard !self.detached, let insets = self.pendingInsets else { return }
+                self.pendingInsets = nil
+                self.document.padding = self.writtenPadding + insets
+                self.scroller.insetScrollbars(insets)
+            }
+        }
+        return viewport
+    }
+
+    /// The native viewport extends under bars; its document alone reserves
+    /// their region. Descendants receive a consumed context, independent of
+    /// the document's moving origin and of any enclosing scroller.
     override func arrange(in bounds: Rect) {
-        refreshBarsInsets(width: bounds.width)
-        scroller.layout(bounds)
+        let viewport = resolve(in: bounds)
+        scroller.layout(viewport)
+        // Initial offsets/anchors wait for the resolved document extent.
+        guard document.padding == document.layoutPadding else { return }
         if let target = writtenOffset.laidOutNow() {
             move(to: target)
         } else if let defaultAnchor, !anchoredOnce {
@@ -180,6 +193,8 @@ final class GTKScrollView: GTKLayoutView {
     }
 
     override func detach() {
+        detached = true
+        pendingInsets = nil
         super.detach()
         onOffsetChanged = nil
         onScrollStopped = nil
@@ -207,12 +222,14 @@ final class GTKScrollView: GTKLayoutView {
         if orientation == .horizontal || orientation == .both {
             place.x = Self.target(
                 at: Double(bounds.origin.x), length: Double(bounds.size.width),
-                in: room.width, now: offset.x, anchor: anchorX)
+                in: max(0, room.width - barsInsets.left - barsInsets.right),
+                now: offset.x + barsInsets.left, anchor: anchorX) - barsInsets.left
         }
         if orientation == .vertical || orientation == .both {
             place.y = Self.target(
                 at: Double(bounds.origin.y), length: Double(bounds.size.height),
-                in: room.height, now: offset.y, anchor: anchorY)
+                in: max(0, room.height - barsInsets.top - barsInsets.bottom),
+                now: offset.y + barsInsets.top, anchor: anchorY) - barsInsets.top
         }
         move(to: place)
     }

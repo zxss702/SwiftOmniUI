@@ -61,7 +61,7 @@
     /// The two members need not come from one contract: a field's words are
     /// `TextElementContract.text` and the change it reports is
     /// `InputViewContract.textChanged`, and the element wears both. A member of
-    /// a contract it does not wear is refused, and said once.
+    /// a contract it does not wear is refused.
     ///
     /// - Parameters:
     ///   - property: the value's member, written with its contract.
@@ -73,14 +73,11 @@
         as event: ElementEvent<Raised, Value>
     ) {
         guard Realized.wears(Owner.self) else {
-            return complain("\(Realized.name) reported `\(Owner.name).\(property.name)`, and "
-                + "\(Realized.name) wears no \(Owner.name): nothing was reported.")
+            return
         }
 
         guard Realized.wears(Raised.self) else {
-            return complain("\(Realized.name) reported `\(property.name)` as "
-                + "`\(Raised.name).\(event.name)`, and \(Realized.name) wears no \(Raised.name): "
-                + "nothing was reported.")
+            return
         }
 
         carry(property.token, event.token, value.propValue)

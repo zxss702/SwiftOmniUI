@@ -27,9 +27,7 @@ public struct DismissAction: Sendable {
 
 /// `\.dismiss` reads a `DismissAction`.
 struct DismissActionKey: EnvironmentKey {
-    static let defaultValue = DismissAction {
-        complain("@Environment(\\.dismiss) ran where nothing presented holds the view.")
-    }
+    static let defaultValue = DismissAction {}
 }
 
 extension EnvironmentValues {

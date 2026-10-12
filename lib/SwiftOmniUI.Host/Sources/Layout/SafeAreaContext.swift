@@ -1,0 +1,149 @@
+// SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
+// SPDX-License-Identifier: Apache-2.0
+
+@_spi(Host) import SwiftOmniUICore
+
+/// The proposal and the safe region in one container's coordinates. Native hosts
+/// carry this with placement; geometry and scrolling read the same result.
+@_spi(Host) public struct SafeAreaContext: Equatable, Sendable {
+    public var bounds: Rect
+    public var container: Rect
+    public var keyboard: Rect
+    public var consumed: EdgeInsets
+
+    public init(bounds: Rect, container: Rect? = nil, keyboard: Rect? = nil,
+                consumed: EdgeInsets = EdgeInsets(0)) {
+        self.bounds = bounds
+        self.container = container ?? bounds
+        self.keyboard = keyboard ?? bounds
+        self.consumed = consumed
+    }
+
+    public var safe: Rect { Self.intersection(container, keyboard) }
+
+    public var insets: EdgeInsets { Self.insets(of: safe, in: bounds) }
+
+    /// A child keeps the enclosing proposal's unsafe strips only at edges where
+    /// it touches the safe region. A local card cannot acquire a window-wide bar.
+    public func child(in frame: Rect) -> Self {
+        let safe = self.safe
+        let left = frame.x <= safe.x ? min(frame.x, bounds.x) : frame.x
+        let top = frame.y <= safe.y ? min(frame.y, bounds.y) : frame.y
+        let right = frame.x + frame.width >= safe.x + safe.width
+            ? max(frame.x + frame.width, bounds.x + bounds.width) : frame.x + frame.width
+        let bottom = frame.y + frame.height >= safe.y + safe.height
+            ? max(frame.y + frame.height, bounds.y + bounds.height) : frame.y + frame.height
+        func local(_ rect: Rect) -> Rect {
+            Rect(rect.x - frame.x, rect.y - frame.y, rect.width, rect.height)
+        }
+        return Self(bounds: local(Rect(left, top, max(0, right - left), max(0, bottom - top))),
+                    container: local(container), keyboard: local(keyboard), consumed: consumed)
+    }
+
+    public func padding(_ insets: EdgeInsets) -> Self {
+        var result = self
+        result.container = container.inset(insets)
+        return result
+    }
+
+    public func inset(edge: Edge, extent: Double, spacing: Double) -> Self {
+        var insets = EdgeInsets(0)
+        let amount = max(0, extent.isFinite ? extent : 0) + (spacing.isFinite ? spacing : 0)
+        switch edge {
+        case .top: insets.top = amount
+        case .bottom: insets.bottom = amount
+        case .leading: insets.left = amount
+        case .trailing: insets.right = amount
+        }
+        return padding(insets)
+    }
+
+    /// Container and keyboard are independent regions. Ignoring one never
+    /// clears the other, and an inner inset can reserve space again afterwards.
+    public func ignoring(_ edges: SafeAreaEdges?) -> Self {
+        guard let edges else { return self }
+        let sides: [SafeArea]
+        switch edges {
+        case .uniform(let area): sides = [area, area, area, area]
+        case .edges(let left, let top, let right, let bottom): sides = [left, top, right, bottom]
+        }
+        func cleared(_ rect: Rect, bit: Int32) -> Rect {
+            let left = sides[0].rawValue & bit == 0 ? bounds.x : rect.x
+            let top = sides[1].rawValue & bit == 0 ? bounds.y : rect.y
+            let right = sides[2].rawValue & bit == 0 ? bounds.x + bounds.width : rect.x + rect.width
+            let bottom = sides[3].rawValue & bit == 0 ? bounds.y + bounds.height : rect.y + rect.height
+            return Rect(left, top, max(0, right - left), max(0, bottom - top))
+        }
+        var result = self
+        result.container = cleared(container, bit: SafeArea.container.rawValue)
+        result.keyboard = cleared(keyboard, bit: SafeArea.keyboard.rawValue)
+        return result
+    }
+
+    /// A scroller can extend its native viewport on its scrolling axes while
+    /// keeping its own layout frame in the safe proposal.
+    public func viewport(in frame: Rect, axes: Axis) -> Rect {
+        // All four margins belong to the scroll container. Orientation controls
+        // document proposals and movement, not whether its background extends.
+        bounds
+    }
+
+    public func consuming(in frame: Rect) -> Self {
+        Self(bounds: frame, consumed: consumed + Self.insets(of: safe, in: frame))
+    }
+
+    public static func insets(of safe: Rect, in frame: Rect) -> EdgeInsets {
+        EdgeInsets(top: min(frame.height, max(0, safe.y - frame.y)),
+                   leading: min(frame.width, max(0, safe.x - frame.x)),
+                   bottom: min(frame.height, max(0, frame.y + frame.height - safe.y - safe.height)),
+                   trailing: min(frame.width, max(0, frame.x + frame.width - safe.x - safe.width)))
+    }
+
+    public static func intersection(_ lhs: Rect, _ rhs: Rect) -> Rect {
+        let x = max(lhs.x, rhs.x), y = max(lhs.y, rhs.y)
+        return Rect(x, y, max(0, min(lhs.x + lhs.width, rhs.x + rhs.width) - x),
+                    max(0, min(lhs.y + lhs.height, rhs.y + rhs.height) - y))
+    }
+}
+
+extension MountedElement {
+    public var isGeometryReader: Bool { value(.isGeometryReader)?.bool == true }
+    public var safeAreaInsetEdge: Edge? { value(.safeAreaInsetEdge).flatMap(Edge.init(propValue:)) }
+    public var safeAreaPadding: EdgeInsets? {
+        value(Prop("safeAreaPadding")) == nil ? nil : insets(Prop("safeAreaPadding"))
+    }
+    public var isSafeAreaBoundary: Bool {
+        safeAreaInsetEdge != nil || safeAreaPadding != nil || ignoresSafeArea != nil
+    }
+
+    /// Only the page's uninterrupted root modifier chain joins native chrome.
+    /// GeometryReader, scrolling, stacks and sized/padded local frames end it.
+    public var pageTopSafeAreaBars: [MountedElement] {
+        var bars: [MountedElement] = []
+        var next: MountedElement? = self
+        while let element = next {
+            guard element.value(.isVisible)?.bool != false, element.value(.clipsContent)?.bool != true else { break }
+            let children = element.type == .page ? element.arrangedChildren : element.currentChildren
+            if let edge = element.safeAreaInsetEdge, children.count == 2 {
+                guard edge == .top else { break }
+                if (element.number(.spacing) ?? 0) < 0 { return [] }
+                if edge == .top, children[1].value(.isVisible)?.bool != false {
+                    bars.append(children[1])
+                }
+                next = children[0]
+                continue
+            }
+            guard !element.isGeometryReader, element.safeAreaPadding == nil, element.ignoresSafeArea == nil,
+                  element.value(.clipsContent)?.bool != true,
+                  element.number(.width) == nil, element.number(.height) == nil,
+                  element.number(.maximumWidth).map({ !$0.isFinite || $0 < 0 }) ?? true,
+                  element.number(.maximumHeight).map({ !$0.isFinite || $0 < 0 }) ?? true,
+                  element.insets(.padding) == EdgeInsets(0), element.insets(.contentPadding) == EdgeInsets(0),
+                  element.type == .page || (element.type == .grid && children.count == 1
+                      && children[0].value(.isFrameContent)?.bool == true)
+            else { break }
+            next = children.first
+        }
+        return bars
+    }
+}

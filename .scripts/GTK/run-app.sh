@@ -14,9 +14,7 @@
 #
 # A running copy of the head is stopped first: a GTK application is one
 # instance, and a second launch would only bring the first one forward.
-# Everything a build writes stays under <app-dir>/.build/gtk. Every SWIFTOMNIUI_
-# variable of the calling shell - SWIFTOMNIUI_TALLY=1, SWIFTOMNIUI_INSPECT=1 - reaches
-# the application.
+# Everything a build writes stays under <app-dir>/.build/gtk.
 set -euo pipefail
 
 app_dir=""

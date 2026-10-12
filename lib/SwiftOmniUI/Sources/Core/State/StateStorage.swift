@@ -311,13 +311,6 @@ extension State.Storage where Value: Walked {
             return made
         }
 
-        if made == nil {
-            complain("`\(origin ?? "a state")` is carried as the value itself - a feed "
-                + "or a driven property has it, and the host has its number - and "
-                + "was handed to something that walks it, or its journey was read. "
-                + "One state has one shape: declare a second state for the other.")
-        }
-
         return made
     }
 
@@ -430,13 +423,6 @@ extension State.Storage where Value: StateValue {
             }
 
             return made
-        }
-
-        if made == nil {
-            complain("`\(origin ?? "a state")` is carried as a journey - a Slider's "
-                + "or a Stepper's - and was handed to something that carries the "
-                + "value itself. One state has one shape: declare a second state "
-                + "for the other.")
         }
 
         return made

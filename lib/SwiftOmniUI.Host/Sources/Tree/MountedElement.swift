@@ -607,6 +607,11 @@ import CRT
         default:
             break
         }
+        if isGeometryReader {
+            // Its content never supplies the reader's ideal size or scroll axes.
+            values.scrollAxes = .neither
+            values.expandingAxes = .both
+        }
         values.horizontal = value(.horizontalAlignment)?.enumeration
             ?? value(.horizontalAlignmentDefault)?.enumeration ?? 3
         values.vertical = value(.verticalAlignment)?.enumeration

@@ -34,6 +34,7 @@ namespace {
 
         controls::Grid sheets;
         sheets.Tag(winrt::box_value(L"sheets"));
+        controls::Canvas::SetZIndex(sheets, 2);
         controls::Grid::SetRowSpan(sheets, 4);
         media::Animation::TransitionCollection transitions;
         transitions.Append(media::Animation::PopupThemeTransition());

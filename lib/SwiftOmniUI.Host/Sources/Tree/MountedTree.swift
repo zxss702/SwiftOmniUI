@@ -126,9 +126,6 @@
 
     var arrangementChanged = false
 
-    /// What the runtime writes out for its log: the running tally and the inspected passes.
-    public private(set) var diagnostics: DiagnosticText
-
     private let now: () -> Double
     private let reducesMotion: () -> Bool
     let makeNative: (MountedElement) -> any NativeElement
@@ -141,7 +138,7 @@
     /// window composes its chrome again only then. The host clears it once its windows have.
     public var chromeMayChange = true
 
-    /// What the message being applied costs, while an inspector records or the tally is written; nil otherwise.
+    /// What the message being applied costs, while an inspector records; nil otherwise.
     var tally: RenderTally?
 
     /// A tree whose elements' native halves `makeNative` makes, on `now`'s time.
@@ -153,7 +150,6 @@
         layoutMotion: LayoutMotion,
         now: @escaping () -> Double,
         reducesMotion: @escaping () -> Bool,
-        diagnostics: DiagnosticText = .environment,
         makeNative: @escaping (MountedElement) -> any NativeElement
     ) {
         self.core = core
@@ -164,13 +160,10 @@
         self.now = now
         self.reducesMotion = reducesMotion
         self.makeNative = makeNative
-        self.diagnostics = diagnostics
-        // The first take starts the recording, so the log holds every pass from here on.
-        if diagnostics.inspects { _ = core.takeInspectionLog() }
     }
 
     /// Applies a message's root `patch`, at one time for the whole message; a new root when `complete`.
-    /// While an inspector records, it is told what the apply cost; the diagnostic text hears of it too.
+    /// While an inspector records, it is told what the apply cost.
     /// Design: docs/design/host/patches.md#what-a-message-costs
     public func apply(_ patch: HostPatch, complete: Bool) {
         let previousPatchTime = patchTime
@@ -179,13 +172,12 @@
         if patchTime == nil { patchTime = now() }
         if patchReducesMotion == nil { patchReducesMotion = reducesMotion() }
         let inspecting = core.inspecting
-        tally = inspecting || diagnostics.tallies ? RenderTally() : nil
+        tally = inspecting ? RenderTally() : nil
         defer {
             if let tally {
                 if inspecting, let generation = intake.generationBeingApplied {
                     core.inspected(tally, generation: generation)
                 }
-                diagnostics.applied(tally, began: patchTime ?? 0, core: core)
             }
             patchTime = previousPatchTime
             patchReducesMotion = previousPatchReducesMotion

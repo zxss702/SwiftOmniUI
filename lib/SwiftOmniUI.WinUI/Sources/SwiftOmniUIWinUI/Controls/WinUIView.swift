@@ -18,6 +18,78 @@ class WinUIView {
     /// The layout that places this view, which a place written between passes asks to arrange again.
     weak var placingLayout: WinUILayoutView?
 
+    /// Logical ancestry survives native toolbar hosting.
+    weak var sourceElement: MountedElement?
+    var safeAreaContext: SafeAreaContext?
+    var rootSafeAreaContext: ((Rect) -> SafeAreaContext)?
+
+    /// A native toolbar owns the widget, while the source modifier still owns
+    /// its layout contribution, animation ancestry and parent-space report.
+    weak var nativeSafeBarOwner: AnyObject?
+    private(set) var safeBarDrawing: HostMatrix?
+
+    func recordSafeBarPlace(_ place: Rect, context: SafeAreaContext) {
+        placed = place
+        safeAreaContext = context
+        updateSafeBarDrawing()
+    }
+
+    func clearSafeBarDrawing() {
+        safeBarDrawing = nil
+        setPlacedDrawing(nil, opacity: 1)
+        writeTransform()
+    }
+
+    func updateSafeBarDrawing() {
+        guard nativeSafeBarOwner != nil else { return }
+        var matrix = HostMatrix.identity
+        var opacity = 1.0
+        var x = placedFrame.x, y = placedFrame.y
+        var totalX = 0.0, totalY = 0.0
+        var next = sourceElement?.parent
+        while let element = next {
+            if let view = (element.native as? WinUIElement)?.view {
+                let frame = view.placedFrame
+                var moved = HostMatrix.identity
+                moved.m41 = x
+                moved.m42 = y
+                totalX += x
+                totalY += y
+                matrix = matrix * moved * view.drawing.matrix(width: frame.width, height: frame.height)
+                opacity *= view.opacity * view.placedOpacity
+                x = frame.x
+                y = frame.y
+            }
+            next = element.parent
+        }
+        var unmoved = HostMatrix.identity
+        unmoved.m41 = -totalX
+        unmoved.m42 = -totalY
+        safeBarDrawing = matrix * unmoved
+        setPlacedDrawing(placedDrawing, opacity: opacity)
+        writeTransform()
+    }
+
+    /// An ancestor opacity/offset animation need not cause layout. Mirror it
+    /// to promoted descendants when drawing changes as well as when arranging.
+    func refreshNativeSafeBarDrawing() {
+        func visit(_ element: MountedElement) {
+            for child in element.children {
+                if let view = (child.native as? WinUIElement)?.view, view.nativeSafeBarOwner != nil {
+                    view.updateSafeBarDrawing()
+                } else {
+                    visit(child)
+                }
+            }
+        }
+        if let sourceElement { visit(sourceElement) }
+    }
+
+    func layoutSafeArea(in bounds: Rect) -> SafeAreaContext {
+        (safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds))
+            .ignoring(sourceElement?.ignoresSafeArea)
+    }
+
     /// Toolbar controls share the title bar's transparent trigger appearance.
     var isToolbarControl = false
 
@@ -97,6 +169,7 @@ class WinUIView {
         guard drawn != writtenOpacity else { return }
         writtenOpacity = drawn
         swiftomniui_winui_set_opacity(handle, drawn)
+        refreshNativeSafeBarDrawing()
     }
 
     /// How a placing layout draws the view over the place it gave, and how opaque; nil and 1 for as the view says.
@@ -108,6 +181,7 @@ class WinUIView {
         placedOpacity = opacity
         writeTransform()
         setOpacity(self.opacity)
+        refreshNativeSafeBarDrawing()
     }
 
     /// Whether clicks and touches go through the view to what is behind it.
@@ -141,6 +215,7 @@ class WinUIView {
     func setTransform(_ transform: HostDrawingTransform) {
         self.transform = transform
         writeTransform()
+        refreshNativeSafeBarDrawing()
     }
 
     /// How the view is drawn over its place: its own transform with a placing layout's over it
@@ -158,7 +233,8 @@ class WinUIView {
         swiftomniui_winui_set_transform(
             handle, drawn.translationX, drawn.translationY, drawn.rotation,
             drawn.scaleX, drawn.scaleY, drawn.pivotX * size.width, drawn.pivotY * size.height)
-        let tip = drawn.tip(width: size.width, height: size.height)
+        let ownTip = drawn.tip(width: size.width, height: size.height)
+        let tip = safeBarDrawing.map { (ownTip ?? .identity) * $0 } ?? ownTip
         guard tip != writtenTip else { return }
         writtenTip = tip
         guard let tip else { return swiftomniui_winui_set_projection(handle, nil) }
@@ -221,9 +297,7 @@ class WinUIView {
             return desiredSize
         }
         var size = [0.0, 0.0]
-        WinUIRenderer.timed("winui.nativeMeasure") {
-            swiftomniui_winui_measure(handle, width ?? .infinity, height ?? .infinity, &size)
-        }
+        swiftomniui_winui_measure(handle, width ?? .infinity, height ?? .infinity, &size)
         let measured = LayoutSize(width: size[0], height: size[1])
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.
@@ -243,8 +317,12 @@ class WinUIView {
     /// the layout for one. Its size is its words' room while its place travels.
     /// Design: docs/design/platforms/winui/layout.md#a-place-between-passes
     func layout(_ place: Rect) {
+        if nativeSafeBarOwner == nil, let placingLayout {
+            safeAreaContext = placingLayout.context(for: self, at: place)
+                .ignoring(sourceElement?.ignoresSafeArea)
+        }
         let resized = placed.map { $0.width != place.width || $0.height != place.height } ?? true
-        placed = place
+        if nativeSafeBarOwner == nil { placed = place }
         if Self.arranging > 0 {
             // A layout of SwiftOmniUI's is measured at the width it stands at; a new width is measured once the
             // pass ends - measuring an element while WinUI arranges marks it for another pass, for ever.
@@ -296,7 +374,10 @@ class WinUIView {
     /// Where the view stands, in DIPs: its frame in its parent, its place in the window, and the frame the
     /// window's content - clear of its chrome - stands in there.
     func frameReport(safeArea: Rect) -> [Double] {
-        MountedElement.frameNumbers(place: placedFrame, corner: origin, safeArea: safeArea)
+        let corner = origin
+        let local = safeAreaContext?.safe
+        let safe = local.map { Rect(corner.x + $0.x, corner.y + $0.y, $0.width, $0.height) } ?? safeArea
+        return MountedElement.frameNumbers(place: placedFrame, corner: corner, safeArea: safe)
     }
 
     /// Where WinUI laid the element out in its parent, in DIPs.

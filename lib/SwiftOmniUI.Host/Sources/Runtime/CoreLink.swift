@@ -27,9 +27,6 @@
     /// Whether an inspector records.
     var inspecting: Bool { HostBoundary.inspecting }
 
-    /// Every pass reported on since the last take, as text; the first take starts the recording for good.
-    func takeInspectionLog() -> String { HostBoundary.takeInspectionLog() }
-
     /// Tells the inspector what applying the message of `generation` cost: every scene's part by its key, then the
     /// whole.
     @MainActor
@@ -51,7 +48,7 @@
     /// The last display cycle as one line.
     public var cycleTrace: String { HostBoundary.cycleTrace }
 
-    /// What this process's renders came to - the tally a runtime prints to count leaks.
+    /// What this process's renders came to, available to an inspector or a test.
     public var tally: HostTally { HostBoundary.tally }
 
     /// Runs the display's cycle at `now` and returns what it published.

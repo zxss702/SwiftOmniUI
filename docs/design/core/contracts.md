@@ -127,7 +127,7 @@ host takes the same machinery.
                   realization
 ```
 
-A member of a contract the element does not wear is refused and said once, at
+A member of a contract the element does not wear is refused, at
 registration and at report alike. `apply` puts changed properties registered
 alone in name order, then runs each whole applier whose members changed, every
 value read as the host presents it - a value in animation or carried by a state
@@ -166,8 +166,9 @@ some acts of its own - a chooser, a prompt - that no contract declares.
 
 ## Unrealized names
 
-A node type described for the first time that the host said it does not realize
-is said once, with the realized names nearest to it - at most three, within a
-quarter of the name's length in single-character edits (at least two). A
-handler listening for an application event the host does not raise is said once
-the same way. Nothing is said while the host has said nothing.
+Realization diagnostics can describe a node type the host does not realize,
+with the realized names nearest to it - at most three, within a quarter of
+the name's length in single-character edits (at least two). An application
+event the host does not raise can be described the same way. These descriptions
+are returned as values without writing output. No description is available
+while the host has said nothing.

@@ -96,7 +96,6 @@ struct FoundationProbeSample: SampleContent, ExampleContent {
             let json = (try? JSONEncoder().encode(["probe": 1])) ?? Data()
             found.append(("JSONEncoder", String(decoding: json, as: UTF8.self)))
 
-            for row in found { print("FOUNDATION-PROBE \\(row.0): \\(row.1)") }
             rows = found
         }
 
@@ -191,7 +190,6 @@ struct FoundationProbeSample: SampleContent, ExampleContent {
             let json = (try? JSONEncoder().encode(["probe": 1])) ?? Data()
             found.append(("JSONEncoder", String(decoding: json, as: UTF8.self)))
 
-            for row in found { print("FOUNDATION-PROBE \(row.0): \(row.1)") }
             rows = found
         }
     }

@@ -130,13 +130,6 @@ enum Inspection {
     /// Told whenever a pass lands or the host reports on one.
     nonisolated(unsafe) static var landed: (() -> Void)?
 
-    /// Whether the host takes every pass as text too (`SWIFTOMNIUI_INSPECT=1`); set by its
-    /// first `takeLog()`, after which recording stays on.
-    nonisolated(unsafe) static var logging = false
-
-    /// The passes written out as text and not yet taken.
-    nonisolated(unsafe) private static var log = ""
-
     /// One composed view the differ is inside.
     private struct Frame {
         let view: String
@@ -166,11 +159,8 @@ enum Inspection {
         recording = true
     }
 
-    /// Stops recording, keeping what was recorded - unless the host takes the passes
-    /// as text.
+    /// Stops recording, keeping what was recorded.
     static func stop() {
-        guard !logging else { return }
-
         recording = false
         pass = nil
         stack.removeAll()
@@ -350,30 +340,10 @@ enum Inspection {
 
         passes[index].host = host
 
-        if logging {
-            log += text(of: passes[index])
-        }
-
         landed?()
     }
 
     // MARK: - As text
-
-    /// Every pass the host reported on since the last call, as text; the first call
-    /// starts recording for good.
-    static func takeLog() -> String {
-        if !logging {
-            logging = true
-
-            if !recording {
-                start()
-            }
-        }
-
-        defer { log = "" }
-
-        return log
-    }
 
     /// One pass as text, the way an inspector shows it.
     static func text(of pass: InspectedPass) -> String {

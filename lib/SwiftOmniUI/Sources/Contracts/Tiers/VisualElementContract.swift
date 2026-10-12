@@ -162,6 +162,10 @@ public enum VisualElementContract: Contract {
     public static let safeAreaInsetEdge = ElementProperty<Self, Edge>(
         "safeAreaInsetEdge", layer: .structure, travels: false)
 
+    /// An ordered safe-area modifier, separate from document/content padding.
+    @_spi(Host) public static let safeAreaPadding = ElementProperty<Self, EdgeInsets>(
+        "safeAreaPadding", layer: .structure, travels: false)
+
     /// How far the element is moved across from where its layout put it.
     public static let translationX = ElementProperty<Self, Double>(
         "translationX", layer: .native, moves: .place)
@@ -250,7 +254,7 @@ public enum VisualElementContract: Contract {
         isLayoutDecoration, isVisible, layoutDirection,
         matchedGeometry, matchedGeometrySource, maximumHeight, maximumWidth, minimumHeight,
         minimumWidth, opacity, pivotX, pivotY,
-        rotation, rotationX, rotationY, safeAreaInsetEdge, scale, scaleX, scaleY, shadow, style, symbolEffect,
+        rotation, rotationX, rotationY, safeAreaInsetEdge, safeAreaPadding, scale, scaleX, scaleY, shadow, style, symbolEffect,
         symbolEffectActive, symbolEffectOptions, symbolEffectValue, transition, translationX,
         translationY, unfocus, verticalAlignmentDefault, width, zIndex,
     ]

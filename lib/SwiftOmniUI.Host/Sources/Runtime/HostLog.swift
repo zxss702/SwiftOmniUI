@@ -45,8 +45,7 @@ import CRT
         "SwiftOmniUI \(host): \(message)\n"
     }
 
-    /// Writes `text` to file descriptor 2, which nothing buffers. `SWIFTOMNIUI_LOG` names a file the line also lands
-    /// in, for hosts whose standard error reaches no reader.
+    /// Writes `text` to file descriptor 2, which nothing buffers.
     static func writeStandardError(_ text: String) {
         var text = text
         text.withUTF8 { bytes in
@@ -56,16 +55,5 @@ import CRT
             _ = write(2, bytes.baseAddress, bytes.count)
             #endif
         }
-        // `SWIFTOMNIUI_LOG` names a file the line also lands in, for hosts whose
-        // standard error reaches no reader; C streams carry it, Foundation
-        // never entering the library.
-        if let path = logFile, let stream = fopen(path, "a") {
-            var text = text
-            text.withUTF8 { bytes in bytes.baseAddress.map { _ = fwrite($0, 1, bytes.count, stream) } }
-            fclose(stream)
-        }
     }
-
-    /// The path `SWIFTOMNIUI_LOG` names, read once.
-    private static let logFile: String? = getenv("SWIFTOMNIUI_LOG").map { String(cString: $0) }
 }

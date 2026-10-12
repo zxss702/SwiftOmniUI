@@ -115,7 +115,7 @@ and this table maps the two.
 | aim (`@Aim`) | control reference | the reference an act is called through |
 | completion id | continuation handle | the negative id an awaited act or animation is answered by |
 | declaration (`HostDeclaration`) | capability manifest | which elements and members a host realizes: presence, not ownership |
-| tally, pass, complaint | render counters, trace record, logged warning | what the core's diagnostics count, trace and say once |
+| tally, pass | render counters, trace record | what the core's diagnostics count and record |
 | sync (`Sync`) | frame source | the clock a cycle runs on |
 | arrangement (layout) | layout pass | a layout placing its children |
 | placement | frame | the rectangle a layout gives a child |

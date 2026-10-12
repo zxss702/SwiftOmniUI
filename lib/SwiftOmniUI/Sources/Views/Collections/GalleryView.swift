@@ -259,7 +259,7 @@ public struct GalleryView<Items: RandomAccessCollection, Id: Hashable>: View {
     @_spi(Host) public func shade(_ view: Element, amount: Double = 1) -> Self {
         var copy = self
         copy.mask = view
-        copy.shades = Self.fraction(amount, "shade(_:amount:)")
+        copy.shades = Self.fraction(amount)
         return copy
     }
 
@@ -275,28 +275,17 @@ public struct GalleryView<Items: RandomAccessCollection, Id: Hashable>: View {
     /// - Returns: the gallery, fading that much.
     @_spi(Host) public func fading(_ amount: Double) -> Self {
         var copy = self
-        copy.fades = Self.fraction(amount, "fading(_:)")
+        copy.fades = Self.fraction(amount)
         return copy
     }
 
-    /// A strength held between 0 and 1, saying so where it had to be: held
-    /// rather than refused, so a gallery still being written keeps working.
-    private static func fraction(_ amount: Double, _ modifier: String) -> Double {
+    /// A strength held between 0 and 1 so an out-of-range value keeps working.
+    private static func fraction(_ amount: Double) -> Double {
         guard amount.isFinite else {
-            complain("GalleryView.\(modifier) was given a number that is not one. Using 1.")
             return 1
         }
 
-        let held = min(max(amount, 0), 1)
-
-        if held != amount {
-            complain("""
-                GalleryView.\(modifier) takes a strength from 0 to 1, and was \
-                given \(amount). Using \(held).
-                """)
-        }
-
-        return held
+        return min(max(amount, 0), 1)
     }
 
     /// The cards, the shape they stand in, and the scroller that turns them.

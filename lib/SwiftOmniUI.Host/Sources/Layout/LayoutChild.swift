@@ -263,7 +263,11 @@ extension LayoutChild {
     public func size(offering width: Double?, measure: () -> LayoutSize) -> LayoutSize {
         if let kept = sizes.first(where: { $0.width == width }) { return kept.size }
 
+        let startedAt = revision
         let measured = measure()
+        // Native feedback can invalidate this cache during the query. Do not
+        // retain a result produced from the previous layout revision.
+        guard revision == startedAt else { return measured }
         if sizes.count == Self.capacity { sizes.removeFirst() }
         sizes.append((width, measured))
         return measured

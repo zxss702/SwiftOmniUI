@@ -130,7 +130,7 @@ moves sixty times a second costs a render only where a body prints it.
 
 An image is either the value's own lanes (a feed, a text, a plain value) or a
 journey's (`JourneyLanes`: a driven property, a slider, a scroller). One state
-has one shape. A state handed to both is refused with a complaint: declare a
+has one shape. A state handed to both is refused: declare a
 second state for the other role. The one exception is an image the host has not
 been told the number of yet - made by a hand-over the differ has not
 registered, in the same body that now hands the state to a slider. It is

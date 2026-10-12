@@ -19,6 +19,9 @@ final class WinUIScrollDocument: WinUILayoutView {
         didSet { if padding != oldValue { invalidateMeasurements() } }
     }
 
+    /// The pass's resolved padding; assigning it has no native side effects.
+    var layoutPadding = EdgeInsets(0)
+
     var orientation = Axis.vertical {
         didSet { if orientation != oldValue { invalidateMeasurements() } }
     }
@@ -31,7 +34,7 @@ final class WinUIScrollDocument: WinUILayoutView {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        ScrollArithmetic.contentSize(of: items.first, padding: padding, orientation: orientation, width: width)
+        ScrollArithmetic.contentSize(of: items.first, padding: layoutPadding, orientation: orientation, width: width)
     }
 
     /// The scroller's presenter asks this size as it arranges - inside the pass, where a layout answers only
@@ -51,8 +54,15 @@ final class WinUIScrollDocument: WinUILayoutView {
         guard let item = items.first, item.isShown else { return }
 
         let arranged = ScrollArithmetic.arrange(
-            item, padding: padding, orientation: orientation,
+            item, padding: layoutPadding, orientation: orientation,
             in: LayoutSize(width: bounds.width, height: bounds.height))
         item.view.layout(arranged.place)
     }
+    override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
+        // The document's margins consumed the viewport's contributions.
+        // Scrolling cannot make those contributions reappear in inner readers.
+        SafeAreaContext(bounds: Rect(0, 0, place.width, place.height),
+                        consumed: padding)
+    }
+
 }

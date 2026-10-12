@@ -84,10 +84,13 @@ extension View {
         let edges: SafeAreaEdges = edges == .all
             ? .uniform(answer)
             : .edges(
-                left: edges.contains(.leading) ? answer : .container,
-                top: edges.contains(.top) ? answer : .container,
-                right: edges.contains(.trailing) ? answer : .container,
-                bottom: edges.contains(.bottom) ? answer : .container)
-        return setting(LayoutContract.ignoresSafeArea, edges)
+                left: edges.contains(.leading) ? answer : .all,
+                top: edges.contains(.top) ? answer : .all,
+                right: edges.contains(.trailing) ? answer : .all,
+                bottom: edges.contains(.bottom) ? answer : .all)
+        return revised {
+            $0.wrapPaddedFrame()
+            $0.write(LayoutContract.ignoresSafeArea, edges)
+        }
     }
 }

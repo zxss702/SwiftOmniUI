@@ -50,7 +50,7 @@ under a finger costs the arithmetic and nothing else.
 
 A part of a state (`$room.width`) has no image of its own for the host to write
 into, and a binding made from closures has none either. A driven property
-refuses both with a complaint naming the property; a two-way control falls
+refuses both; a two-way control falls
 back to its described form instead.
 
 ## Element side only

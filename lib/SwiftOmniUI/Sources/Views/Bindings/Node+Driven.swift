@@ -16,9 +16,6 @@ extension Node {
         kind: StateKind
     ) {
         guard let image = state.image else {
-            complain("`\(property.name)` was driven from a part of a state, or a binding "
-                + "made from closures, which the host cannot carry. Drive it from "
-                + "the whole state.")
             return
         }
 
@@ -43,9 +40,6 @@ extension Node {
     ) {
         guard kind == .property else {
             guard let image = state.image else {
-                complain("`\(property.name)` was driven from a part of a state, or a binding "
-                    + "made from closures, which the host cannot carry. Drive it from "
-                    + "the whole state.")
                 return
             }
 
@@ -57,9 +51,6 @@ extension Node {
         }
 
         guard let image = state.journeyImage else {
-            complain("`\(property.name)` was handed a part of a state, a binding made from "
-                + "closures, or a state the host already carries in another shape, "
-                + "none of which it can walk. Hand it the whole state.")
             return
         }
 
@@ -89,10 +80,6 @@ extension Node {
     /// A property the host animates from a state.
     mutating func driveJourney<Value: Walked>(_ property: Prop, by state: Binding<Value>) {
         guard let image = state.journeyImage else {
-            complain("`\(property.name)` was handed a part of a state, a binding made from "
-                + "closures, or a state the host already carries in another shape, "
-                + "none of which it can walk. Hand it the whole state, declared for "
-                + "it.")
             return
         }
 
@@ -143,9 +130,6 @@ extension Node {
     /// told where to report (`panX`, `panY`).
     mutating func driveNumber<Value: StateValue>(_ property: Prop, by state: Binding<Value>) {
         guard let image = state.image else {
-            complain("`\(property.name)` was told to report into a part of a state, or a "
-                + "binding made from closures, which the host cannot carry. Report "
-                + "into the whole state.")
             return
         }
 

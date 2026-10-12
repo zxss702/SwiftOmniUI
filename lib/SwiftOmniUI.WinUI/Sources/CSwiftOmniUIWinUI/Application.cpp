@@ -69,7 +69,16 @@ namespace swiftomniui {
         /// The application: WinUI's control resources and their type information, with no XAML file.
         /// Design: docs/design/platforms/winui/runtime.md#an-application-with-no-xaml
         struct SwiftOmniUIApplication : xaml::ApplicationT<SwiftOmniUIApplication, xaml::Markup::IXamlMetadataProvider> {
-            explicit SwiftOmniUIApplication(bool embedded) : embedded(embedded) {}
+            explicit SwiftOmniUIApplication(bool embedded) : embedded(embedded) {
+                UnhandledException([](IInspectable const &, xaml::UnhandledExceptionEventArgs const &args) {
+                    auto message = winrt::to_string(args.Message());
+                    std::fprintf(stderr, "SwiftOmniUI: unhandled XAML exception HRESULT=0x%08lx: %s\n",
+                        static_cast<unsigned long>(args.Exception().value), message.c_str());
+                    std::fflush(stderr);
+                    // Preserve XAML's original termination behaviour. This is
+                    // diagnostics, not recovery from an unknown layout failure.
+                });
+            }
 
             void OnLaunched(xaml::LaunchActivatedEventArgs const &) {
                 if (embedded) return;

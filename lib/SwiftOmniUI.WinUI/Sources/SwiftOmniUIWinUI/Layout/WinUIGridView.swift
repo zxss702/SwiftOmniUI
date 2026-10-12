@@ -43,7 +43,8 @@ final class WinUIGridView: WinUITravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        GridArithmetic.size(
+        if sourceElement?.isGeometryReader == true { return GeometryReaderArithmetic.size(width: width) }
+        return GridArithmetic.size(
             of: items, rows: rows, columns: columns,
             rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, width: width,
             flow: flowColumns)
@@ -51,6 +52,22 @@ final class WinUIGridView: WinUITravellingLayout {
 
     override func arrange(in bounds: Rect) {
         beginArrangement(width: bounds.width)
+        let context = layoutSafeArea(in: bounds)
+        if let element = sourceElement, element.isSafeAreaBoundary, let item = items.first {
+            let next = context.padding(element.safeAreaPadding ?? EdgeInsets(0))
+            let place = SafeAreaArithmetic.base(of: item, boundary: item.element?.isSafeAreaBoundary == true,
+                                               ignores: item.element?.ignoresSafeArea,
+                                               in: next, direction: direction)
+            self.place(item, at: place)
+            return
+        }
+        if sourceElement?.isGeometryReader == true {
+            let places = GeometryReaderArithmetic.places(of: items, in: bounds, direction: direction)
+            for (item, place) in zip(items, places) {
+                if let place { self.place(item, at: place) }
+            }
+            return
+        }
         let places = GridArithmetic.places(
             of: items, rows: rows, columns: columns,
             rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, in: bounds,
@@ -59,4 +76,11 @@ final class WinUIGridView: WinUITravellingLayout {
             if let place { self.place(item, at: place) }
         }
     }
+    override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
+        let frame = placedFrame
+        let context = layoutSafeArea(in: Rect(0, 0, frame.width, frame.height))
+            .padding(sourceElement?.safeAreaPadding ?? EdgeInsets(0))
+        return context.child(in: place)
+    }
+
 }

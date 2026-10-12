@@ -65,10 +65,8 @@ final class WinUIImageView: WinUIView {
             if !found { WinUIRenderer.log.error("no symbol \(name) the platform knows") }
         } else {
             let files = PictureArithmetic.files(for: file)
-            found = WinUIRenderer.timed("winui.imageLoad") {
-                WinUIStrings.withCStrings(files) { names in
-                    swiftomniui_winui_image_set(handle, names, Int32(files.count), aspect.rawValue, &size)
-                }
+            found = WinUIStrings.withCStrings(files) { names in
+                swiftomniui_winui_image_set(handle, names, Int32(files.count), aspect.rawValue, &size)
             }
             if !found { WinUIRenderer.log.error("no picture \(file) among the application's pictures") }
         }
@@ -110,8 +108,6 @@ final class WinUIImageView: WinUIView {
             picturePlace = size
         }
         guard !symbol else { return }
-        WinUIRenderer.timed("winui.imageDraw") {
-            swiftomniui_winui_image_draw(handle, size.width, size.height)
-        }
+        swiftomniui_winui_image_draw(handle, size.width, size.height)
     }
 }

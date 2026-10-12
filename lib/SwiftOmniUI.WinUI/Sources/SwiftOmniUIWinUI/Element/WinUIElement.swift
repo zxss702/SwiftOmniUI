@@ -26,7 +26,7 @@ final class WinUIElement: NativeElement {
     init(_ element: MountedElement, host: WinUIRenderer) {
         self.element = element
         self.host = host
-        view = WinUIRenderer.timed("winui.makeView") { makeView() }
+        view = makeView()
     }
 
     // MARK: - The element's tree, read through its mounted element
@@ -53,21 +53,15 @@ final class WinUIElement: NativeElement {
     }
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {
-        WinUIRenderer.timed("winui.nativeApply") {
-            applyNative(changed: changed, wasDescribed: wasDescribed)
-        }
-    }
-
-    private func applyNative(changed: Set<Prop>, wasDescribed: Bool) {
         if wasDescribed, changed.contains(.isVisible) { crossVisibility() }
-        WinUIRenderer.timed("winui.properties") { applyProperties(changed: changed) }
+        applyProperties(changed: changed)
         if let view, let host { element.applyDrawnChildren(to: view, through: WinUIRegistrations.registry, in: host.runtime) }
         configureGestures()
         view?.setFocusChanged(element.handler(.isFocusedChanged) == nil ? nil : { [weak self] focused in
             self?.send(.isFocusedChanged, [.bool(focused)])
         })
         configureLayoutMotion()
-        WinUIRenderer.timed("winui.children") { arrangeChildren() }
+        arrangeChildren()
         arrangePages(changed: changed)
         if type == .contextMenu { parent?.contextMenuChanged = true }
         refreshContextMenu()

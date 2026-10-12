@@ -113,7 +113,6 @@ private struct InspectedApp: App {
         InspectorModel.shared.collapsed = []
         InspectorModel.shared.selected = nil
         InspectorModel.shared.windows = 0
-        Inspection.logging = false
         Inspection.stop()
         Inspection.ownViews = []
         Inspection.ownStates = []
@@ -193,20 +192,17 @@ private struct InspectedApp: App {
 
     // MARK: - As text
 
-    /// A pass is written out as text once the host has said what applying it
-    /// cost - what the host prints for `SWIFTOMNIUI_INSPECT=1` - and taken once.
-    func testAPassIsWrittenOutOnceTheHostReportsOnIt() throws {
-        Inspection.logging = true
-
+    /// The inspector can format a recorded pass on demand, after the host
+    /// has reported its cost, without a process-wide text log.
+    func testARecordedPassCanBeFormattedAfterTheHostReportsOnIt() throws {
         let first = try XCTUnwrap(pass(generation: 7) { Renders().render(Holds(counts: Counts()).node) })
-
-        XCTAssertEqual(Inspection.takeLog(), "", "written before the host reported on it")
 
         Inspection.applied(
             generation: 7,
             InspectedHost(apply: 352, nodes: 5, made: 2, kept: 3))
 
-        let lines = Inspection.takeLog().split(separator: "\n").map(String.init)
+        let recorded = try XCTUnwrap(Inspection.passes.last)
+        let lines = Inspection.text(of: recorded).split(separator: "\n").map(String.init)
         let head = try XCTUnwrap(lines.first)
 
         XCTAssertTrue(head.hasPrefix("SwiftOmniUI inspect #\(first.number) build at "), head)
@@ -216,7 +212,8 @@ private struct InspectedApp: App {
             "    ● Titled — first time",
             "    ● Reads — first time",
         ])
-        XCTAssertEqual(Inspection.takeLog(), "", "a pass taken is written once")
+        Inspection.stop()
+        XCTAssertFalse(Inspection.recording, "formatting a pass must not keep recording active")
     }
 
     // MARK: - The tree

@@ -8,7 +8,6 @@
 extension MountedElement {
     /// Insets reserved above this reader, measured in the same native layout as its frame.
     public func contentSafeAreaInsets(frameOf: (MountedElement) -> Rect?) -> EdgeInsets {
-        guard value(.isGeometryReader)?.bool == true else { return EdgeInsets(0) }
         return ancestorSafeAreaInsets { element, edge in
             frameOf(element).map { edge == .top || edge == .bottom ? $0.height : $0.width }
         }
@@ -23,6 +22,8 @@ extension MountedElement {
     public func ancestorSafeAreaInsets(extentOf: (MountedElement, Edge) -> Double?) -> EdgeInsets {
         var insets = EdgeInsets(0), child = self
         while let parent = child.parent {
+            // A native scroll document has already resolved its enclosing region.
+            if parent.type == .scrollView { break }
             defer { child = parent }
 
             guard let edge = parent.value(.safeAreaInsetEdge).flatMap(Edge.init(propValue:)) else { continue }
@@ -59,7 +60,7 @@ extension MountedElement {
                             contentInsets: EdgeInsets = EdgeInsets(0)) {
         guard readsOwnFrame else { return }
         var numbers = numbers
-        if value(.isGeometryReader)?.bool == true, contentInsets != EdgeInsets(0), numbers.count == 10 {
+        if contentInsets != EdgeInsets(0), numbers.count == 10 {
             let top = max(0, numbers[7] - numbers[5]) + contentInsets.top
             let left = max(0, numbers[6] - numbers[4]) + contentInsets.left
             let bottom = max(0, numbers[5] + numbers[3] - numbers[7] - numbers[9]) + contentInsets.bottom
@@ -103,7 +104,7 @@ extension MountedElement {
         var frames: [NamedSpaceFrame] = []
         var element = parent
         while let ancestor = element {
-            if let name = resolvedValue(.coordinateSpaceName)?.string,
+            if let name = ancestor.resolvedValue(.coordinateSpaceName)?.string,
                let frame = windowRect(ancestor) {
                 frames.append(NamedSpaceFrame(name: name, frame: frame))
             }

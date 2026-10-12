@@ -1,9 +1,9 @@
 # Diagnostics
 
-Three instruments tell what the core is doing without changing it: the tally
-of renders and live elements, the inspector's record of each render, and the
-complaints a value the library cannot use leaves behind. `debugInfo()`, which
-explains a single build in the author's names, is in invalidation.md.
+Two instruments tell what the core is doing without changing it: the tally
+of renders and live elements and the inspector's record of each render.
+`debugInfo()`, which explains a single build in the author's names, is in
+invalidation.md.
 
 ## The tally
 
@@ -21,8 +21,7 @@ is the other half, what counting live readers spared beside what got through.
 page that was left and still stands in memory shows as a number that does not
 come back down. It tells a leaked page from memory the allocator has not handed
 back yet, which a process's resident size cannot. A host reads the tally
-through `HostBoundary.tally` - a Swift runtime writes it with its own totals
-under `SWIFTOMNIUI_TALLY=1` (host/patches.md) - and the per-cycle trace through
+through `HostBoundary.tally` and the per-cycle trace through
 `HostBoundary.cycleTrace`, built only when the host's trace switch is on: this
 side has no environment to read.
 
@@ -43,8 +42,8 @@ the differ writes an entry for every composed view it reaches:
 
 Nothing runs while nobody looks: every hook in the differ is one read of
 `recording`, false until an inspector opens, so an application that never opens
-one pays a branch per composed view. A host that wants every pass as text
-(`SWIFTOMNIUI_INSPECT=1`) asks for the log once, and recording then stays on.
+one pays a branch per composed view. Closing the inspector stops recording.
+Passes can be formatted on demand without enabling automatic log output.
 
 The inspector is not its own subject. It is a tree like any other, built again
 whenever a pass lands, so its own views are muted - their time is kept apart and
@@ -56,19 +55,3 @@ draw again, for good.
 
 A pass keeps at most `most` entries, and the record keeps the last `kept`
 passes; the host's report is matched to its pass by generation.
-
-## Complaints
-
-`complain` says, once, that a value an application handed the library was not
-one it could use, and leaves whatever was used instead to the caller. A
-complaint is never a refusal: every one is written beside a value that carries
-on working, and nothing depends on one being read. It exists because the
-alternative is silence - a value quietly held to what it can be, and an author
-left wondering why the constant they wrote does nothing.
-
-Each message is said once per process, because the places that complain are
-modifiers, and a modifier runs on every render: an author who wrote 1.4 where a
-fraction belongs would otherwise be told so as fast as the interface is
-described. It goes to standard output, outside the lock: a shell on Windows
-and Linux, and nowhere on Android, whose process output is not routed. So a complaint is a development aid and may never
-be the only thing between an application and working.

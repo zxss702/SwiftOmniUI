@@ -16,8 +16,7 @@ list with no groups is one section with neither. An item's identity is
 unit separator, and that - so two groups may hold equal items. A header or a
 footer is named after its group with a record separator (`\u{1E}header`),
 which no author writes. Two items that describe alike are told apart as two
-repeated `.id()`s are, and a complaint says so: a platform's collection
-refuses two cells of one identity.
+repeated `.id()`s are: a platform's collection refuses two cells of one identity.
 
 The entries cross in the patch as any property does, so they are compared,
 sent only when they change, and printed by the inspector. What a host needs

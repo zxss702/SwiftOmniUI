@@ -255,6 +255,10 @@ void swiftomniui_winui_release(SwiftOmniUIObjectRef object);
 SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t window);
 void swiftomniui_winui_window_set_title(SwiftOmniUIObjectRef window, char const *title);
 void swiftomniui_winui_window_set_content(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef content);
+/// A native overlay in the existing content row, below TitleBar and above its
+/// ScrollView. It never creates another auto row or reduces the viewport.
+void swiftomniui_winui_window_set_safe_area_bars(SwiftOmniUIObjectRef window,
+    SwiftOmniUIObjectRef const *bars, int32_t count, bool hasBackground, uint32_t background);
 
 /// The window's chrome across its top, its menu bar and the row of tabs beneath it; null for none. The first chrome
 /// given also takes the window's way back: the mouse's back button, Alt+Left and the Back key choose its way back

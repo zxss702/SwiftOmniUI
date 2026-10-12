@@ -23,6 +23,9 @@ class WinUIZStackView: WinUITravellingLayout {
         }
     }
 
+    /// Computed during arrangement; shared by placement and child reports.
+    private var insetContext: SafeAreaContext?
+
     /// The room inside the ZStack's own edge, in DIPs.
     var padding = EdgeInsets(0) {
         didSet { if padding != oldValue { invalidateMeasurements() } }
@@ -54,7 +57,33 @@ class WinUIZStackView: WinUITravellingLayout {
         }
 
         beginArrangement(width: bounds.width)
-        for item in items { item.view.setPlacedDrawing(nil, opacity: 1) }
+        for item in items where item.view.nativeSafeBarOwner == nil { item.view.setPlacedDrawing(nil, opacity: 1) }
+        insetContext = nil
+        if let edge = sourceElement?.safeAreaInsetEdge, items.count == 2 {
+            let context = layoutSafeArea(in: bounds)
+            let bar = items[1]
+            let barPlace = bar.isShown
+                ? SafeAreaArithmetic.bar(of: bar, edge: edge, in: context, direction: direction) : .zero
+            let extent = edge == .top || edge == .bottom
+                ? barPlace.height + bar.values.margin.top + bar.values.margin.bottom
+                : barPlace.width + bar.values.margin.left + bar.values.margin.right
+            let next = bar.isShown
+                ? context.inset(edge: edge, extent: extent, spacing: sourceElement?.number(.spacing) ?? 0) : context
+            insetContext = next
+            let base = items[0]
+            let basePlace = SafeAreaArithmetic.base(of: base, boundary: base.element?.isSafeAreaBoundary == true,
+                                                   ignores: base.element?.ignoresSafeArea,
+                                                   in: next, direction: direction)
+            self.place(base, at: basePlace)
+            if bar.isShown {
+                if bar.view.nativeSafeBarOwner != nil {
+                    bar.view.recordSafeBarPlace(barPlace, context: SafeAreaContext(bounds: Rect(0, 0, barPlace.width, barPlace.height)))
+                } else {
+                    self.place(bar, at: barPlace)
+                }
+            }
+            return
+        }
         let room = Rect(x: 0, y: 0, width: bounds.width, height: bounds.height)
         let places = ZStackArithmetic.places(of: items, in: room, padding: padding, direction: direction)
         for (item, place) in zip(items, places) {
@@ -84,4 +113,14 @@ class WinUIZStackView: WinUITravellingLayout {
         }
         for item in items[count...] { item.view.setPlacedDrawing(nil, opacity: 1) }
     }
+    override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
+        if sourceElement?.safeAreaInsetEdge != nil {
+            if items.first?.view === child, let insetContext { return insetContext.child(in: place) }
+            // The inset's content receives the incoming edge proposal, not its
+            // own contribution, so GeometryReader inside a bar cannot loop.
+            return SafeAreaContext(bounds: Rect(0, 0, place.width, place.height))
+        }
+        return super.context(for: child, at: place)
+    }
+
 }

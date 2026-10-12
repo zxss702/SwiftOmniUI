@@ -121,9 +121,6 @@ public struct Journey<Value: Walked> {
             var lanes = standing
 
             guard !newValue.isCustom, !lanes.animation.isCustom else {
-                complain("`\(storage.origin ?? "a state")` was given a law after it was declared "
-                    + "that would change who walks it. `.custom` is said at the declaration - "
-                    + "`@State(animation: .custom)` - and a value declared so keeps it.")
                 return
             }
 
@@ -164,9 +161,6 @@ public struct Journey<Value: Walked> {
     @discardableResult
     public nonisolated(nonsending) func move(to target: Value, _ animation: Animation? = nil) async throws -> Bool {
         guard let (storage, image, lanes) = walking() else {
-            complain("`move` was called on a part of a state, a binding made from closures, "
-                + "or a state the host carries as the value itself, none of which it can "
-                + "walk. Move the whole state, handed to something that walks it.")
             return false
         }
 
@@ -203,8 +197,6 @@ public struct Journey<Value: Walked> {
     /// to the end. A value that was not moving is unaffected.
     @_spi(Host) public func stop() {
         guard let (_, image, standing) = walking() else {
-            complain("`stop` was called on a part of a state, a binding made from closures, "
-                + "or a state the host carries as the value itself, none of which it walks.")
             return
         }
 

@@ -172,6 +172,7 @@ extension NodeType {
     static let isGeometryReader = VisualElementContract.isGeometryReader.token
     static let lazyRowStack = PipelineMarksContract.lazyRowStack.token
     static let safeAreaInsetEdge = VisualElementContract.safeAreaInsetEdge.token
+    static let safeAreaPadding = VisualElementContract.safeAreaPadding.token
     static let flowColumns = GridContract.flowColumns.token
     static let flowRows = LazyHGridContract.flowRows.token
     static let gridColumn = ViewContract.gridColumn.token

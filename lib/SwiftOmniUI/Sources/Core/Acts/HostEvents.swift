@@ -61,18 +61,12 @@ public enum HostEvents {
     /// The lock: a subscription may be written while a raise arrives.
     private static let guarded = Lock()
 
-    /// Subscribes a handler to what the host raises under an event's name, the values
-    /// as they crossed; an event the host says it does not raise is said once.
+    /// Subscribes a handler to what the host raises under an event's name,
+    /// with the values as they crossed.
     private static func subscribe(
         _ event: Event,
-        owner: String,
-        member: String,
         _ handler: @escaping ValueEventHandler<[PropValue]>
     ) -> HostEventSubscription {
-        if let unraised = HostRealizations.unraised(owner: owner, event: member) {
-            complain(unraised)
-        }
-
         let id = guarded.withLock {
             let id = nextId
             nextId += 1
@@ -88,8 +82,7 @@ public enum HostEvents {
     ///
     ///     let heard = HostEvents.on(NotesContract.memoryLow) { cache.removeAll() }
     ///
-    /// A raise carrying anything is reported once and does not reach the
-    /// handler.
+    /// A raise carrying anything does not reach the handler.
     ///
     /// - Parameters:
     ///   - event: the member, written with its contract.
@@ -100,7 +93,7 @@ public enum HostEvents {
         _ event: ElementEvent<Owner, Void>,
         _ handler: @escaping EventHandler
     ) -> HostEventSubscription {
-        subscribe(event.token, owner: Owner.name, member: event.name) { payload in
+        subscribe(event.token) { payload in
             guard MemberValues.carried(payload, by: event.name) != nil else { return }
 
             try await handler()
@@ -113,7 +106,7 @@ public enum HostEvents {
     ///     let heard = HostEvents.on(NotesContract.connectivityChanged) { online in … }
     ///
     /// A raise of another shape - the value missing, one too many, or one of
-    /// another kind - is reported once and does not reach the handler.
+    /// another kind - does not reach the handler.
     ///
     /// - Parameters:
     ///   - event: the member, written with its contract.
@@ -124,7 +117,7 @@ public enum HostEvents {
         _ event: ElementEvent<Owner, Value>,
         _ handler: @escaping ValueEventHandler<Value>
     ) -> HostEventSubscription {
-        subscribe(event.token, owner: Owner.name, member: event.name) { payload in
+        subscribe(event.token) { payload in
             guard let value = MemberValues.carried(payload, by: event.name, as: Value.self) else { return }
 
             try await handler(value)
@@ -147,7 +140,7 @@ public enum HostEvents {
         _ event: ElementEvent<Owner, (First, Second)>,
         _ handler: @escaping ValueEventHandler<First, Second>
     ) -> HostEventSubscription {
-        subscribe(event.token, owner: Owner.name, member: event.name) { payload in
+        subscribe(event.token) { payload in
             guard let (first, second) = MemberValues.carried(
                 payload, by: event.name, as: First.self, Second.self)
             else { return }
@@ -171,7 +164,7 @@ public enum HostEvents {
         _ event: ElementEvent<Owner, (First, Second, Third)>,
         _ handler: @escaping ValueEventHandler<First, Second, Third>
     ) -> HostEventSubscription {
-        subscribe(event.token, owner: Owner.name, member: event.name) { payload in
+        subscribe(event.token) { payload in
             guard let (first, second, third) = MemberValues.carried(
                 payload, by: event.name, as: First.self, Second.self, Third.self)
             else { return }

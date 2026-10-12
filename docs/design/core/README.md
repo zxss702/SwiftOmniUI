@@ -23,7 +23,7 @@ The core's sources stand in one folder per topic, one element to a file, and
 | [concurrency.md](concurrency.md) | `MainActor` on every platform, the doorbell, draining jobs, the lock and its order |
 | [contracts.md](contracts.md) | contracts and tiers, member facts, values that cross, tokens, realizations |
 | [scenes.md](scenes.md) | the scene tree, sessions, what the platform keeps, connecting and ending scenes |
-| [diagnostics.md](diagnostics.md) | the tally, the inspector, complaints |
+| [diagnostics.md](diagnostics.md) | the tally, the inspector |
 
 ## The core at a glance
 
@@ -184,5 +184,5 @@ holds its reasons. A type's extensions stand in its folder, named
   Core/Realization  a host's registry and reports, realizations and       contracts
                     declarations
   Core/Scenes       scenes, their records and element, a value as text    scenes
-  Core/Diagnostics  the inspector, complaints                             diagnostics
+  Core/Diagnostics  the inspector                                         diagnostics
 ```

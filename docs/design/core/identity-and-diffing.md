@@ -363,7 +363,7 @@ What `.inherited` means for a driven value can be answered only here: the host
 knows what the application says, while an element's animation plan answers per
 kind of value. The differ resolves it and leaves the answer on the state's
 storage, which applies it at every crossing. Two elements resolving the same
-state differently is a complaint; the one described last wins.
+state differently use the answer of the one described last.
 
 ## Aims and readings on an element
 

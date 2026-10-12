@@ -52,13 +52,11 @@
     private var settling = false
 
     /// A runtime on `clock`, its elements' native halves made by `makeNative`, a drift the intake refused told to
-    /// `log`, and the host's own views alive counted by `views` for the tally; `localization` answers lookup keys
-    /// from the toolkit's string tables where it keeps any.
+    /// `log`; `localization` answers lookup keys from the toolkit's string tables where it keeps any.
     public init(
         clock: any FrameClock, reducesMotion: @escaping () -> Bool,
         makeNative: @escaping (MountedElement) -> any NativeElement, log: @escaping (String) -> Void,
-        localization: @escaping (LocalizedStringKey) -> String? = { _ in nil },
-        views: (() -> Int)? = nil
+        localization: @escaping (LocalizedStringKey) -> String? = { _ in nil }
     ) {
         self.clock = clock
         self.reducesMotion = reducesMotion
@@ -68,11 +66,9 @@
         displayCycle = DisplayCycle(
             core: core, clock: clock, animator: animator, stateChannels: stateChannels,
             describedMotion: describedMotion, layoutMotion: layoutMotion, reducesMotion: reducesMotion)
-        var diagnostics = DiagnosticText.environment
-        diagnostics.views = views
         tree = MountedTree(
             core: core, intake: intake, stateChannels: stateChannels, describedMotion: describedMotion,
-            layoutMotion: layoutMotion, now: clock.now, reducesMotion: reducesMotion, diagnostics: diagnostics,
+            layoutMotion: layoutMotion, now: clock.now, reducesMotion: reducesMotion,
             makeNative: makeNative)
         tree.localization = localization
         pump = Pump(core: core, intake: intake, tree: tree, displayCycle: displayCycle, now: clock.now, log: log)

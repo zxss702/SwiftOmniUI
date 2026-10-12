@@ -19,8 +19,7 @@
 #
 # The Swift is built for the device's ABI alone, by build-swift.sh; Gradle
 # packages it with the host's Java layer. Everything a build writes stays under
-# <app-dir>/.build/android. Every SWIFTOMNIUI_ variable of the calling shell -
-# SWIFTOMNIUI_TALLY=1, SWIFTOMNIUI_INSPECT=1 - reaches the application's environment.
+# <app-dir>/.build/android.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

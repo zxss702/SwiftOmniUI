@@ -39,6 +39,7 @@ final class WinUIWindowController {
         showSheets(presentation.sheets)
         if let overlay = changes.overlay { window.showOverlay(overlay?.winUI.view) }
         if runtime.tree.chromeMayChange || changes.arrangement != nil || changes.traits != nil { refreshChrome(in: runtime) }
+        window.showTopSafeAreaBars(presentation.arrangement?.visiblePage?.pageTopSafeAreaBars ?? [])
         boundContent(element, requested: changes.frame, quiet: changes.arrangement == nil && changes.traits == nil, keepingSizing: keepingSizing)
         let asked = WindowFrame(of: element)
         if asked.x == nil, asked.y == nil, let anchor = element.value(.defaultPosition)?.numbers {
@@ -63,19 +64,17 @@ final class WinUIWindowController {
         let sizing: WindowContentSizing
         if quiet, keepingSizing || LazyCells.realizing, let sized { sizing = sized } else {
             var asked: [Double?: [ObjectIdentifier: LayoutSize]] = [:]
-            sizing = WinUIRenderer.timed("winui.windowSizing") {
-                WindowContentSizing(of: element, content: presentation.arrangement) { node, width in
-                    guard let item = node.winUI.layoutItem else { return nil }
-                    if let known = asked[width]?[ObjectIdentifier(node)] { return known }
-                    let size = SingleChildArithmetic.size(of: item, padding: EdgeInsets(0), width: width)
-                    asked[width, default: [:]][ObjectIdentifier(node)] = size
-                    return size
-                }
+            sizing = WindowContentSizing(of: element, content: presentation.arrangement) { node, width in
+                guard let item = node.winUI.layoutItem else { return nil }
+                if let known = asked[width]?[ObjectIdentifier(node)] { return known }
+                let size = SingleChildArithmetic.size(of: item, padding: EdgeInsets(0), width: width)
+                asked[width, default: [:]][ObjectIdentifier(node)] = size
+                return size
             }
             sized = sizing
         }
         if let traits { window.apply(traits, isResizable: sizing.isResizable) }
-        let chromeHeight = WinUIRenderer.timed("winui.chromeMeasure") { window.chromeHeight }
+        let chromeHeight = window.chromeHeight
         window.boundContent(sizing.bounds, chromeHeight: chromeHeight)
         if let requested { window.requestContent(requested, chromeHeight: chromeHeight) }
         let frame = sizing.constrain(window.contentSize(chromeHeight: chromeHeight))

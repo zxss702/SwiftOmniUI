@@ -47,9 +47,6 @@ public final class HostStorage: @unchecked Sendable, NamedState {
     /// Design: docs/design/core/identity-and-diffing.md#driven-properties
     var inherited: Animation = .inherited
 
-    /// Which element resolved that law, so a second answering differently is heard.
-    var inheritedBy: ElementId?
-
     /// What runs after the host wrote this value, handed the lanes it wrote - the
     /// state's own ask for a render.
     nonisolated(unsafe) var told: ((UInt64) -> Void)?

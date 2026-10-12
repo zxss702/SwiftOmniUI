@@ -50,15 +50,13 @@
     }
 
     /// A member's current value as the type its contract declares - nil where
-    /// it is not described, or crossed as another kind, which is said once.
+    /// it is not described, or crossed as another kind.
     ///
     /// - Parameter member: the property, written with its contract.
     public subscript<Owner: Contract, Value: HostRepresentable>(_ member: ElementProperty<Owner, Value>) -> Value? {
         guard let value = read(member.token) else { return nil }
 
         guard let typed = Value(propValue: value) else {
-            complain("`\(member.name)` reached \(Realized.name) as \(MemberValues.describe([value])), "
-                + "and its contract declares \(Value.self): the view read no value for it.")
             return nil
         }
 

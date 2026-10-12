@@ -15,18 +15,6 @@ final class WinUIRenderer {
     /// What the host says for whoever reads its log: standard error, or wherever a test listens.
     static var log = HostLog(host: "WinUI")
 
-    /// Native work can happen after the runtime's turn, so it uses the same
-    /// optional tally as core rendering, patch application and window presentation.
-    static func timed<Result>(_ phase: String, _ body: () -> Result) -> Result {
-        guard let shared, shared.runtime.tree.diagnostics.tallies else { return body() }
-        return shared.runtime.tree.diagnostics.measure(phase, body)
-    }
-
-    static func writeTimings() {
-        guard let shared, shared.runtime.tree.diagnostics.tallies else { return }
-        shared.runtime.tree.diagnostics.writeTimings(now: shared.frameClock.now())
-    }
-
     let frameClock: WinUIFrameClock
 
     /// Whether the user asked for less animation: every animation arrives at once.
@@ -37,8 +25,7 @@ final class WinUIRenderer {
     private(set) lazy var runtime = HostRuntime(
         clock: frameClock, reducesMotion: reducesMotion,
         makeNative: { [unowned self] element in WinUIElement(element, host: self) }, log: { WinUIRenderer.log.error($0) },
-        localization: { key in WinUIStrings.resolve(key) },
-        views: { WinUIView.liveCount })
+        localization: { key in WinUIStrings.resolve(key) })
 
     /// What is kept of the scenes for the next start: Windows restores no windows.
     let scenes = SceneKeeper()

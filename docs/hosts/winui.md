@@ -173,8 +173,7 @@ it, passing on what it writes. Everything a build writes stays in the
 application's `.build\winui\`. The application carries the Windows App SDK
 itself - no package, no installer: its runtime, a manifest registering its
 classes and `resources.pri` stand beside the executable. `-Detach` returns once
-the application has started. Every `SWIFTOMNIUI_` variable of the shell that runs
-it - `SWIFTOMNIUI_TALLY=1`, `SWIFTOMNIUI_INSPECT=1` - reaches the application.
+the application has started.
 
 Keep an application's folder near the root of a drive: the Swift compiler on
 Windows fails with "the filename or extension is too long" under a deep path.

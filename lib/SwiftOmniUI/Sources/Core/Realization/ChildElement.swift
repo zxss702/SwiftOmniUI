@@ -42,14 +42,12 @@
     }
 
     /// One of the child's values, as the type its contract declares - nil where it is not described, or where a
-    /// member of a contract the child does not wear is asked for, which is said once.
+    /// member of a contract the child does not wear is asked for.
     ///
     /// - Parameter property: the member, written with its contract.
     /// - Returns: the value, or nil.
     public func value<Owner: Contract, Value: HostRepresentable>(_ property: ElementProperty<Owner, Value>) -> Value? {
         guard Child.wears(Owner.self) else {
-            complain("\(Child.name) was read for `\(Owner.name).\(property.name)`, and \(Child.name) wears no "
-                + "\(Owner.name): nothing was read.")
             return nil
         }
 

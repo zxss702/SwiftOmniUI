@@ -60,17 +60,14 @@
         "(" + payload.map(\.kindName).joined(separator: ", ") + ")"
     }
 
-    /// What an event carried, as the types its contract declares - or nil,
-    /// said once, where it carried anything else: a handler never runs on a
-    /// guess.
+    /// What an event carried, as the types its contract declares, or nil
+    /// where it carried anything else: a handler never runs on a guess.
     static func carried<each Value: HostRepresentable>(
         _ payload: [PropValue],
-        by event: String,
+        by _: String,
         as type: repeat (each Value).Type
     ) -> (repeat each Value)? {
         guard let values = decode(payload, as: repeat (each Value).self) else {
-            complain("`\(event)` carried \(describe(payload)), and its contract declares "
-                + "\(describe(repeat (each Value).self)): the handler did not run.")
             return nil
         }
 

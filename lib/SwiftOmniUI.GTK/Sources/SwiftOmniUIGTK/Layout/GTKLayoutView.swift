@@ -75,8 +75,10 @@ class GTKLayoutView: GTKPanelView {
     /// the outline where the box clips.
     /// Design: docs/design/platforms/gtk/drawing.md#a-layouts-box
     override func draw(_ snapshot: OpaquePointer, width: Double, height: Double) {
+        let room = backgroundBounds(in: Rect(0, 0, width, height))
         let bounds = graphene_rect_t(
-            origin: graphene_point_t(x: 0, y: 0), size: graphene_size_t(width: Float(width), height: Float(height)))
+            origin: graphene_point_t(x: Float(room.x), y: Float(room.y)),
+            size: graphene_size_t(width: Float(room.width), height: Float(room.height)))
         var outline = box.outline.rounded(bounds)
         let rounded = box.outline != .rectangle
 
@@ -103,7 +105,10 @@ class GTKLayoutView: GTKPanelView {
     }
 
     /// Holds `views` in the panel in this order, the one it draws them in.
-    func setChildren(_ views: [GTKView]) {
+    var allowsNativeSafeBars = false
+
+    func setChildren(_ proposed: [GTKView]) {
+        let views = allowsNativeSafeBars ? proposed : proposed.filter { $0.nativeSafeBarOwner == nil }
         guard views.count != held.count || !zip(views, held).allSatisfy({ $0 === $1 }) else { return }
 
         for gone in held where !views.contains(where: { $0 === gone }) && gtk_widget_get_parent(gone.widget) == widget {
@@ -167,6 +172,15 @@ class GTKLayoutView: GTKPanelView {
     /// The room the children take for the width offered.
     func contentSize(width: Double?) -> LayoutSize {
         .zero
+    }
+
+    func backgroundBounds(in bounds: Rect) -> Rect { bounds }
+
+    /// Context inherited by a placed child. Special modifiers override this;
+    /// ordinary overlays only inherit the region and reserve no space.
+    func context(for child: GTKView, at place: Rect) -> SafeAreaContext {
+        let frame = placedFrame
+        return layoutSafeArea(in: Rect(0, 0, frame.width, frame.height)).child(in: place)
     }
 
     /// Places the children in `bounds`.

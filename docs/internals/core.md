@@ -457,9 +457,6 @@ type's extensions in its folder as `Type+Responsibility.swift`
 - **`Inspection`** is the record an inspector reads: a pass for each render,
   an entry for each composed view it reached, and the host's half matched by
   generation. *Internal.* ([The inspector](../design/core/diagnostics.md#the-inspector))
-- **`complain`** says, once per process, that a value an application handed
-  the library was not one it could use. *Internal.*
-  ([Complaints](../design/core/diagnostics.md#complaints))
 - **The tally** - renders, empty ones, refused writes, live elements - is the
   renderer's, and a host reads it as `HostTally`.
   ([The tally](../design/core/diagnostics.md#the-tally))
@@ -520,8 +517,8 @@ values ([core link](../design/host/runtime.md#core-link)). The
   and `HostMatrix` how a view is drawn over its place, and `PropValue.argb` a
   colour as one number for a relay.
   ([canvas and path](../design/views/controls.md#canvas-and-path))
-- **Diagnostics.** `tally` is a `HostTally`; `inspecting`,
-  `takeInspectionLog()` and `inspected(generation:scenes:apply:nodes:made:)`
+- **Diagnostics.** `tally` is a `HostTally`; `inspecting` and
+  `inspected(generation:scenes:apply:nodes:made:)`
   exchange the inspector's record.
   ([What a message costs](../design/host/patches.md#what-a-message-costs))
 

@@ -15,20 +15,30 @@ final class GTKScrollDocument: GTKLayoutView {
         didSet { if padding != oldValue { invalidateMeasurements() } }
     }
 
+    /// The pass's resolved padding; assigning it has no native side effects.
+    var layoutPadding = EdgeInsets(0)
+
     var orientation = Axis.vertical {
         didSet { if orientation != oldValue { invalidateMeasurements() } }
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        ScrollArithmetic.contentSize(of: items.first, padding: padding, orientation: orientation, width: width)
+        ScrollArithmetic.contentSize(of: items.first, padding: layoutPadding, orientation: orientation, width: width)
     }
 
     override func arrange(in bounds: Rect) {
         guard let item = items.first, item.isShown else { return }
 
         let arranged = ScrollArithmetic.arrange(
-            item, padding: padding, orientation: orientation,
+            item, padding: layoutPadding, orientation: orientation,
             in: LayoutSize(width: bounds.width, height: bounds.height))
         item.view.layout(arranged.place)
     }
+    override func context(for child: GTKView, at place: Rect) -> SafeAreaContext {
+        // The document's margins consumed the viewport's contributions.
+        // Scrolling cannot make those contributions reappear in inner readers.
+        SafeAreaContext(bounds: Rect(0, 0, place.width, place.height),
+                        consumed: padding)
+    }
+
 }

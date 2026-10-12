@@ -18,6 +18,7 @@ class WinUILayoutView: WinUIView {
     private var lastSizingWidth: Double?
     private var hasSizing = false
     private var preparingMeasure = false
+    private var sizeFeedbackPending = false
 
     /// The children, in order.
     private(set) var items: [WinUILayoutItem] = []
@@ -78,7 +79,10 @@ class WinUILayoutView: WinUIView {
     }
 
     /// Holds `views` in the panel in this order, the one it draws them in, over the box.
-    func setChildren(_ views: [WinUIView]) {
+    var allowsNativeSafeBars = false
+
+    func setChildren(_ proposed: [WinUIView]) {
+        let views = allowsNativeSafeBars ? proposed : proposed.filter { $0.nativeSafeBarOwner == nil }
         guard boxView !== heldBox || views.count != held.count || !zip(views, held).allSatisfy({ $0 === $1 })
         else { return }
 
@@ -200,7 +204,13 @@ class WinUILayoutView: WinUIView {
         else { return }
 
         measurementRevision &+= 1
-        placingLayout.invalidateMeasurements()
+        guard !sizeFeedbackPending else { return }
+        sizeFeedbackPending = true
+        WinUIDoorbell.afterPass { [weak self, weak placingLayout] in
+            guard let self else { return }
+            self.sizeFeedbackPending = false
+            placingLayout?.invalidateMeasurements()
+        }
     }
 
     /// The room the children take for the width offered, in DIPs, kept until a change beneath marks the layout.
@@ -222,7 +232,7 @@ class WinUILayoutView: WinUIView {
     func arrange(width: Double, height: Double) {
         WinUIView.arranging += 1
         defer { WinUIView.arranging -= 1 }
-        boxView?.layout(Rect(x: 0, y: 0, width: width, height: height))
+        boxView?.layout(backgroundBounds(in: Rect(0, 0, width, height)))
         writeCut(width: width, height: height)
         arrange(in: Rect(x: 0, y: 0, width: width, height: height))
         holdDeparting()
@@ -253,6 +263,15 @@ class WinUILayoutView: WinUIView {
     /// The room the children take for the width offered, in DIPs.
     func contentSize(width: Double?) -> LayoutSize {
         .zero
+    }
+
+    func backgroundBounds(in bounds: Rect) -> Rect { bounds }
+
+    /// Context inherited by a placed child. Special modifiers override this;
+    /// ordinary overlays only inherit the region and reserve no space.
+    func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
+        let frame = placedFrame
+        return layoutSafeArea(in: Rect(0, 0, frame.width, frame.height)).child(in: place)
     }
 
     /// Places the children in `bounds`, in DIPs.

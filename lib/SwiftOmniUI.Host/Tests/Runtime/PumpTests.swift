@@ -202,7 +202,6 @@ private final class TurnRuntime: TurnPresenter, FrameClock {
         tree = MountedTree(
             core: core, intake: intake, stateChannels: stateChannels, describedMotion: describedMotion,
             layoutMotion: layoutMotion, now: now, reducesMotion: { false },
-            diagnostics: DiagnosticText(tallies: false, inspects: false) { _ in },
             makeNative: { [unowned self] in HeldNative($0, runtime: self) })
         pump = Pump(
             core: core, intake: intake, tree: tree, displayCycle: displayCycle, now: now,

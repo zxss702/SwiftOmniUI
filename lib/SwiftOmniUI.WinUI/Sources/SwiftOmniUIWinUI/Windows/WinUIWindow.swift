@@ -22,6 +22,11 @@ final class WinUIWindow {
     /// What the window lays over its page and its sheets.
     private(set) var overlay: WinUIView?
 
+    private var safeBars: [WinUISafeAreaBarHost] = []
+    private var requestedSafeBars: [MountedElement] = []
+    private var safeBarCommitPending = false
+    private var safeBarBackground: UInt32??
+
     /// The window's chrome, its menu bar, and the row a window's tabs stand in.
     let titleBar = WinUITitleBarView()
     let menuBar = WinUIMenuBarView()
@@ -51,7 +56,35 @@ final class WinUIWindow {
     }
 
     isolated deinit {
+        swiftomniui_winui_window_set_safe_area_bars(handle, nil, 0, false, 0)
+        for host in safeBars { host.releaseBar() }
         swiftomniui_winui_release(handle)
+    }
+
+    func showTopSafeAreaBars(_ bars: [MountedElement]) {
+        requestedSafeBars = bars
+        let views = bars.compactMap { $0.winUI.view }
+        let background = titleBar.chrome.background?.argb
+        let sameBars = views.count == safeBars.count && zip(views, safeBars).allSatisfy { $0 === $1.bar }
+        if sameBars, safeBarBackground == .some(background), !safeBarCommitPending { return }
+        guard !safeBarCommitPending else { return }
+        safeBarCommitPending = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.safeBarCommitPending = false
+            guard !self.isClosed else { return }
+            let views = self.requestedSafeBars.compactMap { $0.winUI.view }
+            if views.count != self.safeBars.count || !zip(views, self.safeBars).allSatisfy({ $0 === $1.bar }) {
+                swiftomniui_winui_window_set_safe_area_bars(self.handle, nil, 0, false, 0)
+                for host in self.safeBars { host.releaseBar() }
+                self.safeBars = views.map { WinUISafeAreaBarHost(bar: $0) }
+            }
+            let handles: [SwiftOmniUIObjectRef?] = self.safeBars.map(\.handle)
+            let background = self.titleBar.chrome.background?.argb
+            self.safeBarBackground = .some(background)
+            swiftomniui_winui_window_set_safe_area_bars(
+                self.handle, handles, Int32(handles.count), background != nil, background ?? 0)
+        }
     }
 
     /// The window's name, which the system shows for it; nil for none.

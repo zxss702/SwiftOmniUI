@@ -36,7 +36,6 @@ public struct OpenURLAction: Sendable {
     init() {
         act = { url in
             guard let open = OpenURLAction.opener else {
-                complain("@Environment(\\.openURL) has no system handler on this platform.")
                 return
             }
             open(url)

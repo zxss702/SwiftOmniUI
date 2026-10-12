@@ -28,8 +28,7 @@ final class WebRenderer {
     /// The parts every host holds alike, each element's Web half a `WebElement`.
     private(set) lazy var runtime = HostRuntime(
         clock: frameClock, reducesMotion: reducesMotion,
-        makeNative: { [unowned self] element in WebElement(element, host: self) }, log: { WebRenderer.log.error($0) },
-        views: { WebDOMView.liveCount })
+        makeNative: { [unowned self] element in WebElement(element, host: self) }, log: { WebRenderer.log.error($0) })
 
     /// The Web's part of the acts, its files', and what performs them and answers them by the host layer's rules.
     private(set) lazy var actToolkit = WebActToolkit(renderer: self)

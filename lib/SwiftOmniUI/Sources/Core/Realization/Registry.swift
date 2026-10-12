@@ -60,8 +60,6 @@
             let made = create(Reports(sending: send, reporting: carry))
 
             guard let view = made as? View else {
-                complain("\(Realized.name)'s registration made a \(type(of: made)), which is no "
-                    + "\(View.self): no view stands for it.")
                 return nil
             }
 
@@ -291,14 +289,13 @@
 
     /// A property the view takes alone, handed over as the type its contract
     /// declares - nil where the value is no longer described. A member of the
-    /// contract or of a tier it wears; any other is refused, and said once.
+    /// contract or of a tier it wears; any other is refused.
     ///
     ///     registration.property(TrafficLightContract.signal) { light, signal in
     ///         light.signal = signal ?? .stop
     ///     }
     ///
-    /// A value that crosses as another kind is said once and leaves the view
-    /// as it was.
+    /// A value that crosses as another kind leaves the view as it was.
     ///
     /// - Parameters:
     ///   - member: the property, written with its contract.
@@ -307,15 +304,12 @@
         _ member: ElementProperty<Owner, Value>,
         _ apply: @escaping (Made, Value?) -> Void
     ) {
-        guard Self.wears(Owner.self, for: member.name) else { return }
+        guard Self.wears(Owner.self) else { return }
 
         appliers[member.token] = { view, value in
             guard let value else { return apply(view, nil) }
 
             guard let typed = Value(propValue: value) else {
-                complain("`\(member.name)` reached \(Realized.name) as "
-                    + "\(MemberValues.describe([value])), and its contract declares "
-                    + "\(Value.self): the view kept what it had.")
                 return
             }
 
@@ -328,7 +322,7 @@
     /// several members at once - a caption's attributes read its text, its
     /// font and its colour together. `members` are what it realizes - each a
     /// property of the contract or of a tier it wears; anything else is left
-    /// out, and said once - and it runs once whenever any of them changes.
+    /// out - and it runs once whenever any of them changes.
     ///
     ///     registration.applies([SwitchContract.isOn, VisualElementContract.isEnabled]) { toggle, values in
     ///         toggle.apply(toggled: values[SwitchContract.isOn] ?? false,
@@ -343,12 +337,10 @@
 
         for member in members {
             guard let property = member as? any RegisteredProperty else {
-                complain("\(Realized.name) was registered to apply `\(member.name)`, which is no property: "
-                    + "it was left out.")
                 continue
             }
 
-            guard Self.wears(property.ownerType, for: member.name) else { continue }
+            guard Self.wears(property.ownerType) else { continue }
 
             keys.insert(property.key)
             self.members.insert(
@@ -362,8 +354,7 @@
     /// markers - where the last patch changed its children: each the one kept
     /// for as long as the child lives, read and reported through it. `members`
     /// are what the view realizes of each child - a property or an event of
-    /// the child's contract or of a tier it wears; anything else is left out,
-    /// and said once.
+    /// the child's contract or of a tier it wears; anything else is left out.
     ///
     ///     registration.children(MarkerContract.self, members: [MarkerContract.label, MarkerContract.selected]) { map, markers in
     ///         map.show(markers.map { ($0, $0.value(MarkerContract.label) ?? "") })
@@ -380,14 +371,10 @@
     ) {
         for member in members {
             guard let owner = (member as? any OwnedMember)?.ownerType else {
-                complain("\(Realized.name)'s children were registered with `\(member.name)`, which is no property "
-                    + "and no event: it was left out.")
                 continue
             }
 
             guard Child.wears(owner) else {
-                complain("\(Realized.name)'s children were registered with `\(owner.name).\(member.name)`, and "
-                    + "\(Child.name) wears no \(owner.name): it was left out.")
                 continue
             }
 
@@ -400,25 +387,18 @@
     /// An event the view raises through its `Reports` - its own, or one a tier
     /// it wears declares, as a field's text change is. Recorded, so the core
     /// knows the host reports it; an event of a contract the element does not
-    /// wear is refused, and said once.
+    /// wear is refused.
     ///
     /// - Parameter event: the member, written with its contract.
     @_spi(Host) public func raises<Owner: Contract, Payload>(_ event: ElementEvent<Owner, Payload>) {
-        guard Self.wears(Owner.self, for: event.name) else { return }
+        guard Self.wears(Owner.self) else { return }
 
         members.insert(HostRealizedMember(element: Realized.name, owner: Owner.name, member: event.name))
     }
 
-    /// Whether the element wears the contract a member was declared in - said
-    /// once where it does not.
-    private static func wears(_ owner: any Contract.Type, for member: String) -> Bool {
-        guard Realized.wears(owner) else {
-            complain("\(Realized.name) was registered with `\(owner.name).\(member)`, and "
-                + "\(Realized.name) wears no \(owner.name): it was not registered.")
-            return false
-        }
-
-        return true
+    /// Whether the element wears the contract a member was declared in.
+    private static func wears(_ owner: any Contract.Type) -> Bool {
+        Realized.wears(owner)
     }
 }
 

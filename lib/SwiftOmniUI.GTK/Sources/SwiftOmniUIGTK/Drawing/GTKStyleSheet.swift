@@ -12,6 +12,13 @@ enum GTKStyleSheet {
     private static var provider: UnsafeMutablePointer<GtkCssProvider>?
     private static var rules: [String: String] = [:]
 
+    /// The authored bar owns its spacing. Native toolbar styling must not
+    /// add another padding or minimum height to the measured contribution.
+    static var safeAreaBar: String {
+        write("swiftomniui-safe-area-bar", "padding: 0; margin: 0; min-height: 0; border: none;")
+        return "swiftomniui-safe-area-bar"
+    }
+
     /// The class giving a widget `insets` of room between its edge and its content.
     static func padding(_ insets: EdgeInsets) -> String {
         let sides = [insets.top, insets.right, insets.bottom, insets.left].map { max(0, $0.isFinite ? $0 : 0) }

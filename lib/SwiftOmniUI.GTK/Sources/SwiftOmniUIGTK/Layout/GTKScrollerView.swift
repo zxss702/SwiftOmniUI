@@ -98,18 +98,25 @@ final class GTKScrollerView: GTKView {
 
     /// The room the bars floating over the scroller keep from its indicators: each bar's extent on its own
     /// edge goes on the indicator's margin there, the document's room untouched.
+    private var indicatorMargins: [GTKWidget: EdgeInsets] = [:]
+    private var indicatorInsets: EdgeInsets?
+
     func insetScrollbars(_ insets: EdgeInsets) {
-        var child = gtk_widget_get_first_child(widget)
-        while let bar = child {
-            defer { child = gtk_widget_get_next_sibling(bar) }
-            guard g_type_check_instance_is_a(bar.of(GTypeInstance.self), gtk_scrollbar_get_type()) != 0
-            else { continue }
-            if gtk_orientable_get_orientation(bar.opaque) == GTK_ORIENTATION_VERTICAL {
-                gtk_widget_set_margin_top(bar, Int32(insets.top.rounded()))
-                gtk_widget_set_margin_bottom(bar, Int32(insets.bottom.rounded()))
+        guard insets != indicatorInsets else { return }
+        indicatorInsets = insets
+        let bars = [gtk_scrolled_window_get_vscrollbar(scrolled), gtk_scrolled_window_get_hscrollbar(scrolled)]
+        for (index, candidate) in bars.enumerated() {
+            guard let bar = candidate else { continue }
+            let original = indicatorMargins[bar] ?? EdgeInsets(
+                top: Double(gtk_widget_get_margin_top(bar)), leading: Double(gtk_widget_get_margin_start(bar)),
+                bottom: Double(gtk_widget_get_margin_bottom(bar)), trailing: Double(gtk_widget_get_margin_end(bar)))
+            indicatorMargins[bar] = original
+            if index == 0 {
+                gtk_widget_set_margin_top(bar, Int32(max(0, original.top + insets.top).rounded()))
+                gtk_widget_set_margin_bottom(bar, Int32(max(0, original.bottom + insets.bottom).rounded()))
             } else {
-                gtk_widget_set_margin_start(bar, Int32(insets.left.rounded()))
-                gtk_widget_set_margin_end(bar, Int32(insets.right.rounded()))
+                gtk_widget_set_margin_start(bar, Int32(max(0, original.left + insets.left).rounded()))
+                gtk_widget_set_margin_end(bar, Int32(max(0, original.right + insets.right).rounded()))
             }
         }
     }

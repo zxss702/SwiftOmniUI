@@ -18,6 +18,82 @@ class GTKView {
     /// The layout that places this view, which a place written between passes asks to allocate again.
     weak var placingLayout: GTKLayoutView?
 
+    /// Logical ancestry survives native toolbar hosting.
+    weak var sourceElement: MountedElement?
+    var safeAreaContext: SafeAreaContext?
+    var rootSafeAreaContext: ((Rect) -> SafeAreaContext)?
+
+    /// A native toolbar owns the widget, while the source modifier still owns
+    /// its layout contribution, animation ancestry and parent-space report.
+    weak var nativeSafeBarOwner: AnyObject?
+    private(set) var safeBarDrawing: HostMatrix?
+
+    func recordSafeBarPlace(_ place: Rect, context: SafeAreaContext) {
+        placed = place
+        safeAreaContext = context
+        updateSafeBarDrawing()
+    }
+
+    func clearSafeBarDrawing() {
+        safeBarDrawing = nil
+        setPlacedDrawing(nil, opacity: 1)
+    }
+
+    func updateSafeBarDrawing() {
+        guard nativeSafeBarOwner != nil else { return }
+        var matrix = HostMatrix.identity
+        var opacity = 1.0
+        var x = placedFrame.x, y = placedFrame.y
+        var totalX = 0.0, totalY = 0.0
+        var next = sourceElement?.parent
+        while let element = next {
+            if let view = (element.native as? GTKElement)?.view {
+                let frame = view.placedFrame
+                var moved = HostMatrix.identity
+                moved.m41 = x
+                moved.m42 = y
+                totalX += x
+                totalY += y
+                matrix = matrix * moved * view.transform.under(view.placedDrawing).matrix(width: frame.width, height: frame.height)
+                opacity *= view.opacity * view.placedOpacity
+                x = frame.x
+                y = frame.y
+                if element.type == .page { break }
+            }
+            next = element.parent
+        }
+        var unmoved = HostMatrix.identity
+        unmoved.m41 = -totalX
+        unmoved.m42 = -totalY
+        let drawing = matrix * unmoved
+        let changed = safeBarDrawing != drawing
+        safeBarDrawing = drawing
+        setPlacedDrawing(placedDrawing, opacity: opacity)
+        if changed, Self.allocating == 0, let host = nativeSafeBarOwner as? GTKLayoutView {
+            gtk_widget_queue_allocate(host.widget)
+        }
+    }
+
+    /// An ancestor opacity/offset animation need not cause layout. Mirror it
+    /// to promoted descendants when drawing changes as well as when arranging.
+    func refreshNativeSafeBarDrawing() {
+        func visit(_ element: MountedElement) {
+            for child in element.children {
+                if let view = (child.native as? GTKElement)?.view, view.nativeSafeBarOwner != nil {
+                    view.updateSafeBarDrawing()
+                } else {
+                    visit(child)
+                }
+            }
+        }
+        if let sourceElement { visit(sourceElement) }
+    }
+
+    func layoutSafeArea(in bounds: Rect) -> SafeAreaContext {
+        (safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds))
+            .ignoring(sourceElement?.ignoresSafeArea)
+    }
+
     /// Where the view was last placed in its parent; nil before its first place.
     var placed: Rect?
 
@@ -120,6 +196,7 @@ class GTKView {
         guard opacity != self.opacity else { return }
         self.opacity = opacity
         gtk_widget_set_opacity(widget, opacity * placedOpacity)
+        refreshNativeSafeBarDrawing()
     }
 
     /// How a placing layout's run draws the view, and how opaque, over its own; nil draws it as its own say.
@@ -128,7 +205,10 @@ class GTKView {
         placedDrawing = drawing
         placedOpacity = opacity
         gtk_widget_set_opacity(widget, self.opacity * opacity)
-        if let placingLayout { gtk_widget_queue_allocate(placingLayout.widget) }
+        refreshNativeSafeBarDrawing()
+        if Self.allocating == 0, let layout = (nativeSafeBarOwner as? GTKLayoutView) ?? placingLayout {
+            gtk_widget_queue_allocate(layout.widget)
+        }
     }
 
     /// Whether clicks and touches go through the view to what is behind it.
@@ -207,7 +287,11 @@ class GTKView {
             }
             ancestor = gtk_widget_get_parent(each)
         }
-        return MountedElement.frameNumbers(place: placedFrame, corner: Self.origin(of: widget, in: root), safeArea: safeArea)
+        let corner = Self.origin(of: widget, in: root)
+        if let local = safeAreaContext?.safe {
+            safeArea = Rect(corner.x + local.x, corner.y + local.y, local.width, local.height)
+        }
+        return MountedElement.frameNumbers(place: placedFrame, corner: corner, safeArea: safeArea)
     }
 
     /// The widget's frame in its window, in logical pixels; nil in no window.

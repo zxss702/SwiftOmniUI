@@ -184,8 +184,7 @@ extension AnyTransition {
                 phase.pivot = UnitPoint(
                     x: phase.pivot?.x ?? 0.5, y: value.number ?? 0.5)
             default:
-                complain("`transition(.modifier)` can cross only the drawn properties - " +
-                    "`\(prop)` sits outside them and stays")
+                break
             }
         }
         return AnyTransition(insertion: phase, removal: phase)

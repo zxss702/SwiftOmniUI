@@ -25,9 +25,7 @@
 #   -BuildOnly     starts nothing: the head stands ready for a debugger to start
 #
 # Everything a build writes stays under <App>\.build\winui, each architecture's
-# head in a folder of its own (--show-bin-path). Every SWIFTOMNIUI_ variable of the
-# calling shell - SWIFTOMNIUI_TALLY=1, SWIFTOMNIUI_INSPECT=1 - reaches the
-# application's environment.
+# head in a folder of its own (--show-bin-path).
 # ---------------------------------------------------------------------------
 param(
     [Parameter(Mandatory = $true)][string]$App,

@@ -11,8 +11,7 @@
 ///     Button("Open") { openWindow(value: folder.url) }
 ///
 /// A `value:` call finds the group declared for the value's own type. Asking
-/// outside every scene, or for what no group declares, says so and opens
-/// nothing.
+/// outside every scene, or for what no group declares, opens nothing.
 public struct OpenWindowAction: Sendable {
     /// The scene's window opening, bridged to calls: the group's kind, the
     /// value's own type, the value, and the value written down.
@@ -28,7 +27,7 @@ public struct OpenWindowAction: Sendable {
             do {
                 try record.open(type, valueType: valueType, value: value, text: text)
             } catch {
-                complain("@Environment(\\.openWindow) could not open \(type): \(error).")
+                reportFailure("@Environment(\\.openWindow) could not open \(type): \(error).")
             }
         }
         groupFor = { valueType in
@@ -46,11 +45,9 @@ public struct OpenWindowAction: Sendable {
         self.groupFor = groupFor
     }
 
-    /// An action with no scene behind it: every call says so.
+    /// An action with no scene behind it opens nothing.
     static let nowhere = OpenWindowAction(
-        open: { _, _, _, _ in
-            complain("@Environment(\\.openWindow) ran outside every scene - no window opens.")
-        },
+        open: { _, _, _, _ in },
         groupFor: { _ in nil })
 
     /// Opens a window of the group declared under `id`.
@@ -66,11 +63,6 @@ public struct OpenWindowAction: Sendable {
     /// Opens a window of the group declared for `value`'s own type.
     public func callAsFunction<Value: Codable & Hashable>(value: Value) {
         guard let type = groupFor(Value.self) else {
-            complain("""
-                @Environment(\\.openWindow) asked for a window standing for \
-                \(Value.self), and no WindowGroup declares one. Declare \
-                `WindowGroup(.name, for: \(Value.self).self)` on the scene.
-                """)
             return
         }
         open(type, Value.self, AnyHashable(value), (try? ValueText.write(value)))

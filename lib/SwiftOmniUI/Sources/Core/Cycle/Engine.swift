@@ -202,12 +202,6 @@ extension View {
         let named = [first] + more
         let follows = named.compactMap(\.followed)
 
-        if follows.count < named.count {
-            complain("`following:` was handed a part of a state, or a binding made "
-                + "from closures, which has no storage of its own to be woken by. "
-                + "Follow the whole state.")
-        }
-
         return revised {
             $0.engines.append(EngineDeclaration(
                 follows: follows,
@@ -248,18 +242,8 @@ extension View {
         _ run: @escaping (EngineCycle) -> EngineAnswer
     ) -> ModifiedContent {
         var follows: [any FollowedState] = []
-        var named = 0
-
         for storage in repeat (each following).followed {
-            named += 1
-
             if let storage { follows.append(storage) }
-        }
-
-        if follows.count < named {
-            complain("`following:` was handed a part of a state, or a binding made "
-                + "from closures, which has no storage of its own to be woken by. "
-                + "Follow the whole state.")
         }
 
         return revised {

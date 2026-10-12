@@ -25,9 +25,6 @@ public struct MultiBinding<Out: StateValue, Sources> {
         let storages = parts.compactMap { $0 }
 
         guard storages.count == parts.count, let first = storages.first else {
-            complain("`multi` was handed a part of a state, or a binding made from "
-                + "closures, which the host cannot carry. The value is worked out at "
-                + "build instead, and nothing reports back through it.")
             return Binding<Out>(get: read, set: { _ in })
         }
 
