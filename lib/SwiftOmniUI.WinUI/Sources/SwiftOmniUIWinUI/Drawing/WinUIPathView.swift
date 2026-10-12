@@ -19,6 +19,28 @@ final class WinUIPathView: WinUIView {
     }
 
     private var geometry = Geometry.rectangle([0, 0, 0, 0], transform: nil)
+
+    /// What a mask standing in this shape cuts a panel to: a rectangle, a rectangle of one corner radius, or an
+    /// ellipse; the figure is drawn inset by half its outline, and the cut stands inside the outline as well.
+    /// A shape drawn from a geometry of its own has no silhouette WinUI cuts a clip from; a mask holding one cuts
+    /// to the shape's box.
+    struct Silhouette {
+        var kind: Int32
+        var radius: Double
+        var inset: Double
+    }
+
+    /// The silhouette this shape cuts a panel to.
+    var silhouette: Silhouette {
+        switch geometry {
+        case .rectangle(let radii, _) where radii.count == 4 && Set(radii).count == 1:
+            return Silhouette(kind: 1, radius: radii[0], inset: outlineWidth / 2)
+        case .ellipse:
+            return Silhouette(kind: 2, radius: 0, inset: outlineWidth / 2)
+        default:
+            return Silhouette(kind: 0, radius: 0, inset: outlineWidth / 2)
+        }
+    }
     private var strokeWidth = 1.0
 
     /// The outline drawn, which the figure is inset by half of; none without a colour.

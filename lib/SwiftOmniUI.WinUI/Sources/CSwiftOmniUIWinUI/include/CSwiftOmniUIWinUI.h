@@ -331,9 +331,13 @@ void swiftomniui_winui_set_enabled(SwiftOmniUIObjectRef control, bool enabled);
 void swiftomniui_winui_set_clip(SwiftOmniUIObjectRef element, bool cuts, SwiftOmniUIOutline outline, double radius,
                             double width, double height);
 
-/// Cuts what `element` shows to the first shape standing in `mask`, laid out `x` by `y` DIPs from the panel's
-/// corner: the silhouette a `.mask` asks for. No shape in `mask` - or no mask - shows it whole.
-void swiftomniui_winui_clip_to_shape(SwiftOmniUIObjectRef element, SwiftOmniUIObjectRef mask, double x, double y);
+/// Cuts what `element` shows to a silhouette standing `x` by `y` DIPs from its corner and `width` by `height`:
+/// `kind` 0 a rectangle, 1 a rectangle of `radius` at each corner, 2 an ellipse, and any other kind - no mask -
+/// shows the element whole. Lines of a geometry of a shape's own are no silhouette WinUI draws a clip from: a
+/// panel cut to such a mask is cut to its box.
+void swiftomniui_winui_clip_to_shape(
+    SwiftOmniUIObjectRef element, int32_t kind, double radius, double x, double y, double width, double height
+);
 
 /// Whether the element takes clicks and touches; one that does not lets them through to what is behind it.
 void swiftomniui_winui_set_hit_testable(SwiftOmniUIObjectRef element, bool testable);
