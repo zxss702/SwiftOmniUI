@@ -242,4 +242,4 @@ What shows behind a scrollable view's content - a list's or an editor's own canv
 
 | Member | Kind | Value | Layer | Android Views | WinUI 3 | GTK 4 | Web | Notes |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| `scrollContentBackground` | property | `Visibility` | native |  |  |  |  | WinUI 3: not realized; GTK 4: not realized |
+| `scrollContentBackground` | property | `Visibility` | native |  |  |  |  |  |

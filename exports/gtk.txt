@@ -349,6 +349,7 @@ TextEditor
   multilineTextAlignment
   placeholder
   placeholderColor
+  scrollContentBackground
   selectionLength
   text
   textCase

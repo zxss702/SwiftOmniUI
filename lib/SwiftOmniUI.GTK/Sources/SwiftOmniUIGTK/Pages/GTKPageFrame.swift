@@ -293,9 +293,9 @@ extension GTKButtonView {
     /// Design: docs/design/platforms/gtk/pages.md#the-chrome
     static func action(_ action: GTKToolbarAction, inMenu: Bool = false) -> GTKButtonView {
         let button = GTKButtonView()
-        if inMenu || action.icon.map({ button.setIcon($0, size: 16, caption: action.title) }) != true {
-            button.setText(action.title)
-        }
+        button.showsPictureAlone = !inMenu
+        button.setText(action.title)
+        button.setPictureNamed(inMenu ? nil : action.icon)
         button.setEnabled(action.isEnabled)
         if inMenu { gtk_widget_add_css_class(button.widget, "flat") }
         if action.isDestructive {

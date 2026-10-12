@@ -9,7 +9,8 @@
 struct GTKToolbarAction {
     let title: String
 
-    /// The picture the button shows in place of its title, by file name; nil for the title.
+    /// The picture the button shows in place of its title - the theme's name for a symbol, a file's name for a
+    /// picture; nil for the title.
     var icon: String? = nil
     let isEnabled: Bool
 

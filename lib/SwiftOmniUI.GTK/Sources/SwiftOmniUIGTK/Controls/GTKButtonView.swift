@@ -104,10 +104,80 @@ final class GTKButtonView: GTKView {
     /// The style sheet's class drawing the button's box.
     private var boxClass: String?
 
+    /// The caption's words and picture's name - a symbol's or a file's - as the element last said them.
+    private var caption = ""
+    private var picture: String?
+
+    /// Whether the button shows a picture now, which a caption of words alone takes away again.
+    private var showsPicture = false
+
+    /// Whether a picture stands in place of the words - a header bar's button, as a toolbar's `Label` shows its
+    /// icon alone - the words its tooltip and its name to assistive technology.
+    var showsPictureAlone = false {
+        didSet { if showsPictureAlone != oldValue { writeCaption() } }
+    }
+
     /// The caption.
     func setText(_ text: String) {
-        gtk_button_set_label(widget.of(GtkButton.self), text)
+        caption = text
+        writeCaption()
+    }
+
+    /// The picture beside the caption - a symbol or a picture's file; nil for the words alone.
+    func setPicture(_ source: ImageSource?) {
+        setPictureNamed(source.flatMap { $0.symbol ?? ($0.file.isEmpty ? nil : $0.file) })
+    }
+
+    /// The picture by the name the theme or a file answers to; nil for the words alone.
+    func setPictureNamed(_ name: String?) {
+        guard name != picture else { return }
+        picture = name
+        writeCaption()
+    }
+
+    /// Shows the caption as SwiftUI does, through the platform's own buttons: a theme's symbol alone where the
+    /// words stand aside - GTK's icon button - or beside the words in libadwaita's button content; a picture's
+    /// file alone; the words alone otherwise.
+    private func writeCaption() {
+        let button = widget.of(GtkButton.self)
+        let name = picture
+        let alone = showsPictureAlone || caption.isEmpty
+        if showsPicture {
+            gtk_widget_remove_css_class(widget, "image-button")
+            gtk_widget_set_tooltip_text(widget, nil)
+            showsPicture = false
+        }
+        if let name, GTKSymbols.has(name) {
+            if alone {
+                gtk_button_set_icon_name(button, name)
+                if !caption.isEmpty { nameByCaption(caption) }
+            } else {
+                let content = adw_button_content_new()!
+                adw_button_content_set_icon_name(content.opaque, name)
+                adw_button_content_set_label(content.opaque, caption)
+                gtk_button_set_child(button, content)
+            }
+            showsPicture = true
+            return
+        }
+        if let name, alone, setIcon(name, size: 16, caption: caption) {
+            showsPicture = true
+            return
+        }
+        gtk_button_set_label(button, caption)
         writeLook()
+    }
+
+    /// Names the button by `caption` where a picture stands in place of it: its tooltip, and its name to
+    /// assistive technology.
+    private func nameByCaption(_ caption: String) {
+        gtk_widget_set_tooltip_text(widget, caption)
+        var property = GTK_ACCESSIBLE_PROPERTY_LABEL
+        var label = GValue()
+        g_value_init(&label, g_type_from_name("gchararray"))
+        g_value_set_string(&label, caption)
+        gtk_accessible_update_property_value(widget.opaque, 1, &property, &label)
+        g_value_unset(&label)
     }
 
     /// Changes how the caption's words look.
@@ -155,14 +225,7 @@ final class GTKButtonView: GTKView {
         guard let image = GTKPictures.icon(named: name, size: size) else { return false }
         gtk_button_set_child(widget.of(GtkButton.self), image)
         gtk_widget_add_css_class(widget, "image-button")
-        gtk_widget_set_tooltip_text(widget, caption)
-
-        var property = GTK_ACCESSIBLE_PROPERTY_LABEL
-        var name = GValue()
-        g_value_init(&name, g_type_from_name("gchararray"))
-        g_value_set_string(&name, caption)
-        gtk_accessible_update_property_value(widget.opaque, 1, &property, &name)
-        g_value_unset(&name)
+        nameByCaption(caption)
         return true
     }
 

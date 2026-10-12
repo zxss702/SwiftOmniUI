@@ -7,7 +7,29 @@ import CSwiftOmniUIGTK
 
 /// The widget: made, and given the element's properties.
 extension GTKElement {
+    /// Whether the element stands on the page's chrome - under a toolbar's items or a title view - where a
+    /// button's picture stands in place of its words.
+    var standsInToolbar: Bool {
+        var ancestor = element.parent
+        while let each = ancestor {
+            // A popover's card is no part of the bar its anchor stands on.
+            if each.type == .popover { return false }
+            if each.type == .toolbarItems || each.type == .titleView { return true }
+            ancestor = each.parent
+        }
+        return false
+    }
+
     func makeView() -> GTKView? {
+        if type == .button, standsInToolbar {
+            // The bar's own button, made here as the registration would: its members still reach it, and a
+            // `Label`'s picture shows in place of its words, the words the button's tooltip.
+            let button = GTKButtonView(toggles: true)
+            button.showsPictureAlone = true
+            button.onClicked = { [weak self] in self?.send(.clicked, []) }
+            button.onToggled = { [weak self] on in self?.report(.isOn, .toggled, .bool(on)) }
+            return button
+        }
         if element.isLayoutDivider {
             let axis = element.dividerAxis
             return GTKView { _ in
