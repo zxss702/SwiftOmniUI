@@ -395,16 +395,19 @@ namespace {
         Size ArrangeOverride(Size final) {
             if (final != size) {
                 size = final;
-                invalidate();
+                // The room is known in this pass: a drawing that waited for it is replayed here, not a frame
+                // later - a row realized into view is painted by the pass that placed it.
+                if (!paint()) invalidate();
             }
             return final;
         }
 
-        /// The drawing to replay from now on.
+        /// The drawing to replay from now on: at once where the canvas is sized and in a tree, else on the
+        /// frame the room or the root arrives.
         void show(Drawing next) {
             drawing = std::move(next);
             stale = true;
-            invalidate();
+            if (!paint()) invalidate();
         }
 
     private:
@@ -415,13 +418,19 @@ namespace {
 
         void render(IInspectable const &, IInspectable const &) {
             rendering.revoke();
+            paint();
+        }
+
+        /// Draws what stands, now: the drawing again where it, the room, the scale or the device moved. False
+        /// where there is no root to draw in - nothing is asked for, and the drawing waits for the next notice.
+        bool paint() {
             auto root = XamlRoot();
-            if (!root) return;
+            if (!root) return false;
             watch(root);
             auto scale = static_cast<float>(root.RasterizationScale());
             auto across = static_cast<int32_t>(std::ceil(size.Width * scale));
             auto down = static_cast<int32_t>(std::ceil(size.Height * scale));
-            if (!stale && across == drawnAcross && down == drawnDown && scale == drawnScale) return;
+            if (!stale && across == drawnAcross && down == drawnDown && scale == drawnScale) return true;
 
             stale = false;
             drawnScale = scale;
@@ -430,7 +439,7 @@ namespace {
                     surface = nullptr;
                     drawnAcross = drawnDown = 0;
                     Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
-                    return;
+                    return true;
                 }
                 for (int attempt = 0; attempt < 2; ++attempt) {
                     prepare();
@@ -448,7 +457,7 @@ namespace {
                     auto result = draw(scale);
                     if (!lost(result)) {
                         winrt::check_hresult(result);
-                        return;
+                        return true;
                     }
                     // Windows took the device away: a new one, a new surface, and the drawing again.
                     devices.device = nullptr;
@@ -456,6 +465,7 @@ namespace {
             } catch (...) {
                 report("drawing a canvas");
             }
+            return true;
         }
 
         /// Replays the drawing on the whole surface, cleared first: the canvas's DIPs at `scale` pixels each.

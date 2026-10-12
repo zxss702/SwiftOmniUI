@@ -85,8 +85,10 @@ final class WinUIScrollView: WinUILayoutView {
     private var defaultAnchor: (x: Double, y: Double)?
     private var anchoredOnce = false
 
-    /// Whether each axis moves only where the content fills the view: WinUI's `ScrollMode`.
-    private var modes = (vertical: Int32(1), horizontal: Int32(1))
+    /// Whether each axis moves only where the content fills the view: WinUI's `ScrollMode`. Down alone at first:
+    /// the scroller's own set leaves a view that names no other way with down alone, and a patch that names no
+    /// member of this registration never reaches `apply` to say otherwise.
+    private var modes = (vertical: Int32(1), horizontal: Int32(0))
 
     /// The scroller's orientation, padding, bars, where a reader's default
     /// anchor asks it to begin, and an offset the tree moved it to.

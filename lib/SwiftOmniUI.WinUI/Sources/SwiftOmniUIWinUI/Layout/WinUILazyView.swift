@@ -124,6 +124,11 @@ class WinUILazyView: WinUITravellingLayout {
     func viewportChanged(_ rect: Rect, effective: Bool = true, target override: Rect? = nil,
                          bring: Point = .zero) {
         guard clip != nil else { return }
+        // WinUI names "no viewport at all" with (+Inf, +Inf, -Inf, -Inf) while a
+        // view stands outside every viewport - a swap under way, a run not yet
+        // placed. No window stands in such a rect: the notice is no news, and
+        // the last real viewport stands.
+        guard rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite else { return }
         watchClip()
         if effective {
             effectiveViewport = rect

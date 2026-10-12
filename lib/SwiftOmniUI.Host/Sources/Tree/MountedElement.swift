@@ -102,6 +102,9 @@ import CRT
         self.tree = tree
         self.parent = parent
         mount = tree.allocateMount()
+        // The native half is made knowing what describes the element - a host picks its control by the
+        // properties - so they stand while it is made; `apply` describes the element itself.
+        properties = patch.properties
         native = nil
         native = tree.makeNative(self)
         tree.tally?.made += 1

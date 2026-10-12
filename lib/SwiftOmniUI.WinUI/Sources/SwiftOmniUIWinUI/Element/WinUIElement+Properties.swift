@@ -98,8 +98,6 @@ extension WinUIElement {
             return
         }
 
-        view.isToolbarControl = standsInToolbar
-
         let taken = WinUIRegistrations.registry.apply(
             changed, to: view, of: type,
             reading: { [element] in element.value($0) },

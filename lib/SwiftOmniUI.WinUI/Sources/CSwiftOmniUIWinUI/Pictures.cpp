@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 
 #include <shcore.h>
@@ -43,8 +44,12 @@ namespace {
         return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
     }
 
-    /// A local bitmap decoded before it is attached to the visible tree.
+    /// A local bitmap decoded before it is attached to the visible tree, once per file: a row realized again - a
+    /// list scrolled back and forth - takes the bitmap the first read left, not another decode of the same file.
     imaging::BitmapImage bitmapSource(std::wstring const &path) {
+        static std::map<std::wstring, imaging::BitmapImage> decoded;
+        auto kept = decoded.find(path);
+        if (kept != decoded.end()) return kept->second;
         winrt::com_ptr<IStream> file;
         winrt::check_hresult(SHCreateStreamOnFileEx(path.c_str(), STGM_READ | STGM_SHARE_DENY_NONE,
                                                   FILE_ATTRIBUTE_NORMAL, FALSE, nullptr, file.put()));
@@ -53,6 +58,7 @@ namespace {
             file.get(), BSOS_DEFAULT, winrt::guid_of<decltype(stream)>(), winrt::put_abi(stream)));
         imaging::BitmapImage source;
         source.SetSource(stream);
+        decoded.emplace(path, source);
         return source;
     }
 
