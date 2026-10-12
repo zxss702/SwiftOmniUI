@@ -315,8 +315,12 @@ final class GTKLazyTests: XCTestCase {
                 for scroll in scrolls.dropFirst() {
                     XCTAssertEqual(scroll.frame.width, outer.frame.width, accuracy: 1,
                                    "a composed shelf must receive the vertical viewport's width")
+                    let row = try XCTUnwrap(host.views(GTKLazyStackView.self).first {
+                        $0.placingLayout === scroll.scroller.content
+                    })
+                    let measured = row.cells.identities.filter { row.cells.extents.hasMeasurement(for: $0) }.count
                     XCTAssertEqual(scroll.scroller.standing.reach.x + scroll.frame.width,
-                                   40 * 96 + 39 * 8, accuracy: 1)
+                                   Double(measured) * 96 + Double(40 - measured) * 44 + 39 * 8, accuracy: 1)
                 }
                 outer.scroller.move(to: outer.scroller.standing.reach)
                 for _ in 0..<30 { host.step() }
@@ -361,9 +365,9 @@ final class GTKLazyTests: XCTestCase {
                 for _ in 0..<30 { host.step() }
                 let tracks = Int((scroll.frame.width + 10) / 106)
                 let runs = (rows.wrappedValue.count + tracks - 1) / tracks
-                let total = Double(runs) * cellHeight + Double(runs - 1) * 10
                 XCTAssertEqual(grid.cells.window?.perRun, tracks)
-                XCTAssertEqual(scroll.scroller.standing.reach.y + scroll.frame.height, total, accuracy: 1)
+                XCTAssertEqual(scroll.scroller.standing.reach.y + scroll.frame.height,
+                               grid.cells.runs.total(count: runs), accuracy: 1)
                 scroll.scroller.move(to: scroll.scroller.standing.reach)
                 for _ in 0..<30 { host.step() }
                 XCTAssertTrue(host.views(GTKLabelView.self).contains { $0.text == "Cell 499" })
@@ -372,7 +376,7 @@ final class GTKLazyTests: XCTestCase {
                 var bottom = graphene_point_t(x: Float(last.frame.width / 2), y: Float(last.frame.height))
                 var inGrid = graphene_point_t()
                 XCTAssertNotEqual(gtk_widget_compute_point(last.widget, grid.widget, &bottom, &inGrid), 0)
-                XCTAssertEqual(Double(inGrid.y), total, accuracy: 1)
+                XCTAssertEqual(Double(inGrid.y), grid.cells.runs.total(count: runs), accuracy: 1)
                 var inScroll = graphene_point_t()
                 XCTAssertNotEqual(gtk_widget_compute_point(last.widget, scroll.widget, &bottom, &inScroll), 0)
                 XCTAssertEqual(Double(inScroll.y),
@@ -397,6 +401,15 @@ final class GTKLazyTests: XCTestCase {
                 let perRun = kind < 2 ? 1 : 4
                 let extent = horizontal ? 80.0 : 40.0
                 let viewport = horizontal ? scroll.frame.width : scroll.frame.height
+                // Supply exact fixture geometry without building offscreen
+                // controls; this test exercises window identity and idle reuse.
+                if kind < 2 {
+                    for identity in lazy.cells.identities { lazy.cells.extents.measure(identity, extent: extent) }
+                } else {
+                    for run in 0..<(1_000 / perRun) { lazy.cells.runs.measure(run, extent: extent) }
+                }
+                lazy.invalidateMeasurements()
+                for _ in 0..<8 { host.step() }
                 let reach = scroll.scroller.standing.reach
                 XCTAssertEqual(viewport, horizontal ? 480 : 240, accuracy: 1)
                 XCTAssertEqual(horizontal ? reach.x : reach.y,
@@ -548,7 +561,8 @@ final class GTKLazyTests: XCTestCase {
             let scroll = try XCTUnwrap(host.views(GTKScrollView.self).first)
             host.settle { host.views(GTKLabelView.self).contains { $0.text == "Row 0" } }
 
-            scroll.scroller.move(to: Point(0, 20_000))
+            let lazy = try XCTUnwrap(host.views(GTKLazyStackView.self).first)
+            scroll.scroller.move(to: Point(0, lazy.cells.offset(of: 500)))
             host.settle { host.views(GTKLabelView.self).contains { $0.text == "Row 500" } }
 
             let standing = host.views(GTKLabelView.self).map(\.text)
@@ -563,9 +577,11 @@ final class GTKLazyTests: XCTestCase {
             let host = GTKRenderer.running { LazyRowsPage() }
             host.settle { host.views(GTKLabelView.self).count > 4 }
 
-            // A thousand forty-point rows: the lazy view's height is their run.
+            // Known rows replace only their own forty-four-point estimates.
             let lazy = try XCTUnwrap(host.views(GTKLazyStackView.self).first)
-            XCTAssertEqual(lazy.frame.height, 40_000, accuracy: 4_000)
+            let measured = lazy.cells.identities.filter { lazy.cells.extents.hasMeasurement(for: $0) }.count
+            XCTAssertLessThan(measured, lazy.cells.identities.count)
+            XCTAssertEqual(lazy.frame.height, Double(measured) * 40 + Double(1_000 - measured) * 44, accuracy: 1)
         }
     }
 

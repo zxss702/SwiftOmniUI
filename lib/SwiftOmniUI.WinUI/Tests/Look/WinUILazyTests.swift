@@ -65,9 +65,48 @@ private struct ModifiedLazyPage: View {
     }
 }
 
+/// Exact-offset fixtures know their dimensions independently of realization.
+/// Seed geometry only; their offscreen view closures and controls stay lazy.
+@MainActor private func giveExactGeometry(_ lazy: WinUILazyView, extent: Double, perRun: Int) {
+    if perRun == 1 {
+        for identity in lazy.cells.identities { lazy.cells.extents.measure(identity, extent: extent) }
+    } else {
+        let count = (lazy.cells.identities.count + perRun - 1) / perRun
+        for run in 0..<count { lazy.cells.runs.measure(run, extent: extent) }
+    }
+    lazy.invalidateMeasurements()
+}
+
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testAnEmptyFirstRowDoesNotBlockTheMeasuredWindow() throws {
+        try onUIThread {
+            let builds = ModifiedLazyBuilds()
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<100) { number in
+                            builds.numbers.insert(number)
+                            return Group {
+                                if number == 0 { EmptyView() }
+                                else { Text("Card \(number)").frame(height: 360) }
+                            }
+                        }
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            XCTAssertEqual(builds.numbers, Set(0..<4))
+            XCTAssertEqual(lazy.mounted.count, 3)
+            XCTAssertEqual(lazy.cells.extents.extent(of: lazy.cells.identities[0]), 0)
+            XCTAssertFalse(lazy.cells.needsMeasurement)
+            XCTAssertTrue(host.views(WinUITextView.self).contains { $0.text == "Card 1" })
+        }
+    }
+
     func testTallGroupedPagesDoNotBuildTheirEstimatedScreenfulBeforeMeasuring() throws {
         try onUIThread {
             let showing = State(wrappedValue: true)
@@ -113,7 +152,8 @@ final class WinUILazyTests: XCTestCase {
                 XCTAssertEqual(lazy.mounted.count, 3)
                 XCTAssertEqual(host.views(WinUIPickerView.self).count, 27)
                 XCTAssertFalse(lazy.cells.needsMeasurement)
-                XCTAssertEqual(lazy.cells.total, 36_000, accuracy: 1)
+                XCTAssertEqual(lazy.cells.total, 3 * 360 + 97 * 44, accuracy: 1,
+                               "the three measured cards replace only their own provisional extents")
             }
         }
     }
@@ -290,6 +330,8 @@ final class WinUILazyTests: XCTestCase {
                     let horizontal = kind % 2 == 1
                     let extent = horizontal ? 80.0 : 40.0
                     let perRun = kind < 2 ? 1 : 4
+                    giveExactGeometry(lazy, extent: extent, perRun: perRun)
+                    for _ in 0..<8 { host.step() }
                     let start = extent * 20 + 5
                     scroll.scroller.move(to: Point(horizontal ? start : 0, horizontal ? 0 : start))
                     for _ in 0..<8 { host.step() }
@@ -694,10 +736,11 @@ final class WinUILazyTests: XCTestCase {
             for _ in 0..<20 { host.step() }
             let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
-            let total = 200.0 * 140 + 199 * 12
+            let measured = lazy.cells.identities.filter { lazy.cells.extents.hasMeasurement(for: $0) }.count
+            let total = Double(measured) * 140 + Double(200 - measured) * 44 + 199 * 12
             XCTAssertEqual(lazy.cells.total, total, accuracy: 1)
             XCTAssertEqual(scroll.scroller.standing.reach.x + scroll.scroller.laidOutFrame.width,
-                           total, accuracy: 1, "the native document must replace the initial 44-point estimate")
+                           total, accuracy: 1, "the native document must replace each measured tile's estimate")
             scroll.scroller.move(to: scroll.scroller.standing.reach)
             for _ in 0..<20 { host.step() }
             let identity = try XCTUnwrap(lazy.cells.identities.last)
@@ -776,8 +819,12 @@ final class WinUILazyTests: XCTestCase {
                                            "turn \(turn): a shelf inherits the vertical viewport's width")
                             if scroll.scroller.origin.y < outer.scroller.origin.y + outer.scroller.laidOutFrame.height,
                                scroll.scroller.origin.y + scroll.scroller.laidOutFrame.height > outer.scroller.origin.y {
+                                let row = try XCTUnwrap(host.views(WinUILazyStackView.self).first {
+                                    ($0.placingLayout as? WinUIScrollDocument)?.scrollView === scroll
+                                })
+                                let measured = row.cells.identities.filter { row.cells.extents.hasMeasurement(for: $0) }.count
                                 XCTAssertEqual(scroll.scroller.standing.reach.x + scroll.scroller.laidOutFrame.width,
-                                               40 * 96 + 39 * 8, accuracy: 1)
+                                               Double(measured) * 96 + Double(40 - measured) * 44 + 39 * 8, accuracy: 1)
                             }
                         }
                         XCTAssertGreaterThan(scrolls.count, 2)
@@ -840,6 +887,11 @@ final class WinUILazyTests: XCTestCase {
                 let perRun = kind < 2 ? 1 : 4
                 let extent = horizontal ? 80.0 : 40.0
                 let viewport = horizontal ? scroll.frame.width : scroll.frame.height
+                // This test isolates exact-window identity and idle reuse from
+                // provisional geometry. Supply the fixture's known dimensions
+                // without constructing its offscreen native rows.
+                giveExactGeometry(lazy, extent: extent, perRun: perRun)
+                for _ in 0..<8 { host.step() }
                 let reach = scroll.scroller.standing.reach
                 XCTAssertEqual(viewport, horizontal ? 480 : 240, accuracy: 1)
                 XCTAssertEqual(horizontal ? reach.x : reach.y,
@@ -882,6 +934,8 @@ final class WinUILazyTests: XCTestCase {
                     let horizontal = kind % 2 == 1
                     let perRun = kind < 2 ? 1 : 4
                     let extent = horizontal ? 80.0 : 40.0
+                    giveExactGeometry(lazy, extent: extent, perRun: perRun)
+                    for _ in 0..<8 { host.step() }
                     var previous: [String: WinUIView] = [:]
                     var animatedPhases: Set<Int> = []
                     var phaseStarts: [Double] = []
@@ -1047,6 +1101,8 @@ final class WinUILazyTests: XCTestCase {
                 let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
                 let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
                 let title = "SOUILazyNativeOffsets-\(kind)"
+                giveExactGeometry(lazy, extent: extent, perRun: perRun)
+                for _ in 0..<8 { host.step() }
                 try XCTUnwrap(host.window).setTitle(title)
                 let name = Array(title.utf16) + [0]
                 let hwnd = try XCTUnwrap(name.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
@@ -1256,8 +1312,8 @@ final class WinUILazyTests: XCTestCase {
                 }
                 for _ in 0..<30 { host.step() }
                 if phase == 0 {
-                    // Visit every row so total-length assertions compare known measurements, not a
-                    // changing statistical estimate of rows the test has never displayed.
+                    // Visit every row so total-length assertions compare known
+                    // measurements rather than provisional sizes of unseen rows.
                     for offset in stride(from: 0.0, through: scroll.scroller.standing.reach.y, by: 200) {
                         scroll.scroller.move(to: Point(0, offset))
                         host.step()
@@ -1308,7 +1364,8 @@ final class WinUILazyTests: XCTestCase {
             let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             host.settle { host.views(WinUILabelView.self).contains { $0.text == "Row 0" } }
 
-            scroll.scroller.move(to: Point(0, 20_000))
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            scroll.scroller.move(to: Point(0, lazy.cells.offset(of: 500)))
             host.settle { host.views(WinUILabelView.self).contains { $0.text == "Row 500" } }
 
             let standing = host.views(WinUILabelView.self).map(\.text)
@@ -1323,9 +1380,12 @@ final class WinUILazyTests: XCTestCase {
             let host = WinUIRenderer.running { LazyRowsPage() }
             host.settle { host.views(WinUILabelView.self).count > 4 }
 
-            // A thousand forty-point rows: the lazy view's height is their run.
+            // The document combines known forty-point rows and provisional
+            // forty-four-point rows without building the whole source.
             let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
-            XCTAssertEqual(lazy.laidOutFrame.height, 40_000, accuracy: 4_000)
+            let measured = lazy.cells.identities.filter { lazy.cells.extents.hasMeasurement(for: $0) }.count
+            XCTAssertLessThan(measured, lazy.cells.identities.count)
+            XCTAssertEqual(lazy.laidOutFrame.height, Double(measured) * 40 + Double(1_000 - measured) * 44, accuracy: 1)
         }
     }
 

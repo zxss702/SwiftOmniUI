@@ -217,7 +217,11 @@ class WinUILazyView: WinUITravellingLayout {
             // Complete native measurement before asking for further unknown
             // rows. Keep 44 as the initial scroll estimate, and replace it with
             // actual extents before it can request a whole page of tall cards.
-            guard WinUIView.arranging == 0, let placed else { break }
+            guard WinUIView.arranging == 0, !cells.needsMeasurement || cells.requestedItemsAreCurrent,
+                  let placed else {
+                retell()
+                break
+            }
             if cells.built != built || measuredRevision != measurementRevision || cells.anchorShift != 0 {
                 _ = contentSize(width: standsAt ?? placed.width)
                 arrange(width: placed.width, height: placed.height)
@@ -415,6 +419,14 @@ final class WinUILazyStackView: WinUILazyView {
                 measuredRevisions = [:]
                 measuredAcross = across
             }
+            if cells.requestedItemsAreCurrent {
+                // An empty builder fragment produces no native child at all.
+                // Once its render is committed, it is a measured zero, not a
+                // permanently unmeasured row that blocks incremental filling.
+                for identity in cells.identities[cells.built] where mounted[identity] == nil {
+                    cells.extents.measure(identity, extent: 0)
+                }
+            }
             for (identity, item) in mounted {
                 guard !item.departing, cells.position(of: identity) != nil else { continue }
                 let margin = item.values.margin
@@ -503,7 +515,8 @@ final class WinUILazyStackView: WinUILazyView {
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>) {
-        cells.show(span, realize: realize, measureBeforeExpanding: true)
+        cells.show(span, realize: realize,
+                   measureBeforeExpanding: cells.element?.handler(.realizedChanged) != nil)
     }
 }
 
@@ -583,6 +596,11 @@ final class WinUILazyGridView: WinUILazyView {
                 geometryChanged = true
             }
             var runExtents: [Int: Double] = [:]
+            if cells.requestedItemsAreCurrent, !widths.isEmpty {
+                for identity in cells.identities[cells.built] where mounted[identity] == nil {
+                    if let place = cells.position(of: identity) { runExtents[place / widths.count] = 0 }
+                }
+            }
             for (identity, item) in mounted {
                 guard !item.departing, let place = cells.position(of: identity), !widths.isEmpty else { continue }
                 let run = place / widths.count, track = place % widths.count
@@ -683,7 +701,8 @@ final class WinUILazyGridView: WinUILazyView {
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>) {
-        cells.show(span, perRun: perRun, grid: true, realize: realize, measureBeforeExpanding: true)
+        cells.show(span, perRun: perRun, grid: true, realize: realize,
+                   measureBeforeExpanding: cells.element?.handler(.realizedChanged) != nil)
     }
 }
 

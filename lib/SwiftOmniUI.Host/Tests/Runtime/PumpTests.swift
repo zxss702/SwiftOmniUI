@@ -43,12 +43,15 @@ final class PumpTests: XCTestCase {
         runtime.pump.turn()
 
         runtime.pump.performUserTransaction {
+            XCTAssertFalse(runtime.pump.handlers.hasQueued)
             runtime.pump.dispatch(runtime.add)
             runtime.pump.dispatch(runtime.add)
             XCTAssertEqual(runtime.core.needsRender, false, "a handler ran inside the transaction")
+            XCTAssertTrue(runtime.pump.handlers.hasQueued)
         }
 
         XCTAssertEqual(runtime.shown, ["count 0", "count 2"])
+        XCTAssertFalse(runtime.pump.handlers.hasQueued)
     }
 
     /// A turn asked for inside the user's transaction - a report that wrote a state - waits for it to be over,
@@ -77,11 +80,13 @@ final class PumpTests: XCTestCase {
             runtime.onApply = nil
             XCTAssertTrue(runtime.pump.handlers.isHeld)
             runtime.pump.dispatch(runtime.add)
+            XCTAssertTrue(runtime.pump.handlers.hasQueued)
         }
 
         runtime.pump.dispatch(runtime.add)
 
         XCTAssertEqual(runtime.shown, ["count 0", "count 1", "count 2"])
+        XCTAssertFalse(runtime.pump.handlers.hasQueued)
     }
 
     /// A page's phase is rendered before the handler queued after it runs.

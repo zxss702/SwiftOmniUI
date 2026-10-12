@@ -6,6 +6,52 @@
 import XCTest
 
 final class LazyGeometryTests: XCTestCase {
+    func testMeasurementsReplaceOnlyTheirOwnProvisionalExtents() {
+        let identities = ["hero", "file", "unseen"]
+        var extents = LazyExtents()
+        XCTAssertEqual(extents.total(in: identities), 132)
+        extents.measure("hero", extent: 720)
+        XCTAssertEqual(extents.extent(of: "unseen"), 44)
+        XCTAssertEqual(extents.total(in: identities), 808)
+        extents.measure("file", extent: 20)
+        XCTAssertEqual(extents.total(in: identities), 784)
+        extents.keep(identities: Set(["file", "unseen"]))
+        XCTAssertEqual(extents.total(in: ["file", "unseen"]), 64)
+        extents.reset()
+        XCTAssertEqual(extents.total(in: ["file", "unseen"]), 88)
+
+        var runs = LazyRunExtents()
+        runs.measure(0, extent: 720)
+        runs.measure(1, extent: 20)
+        XCTAssertEqual(runs.extent(of: 2), 44)
+        XCTAssertEqual(runs.total(count: 3), 784)
+        runs.reset()
+        XCTAssertEqual(runs.total(count: 3), 132)
+    }
+
+    func testZeroMeasurementsKeepProvisionalRoomForUnseenRows() {
+        let identities = ["empty", "card", "last"]
+        var extents = LazyExtents()
+        extents.spacing = 0
+        extents.measure("empty", extent: 0)
+        XCTAssertEqual(extents.extent(of: "empty"), 0)
+        XCTAssertEqual(extents.estimate, 44)
+        XCTAssertEqual(extents.total(in: identities), 88)
+        XCTAssertEqual(extents.places(in: 0..<44, overscan: 0, in: identities), 1..<2)
+        extents.measure("card", extent: 360)
+        XCTAssertEqual(extents.offset(of: 2, in: identities), 360)
+        extents.measure("last", extent: 0)
+        XCTAssertEqual(extents.total(in: identities), 360, "measured zeros take no space")
+
+        var runs = LazyRunExtents()
+        runs.measure(0, extent: 0)
+        XCTAssertEqual(runs.extent(of: 0), 0)
+        XCTAssertEqual(runs.total(count: 3), 88)
+        runs.measure(1, extent: 360)
+        runs.measure(2, extent: 0)
+        XCTAssertEqual(runs.total(count: 3), 360)
+    }
+
     @MainActor
     func testIncrementalWindowMeasuresTallRowsBeforeExpandingItsEstimate() throws {
         let runtime = HostRuntime.still()
@@ -104,15 +150,15 @@ final class LazyGeometryTests: XCTestCase {
         let identities = (0..<10_000).map(String.init)
         var extents = LazyExtents()
         extents.measure("0", extent: 40)
-        XCTAssertEqual(extents.total(in: identities), 400_000, accuracy: 0.001)
-        XCTAssertEqual(extents.places(in: 800..<1_040, overscan: 0, in: identities), 20..<26)
-        XCTAssertEqual(extents.places(in: 801..<1_041, overscan: 0, in: identities), 20..<27)
-        XCTAssertEqual(extents.places(in: 399_960..<400_010, overscan: 0, in: identities), 9_999..<10_000)
-        XCTAssertEqual(extents.places(in: 400_000..<400_010, overscan: 0, in: identities), 0..<0)
+        XCTAssertEqual(extents.total(in: identities), 439_996, accuracy: 0.001)
+        XCTAssertEqual(extents.places(in: 876..<1_140, overscan: 0, in: identities), 20..<26)
+        XCTAssertEqual(extents.places(in: 877..<1_141, overscan: 0, in: identities), 20..<27)
+        XCTAssertEqual(extents.places(in: 439_952..<440_010, overscan: 0, in: identities), 9_999..<10_000)
+        XCTAssertEqual(extents.places(in: 439_996..<440_010, overscan: 0, in: identities), 0..<0)
         extents.spacing = 10
         extents.padding = (5, 7)
         XCTAssertEqual(extents.places(in: 45..<55, overscan: 0, in: identities), 0..<0)
-        XCTAssertEqual(extents.total(in: identities), 500_002, accuracy: 0.001)
+        XCTAssertEqual(extents.total(in: identities), 539_998, accuracy: 0.001)
     }
 
     func testVariableExtentsMatchIntersectionsAcrossTheWholeRun() {
@@ -138,9 +184,9 @@ final class LazyGeometryTests: XCTestCase {
     func testGridMeasurementsCanShrinkAndRegroup() {
         var runs = LazyRunExtents()
         runs.measure(0, extent: 100)
-        XCTAssertEqual(runs.total(count: 500), 50_000)
+        XCTAssertEqual(runs.total(count: 500), 22_056)
         runs.measure(0, extent: 20)
-        XCTAssertEqual(runs.total(count: 500), 10_000)
+        XCTAssertEqual(runs.total(count: 500), 21_976)
         runs.measure(1, extent: 40)
         XCTAssertEqual(runs.offset(of: 2, count: 500), 60)
         let revision = runs.revision
@@ -148,8 +194,8 @@ final class LazyGeometryTests: XCTestCase {
         XCTAssertEqual(runs.revision, revision)
         runs.reset()
         runs.measure(0, extent: 50)
-        XCTAssertEqual(runs.total(count: 250), 12_500)
-        XCTAssertEqual(runs.places(in: 100..<200, overscan: 0, count: 250), 2..<4)
+        XCTAssertEqual(runs.total(count: 250), 11_006)
+        XCTAssertEqual(runs.places(in: 94..<182, overscan: 0, count: 250), 2..<4)
     }
 
     @MainActor

@@ -116,9 +116,10 @@ road of its own for it.
 
 ## Lazy layout windows
 
-`LazyCells` keeps scroll geometry for a lazy stack or grid. Unmeasured rows
-start with an extent of 44; native measurements replace those estimates and
-update the document extent. WinUI fills a new window incrementally: it mounts
+`LazyCells` keeps scroll geometry for a lazy stack or grid. Each unmeasured
+row stays at an extent of 44; a native measurement replaces only that row's
+estimate and updates the document extent. Measured rows never change the
+estimates of unseen rows. WinUI fills a new window incrementally: it mounts
 an unknown row (a complete run for a grid), measures it, and rechecks the
 window before requesting more. A tall settings card therefore corrects the
 range before the provisional estimate builds all the cards behind it.
@@ -132,4 +133,7 @@ viewport callback when measurement is allowed; a callback within another
 layout or patch resumes after that pass. Source changes keep surviving rows'
 measurement caches. Their native revisions, placement values and cross-axis
 proposals decide which rows need fresh measurement.
+An empty fragment is a zero-size row once its requested render has committed.
+Zero-size rows leave unseen rows' 44-point estimates intact, so an empty
+header cannot hide all the cards behind it.
 

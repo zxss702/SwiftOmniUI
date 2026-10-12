@@ -34,6 +34,9 @@
     /// Whether the user's transaction runs.
     public var inTransaction: Bool { transactions > 0 }
 
+    /// Whether a handler raised during a patch or transaction still awaits dispatch.
+    var hasQueued: Bool { !queued.isEmpty }
+
     /// Raises `handler` with `payload` now, or queues it while held; whether it ran.
     @discardableResult
     public func raise(_ handler: Int32, payload: [HostValue] = []) -> Bool {

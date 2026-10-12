@@ -45,6 +45,14 @@
     /// expanding the same window; an unchanged 44-point estimate still resumes.
     public private(set) var needsMeasurement = false
 
+    /// Requested rows have finished their render. During a patch or a held
+    /// transaction, a missing native row can still be waiting for that render.
+    public var requestedItemsAreCurrent: Bool {
+        guard let runtime, element?.handler(.realizedChanged) != nil else { return false }
+        return !runtime.intake.isApplying && !runtime.pump.handlers.inTransaction
+            && !runtime.pump.handlers.hasQueued && !runtime.core.needsRender
+    }
+
     /// Diagnostic counts for the work a lazy window actually performs.
     public private(set) var requests = 0
     /// Viewport range lookups performed.
@@ -57,8 +65,7 @@
 
     private var anchor: (identity: String, place: Int, inset: Double, origin: Double, viewport: Double, trailing: Bool)?
 
-    /// The run's arithmetic: measured extents by identity, the rest by the
-    /// mean of the measured.
+    /// The run's arithmetic: measured extents by identity, the rest at 44.
     public var extents = LazyExtents()
 
     /// A grid's arithmetic: one extent a row, measured of the tallest cell
@@ -280,7 +287,7 @@ private struct MeasuredSums: Sendable {
     }
 }
 
-/// Measured child extents; the places not yet measured stand at the mean of those that are.
+/// Measured child extents; each place not yet measured stands at 44.
 /// The host invalidates measurements when the source or its cross-axis size changes.
 @_spi(Host) public struct LazyExtents: Sendable {
     /// The spacing between adjacent children or runs.
@@ -291,12 +298,11 @@ private struct MeasuredSums: Sendable {
     public var padding: (head: Double, tail: Double) = (0, 0) {
         didSet { if padding != oldValue { revision += 1 } }
     }
-    /// The mean measured extent used for unseen children or runs.
-    public private(set) var estimate: Double = 44
+    /// The provisional extent of each unseen child, independent of measured neighbours.
+    public let estimate: Double = 44
     /// Geometry version used to reuse viewport searches.
     public private(set) var revision = 0
     private var measured: [String: Double] = [:]
-    private var sum = 0.0
     private var index: [String: Int] = [:]
     private var sums = MeasuredSums()
 
@@ -308,19 +314,14 @@ private struct MeasuredSums: Sendable {
         guard extent.isFinite, extent >= 0, measured[identity] != extent else { return }
         let before = measured[identity]
         let previous = before ?? estimate
-        sum += extent - (before ?? 0)
         measured[identity] = extent
         if let place = index[identity] { sums.add(place, extent: extent - (before ?? 0), count: before == nil ? 1 : 0) }
-        let next = sum / Double(measured.count)
-        if extent != previous || next != estimate { revision += 1 }
-        estimate = next
+        if extent != previous { revision += 1 }
     }
 
     /// Reordering invalidates positions even when every identity survives; `adopt` follows.
     public mutating func keep(identities: Set<String>) {
         measured = measured.filter { identities.contains($0.key) }
-        sum = measured.values.reduce(0, +)
-        estimate = measured.isEmpty ? 44 : sum / Double(measured.count)
         index = [:]
         sums = MeasuredSums()
         revision += 1
@@ -338,10 +339,8 @@ private struct MeasuredSums: Sendable {
     /// Forget sizes that were measured under a different layout proposal.
     public mutating func reset() {
         measured = [:]
-        sum = 0
         sums = MeasuredSums(places: index.count)
         revision += 1
-        // Keep the last useful estimate until the new visible measurements arrive.
     }
 
     /// The measured child extent, or the current estimate.
@@ -396,7 +395,7 @@ private struct MeasuredSums: Sendable {
     }
 }
 
-/// Measured row or column extents; the runs not yet measured stand at the mean of those that are.
+/// Measured row or column extents; each run not yet measured stands at 44.
 /// The host invalidates measurements when the source or its cross-axis size changes.
 @_spi(Host) public struct LazyRunExtents: Sendable {
     /// The spacing between adjacent children or runs.
@@ -407,12 +406,11 @@ private struct MeasuredSums: Sendable {
     public var padding: (head: Double, tail: Double) = (0, 0) {
         didSet { if padding != oldValue { revision += 1 } }
     }
-    /// The mean measured extent used for unseen children or runs.
-    public private(set) var estimate: Double = 44
+    /// The provisional extent of each unseen run, independent of measured neighbours.
+    public let estimate: Double = 44
     /// Geometry version used to reuse viewport searches.
     public private(set) var revision = 0
     private var measured: [Int: Double] = [:]
-    private var sum = 0.0
     private var runs = 0
     private var sums = MeasuredSums()
 
@@ -424,21 +422,16 @@ private struct MeasuredSums: Sendable {
         guard extent.isFinite, extent >= 0, measured[run] != extent else { return }
         let before = measured[run]
         let previous = before ?? estimate
-        sum += extent - (before ?? 0)
         measured[run] = extent
         if run < runs { sums.add(run, extent: extent - (before ?? 0), count: before == nil ? 1 : 0) }
-        let next = sum / Double(measured.count)
-        if extent != previous || next != estimate { revision += 1 }
-        estimate = next
+        if extent != previous { revision += 1 }
     }
 
     /// Forget sizes that were measured under a different layout proposal.
     public mutating func reset() {
         measured = [:]
-        sum = 0
         sums = MeasuredSums(places: runs)
         revision += 1
-        // Keep the last useful estimate until the new visible measurements arrive.
     }
 
     /// The measured run extent, or the current estimate.
