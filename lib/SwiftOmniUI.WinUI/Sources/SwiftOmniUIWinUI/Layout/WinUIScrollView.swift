@@ -119,7 +119,12 @@ final class WinUIScrollView: WinUILayoutView {
             scroller.setModes(vertical: modes.vertical, horizontal: modes.horizontal)
         }
         writtenPadding = padding
-        document.layoutPadding = padding + barsInsets
+        let resolvedPadding = SafeAreaArithmetic.physicalInsets(padding, direction: direction) + barsInsets
+        if document.layoutPadding != resolvedPadding {
+            document.layoutPadding = resolvedPadding
+            document.forgetMeasurements()
+            wrapper.forgetMeasurements()
+        }
         document.orientation = orientation
         if let defaultAnchor { self.defaultAnchor = (defaultAnchor.x, defaultAnchor.y) }
 
@@ -135,6 +140,10 @@ final class WinUIScrollView: WinUILayoutView {
 
     override func backgroundBounds(in bounds: Rect) -> Rect {
         box.clips ? bounds : layoutSafeArea(in: bounds).viewport(in: bounds, axes: orientation)
+    }
+
+    override func safeAreaChanged() {
+        if let context = safeAreaContext { _ = resolve(in: context.layout) }
     }
 
     private func resolve(in bounds: Rect) -> Rect {

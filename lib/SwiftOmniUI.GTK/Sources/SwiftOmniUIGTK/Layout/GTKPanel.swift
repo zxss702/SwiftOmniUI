@@ -29,11 +29,14 @@ enum GTKPanel {
             widgetClass.pointee.get_request_mode = { _ in GTK_SIZE_REQUEST_HEIGHT_FOR_WIDTH }
             widgetClass.pointee.measure = { widget, orientation, forSize, least, natural, leastBaseline, naturalBaseline in
                 let number = GTKPanel.number(of: widget)
-                let size = MainActor.assumeIsolated {
-                    GTKPanel.view(number)?.measure(across: orientation == GTK_ORIENTATION_HORIZONTAL, forSize: forSize) ?? 0
+                let sizes = MainActor.assumeIsolated {
+                    let across = orientation == GTK_ORIENTATION_HORIZONTAL
+                    let view = GTKPanel.view(number)
+                    let natural = view?.measure(across: across, forSize: forSize) ?? 0
+                    return (view?.minimumSize(across: across, natural: natural) ?? 0, natural)
                 }
-                least?.pointee = 0
-                natural?.pointee = Int32(size.rounded(.up))
+                least?.pointee = Int32(sizes.0.rounded(.up))
+                natural?.pointee = Int32(sizes.1.rounded(.up))
                 leastBaseline?.pointee = -1
                 naturalBaseline?.pointee = -1
             }

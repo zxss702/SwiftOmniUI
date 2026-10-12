@@ -20,7 +20,9 @@ class GTKView {
 
     /// Logical ancestry survives native toolbar hosting.
     weak var sourceElement: MountedElement?
-    var safeAreaContext: SafeAreaContext?
+    var safeAreaContext: SafeAreaContext? {
+        didSet { if safeAreaContext != oldValue { safeAreaChanged() } }
+    }
     var rootSafeAreaContext: ((Rect) -> SafeAreaContext)?
 
     /// A native toolbar owns the widget, while the source modifier still owns
@@ -96,6 +98,10 @@ class GTKView {
         (safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds))
             .ignoring(sourceElement?.ignoresSafeArea)
     }
+
+    /// Resolve arithmetic when a parent places this view, before native
+    /// measurement reads its document. Native writes still wait until layout ends.
+    func safeAreaChanged() {}
 
     /// Where the view was last placed in its parent; nil before its first place.
     var placed: Rect?

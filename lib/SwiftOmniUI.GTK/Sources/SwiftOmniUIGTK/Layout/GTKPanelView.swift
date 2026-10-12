@@ -24,6 +24,10 @@ class GTKPanelView: GTKView {
         0
     }
 
+    /// Ordinary panels can shrink. A scroll document supplies its complete
+    /// extent on scrolling axes so the native viewport cannot compress it.
+    func minimumSize(across: Bool, natural: Double) -> Double { 0 }
+
     /// Answers GTK's allocation of `width` by `height`.
     func allocate(width: Double, height: Double) {}
 

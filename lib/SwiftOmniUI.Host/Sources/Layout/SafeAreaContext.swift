@@ -21,7 +21,9 @@
         self.consumed = consumed
     }
 
-    public var safe: Rect { Self.intersection(container, keyboard) }
+    /// Ancestors' regions can extend past a local child's proposal. Clip the
+    /// usable region to that proposal before placing a local bar or its base.
+    public var safe: Rect { Self.intersection(bounds, Self.intersection(container, keyboard)) }
 
     public var insets: EdgeInsets { Self.insets(of: safe, in: layout) }
 

@@ -129,6 +129,12 @@ extension GTKElement {
 
     /// Forgets the sizes kept by this element's layout and every one above it, and asks GTK to measure again.
     func invalidateMeasurements() {
+        var invalidated: Set<ObjectIdentifier> = []
+        func invalidate(_ view: GTKView?) {
+            guard let view, invalidated.insert(ObjectIdentifier(view)).inserted else { return }
+            (view as? GTKLayoutView)?.forgetMeasurements()
+            view.invalidateMeasure()
+        }
         var element: GTKElement? = self
         while let each = element {
             // An entry of an List is measured by its cell; the list's own size never follows its items.
@@ -136,13 +142,18 @@ extension GTKElement {
                 items.remeasure(each.element)
                 break
             }
-            (each.view as? GTKLayoutView)?.forgetMeasurements()
-            each.view?.invalidateMeasure()
+            invalidate(each.view)
             // A popover is its own room: nothing its content asks reaches the layout its anchor stands in.
             if each.type == .popover { break }
             element = each.parent
         }
-
+        // The source tree does not contain the native scroll document or a
+        // wrapper for several content children. Forget their arithmetic too.
+        var layout = (view ?? parent?.nearestView)?.placingLayout
+        while let current = layout {
+            invalidate(current)
+            layout = (current as? GTKScrollDocument)?.scrollView ?? current.placingLayout
+        }
     }
 
     /// Hears the scroller's movement on the display's frames: where it went, and that it came to rest.

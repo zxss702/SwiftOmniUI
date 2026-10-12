@@ -183,7 +183,11 @@ class WinUILayoutView: WinUIView {
         let size = naturalSize(width: offered)
         reportChange(of: size, offered: offered)
         guard placingLayout == nil else { return .zero }
-        return LayoutSize(width: min(size.width, width), height: min(size.height, height))
+        // Native content presenters do not have a LayoutItem to apply the
+        // root frame's bounds. A label's own fixed frame must still survive
+        // when a button, page or native container measures this panel directly.
+        let framed = sourceElement?.layoutValues.sized(size, offered: offered) ?? size
+        return LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
     }
 
     /// How many SwiftOmniUI layouts are measuring, one inside another.

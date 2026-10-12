@@ -127,6 +127,9 @@ class GTKLayoutView: GTKPanelView {
     func invalidateMeasurements() {
         forgetMeasurements()
         invalidateMeasure()
+        // GTK invalidates native requisitions, but our width-keyed arithmetic
+        // caches also belong to placing parents, including the scroll document.
+        ((self as? GTKScrollDocument)?.scrollView ?? placingLayout)?.invalidateMeasurements()
     }
 
     /// Forgets the sizes this layout keeps.

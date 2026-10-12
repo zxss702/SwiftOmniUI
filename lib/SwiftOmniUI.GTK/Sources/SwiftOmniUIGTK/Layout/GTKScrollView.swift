@@ -53,6 +53,7 @@ final class GTKScrollView: GTKLayoutView {
         scroller.onScrolled = { [weak self] standing in self?.scrolled(to: standing) }
         scroller.onHeld = { [weak self] holding in self?.scrollerHeld(holding) }
         scroller.placingLayout = self
+        document.scrollView = self
         setChildren([scroller])
         configure()
     }
@@ -97,7 +98,12 @@ final class GTKScrollView: GTKLayoutView {
             configure()
         }
         writtenPadding = padding
-        document.layoutPadding = padding + barsInsets
+        let resolvedPadding = SafeAreaArithmetic.physicalInsets(padding, direction: direction) + barsInsets
+        if document.layoutPadding != resolvedPadding {
+            document.layoutPadding = resolvedPadding
+            document.forgetMeasurements()
+            wrapper.forgetMeasurements()
+        }
         document.orientation = orientation
         if let defaultAnchor { self.defaultAnchor = (defaultAnchor.x, defaultAnchor.y) }
 
@@ -113,6 +119,10 @@ final class GTKScrollView: GTKLayoutView {
 
     override func backgroundBounds(in bounds: Rect) -> Rect {
         box.clips ? bounds : layoutSafeArea(in: bounds).viewport(in: bounds, axes: orientation)
+    }
+
+    override func safeAreaChanged() {
+        if let context = safeAreaContext { _ = resolve(in: context.layout) }
     }
 
     private func resolve(in bounds: Rect) -> Rect {

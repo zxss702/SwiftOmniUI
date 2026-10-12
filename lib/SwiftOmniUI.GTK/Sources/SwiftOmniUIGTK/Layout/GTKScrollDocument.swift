@@ -10,6 +10,9 @@ import CSwiftOmniUIGTK
 /// Design: docs/design/platforms/gtk/layout.md#scrolling
 @MainActor
 final class GTKScrollDocument: GTKLayoutView {
+    /// The native viewport owns the document; its arithmetic owner is the scroller.
+    weak var scrollView: GTKScrollView?
+
     /// The room inside the scroller's own edge.
     var padding = EdgeInsets(0) {
         didSet { if padding != oldValue { invalidateMeasurements() } }
@@ -25,6 +28,11 @@ final class GTKScrollDocument: GTKLayoutView {
 
     override func contentSize(width: Double?) -> LayoutSize {
         ScrollArithmetic.contentSize(of: items.first, padding: layoutPadding, orientation: orientation, width: width)
+    }
+
+    override func minimumSize(across: Bool, natural: Double) -> Double {
+        let scrolls = orientation == .both || (across ? orientation == .horizontal : orientation == .vertical)
+        return scrolls ? natural : 0
     }
 
     override func arrange(in bounds: Rect) {

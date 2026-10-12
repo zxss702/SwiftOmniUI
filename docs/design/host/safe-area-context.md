@@ -13,6 +13,12 @@ incoming edge proposal without its own contribution. Only the base receives
 the reduced region. Hidden bars reserve no extent or spacing; retained removal
 branches are excluded from current layout.
 
+The usable region is the intersection of the inherited container/keyboard
+rectangles **and the child's proposal bounds**. Keeping only the inherited
+intersection would give a 320-point tutorial column the entire page's width
+when it places a local bar. Ordinary children retain their own bounds while
+edge-touching descendants can retain the corresponding unsafe strips.
+
 GeometryReader accepts its allocated room independently of its closure. A
 finite native allocation supplies its size; an unspecified axis has ideal
 extent ten. Content starts at the leading top corner. The frame-report wire
@@ -55,8 +61,24 @@ were reviewed statically. **Not compiled; no tests run; no test files added.**
 Windows crash resolution, native edge appearance, platform API compatibility
 and live layout convergence remain unverified at the user's request.
 
+The follow-up screenshots exposed a missing WinUI source-element connection:
+each created native view must retain a weak link to its mounted element, or
+the GeometryReader and ordered-inset branches cannot run. Both hosts now
+resolve scroll-document padding when the placed context changes, before the
+native viewport/presenter reads the document. Native writes remain deferred.
+GTK invalidates the placing parents' arithmetic caches when lazy extents change,
+including the document/scroller boundary. Its document reports the full natural
+extent as its minimum on scrolling axes, and lazy realization uses the actual
+native viewport dimensions rather than the reduced source ScrollView frame.
+WinUI panels measured directly by a native presenter retain their root frame's
+bounds, and the label's inner TextBlock uses the same DIP rounding policy as
+its outer Border. These are source corrections; the screenshots' missing
+captions, continuation visibility and platform appearance have not been
+confirmed with a running application.
+
 The semantic references are Apple's [GeometryReader](https://developer.apple.com/documentation/swiftui/geometryreader),
 [safeAreaInset](https://developer.apple.com/documentation/swiftui/view/safeareainset(edge:alignment:spacing:content:))
 and [scroll-view discussion in WWDC23](https://developer.apple.com/videos/play/wwdc2023/10159/).
 Native surface behaviour follows [AdwToolbarView](https://gnome.pages.gitlab.gnome.org/libadwaita/doc/main/class.ToolbarView.html).
+GTK document allocation follows the native [GtkViewport implementation](https://github.com/GNOME/gtk/blob/main/gtk/gtkviewport.c).
 XAML logging uses [UnhandledExceptionEventArgs](https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.unhandledexceptioneventargs?view=windows-app-sdk-1.8).

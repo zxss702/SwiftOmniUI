@@ -98,6 +98,10 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_text_make(void) {
         // The words stand in a border, which draws what they are drawn over and stands them across its height as
         // their alignment says: a text block does neither.
         controls::TextBlock block;
+        // The outer label uses SOUI's DIP proposals. Its inner TextBlock
+        // must use the same width and height when it measures and draws,
+        // including small custom-font captions inside a fixed-height frame.
+        block.UseLayoutRounding(false);
         block.TextWrapping(xaml::TextWrapping::Wrap);
         controls::Border label;
         label.Background(clearGround());

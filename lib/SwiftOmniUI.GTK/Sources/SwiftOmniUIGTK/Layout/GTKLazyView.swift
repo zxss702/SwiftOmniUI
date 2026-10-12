@@ -92,8 +92,8 @@ class GTKLazyView: GTKTravellingLayout {
         var bounds = graphene_rect_t()
         guard gtk_widget_compute_bounds(self.widget, document.widget, &bounds) != 0 else { return nil }
         let room = axis == .vertical
-            ? Double(gtk_widget_get_height(scroll.widget))
-            : Double(gtk_widget_get_width(scroll.widget))
+            ? Double(gtk_widget_get_height(scroll.scroller.widget))
+            : Double(gtk_widget_get_width(scroll.scroller.widget))
         // value-changed precedes the viewport's allocation. Document coordinates plus the
         // adjustment's current offset describe one instant; the old viewport transform does not.
         let offset = scroll.scroller.standing.offset

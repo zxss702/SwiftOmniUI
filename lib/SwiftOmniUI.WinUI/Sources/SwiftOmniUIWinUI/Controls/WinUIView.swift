@@ -20,7 +20,9 @@ class WinUIView {
 
     /// Logical ancestry survives native toolbar hosting.
     weak var sourceElement: MountedElement?
-    var safeAreaContext: SafeAreaContext?
+    var safeAreaContext: SafeAreaContext? {
+        didSet { if safeAreaContext != oldValue { safeAreaChanged() } }
+    }
     var rootSafeAreaContext: ((Rect) -> SafeAreaContext)?
 
     /// A native toolbar owns the widget, while the source modifier still owns
@@ -91,6 +93,10 @@ class WinUIView {
         (safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds))
             .ignoring(sourceElement?.ignoresSafeArea)
     }
+
+    /// Update document arithmetic before its presenter measures; native
+    /// invalidations and margins are committed outside the layout pass.
+    func safeAreaChanged() {}
 
     /// Toolbar controls share the title bar's transparent trigger appearance.
     var isToolbarControl = false

@@ -27,6 +27,7 @@ final class WinUIElement: NativeElement {
         self.element = element
         self.host = host
         view = makeView()
+        view?.sourceElement = element
     }
 
     // MARK: - The element's tree, read through its mounted element
