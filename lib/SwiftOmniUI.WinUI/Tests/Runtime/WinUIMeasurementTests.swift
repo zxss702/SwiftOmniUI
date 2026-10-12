@@ -6,6 +6,17 @@
 @testable import SwiftOmniUIWinUI
 import XCTest
 
+/// Counts actual arithmetic work, including work re-entered through XAML's MeasureOverride.
+private final class CountedMeasureLayout: WinUILayoutView {
+    var extent = 40.0
+    var calls: [Double?: Int] = [:]
+
+    override func contentSize(width: Double?) -> LayoutSize {
+        calls[width, default: 0] += 1
+        return LayoutSize(width: width ?? 80, height: extent)
+    }
+}
+
 /// Words `depth` grids deep, each grid with words and a stack of its own beside them.
 private func nest(_ depth: Int, _ words: String) -> Node {
     guard depth > 0 else { return Text(words).padding(2).node }
@@ -26,6 +37,128 @@ private func nest(_ depth: Int, _ words: String) -> Node {
 }
 
 final class WinUIMeasurementTests: XCTestCase {
+    func testNativePreparationReusesArithmeticAtTheSameWidth() {
+        onUIThread {
+            let child = CountedMeasureLayout()
+            let parent = WinUIStackView(axis: .vertical)
+            parent.setItems([WinUILayoutItem(view: child)])
+            let revision = child.measurements.revision
+
+            let size = parent.naturalSize(width: 320)
+            XCTAssertEqual(size.height, 40)
+            XCTAssertEqual(child.calls[320], 1, "XAML preparation must not recompute the child's just-sized subtree")
+            XCTAssertEqual(child.measurements.revision, revision, "preparation is not content invalidation")
+            child.prepareMeasure(width: 320)
+            child.prepareMeasure(width: 320)
+            XCTAssertEqual(child.calls[320], 1)
+
+            child.extent = 96
+            child.invalidateMeasurements()
+            XCTAssertEqual(parent.naturalSize(width: 320).height, 96)
+            XCTAssertEqual(child.calls[320], 2, "real content changes still discard the preparation and arithmetic")
+        }
+    }
+
+    func testIndependentNativeMeasurementsStillRefreshAndReportChangedContent() {
+        onUIThread {
+            let child = CountedMeasureLayout()
+            let parent = WinUIStackView(axis: .vertical)
+            parent.setItems([WinUILayoutItem(view: child)])
+            XCTAssertEqual(parent.naturalSize(width: 320).height, 40)
+            let revision = child.measurements.revision
+
+            // Model a size change WinUI observed independently of a Swift property patch.
+            child.extent = 96
+            _ = child.measure(width: Double(320), height: Double.infinity)
+            XCTAssertGreaterThan(child.measurements.revision, revision)
+            XCTAssertEqual(parent.naturalSize(width: 320).height, 96, "native size changes still reach the placing parent")
+            XCTAssertEqual(child.calls[320], 2)
+        }
+    }
+
+    func testColdNestedLayoutsSizeEachWidthOnceBeforeNativePreparation() {
+        onUIThread {
+            for depth in [2, 6, 12] {
+                let child = CountedMeasureLayout()
+                var root: WinUILayoutView = child
+                for level in 0..<depth {
+                    let parent: WinUILayoutView
+                    switch level % 3 {
+                    case 0: parent = WinUIStackView(axis: .vertical)
+                    case 1: parent = WinUIZStackView()
+                    default: parent = WinUISingleChildView()
+                    }
+                    parent.setItems([WinUILayoutItem(view: root)])
+                    root = parent
+                }
+                let before = WinUILayoutView.sizings
+                XCTAssertEqual(root.naturalSize(width: 320).height, 40)
+                XCTAssertEqual(child.calls[320], 1, "depth \(depth) must not multiply native and arithmetic work")
+                XCTAssertLessThanOrEqual(WinUILayoutView.sizings - before, depth + 1)
+                _ = root.naturalSize(width: 240)
+                let sized = WinUILayoutView.sizings
+                for width in [320.0, 240, 320, 240] { _ = root.naturalSize(width: width) }
+                XCTAssertEqual(child.calls[320], 1)
+                XCTAssertEqual(child.calls[240], 1)
+                XCTAssertEqual(WinUILayoutView.sizings, sized, "known proposals reuse the subtree")
+            }
+        }
+    }
+
+    func testReturningToACachedWidthPreparesNativeTextAtThatWidth() {
+        onUIThread {
+            let label = WinUILabelView()
+            label.setText("A cached wide proposal must restore these native words after a narrow measurement")
+            label.setTextFont(size: 17, attributes: nil, family: nil)
+            let layout = WinUIStackView(axis: .vertical)
+            layout.setItems([WinUILayoutItem(view: label)])
+
+            _ = layout.naturalSize(width: 320)
+            layout.prepareMeasure(width: 320)
+            let wide = label.desiredSize
+            _ = layout.naturalSize(width: 40)
+            layout.prepareMeasure(width: 40)
+            XCTAssertGreaterThan(label.desiredSize.height, wide.height)
+
+            _ = layout.naturalSize(width: 320)
+            layout.prepareMeasure(width: 320)
+            XCTAssertEqual(label.desiredSize, wide, "XAML retains its last proposal, not all cached natural widths")
+        }
+    }
+
+    func testOpeningAndExpandingDeepLazyRowsDoesBoundedSizingWork() throws {
+        try onUIThread {
+            let items = State(wrappedValue: Array(0..<10_000))
+            let opening = WinUILayoutView.sizings
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(items.wrappedValue) { number in
+                            ModifiedContent(node: nest(3, "Row \(number)"))
+                        }
+                        .transition(.opacity)
+                    }
+                }
+                .frame(width: 480, height: 320)
+            }
+            for _ in 0..<8 { host.step() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            XCTAssertLessThan(lazy.mounted.count, 80)
+            // Count subtree sizings rather than wall time: a few width proposals per
+            // visible layout are bounded independently of the ten-thousand-row source.
+            XCTAssertLessThanOrEqual(WinUILayoutView.sizings - opening, host.views(WinUILayoutView.self).count * 12)
+
+            let expanding = WinUILayoutView.sizings
+            items.wrappedValue.insert(contentsOf: [10_000, 10_001], at: 2)
+            for _ in 0..<8 { host.step() }
+            XCTAssertLessThan(lazy.mounted.count, 80)
+            XCTAssertLessThanOrEqual(WinUILayoutView.sizings - expanding, host.views(WinUILayoutView.self).count * 12)
+            let settled = WinUILayoutView.sizings
+            for _ in 0..<4 { host.step() }
+            XCTAssertEqual(WinUILayoutView.sizings, settled, "the native layout must settle after expansion")
+        }
+    }
+
     func testArrangementUsesTheMeasurementForTheRequestedWidth() {
         onUIThread {
             let label = WinUILabelView()

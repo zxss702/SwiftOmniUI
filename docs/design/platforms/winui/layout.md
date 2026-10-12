@@ -32,6 +32,15 @@ measured its whole subtree again: some seven hundred sizings for one word six
 grids deep, and 2910 measures - 150 ms of a debug build's frame - for one
 card of the home page's run turned.
 
+Arithmetic that has just sized a child prepares its native panel separately.
+That preparation keeps the computed natural sizes, and repeated preparations
+while that allocated width and content revision remain current do nothing. Otherwise the
+panel's `MeasureOverride` would discard the result and size the same subtree
+again. Content invalidation clears both caches; an independent measure from
+XAML still refreshes the arithmetic and reports a changed size upward. Returning
+from another measured width prepares the subtree again: XAML retains only its
+last native proposal, even where the natural-size cache holds both widths.
+
 Nothing is measured while WinUI arranges: `Measure` written on an element
 inside an arrangement marks it, the marked element is measured and arranged
 again, and eight passes that never settle end the process with a layout

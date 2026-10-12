@@ -1030,6 +1030,12 @@ int32_t swiftomniui_winui_stored(char const *name, char *utf8, int32_t capacity)
 /// Writes the whole store in the file `name`, in UTF-8, in place of the old one; whether it was written.
 bool swiftomniui_winui_store(char const *name, char const *utf8);
 
+/// The font file at `path`, in UTF-8, loaded privately for this process - Windows' own process-private font
+/// registration - so a family it carries may be named to `Font.custom`. How far the registration reaches, whether
+/// XAML's `FontFamily` resolves a family it holds, is Windows' to say; a family it does not resolve falls back as
+/// it did. The number of faces Windows took, 0 where none was.
+int32_t swiftomniui_winui_register_font(char const *path);
+
 /// The folder the application's pictures are read from, in UTF-8; empty for `Images` beside the executable.
 void swiftomniui_winui_set_pictures(char const *folder);
 

@@ -253,7 +253,7 @@ class WinUIView {
                     WinUIDoorbell.afterPass { [weak self] in
                         guard let self, let layout = self as? WinUILayoutView, let width = layout.standsAt else { return }
                         layout.invalidateMeasurements()
-                        _ = self.measure(width: width, height: nil)
+                        layout.prepareMeasure(width: width)
                     }
                 }
                 layout.standsAt = place.width

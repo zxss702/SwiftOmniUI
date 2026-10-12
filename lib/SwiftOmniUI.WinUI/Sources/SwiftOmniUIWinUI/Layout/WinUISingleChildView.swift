@@ -14,10 +14,10 @@ class WinUISingleChildView: WinUILayoutView {
 
     override func contentSize(width: Double?) -> LayoutSize {
         let size = SingleChildArithmetic.size(of: items.first, padding: padding, width: width)
-        if WinUIView.arranging == 0, let item = items.first, item.isShown, item.view is WinUILayoutView {
+        if WinUIView.arranging == 0, let item = items.first, item.isShown, let layout = item.view as? WinUILayoutView {
             let room = Rect(x: 0, y: 0, width: size.width, height: size.height)
             let place = SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction)
-            _ = item.view.measure(width: place.width, height: nil)
+            layout.prepareMeasure(width: place.width)
         }
         return size
     }

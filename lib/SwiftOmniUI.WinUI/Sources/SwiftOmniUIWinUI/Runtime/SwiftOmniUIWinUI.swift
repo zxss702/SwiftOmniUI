@@ -41,6 +41,9 @@ public enum SwiftOmniUIWinUI {
             }
             return answered ? PicturePixels(width: Int(size[0]), height: Int(size[1]), rgba: rgba) : nil
         }
+        Fonts.add = { path in swiftomniui_winui_register_font(path) > 0 }
+        for path in Fonts.pending { _ = Fonts.add?(path) }
+        Fonts.pending.removeAll()
         var callbacks = WinUICallbacks.table
         return swiftomniui_winui_run(&callbacks)
     }

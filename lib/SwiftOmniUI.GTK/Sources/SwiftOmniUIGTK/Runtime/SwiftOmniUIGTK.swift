@@ -28,6 +28,9 @@ public enum SwiftOmniUIGTK {
     @discardableResult
     public static func run(applicationID: String) -> Int32 {
         PicturePixels.read = { name in MainActor.assumeIsolated { GTKPictures.pixels(of: name) } }
+        Fonts.add = { path in MainActor.assumeIsolated { GTKFonts.register(path) } }
+        for path in Fonts.pending { _ = Fonts.add?(path) }
+        Fonts.pending.removeAll()
         let application = adw_application_new(
             applicationID, GApplicationFlags(G_APPLICATION_HANDLES_OPEN.rawValue))!
         gtk_window_set_default_icon_name(applicationID)

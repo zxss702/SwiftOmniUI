@@ -42,7 +42,7 @@ struct WinUILayoutItem: LayoutChild {
                 let allocated = Extent.of(option: expands ? 3 : values.horizontal, stated: values.width,
                                           natural: measured.width, available: width ?? measured.width,
                                           minimum: values.minimumWidth, maximum: values.maximumWidth)
-                _ = view.measure(width: allocated, height: nil)
+                layout.prepareMeasure(width: allocated)
             }
         } else {
             measured = view.measure(width: offer, height: nil)

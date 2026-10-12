@@ -12,6 +12,13 @@ class WinUILayoutView: WinUIView {
     /// The sizes measured in the pass under way, by the width offered.
     let measurements = MeasurementCache()
 
+    /// XAML keeps only its last native proposal. Reuse preparation while the arithmetic
+    /// and its children's native measures still stand at that same width and revision.
+    private var preparedMeasure: (width: Double, revision: Int)?
+    private var lastSizingWidth: Double?
+    private var hasSizing = false
+    private var preparingMeasure = false
+
     /// The children, in order.
     private(set) var items: [WinUILayoutItem] = []
 
@@ -131,6 +138,27 @@ class WinUILayoutView: WinUIView {
     /// Forgets the sizes this layout keeps.
     func forgetMeasurements() {
         measurements.invalidate()
+        preparedMeasure = nil
+        hasSizing = false
+    }
+
+    /// Marks this panel measured at its allocated width without discarding the natural
+    /// sizes the arithmetic just computed. An independent XAML measure still refreshes them.
+    func prepareMeasure(width: Double) {
+        guard WinUIView.arranging == 0 else { return }
+        let width = Double(Float(width))
+        let currentSizing = hasSizing && lastSizingWidth == (width.isFinite ? width : nil)
+        guard preparedMeasure?.width != width || preparedMeasure?.revision != measurementRevision || !currentSizing
+        else { return }
+
+        // A speculative width can have measured the children since this panel's last
+        // native pass. Even if XAML still holds this width, that subtree must be prepared again.
+        if !currentSizing { swiftomniui_winui_invalidate_measure(handle) }
+        let wasPreparing = preparingMeasure
+        preparingMeasure = true
+        defer { preparingMeasure = wasPreparing }
+        _ = super.measure(width: width, height: nil)
+        preparedMeasure = (width, measurementRevision)
     }
 
     /// Answers WinUI's measure, every child measured again: no room where a SwiftOmniUI layout places this one, which
@@ -145,9 +173,9 @@ class WinUILayoutView: WinUIView {
         Self.measuring += 1
         defer { Self.measuring -= 1 }
 
-        forgetMeasurements()
-        _ = boxView?.measure(width: width, height: height)
         let offered = width.isFinite ? width : nil
+        if !preparingMeasure || !hasSizing || lastSizingWidth != offered { forgetMeasurements() }
+        _ = boxView?.measure(width: width, height: height)
         let size = naturalSize(width: offered)
         reportChange(of: size, offered: offered)
         guard placingLayout == nil else { return .zero }
@@ -177,9 +205,13 @@ class WinUILayoutView: WinUIView {
 
     /// The room the children take for the width offered, in DIPs, kept until a change beneath marks the layout.
     func naturalSize(width: Double?) -> LayoutSize {
-        measurements.size(offering: width) {
+        let width = width.map { Double(Float($0)) }
+        return measurements.size(offering: width) {
             Self.sizings += 1
-            return contentSize(width: width)
+            let size = contentSize(width: width)
+            lastSizingWidth = width
+            hasSizing = true
+            return size
         }
     }
 

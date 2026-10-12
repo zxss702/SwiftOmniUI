@@ -40,8 +40,8 @@ class WinUIZStackView: WinUITravellingLayout {
             let room = Rect(x: 0, y: 0, width: size.width, height: size.height)
             let places = ZStackArithmetic.places(of: items, in: room, padding: padding, direction: direction)
             for (item, place) in zip(items, places) {
-                if let place, item.view is WinUILayoutView {
-                    _ = item.view.measure(width: place.width, height: nil)
+                if let place, let layout = item.view as? WinUILayoutView {
+                    layout.prepareMeasure(width: place.width)
                 }
             }
         }

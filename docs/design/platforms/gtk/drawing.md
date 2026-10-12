@@ -47,9 +47,22 @@ of logical pixels across: GTK reads the file - an SVG through gdk-pixbuf's
 loader - at that size times the display's scale, and again when the scale
 changes.
 
-`PicturePixels(named:)` answers through `GTKPictures.pixels`: the file's
-`GdkTexture` downloaded as the premultiplied RGBA rows GTK already reads, or
-nil where no loader reads the file.
+`PicturePixels(named:)` answers through `GTKPictures.pixels`: the file read
+by `GdkPixbuf`, whose bytes are RGB, plus a straight alpha where it has one,
+premultiplied on the way into the RGBA rows it hands back - or nil where no
+loader reads the file.
+
+## The application's fonts
+
+The fonts an application carries are registered, as `Fonts.register` names
+them, through `GTKFonts.register`: the file is added to the current
+fontconfig's application fonts - the list every `pango_attr_family_new`
+resolves its name against - so a `Font.custom` family finds it without the
+font being installed. A `PangoFcFontMap` lists the families it had when it
+was made, so the default font map is told the configuration changed, that a
+file registered late is still found. The files are handed to fontconfig as
+the host starts, before it makes a font context; `register` keeps them for
+it before then.
 
 ## The shapes
 

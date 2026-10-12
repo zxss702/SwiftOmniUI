@@ -125,7 +125,11 @@ case "GTK"?:
                 "SwiftOmniUIHost"],
             path: "lib/SwiftOmniUI.GTK/Sources/SwiftOmniUIGTK",
             resources: [.copy("Resources/Icons")],
-            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
+            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
+            // The fonts an application registers are fontconfig's; the font map told they changed is pangoft2's.
+            linkerSettings: [
+                .linkedLibrary("fontconfig"), .linkedLibrary("pangoft2-1.0"), .linkedLibrary("pangocairo-1.0"),
+            ]
         ),
         .testTarget(
             name: "SwiftOmniUIGTKTests",
@@ -165,7 +169,7 @@ case "WinUI"?:
             linkerSettings: [
                 .linkedLibrary("shcore"), .linkedLibrary("shlwapi"), .linkedLibrary("icu"), .linkedLibrary("shell32"),
                 .linkedLibrary("ole32"), .linkedLibrary("d2d1"), .linkedLibrary("d3d11"), .linkedLibrary("dwrite"),
-                .linkedLibrary("windowscodecs"),
+                .linkedLibrary("windowscodecs"), .linkedLibrary("gdi32"),
             ]
         ),
         .target(
