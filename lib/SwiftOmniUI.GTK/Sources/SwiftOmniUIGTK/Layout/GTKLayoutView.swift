@@ -155,6 +155,13 @@ class GTKLayoutView: GTKPanelView {
         GTKView.allocating += 1
         defer { GTKView.allocating -= 1 }
         arrange(in: Rect(x: 0, y: 0, width: width, height: height))
+        holdDeparting()
+    }
+
+    /// Stands every child riding its removal transition where it last stood: it takes no room, but GTK
+    /// allocates each child it draws in every allocation, and its transition draws over that place.
+    private func holdDeparting() {
+        for item in items where item.departing { item.view.layout(item.view.placedFrame) }
     }
 
     /// The room the children take for the width offered.

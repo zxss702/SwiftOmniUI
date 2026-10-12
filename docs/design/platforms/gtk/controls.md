@@ -135,9 +135,11 @@ opacity; a placeholder colour is drawn in full.
 ## An editor
 
 A TextEditor is a `GtkTextView` whose Enter starts a new line and submits
-nothing, its words wrapped, in a scrolled window drawn as an entry is - filled
-faintly, its corners rounded, ringed while it holds the focus - with an
-entry's room around its words. It is as wide as the room it is offered, its
+nothing, its words wrapped, in a faintly filled scrolled window with an
+entry's room around its words, but no border, shadow or focus ring. The
+canvas is transparent with `scrollContentBackground(.hidden)`; visible,
+automatic or unsaid restores the fill. Its native caret and selection stay.
+It is as wide as the room it is offered, its
 words wrapping in it; growing with its words it is as tall as they are, and
 not growing it keeps a line's height, whatever it holds - the room its
 layout gives it is the room it scrolls in. GTK allows a scrolled window no

@@ -31,6 +31,9 @@ extension WinUIRegistrations {
             editor.applies(wordMembers) { view, values in applyWords(view, values) }
             editor.applies(boxMembers) { view, values in applyBox(view, values) }
             editor.property(TextEditorContract.growsWithText) { view, grows in view.growsWithText = grows ?? false }
+            editor.property(ScrollContentElementContract.scrollContentBackground) { view, visibility in
+                view.setContentBackground(visibility)
+            }
             editor.raises(InputViewContract.textChanged)
         })
         registry.add(SearchFieldContract.self, create: { reports in

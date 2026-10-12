@@ -28,7 +28,8 @@ final class WinUICustomLayoutView: WinUITravellingLayout {
     /// placed through this view's arrangement, their `.layoutValue` tags and
     /// guides read back over the boundary.
     private func subviews() -> LayoutSubviews {
-        LayoutSubviews(items.map { item in
+        // A child riding its removal transition is no subview: it stands where it last stood.
+        LayoutSubviews(items.filter { !$0.departing }.map { item in
             LayoutSubview(
                 layoutValues: item.codeId.map { CoreLink().layoutValues(for: $0) } ?? [:],
                 priority: item.values.priority,

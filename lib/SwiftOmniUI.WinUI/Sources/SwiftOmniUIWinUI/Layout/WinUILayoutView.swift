@@ -193,6 +193,13 @@ class WinUILayoutView: WinUIView {
         boxView?.layout(Rect(x: 0, y: 0, width: width, height: height))
         writeCut(width: width, height: height)
         arrange(in: Rect(x: 0, y: 0, width: width, height: height))
+        holdDeparting()
+    }
+
+    /// Stands every child riding its removal transition where it last stood: it takes no room, but WinUI
+    /// arranges each child it draws in every pass, and its transition draws over that place.
+    private func holdDeparting() {
+        for item in items where item.departing { item.view.layout(item.view.placedFrame) }
     }
 
     /// A layout skipped with its children hides from assistive technology all that stands in it.

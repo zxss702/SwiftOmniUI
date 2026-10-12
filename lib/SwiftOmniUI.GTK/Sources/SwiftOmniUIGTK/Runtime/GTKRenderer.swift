@@ -170,7 +170,11 @@ final class GTKRenderer {
             g_application_release(application.of(GApplication.self))
             holdsWithoutWindows = false
         }
-        if frameClock.widget == nil { frameClock.widget = roster.controllers.first?.window.widget }
+        // Frames tick only in a window GTK shows: a window closed or hidden stops ticking, and every animation
+        // would wait for the next event - the clock moves to a window still shown.
+        let widgets = roster.controllers.map(\.window.widget)
+        let ticks = frameClock.widget.map { widgets.contains($0) && gtk_widget_get_mapped($0) != 0 } ?? false
+        if !ticks { frameClock.widget = widgets.first { gtk_widget_get_mapped($0) != 0 } ?? widgets.first }
         if !reportedDisplay, let widget = roster.controllers.first?.window.widget,
            gtk_widget_get_realized(widget) != 0 {
             reportedDisplay = true

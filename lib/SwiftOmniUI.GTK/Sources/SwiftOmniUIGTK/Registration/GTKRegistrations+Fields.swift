@@ -28,6 +28,9 @@ extension GTKRegistrations {
         }, members: { editor in
             editor.applies(inputMembers) { view, values in applyInput(view, values) }
             editor.property(TextEditorContract.growsWithText) { view, grows in view.setGrowsWithText(grows ?? false) }
+            editor.property(ScrollContentElementContract.scrollContentBackground) { view, visibility in
+                view.setContentBackground(visibility)
+            }
             editor.raises(InputViewContract.textChanged)
         })
         registry.add(SearchFieldContract.self, create: { reports in

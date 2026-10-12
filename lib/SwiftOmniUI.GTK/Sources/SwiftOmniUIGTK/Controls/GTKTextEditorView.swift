@@ -20,6 +20,7 @@ final class GTKTextEditorView: GTKView, GTKInputView {
     private var maximumLength: Int?
     private var textCase: TextCase?
     private var wordsClass: String?
+    private var backgroundClass: String?
 
     init() {
         editor = gtk_text_view_new()
@@ -27,7 +28,7 @@ final class GTKTextEditorView: GTKView, GTKInputView {
         super.init { _ in gtk_scrolled_window_new() }
         gtk_scrolled_window_set_child(widget.opaque, editor)
         gtk_scrolled_window_set_policy(widget.opaque, GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC)
-        gtk_widget_add_css_class(widget, GTKStyleSheet.editor)
+        setContentBackground(nil)
         gtk_text_view_set_wrap_mode(view, GTK_WRAP_WORD_CHAR)
         gtk_text_view_set_left_margin(view, Self.margin.across)
         gtk_text_view_set_right_margin(view, Self.margin.across)
@@ -109,6 +110,11 @@ final class GTKTextEditorView: GTKView, GTKInputView {
     func setWordsClass(_ name: String?) {
         swapClass(&wordsClass, to: name, on: editor)
         invalidateMeasure()
+    }
+
+    /// Hides only the editor's canvas, leaving native editing and the words' look intact.
+    func setContentBackground(_ visibility: Visibility?) {
+        swapClass(&backgroundClass, to: GTKStyleSheet.editor(backgroundHidden: visibility == .hidden))
     }
 
     func select(start: Int, length: Int) {

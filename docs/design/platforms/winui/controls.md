@@ -231,7 +231,11 @@ A field submits when Enter goes down in it; the key's release reaches nothing.
 ## An editor
 
 A TextEditor is a `TextBox` of several lines whose Enter starts a new line and
-submits nothing, its words wrapped and scrolled inside it. Growing with its
+submits nothing, its words wrapped and scrolled inside it. It keeps its native
+canvas and padding, with no border or system focus decoration, including the
+focused template's own border thickness. `scrollContentBackground(.hidden)`
+clears the canvas in every visual state; visible, automatic or unsaid restores
+the theme's background. Its native caret and selection stay. Growing with its
 words, it is measured with the room below it open and takes the height they
 take, WinUI telling its layout as they change; not growing, it is measured
 with none and keeps a line's height, whatever it holds - the height the

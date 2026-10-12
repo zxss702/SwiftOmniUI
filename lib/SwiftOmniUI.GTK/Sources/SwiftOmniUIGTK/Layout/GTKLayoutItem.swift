@@ -34,6 +34,6 @@ struct GTKLayoutItem: LayoutChild {
     }
 
     func arranges(like other: GTKLayoutItem) -> Bool {
-        view === other.view && values == other.values && isShown == other.isShown
+        view === other.view && values == other.values && isShown == other.isShown && departing == other.departing
     }
 }

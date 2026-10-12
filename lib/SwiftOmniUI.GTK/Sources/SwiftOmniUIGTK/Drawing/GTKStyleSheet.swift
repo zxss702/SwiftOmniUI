@@ -93,13 +93,15 @@ enum GTKStyleSheet {
         return name
     }
 
-    /// The class drawing an editor's box as an entry's: faintly filled in its words' colour, its corners rounded,
-    /// ringed in the accent while it holds the focus, the text view on it clear.
-    static var editor: String {
-        let name = "swiftomniui-editor"
-        write(name, "background-color: alpha(currentColor, 0.1); border-radius: 6px; outline: 0 solid transparent;",
-              states: ".\(name):focus-within { outline: 2px solid alpha(@accent_color, 0.5); outline-offset: -2px; }\n"
-                + ".\(name) > textview, .\(name) > textview > text { background-color: transparent; }\n")
+    /// An editor's canvas, faintly filled unless hidden, with no border or focus decoration. Only the canvas's
+    /// nodes are cleared: the text view keeps its caret and selection's own drawing.
+    static func editor(backgroundHidden: Bool) -> String {
+        let name = "swiftomniui-editor" + (backgroundHidden ? "-clear" : "")
+        let decoration = "border: none; box-shadow: none; outline: none;"
+        let fill = backgroundHidden ? "transparent" : "alpha(currentColor, 0.1)"
+        write(name, "background: \(fill); border-radius: 6px; \(decoration)",
+              states: ".\(name):focus-within { \(decoration) }\n"
+                + ".\(name) > textview, .\(name) > textview > text { background: transparent; \(decoration) }\n")
         return name
     }
 

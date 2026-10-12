@@ -53,6 +53,6 @@ struct WinUILayoutItem: LayoutChild {
 
     /// Whether a parent would place this item as it places `other`.
     func arranges(like other: WinUILayoutItem) -> Bool {
-        view === other.view && values == other.values && isShown == other.isShown
+        view === other.view && values == other.values && isShown == other.isShown && departing == other.departing
     }
 }

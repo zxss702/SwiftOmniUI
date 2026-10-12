@@ -120,12 +120,43 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_editor_make(int64_t view) {
         controls::TextBox editor;
         editor.AcceptsReturn(true);
         editor.TextWrapping(xaml::TextWrapping::Wrap);
+        auto transparent = media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent());
+        editor.BorderBrush(transparent);
+        editor.BorderThickness({0, 0, 0, 0});
+        editor.UseSystemFocusVisuals(false);
+        // The focused template writes its own border thickness and brush, independently of the control's.
+        for (auto key : {L"TextControlBorderBrush", L"TextControlBorderBrushPointerOver",
+                        L"TextControlBorderBrushFocused", L"TextControlBorderBrushDisabled"})
+            editor.Resources().Insert(winrt::box_value(key), transparent);
+        for (auto key : {L"TextControlBorderThemeThickness", L"TextControlBorderThemeThicknessFocused"})
+            editor.Resources().Insert(winrt::box_value(key), winrt::box_value(xaml::Thickness{0, 0, 0, 0}));
         controls::ScrollViewer::SetVerticalScrollBarVisibility(editor, controls::ScrollBarVisibility::Auto);
         hearWords(editor, view);
         return detach(editor);
     } catch (...) {
         report("making an editor");
         return nullptr;
+    }
+}
+
+extern "C" void swiftomniui_winui_editor_set_background_hidden(SwiftOmniUIObjectRef handle, bool hidden) {
+    try {
+        auto editor = borrow<controls::TextBox>(handle);
+        auto resources = editor.Resources();
+        auto transparent = media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent());
+        for (auto key : {L"TextControlBackground", L"TextControlBackgroundPointerOver",
+                        L"TextControlBackgroundFocused", L"TextControlBackgroundDisabled"}) {
+            auto name = winrt::box_value(key);
+            if (hidden) resources.Insert(name, transparent);
+            else if (resources.HasKey(name)) resources.Remove(name);
+        }
+        if (hidden) editor.Background(transparent);
+        else editor.ClearValue(controls::Control::BackgroundProperty());
+        // A loaded template must read the new resources even when it is already focused. Re-reading the theme
+        // leaves the text box, caret and selection in place and restores native theme colours when shown again.
+        readThemeAgain(editor);
+    } catch (...) {
+        report("setting an editor's canvas visibility");
     }
 }
 

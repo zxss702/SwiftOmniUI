@@ -673,6 +673,10 @@ SwiftOmniUIObjectRef swiftomniui_winui_field_make(int64_t view);
 /// A field's logical style kind: 1 takes the chrome away, 3 unrounds it, the rest the platform's own look.
 void swiftomniui_winui_field_set_style(SwiftOmniUIObjectRef field, int kind);
 SwiftOmniUIObjectRef swiftomniui_winui_editor_make(int64_t view);
+
+/// Hides an editor's native canvas in every visual state; false restores its theme's background, without chrome.
+void swiftomniui_winui_editor_set_background_hidden(SwiftOmniUIObjectRef editor, bool hidden);
+
 SwiftOmniUIObjectRef swiftomniui_winui_search_make(int64_t view);
 void swiftomniui_winui_field_set_text(SwiftOmniUIObjectRef field, char const *utf8);
 void swiftomniui_winui_field_set_placeholder(SwiftOmniUIObjectRef field, char const *utf8);

@@ -19,6 +19,11 @@ final class WinUITextEditorView: WinUIInputView {
         super.init { number in swiftomniui_winui_editor_make(number) }
     }
 
+    /// Hides only the editor's canvas, leaving native editing and the words' look intact.
+    func setContentBackground(_ visibility: Visibility?) {
+        swiftomniui_winui_editor_set_background_hidden(handle, visibility == .hidden)
+    }
+
     /// Growing, the height its words take; not growing, one line's, whatever it holds.
     override func measure(width: Double?, height: Double?) -> LayoutSize {
         super.measure(width: width, height: growsWithText ? height : 0)

@@ -47,12 +47,17 @@ final class GTKFrameClock: FrameClock {
         return held
     }
 
-    /// Adds the tick callback to the widget while held, and removes it otherwise.
+    /// Adds the tick callback to the widget while held, and removes it otherwise. The clock keeps the widget it
+    /// ticked with alive until it lets the callback go: a window the tree closed may be the one it ticked with.
     private func follow() {
         let wanted = held && ticksWithGTK ? widget : nil
         guard wanted != tickedWidget || (wanted != nil && tick == 0) else { return }
 
-        if let tickedWidget, tick != 0 { gtk_widget_remove_tick_callback(tickedWidget, tick) }
+        if let wanted { g_object_ref(wanted) }
+        if let tickedWidget {
+            if tick != 0 { gtk_widget_remove_tick_callback(tickedWidget, tick) }
+            g_object_unref(tickedWidget)
+        }
         tick = 0
         tickedWidget = wanted
         guard let wanted else { return }
@@ -62,7 +67,6 @@ final class GTKFrameClock: FrameClock {
                 guard let clock = GTKFrameClock.current else { return 0 }
                 if clock.frame() { return 1 }
                 clock.tick = 0
-                clock.tickedWidget = nil
                 return 0
             }
         }, nil, nil)

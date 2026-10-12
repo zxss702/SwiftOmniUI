@@ -341,6 +341,12 @@ import CRT
     private func departed(_ child: MountedElement) {
         children.removeAll { $0 === child }
         native.arrangeChildren()
+        // An element with no view passes its children up: the layout that held the view drops it.
+        if !native.presentsView {
+            var holder = parent
+            while let each = holder, !each.native.presentsView { holder = each.parent }
+            holder?.native.arrangeChildren()
+        }
         tree?.arrangementChanged = true
     }
 

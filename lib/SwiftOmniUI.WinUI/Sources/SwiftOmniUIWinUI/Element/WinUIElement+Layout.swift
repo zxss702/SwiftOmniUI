@@ -86,9 +86,15 @@ extension WinUIElement {
     var layoutItem: WinUILayoutItem? {
         // A popover's card stands in no layout: its flyout holds it.
         guard type != .popover else { return nil }
-        guard let view else { return children.lazy.compactMap(\.layoutItem).first }
+        guard let view else {
+            // What a departing element passes up departs with it.
+            guard var item = children.lazy.compactMap(\.layoutItem).first else { return nil }
+            if element.isDeparting { item.departing = true; item.isShown = false }
+            return item
+        }
 
-        var item = WinUILayoutItem(view: view, values: element.layoutValues, isShown: isShown)
+        // A child riding its removal transition stands where it last stood, outside the layout's room.
+        var item = WinUILayoutItem(view: view, values: element.layoutValues, isShown: isShown && !element.isDeparting)
         item.element = element
         item.mount = element.mount
         item.codeId = element.id
