@@ -237,8 +237,13 @@ extern "C" void swiftomniui_winui_toolbar_button_set_icon(SwiftOmniUIObjectRef h
         auto place = [&](auto const &command) {
             command.Icon(icon);
             auto words = command.Label();
-            command.LabelPosition(icon || words.empty() ? controls::CommandBarLabelPosition::Collapsed
-                                                        : controls::CommandBarLabelPosition::Default);
+            bool collapsed = icon || words.empty();
+            command.LabelPosition(collapsed ? controls::CommandBarLabelPosition::Collapsed
+                                            : controls::CommandBarLabelPosition::Default);
+            // Showing its icon alone, the button stands as wide as the bar's own back and pane buttons - the
+            // system gives those 40. Words alone keep the default width, which a label needs.
+            if (collapsed) command.Width(40);
+            else command.ClearValue(xaml::FrameworkElement::WidthProperty());
             if (icon && !words.empty()) controls::ToolTipService::SetToolTip(command, winrt::box_value(words));
         };
         if (auto toggle = control.try_as<controls::AppBarToggleButton>()) return place(toggle);
@@ -298,6 +303,9 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
             if (icon) {
                 button.Icon(icon);
                 button.LabelPosition(controls::CommandBarLabelPosition::Collapsed);
+                // As wide as the bar's own back and pane buttons - the system gives those 40. The AppBarButton
+                // default is a labelled command bar's width, which an icon alone does not need.
+                button.Width(40);
                 controls::ToolTipService::SetToolTip(button, winrt::box_value(text(texts[index])));
             }
             button.Click(guarded("handling Click", [view, index](IInspectable const &, xaml::RoutedEventArgs const &) {

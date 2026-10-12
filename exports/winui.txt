@@ -170,6 +170,14 @@ List
   itemActivated()
   realizedChanged()
   selectionChanged()
+Masked
+  background
+  clipsContent
+  contentPadding
+  ignoresInput
+  shape
+  stroke
+  strokeWidth
 MenuButton
   isEnabled
   menuIndicator

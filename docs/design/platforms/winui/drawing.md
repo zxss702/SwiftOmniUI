@@ -89,6 +89,27 @@ as in SwiftOmniUI; a mitred corner's limit WinUI measures against half the
 outline's width and SwiftOmniUI against the whole, so it is doubled.
 
 
+## A mask
+
+`mask` writes two children into one room: the content first, the mask last. The
+mask is held and laid out like any child - it takes the same room the content
+stands in, and the geometry its shape is drawn with is the room's own - and is
+never drawn: opaque nothing, and no click, so the user's hand passes through it
+to the content under it. What the panel shows is then cut to the mask's
+silhouette: the geometry the mask's own shape holds, moved to the corner the
+mask was laid out at, is the panel's `Clip`. The cut follows the pass that
+arranged the mask, since that is the pass that built the geometry for the room;
+before it - and where the mask holds no shape - nothing is cut, and the panel
+shows whole.
+
+A silhouette is a geometry, so a mask that draws a shape cuts to that shape's
+outline. A mask whose own drawing is soft or only partly opaque - a gradient, a
+picture, words - has no outline to cut to: WinUI would need the mask redirected
+into a surface of its own and composited through a mask brush, which the host
+does not build yet, so such a mask cuts to the outline of the shape standing in
+it, or to nothing where no shape stands. GTK, which composites through
+`gtk_snapshot_push_mask`, masks by alpha throughout.
+
 ## A canvas
 
 A Canvas replays its drawing with Direct2D, the drawing API WinUI itself

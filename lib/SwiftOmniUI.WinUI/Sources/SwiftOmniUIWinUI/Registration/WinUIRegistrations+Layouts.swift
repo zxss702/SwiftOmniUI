@@ -106,7 +106,16 @@ extension WinUIRegistrations {
             layout.property(VisualElementContract.ignoresInput) { view, ignores in view.setIgnoresInput(ignores ?? false) }
         }
 
-        // Where the user moves it is reported by the element, on the display's frames.
+        // The mask the `.mask` modifier writes last is laid out in the same room and never drawn; the content is
+        // cut to its silhouette.
+        // Design: docs/design/platforms/winui/drawing.md#a-mask
+        registry.add(MaskedContract.self, create: { _ in WinUIMaskedView() }) { layout in
+            layout.property(PaddingElementContract.contentPadding) { view, padding in view.padding = padding ?? EdgeInsets(0) }
+            layout.applies(boxMembers) { view, values in applyBox(view, values) }
+            layout.property(VisualElementContract.ignoresInput) { view, ignores in view.setIgnoresInput(ignores ?? false) }
+        }
+
+        // Where the user moves it is reported by the element, on the display.s frames.
         // Design: docs/design/platforms/winui/layout.md#scrolling
         registry.add(ScrollViewContract.self, create: { _ in WinUIScrollView() }) { scroll in
             scroll.applies([

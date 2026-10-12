@@ -29,6 +29,17 @@ namespace {
         return figureShape(as<IInspectable>(handle)).as<shapes::Path>();
     }
 
+    /// The first shape standing in `element`, at whatever depth: the element itself where it is one, or the one
+    /// the figure it holds or the deepest figure under it holds; null where none stands.
+    shapes::Shape firstShape(xaml::DependencyObject const &element) {
+        if (auto shape = figureShape(element)) return shape;
+        auto count = xaml::Media::VisualTreeHelper::GetChildrenCount(element);
+        for (int32_t index = 0; index < count; ++index) {
+            if (auto found = firstShape(xaml::Media::VisualTreeHelper::GetChild(element, index))) return found;
+        }
+        return nullptr;
+    }
+
     /// A rectangle from (x0, y0) to (x1, y1), its corners rounded clockwise from the top left.
     media::PathGeometry rounded(double x0, double y0, double x1, double y1, double const *radii) {
         auto limit = std::max(0.0, std::min(x1 - x0, y1 - y0) / 2);
@@ -199,5 +210,31 @@ extern "C" void swiftomniui_winui_path_draw(
         path.Data(geometry);
     } catch (...) {
         report("drawing a shape");
+    }
+}
+
+extern "C" void swiftomniui_winui_clip_to_shape(
+    SwiftOmniUIObjectRef element, SwiftOmniUIObjectRef mask, double x, double y
+) {
+    try {
+        auto held = as<xaml::UIElement>(element);
+        media::Geometry geometry{nullptr};
+        if (mask) {
+            auto standing = as<xaml::DependencyObject>(mask);
+            auto path = firstShape(standing).try_as<shapes::Path>();
+            // Before its first draw the mask's Path holds no geometry, and nothing is cut.
+            geometry = path ? path.Data() : nullptr;
+            // The mask stands at its own corner of the panel and the cut at the panel's: where the two differ, the
+            // silhouette moves to where the mask was laid out.
+            if (geometry && std::isfinite(x) && std::isfinite(y) && (x != 0 || y != 0)) {
+                media::TranslateTransform moved;
+                moved.X(x);
+                moved.Y(y);
+                geometry.Transform(moved);
+            }
+        }
+        held.Clip(geometry);
+    } catch (...) {
+        report("cutting a panel to its mask");
     }
 }

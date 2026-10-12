@@ -10,7 +10,7 @@
 enum WinUIRealization {
     /// The entries this host realizes none of: those it shows as unsupported, and the parts of one.
     static let unrealized: Set<String> = [
-        "Content", "GridRow", "LeadingContent", "Map", "Masked", "Pin", "PositionIndicator", "TitleBar", "TrailingContent",
+        "Content", "GridRow", "LeadingContent", "Map", "Pin", "PositionIndicator", "TitleBar", "TrailingContent",
     ]
 
     /// The entries a backend realizes on this host - a package of its own, for a library WinUI does not ship - which

@@ -252,9 +252,14 @@ extern "C" void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef handle, char 
         // The bar's button is named by its label; with a picture in its icon slot the words move to its tip.
         auto place = [&](auto const &command) {
             bool pictured = command.Icon() != nullptr;
+            bool collapsed = words.empty() || pictured;
             command.Label(words);
-            command.LabelPosition(words.empty() || pictured ? controls::CommandBarLabelPosition::Collapsed
-                                                            : controls::CommandBarLabelPosition::Default);
+            command.LabelPosition(collapsed ? controls::CommandBarLabelPosition::Collapsed
+                                            : controls::CommandBarLabelPosition::Default);
+            // Showing its icon alone, the button stands as wide as the bar's own back and pane buttons - the
+            // system gives those 40. Words alone keep the default width, which a label needs.
+            if (collapsed) command.Width(40);
+            else command.ClearValue(xaml::FrameworkElement::WidthProperty());
             if (pictured && !words.empty()) controls::ToolTipService::SetToolTip(command, winrt::box_value(words));
         };
         if (auto toggle = control.try_as<controls::AppBarToggleButton>()) return place(toggle);
