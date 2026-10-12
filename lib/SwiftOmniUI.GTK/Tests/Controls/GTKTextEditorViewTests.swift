@@ -7,7 +7,73 @@ import CSwiftOmniUIGTK
 @testable import SwiftOmniUIGTK
 import XCTest
 
+/// The application's composer: comparable, with owned focus and a placeholder that disappears on the first edit.
+private struct EquatableInputEditor: View, Equatable {
+    @Binding var words: String
+    @FocusState private var focused: Bool
+    let reportedFocus: Binding<Bool>
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.words == rhs.words }
+
+    var body: some View {
+        let report = reportedFocus
+        return TextEditor(text: $words)
+            .scrollContentBackground(.hidden)
+            .background(alignment: .topLeading) {
+                if words.isEmpty { Text("Write something") }
+            }
+            .focused($focused)
+            .defaultFocus($focused, true)
+            .frame(width: 220, height: words.isEmpty ? 40 : 128)
+            .onChange(of: focused) { _, focused in report.wrappedValue = focused }
+    }
+}
+
 final class GTKTextEditorViewTests: XCTestCase {
+    /// Every character rebuilds the parent and makes a fresh comparable composer; its owned focus must survive.
+    func testTypingIntoAnEquatableComposerKeepsFocusAcrossParentRebuilds() throws {
+        try onUIThread {
+            let words = State(wrappedValue: "")
+            let focused = State(wrappedValue: false)
+            let revision = State(wrappedValue: 0)
+            let host = GTKRenderer.running {
+                VStack {
+                    Text("\(revision.wrappedValue):\(words.wrappedValue.count)")
+                    EquatableInputEditor(words: words.projectedValue, reportedFocus: focused.projectedValue).equatable()
+                    Button("Other")
+                }
+            }
+            let editor = try XCTUnwrap(host.views(GTKTextEditorView.self).first)
+            let input = editor.textView
+            XCTAssertNotEqual(gtk_widget_grab_focus(input), 0)
+            host.settle { focused.wrappedValue }
+            XCTAssertTrue(focused.wrappedValue)
+
+            var expected = ""
+            for character in ["a", "b", "中", "\n", "c"] {
+                expected += character
+                GTKTestHost.emit(OpaquePointer(input), "insert-at-cursor", words: character)
+                host.step()
+                host.step()
+                XCTAssertEqual(words.wrappedValue, expected)
+                XCTAssertEqual(editor.text, expected)
+                XCTAssertTrue(host.views(GTKTextEditorView.self).first === editor)
+                XCTAssertEqual(editor.textView, input)
+                XCTAssertNotEqual(gtk_widget_has_focus(input), 0, "focus survives typing \(character)")
+                XCTAssertTrue(focused.wrappedValue, "the focus binding stays true")
+            }
+
+            let other = try XCTUnwrap(host.views(GTKButtonView.self).first)
+            XCTAssertNotEqual(gtk_widget_grab_focus(other.widget), 0)
+            host.settle { !focused.wrappedValue }
+            revision.wrappedValue += 1
+            host.step()
+            host.step()
+            XCTAssertEqual(gtk_widget_has_focus(input), 0, "a later rebuild does not steal focus back")
+            XCTAssertFalse(focused.wrappedValue)
+        }
+    }
+
     /// The default canvas is filled, but its edges stay the canvas's colour even with the keyboard inside it.
     func testTheDefaultCanvasHasNoFocusDecoration() throws {
         try onUIThread {

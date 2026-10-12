@@ -1,6 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// The platform's C maths library, for the colour-space conversion's `pow`.
+#if canImport(Android)
+import Android
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(CRT)
+import CRT
+#endif
+
 // A colour, held as four 8-bit sRGB channels, and as a pair where the two
 // themes want different colours.
 // Design: docs/design/types/colour-and-color-scheme.md#four-channels
@@ -105,6 +114,20 @@ public struct Color: Hashable, Sendable, HostRepresentable {
         self.init(red: white, green: white, blue: white, alpha: opacity)
     }
 
+    /// A colour from channels in `colorSpace`, SwiftUI's spelling: red, green and blue each from 0 to 1, and an
+    /// alpha from 0, invisible, to 1 - the components read in the space named, the colour held in sRGB.
+    ///
+    ///     Color(.displayP3, red: 0.2314, green: 0.5251, blue: 0.9678)
+    public init(_ colorSpace: RGBColorSpace = .sRGB, red: Double, green: Double, blue: Double, opacity: Double = 1) {
+        let (r, g, b) = colorSpace.channels(red, green, blue)
+        self.init(red: r, green: g, blue: b, alpha: opacity)
+    }
+
+    /// A grey in `colorSpace`, SwiftUI's spelling.
+    public init(_ colorSpace: RGBColorSpace = .sRGB, white: Double, opacity: Double = 1) {
+        self.init(colorSpace, red: white, green: white, blue: white, opacity: opacity)
+    }
+
     /// Four bytes under the colour kind, or both halves as a themed pair.
     public var propValue: PropValue {
         guard let dark else { return Color.tagged(light) }
@@ -204,6 +227,49 @@ public struct Color: Hashable, Sendable, HostRepresentable {
         return UInt8((min(1, max(0, value)) * 255).rounded())
     }
 
+}
+
+extension Color {
+    /// The space a colour's channels are read in where they are written - SwiftUI's `Color.RGBColorSpace`.
+    /// A colour is held in sRGB however it is spelled: channels in another space are converted as the colour
+    /// is made, so P3's colours are the sRGB colours they stand for.
+    public enum RGBColorSpace: Sendable, Hashable {
+        /// sRGB, gamma-encoded - what every channel already means.
+        case sRGB
+
+        /// sRGB's primaries at linear light: the channels come back gamma-encoded.
+        case sRGBLinear
+
+        /// Display P3: its channels are carried through the P3-to-sRGB matrix, so a colour beyond sRGB's
+        /// gamut is the nearest sRGB one.
+        case displayP3
+
+        /// `red`, `green`, `blue` in this space, as sRGB channels.
+        func channels(_ red: Double, _ green: Double, _ blue: Double) -> (Double, Double, Double) {
+            switch self {
+            case .sRGB:
+                return (red, green, blue)
+            case .sRGBLinear:
+                return (encoded(red), encoded(green), encoded(blue))
+            case .displayP3:
+                let (r, g, b) = (decoded(red), decoded(green), decoded(blue))
+                return (
+                    encoded(1.2249402 * r - 0.2249404 * g),
+                    encoded(-0.0420569 * r + 1.0420571 * g),
+                    encoded(-0.0196376 * r - 0.0786361 * g + 1.0982735 * b))
+            }
+        }
+
+        /// A gamma-encoded channel at linear light, sRGB's transfer curve (Display P3's is the same curve).
+        private static func decoded(_ channel: Double) -> Double {
+            channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
+        }
+
+        /// A linear-light channel gamma-encoded, sRGB's transfer curve.
+        private static func encoded(_ channel: Double) -> Double {
+            channel <= 0.0031308 ? channel * 12.92 : 1.055 * pow(channel, 1 / 2.4) - 0.055
+        }
+    }
 }
 
 // MARK: - Named colors
@@ -340,29 +406,29 @@ extension Color {
     /// two color schemes - the platforms' named colours as their documented
     /// channels.
 
-    /// The colour a principal label or picture draws in - `NSColor.labelColor`.
-    public static let primary = Color(light: .black, dark: .white)
+    /// The colour a principal label or picture draws in - `NSColor.labelColor`, black or white at 85%.
+    public static let primary = Color(
+        light: Color(red: 0, green: 0, blue: 0, alpha: 0.847),
+        dark: Color(red: 1, green: 1, blue: 1, alpha: 0.847))
 
-    /// The colour a label of second importance draws in - the platforms'
-    /// secondary label colour.
+    /// The colour a label of second importance draws in - `NSColor.secondaryLabelColor`.
     public static let secondary = Color(
-        light: Color(red: 60, green: 60, blue: 67, alpha: 153),
-        dark: Color(red: 235, green: 235, blue: 245, alpha: 153))
+        light: Color(red: 0, green: 0, blue: 0, alpha: 0.498),
+        dark: Color(red: 1, green: 1, blue: 1, alpha: 0.549))
 
-    /// The colour a label of third importance draws in.
+    /// The colour a label of third importance draws in - `NSColor.tertiaryLabelColor`.
     public static let tertiary = Color(
-        light: Color(red: 60, green: 60, blue: 67, alpha: 77),
-        dark: Color(red: 235, green: 235, blue: 245, alpha: 77))
+        light: Color(red: 0, green: 0, blue: 0, alpha: 0.259),
+        dark: Color(red: 1, green: 1, blue: 1, alpha: 0.247))
 
-    /// The colour a label of least importance draws in.
+    /// The colour a label of least importance draws in - `NSColor.quaternaryLabelColor`.
     public static let quaternary = Color(
-        light: Color(red: 60, green: 60, blue: 67, alpha: 46),
-        dark: Color(red: 235, green: 235, blue: 245, alpha: 41))
+        light: Color(red: 0, green: 0, blue: 0, alpha: 0.098),
+        dark: Color(red: 1, green: 1, blue: 1, alpha: 0.098))
 
     /// The colour the system marks its own accents with - the blue a control
-    /// takes where nothing was chosen.
-    public static let accentColor = Color(
-        light: Color("#007AFF"), dark: Color("#0A84FF"))
+    /// takes where nothing was chosen, `NSColor.controlAccentColor`.
+    public static let accentColor = Color("#007AFF")
 
     /// The system's plain background colour, where one is needed as a colour.
     public static let background = Color(light: .white, dark: .black)

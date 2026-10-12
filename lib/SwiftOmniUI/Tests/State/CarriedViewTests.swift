@@ -61,6 +61,36 @@ private struct Typed: View {
     }
 }
 
+/// Equality is about the caption, while the counter and keyboard focus belong to the view's lifetime.
+private struct EquatableStatefulCaption: View, Equatable {
+    let text: String
+    let builds: Builds
+    @State var counter = 0
+    @FocusState var focused: Bool
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.text == rhs.text }
+
+    var body: some View {
+        builds.count += 1
+        return Text("\(text):\(counter):\(focused)")
+    }
+}
+
+private final class CaptionContext {
+    let text: String
+    init(_ text: String) { self.text = text }
+}
+
+/// A comparable view's environment must resolve even when its ordinary inputs compare equal.
+private struct EquatableEnvironmentCaption: View, Equatable {
+    let text: String
+    @Environment private var context: CaptionContext?
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.text == rhs.text }
+
+    var body: some View { Text(context?.text ?? "missing") }
+}
+
 @MainActor final class CarriedViewTests: XCTestCase {
     override func setUp() {
         super.setUp()
@@ -70,6 +100,50 @@ private struct Typed: View {
     private var changed: Set<ObjectIdentifier> { Renderer.shared.pendingChanges }
 
     // MARK: - What it was built with
+
+    func testAnEquatableViewsStateAndFocusSurviveNewInputs() {
+        let renders = Renders()
+        let builds = Builds()
+        let first = EquatableStatefulCaption(text: "before", builds: builds)
+        renders.render(first.id("caption").node)
+        first.counter = 7
+        first.focused = true
+
+        let rebuilt = EquatableStatefulCaption(text: "after", builds: builds)
+        let patch = renders.render(rebuilt.id("caption").node, changed: changed)
+
+        XCTAssertEqual(rebuilt.counter, 7, "owned state adopts its previous storage")
+        XCTAssertTrue(rebuilt.focused, "a parent's rebuild must not reset keyboard focus")
+        XCTAssertEqual(patch.props[.text], .string("after:7:true"))
+        XCTAssertFalse(patch.replace)
+    }
+
+    func testAnEquatableViewKeepsItsComparisonAndAdoptsStateWhenCarried() {
+        let renders = Renders()
+        let builds = Builds()
+        renders.render(EquatableStatefulCaption(text: "same", builds: builds).id("caption").node)
+
+        let rebuilt = EquatableStatefulCaption(text: "same", builds: builds)
+        renders.render(rebuilt.id("caption").node)
+        XCTAssertEqual(builds.count, 1, "equal ordinary inputs still carry the body")
+
+        rebuilt.focused = true
+        rebuilt.counter = 8
+        let patch = renders.revisit(changed: changed)
+        XCTAssertEqual(builds.count, 2, "the fresh view lends the same owned state to the carried body")
+        XCTAssertEqual(patch.props[.text], .string("same:8:true"))
+    }
+
+    func testAnEquatableViewsEnvironmentStillResolvesAndChanges() {
+        let renders = Renders()
+        let first = CaptionContext("first")
+        let second = CaptionContext("second")
+        let made = renders.render(EquatableEnvironmentCaption(text: "same").environment(first).id("caption").node)
+        XCTAssertEqual(made.props[.text], .string("first"))
+
+        let changed = renders.render(EquatableEnvironmentCaption(text: "same").environment(second).id("caption").node)
+        XCTAssertEqual(changed.props[.text], .string("second"))
+    }
 
     func testAComposedViewBuiltWithTheSameInputsIsCarried() {
         let renders = Renders()

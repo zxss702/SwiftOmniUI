@@ -195,9 +195,25 @@ private func collectStateParts(
         return
     }
 
-    // A value that can say whether it equals another is compared whole.
+    // Equality decides whether a view's body can be carried, but it must not hide the dynamic properties the
+    // view owns. Their boxes still adopt the previous storage, and environment slots still resolve and compare.
     if let comparable = value as? any Equatable {
         inputs.append((path: path, input: .value(comparable)))
+        if value is any View {
+            var members: [(path: String, input: Input)] = []
+            for (offset, child) in Mirror(reflecting: value).children.enumerated() {
+                collectStateParts(
+                    in: child.value,
+                    at: "\(path).\(child.label ?? String(offset))\(storedViewType(of: child.value))",
+                    boxes: &boxes, slots: &slots, inputs: &members)
+            }
+            inputs.append(contentsOf: members.filter {
+                switch $0.input {
+                case .box, .slot: true
+                default: false
+                }
+            })
+        }
         return
     }
 
