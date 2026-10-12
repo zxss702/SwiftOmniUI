@@ -244,6 +244,22 @@ extension Color {
         /// gamut is the nearest sRGB one.
         case displayP3
 
+        /// sRGB `red`, `green`, `blue` as this space's components - `channels`' reverse.
+        func components(_ red: Double, _ green: Double, _ blue: Double) -> (Double, Double, Double) {
+            switch self {
+            case .sRGB:
+                return (red, green, blue)
+            case .sRGBLinear:
+                return (Self.decoded(red), Self.decoded(green), Self.decoded(blue))
+            case .displayP3:
+                let (r, g, b) = (Self.decoded(red), Self.decoded(green), Self.decoded(blue))
+                return (
+                    Self.encoded(0.8224621 * r + 0.1775380 * g),
+                    Self.encoded(0.0331941 * r + 0.9668058 * g),
+                    Self.encoded(0.0170827 * r + 0.0723974 * g + 0.9105199 * b))
+            }
+        }
+
         /// `red`, `green`, `blue` in this space, as sRGB channels.
         func channels(_ red: Double, _ green: Double, _ blue: Double) -> (Double, Double, Double) {
             switch self {
@@ -398,6 +414,29 @@ extension Color {
                 alpha: UInt8((Double(rgba.alpha) * opacity).rounded()))
         }
         return Color(scaled(light), dark: dark.map(scaled))
+    }
+
+    /// This colour mixed toward `rhs` by `fraction`, SwiftUI's spelling: 0 keeps this colour whole, 1 gives
+    /// `rhs` - the colour components interpolated in `colorSpace`, the alpha with them. A light/dark pair
+    /// mixes scheme for scheme; a side without a dark half mixes its light there.
+    ///
+    ///     accent.mix(with: .back, by: 0.7)
+    public func mix(with rhs: Color, by fraction: Double, in colorSpace: RGBColorSpace = .sRGB) -> Color {
+        let t = min(1, max(0, fraction))
+        func mixed(_ a: Rgba, _ b: Rgba) -> Rgba {
+            var (r, g, b) = colorSpace.components(
+                Double(a.red) / 255, Double(a.green) / 255, Double(a.blue) / 255)
+            let (r2, g2, b2) = colorSpace.components(
+                Double(b.red) / 255, Double(b.green) / 255, Double(b.blue) / 255)
+            (r, g, b) = (r + (r2 - r) * t, g + (g2 - g) * t, b + (b2 - b) * t)
+            (r, g, b) = colorSpace.channels(r, g, b)
+            return Rgba(
+                red: Color.channel(r), green: Color.channel(g), blue: Color.channel(b),
+                alpha: Color.channel(Int((Double(a.alpha) + (Double(b.alpha) - Double(a.alpha)) * t).rounded())))
+        }
+        return Color(
+            mixed(light, rhs.light),
+            dark: dark == nil && rhs.dark == nil ? nil : mixed(dark ?? light, rhs.dark ?? rhs.light))
     }
 }
 
