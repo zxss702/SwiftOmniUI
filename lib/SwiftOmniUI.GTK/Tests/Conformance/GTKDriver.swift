@@ -151,6 +151,7 @@ final class GTKDriver: HostDriver {
         case (.choose(let place), let items as GTKItemsView): try choose(place, in: items, on: element)
         case (.open, let picker as GTKPopoverPickerView): gtk_menu_button_popup(picker.widget.opaque)
         case (.close, let picker as GTKPopoverPickerView): gtk_popover_popdown(picker.popover.of(GtkPopover.self))
+        case (.close, let popover as GTKPopoverView): popover.dismissAsUser()
         case (.pickDate(let day), let dates as GTKDatePickerView):
             guard let native = g_date_time_new_local(Int32(day.year), Int32(day.month), Int32(day.day), 12, 0, 0) else {
                 throw DriverCannot(act, on: element)
@@ -200,6 +201,8 @@ final class GTKDriver: HostDriver {
             return (0..<g_list_model_get_n_items(model)).map { String(cString: gtk_string_list_get_string(model, $0)) }
                 .propValue
         case (.isOpen, let picker as GTKPopoverPickerView): return picker.isOpen.propValue
+        case (.isOpen, let popover as GTKPopoverView): return popover.showsPopover.propValue
+        case (.arrowEdge, let popover as GTKPopoverView): return popover.edge.propValue
         case (.date, let dates as GTKDatePickerView): return dates.date.propValue
         case (.minimumDate, let dates as GTKDatePickerView): return dates.range.earliest?.propValue
         case (.maximumDate, let dates as GTKDatePickerView): return dates.range.latest?.propValue

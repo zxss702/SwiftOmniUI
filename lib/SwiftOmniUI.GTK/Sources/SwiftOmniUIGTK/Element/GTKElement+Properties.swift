@@ -33,6 +33,7 @@ extension GTKElement {
             reporting: { [weak self] property, event, value in self?.report(property, event, value) }
         ) {
             if let scroll = registered as? GTKScrollView { follow(scroll) }
+            if let popover = registered as? GTKPopoverView { popover.anchor = { [weak self] in self?.popoverAnchor } }
             return registered
         }
 
@@ -115,6 +116,8 @@ extension GTKElement {
             }
             (each.view as? GTKLayoutView)?.forgetMeasurements()
             each.view?.invalidateMeasure()
+            // A popover is its own room: nothing its content asks reaches the layout its anchor stands in.
+            if each.type == .popover { break }
             element = each.parent
         }
 
@@ -132,5 +135,14 @@ extension GTKElement {
     /// The view of this element or the nearest one above it.
     var nearestView: GTKView? {
         view ?? parent?.nearestView
+    }
+
+    /// The view a popover stands beside: what the element it hangs off shows - that element's view, else the first
+    /// view of its content, else the nearest view above it.
+    var popoverAnchor: GTKView? {
+        guard let parent else { return nil }
+        if let view = parent.view { return view }
+        return parent.element.arrangedChildren.lazy.compactMap(\.presentingElement).first?.gtk.view
+            ?? parent.nearestView
     }
 }

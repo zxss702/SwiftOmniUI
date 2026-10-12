@@ -113,6 +113,14 @@
             return VStack { [Grid { GridRow { Text("Cell") }.id(dressing.id) }] + others }
         case "ToolbarSpacer":
             return VStack { [Text("Row").toolbar { dressing.wear(ToolbarSpacer()) }] + others }
+        case "Popover":
+            // Built by `.popover` alone, which names its edge and nothing else of the card: the edge written is it.
+            let edge = dressing.worn.compactMap { ($0 as? Write<PopoverContract, Edge>)?.value }.last ?? .top
+            return VStack {
+                [Text("Anchor").popover(isPresented: State(wrappedValue: false).projectedValue, arrowEdge: edge) {
+                    Text("Card")
+                }] + others
+            }
         default:
             return VStack { [view(element, worn)] + others }
         }

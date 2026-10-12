@@ -25,6 +25,7 @@ enum GTKRegistrations {
         shapes(registry)
         drawing(registry)
         items(registry)
+        popovers(registry)
         shared(registry)
 
         return registry
