@@ -21,6 +21,7 @@ using namespace swiftomniui;
 namespace media = winrt::Microsoft::UI::Xaml::Media;
 
 namespace {
+    uint64_t fontProbes = 0;
     winrt::Windows::UI::Color color(uint32_t argb) {
         return {static_cast<uint8_t>(argb >> 24), static_cast<uint8_t>(argb >> 16), static_cast<uint8_t>(argb >> 8),
                 static_cast<uint8_t>(argb)};
@@ -44,27 +45,47 @@ namespace {
     }
 }
 
+swiftomniui::TextFontDefaults swiftomniui::textFontDefaults(int32_t textStyle) {
+    struct Probe {
+        controls::TextBlock block{nullptr};
+        xaml::Style style{nullptr};
+    };
+    static Probe probes[12];
+    auto valid = textStyle >= 0 && textStyle < 11;
+    auto &probe = probes[valid ? textStyle + 1 : 0];
+    if (!probe.block) { probe.block = controls::TextBlock(); ++fontProbes; }
+    xaml::Style style{nullptr};
+    if (valid) {
+        wchar_t const *styles[] = {L"TitleLargeTextBlockStyle", L"TitleTextBlockStyle", L"SubtitleTextBlockStyle",
+            L"BodyLargeTextBlockStyle", L"BodyStrongTextBlockStyle", L"CaptionTextBlockStyle", L"BodyTextBlockStyle",
+            L"BodyTextBlockStyle", L"CaptionTextBlockStyle", L"CaptionTextBlockStyle", L"CaptionTextBlockStyle"};
+        if (auto application = xaml::Application::Current())
+            style = application.Resources().TryLookup(winrt::box_value(styles[textStyle])).try_as<xaml::Style>();
+    }
+    // Resources can be replaced while the application runs. Reuse the native
+    // reader, while still taking the current system/application Style object.
+    if (style != probe.style) {
+        if (style) probe.block.Style(style);
+        else probe.block.ClearValue(xaml::FrameworkElement::StyleProperty());
+        probe.style = style;
+    }
+    return {probe.block.FontSize(), probe.block.FontWeight().Weight};
+}
+
+extern "C" uint64_t swiftomniui_winui_font_probes(void) { return fontProbes; }
+
 extern "C" void swiftomniui_winui_set_font(SwiftOmniUIObjectRef handle, double size, bool bold, bool italic,
                                          char const *family, int32_t textStyle, double requestedWeight) {
     try {
-        controls::TextBlock font;
-        if (textStyle >= 0 && textStyle < 11) {
-            wchar_t const *styles[] = {L"TitleLargeTextBlockStyle", L"TitleTextBlockStyle", L"SubtitleTextBlockStyle",
-                L"BodyLargeTextBlockStyle", L"BodyStrongTextBlockStyle", L"CaptionTextBlockStyle", L"BodyTextBlockStyle",
-                L"BodyTextBlockStyle", L"CaptionTextBlockStyle", L"CaptionTextBlockStyle", L"CaptionTextBlockStyle"};
-            if (auto application = xaml::Application::Current()) {
-                auto resource = application.Resources().TryLookup(winrt::box_value(styles[textStyle]));
-                if (auto styled = resource.try_as<xaml::Style>()) font.Style(styled);
-            }
-        }
+        auto font = textFontDefaults(textStyle);
         auto weight = requestedWeight > 0 ? winrt::Windows::UI::Text::FontWeight{
             static_cast<uint16_t>(std::clamp(requestedWeight, 1.0, 1000.0))}
-            : bold ? winrt::Microsoft::UI::Text::FontWeights::Bold() : font.FontWeight();
+            : bold ? winrt::Microsoft::UI::Text::FontWeights::Bold() : winrt::Windows::UI::Text::FontWeight{font.weight};
         auto style = italic ? winrt::Windows::UI::Text::FontStyle::Italic : winrt::Windows::UI::Text::FontStyle::Normal;
         auto named = family && *family ? media::FontFamily(text(family)) : media::FontFamily{nullptr};
         auto apply = [&](auto const &element, auto sizeProperty, auto familyProperty) {
             if (size > 0) element.FontSize(size);
-            else if (textStyle >= 0) element.FontSize(font.FontSize());
+            else if (textStyle >= 0) element.FontSize(font.size);
             else element.ClearValue(sizeProperty);
             element.FontWeight(weight);
             element.FontStyle(style);

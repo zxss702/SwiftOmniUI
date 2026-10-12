@@ -68,14 +68,8 @@ class WinUILazyView: WinUITravellingLayout {
     func setItems(_ items: [(identity: String, item: WinUILayoutItem)]) {
         let now = Dictionary(items.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
         guard now.keys != mounted.keys || now.contains(where: {
-            mounted[$0.key]?.view !== $0.value.view || mounted[$0.key]?.values != $0.value.values
+            mounted[$0.key]?.arranges(like: $0.value) != true
         }) else { return }
-        if now.contains(where: { identity, item in
-            mounted[identity].map { $0.values != item.values } ?? false
-        }) {
-            cells.extents.reset()
-            cells.runs.reset()
-        }
         for (identity, previous) in mounted {
             if now[identity]?.view !== previous.view {
                 swiftomniui_winui_scroller_anchor(previous.view.handle, false)
@@ -86,11 +80,14 @@ class WinUILazyView: WinUITravellingLayout {
             }
         }
         if !cells.inserting.isDisjoint(with: now.keys) { cells.animatesChanges = true }
-        mounted = now
         for item in items {
             item.item.view.placingLayout = self
-            swiftomniui_winui_scroller_anchor(item.item.view.handle, !item.item.departing)
+            if mounted[item.identity]?.view !== item.item.view
+                || mounted[item.identity]?.departing != item.item.departing {
+                swiftomniui_winui_scroller_anchor(item.item.view.handle, !item.item.departing)
+            }
         }
+        mounted = now
         setChildren(items.map(\.item.view))
         invalidateMeasurements()
         measuredRevision = measurementRevision
@@ -193,11 +190,11 @@ class WinUILazyView: WinUITravellingLayout {
         if override != nil { lastAnnounced = incoming }
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)
             || cells.window?.realize != (realize ?? 0..<0)
-            || cells.window?.revision != revision
+            || cells.window?.revision != revision || cells.needsMeasurement
         else { return }
         let previous = lastTargetViewport
         lastTargetViewport = target
-        if !geometryChanged, !cells.animatesChanges,
+        if !cells.needsMeasurement, !geometryChanged, !cells.animatesChanges,
            measuredRevision == measurementRevision, cells.window?.revision == revision,
            (axis == .vertical ? previous?.width == target.width : previous?.height == target.height),
            let span, let realize {
@@ -212,16 +209,24 @@ class WinUILazyView: WinUITravellingLayout {
                 return
             }
         }
-        let built = cells.built
         invalidateMeasure()
-        tellWindow(span ?? 0..<0, realize: realize ?? 0..<0)
-        // The window's new rows stand mounted but unmeasured and unplaced until
-        // XAML's next pass - the compositor would show them blank first. Measure
-        // and place them in this notice so nothing it can reach stands blank.
-        if WinUIView.arranging == 0, let placed,
-           cells.built != built || measuredRevision != measurementRevision || cells.anchorShift != 0 {
-            _ = contentSize(width: standsAt ?? placed.width)
-            arrange(width: placed.width, height: placed.height)
+        while true {
+            let built = cells.built
+            let before = grid ? cells.runs.revision : cells.extents.revision
+            tellWindow(span ?? 0..<0, realize: realize ?? 0..<0)
+            // Complete native measurement before asking for further unknown
+            // rows. Keep 44 as the initial scroll estimate, and replace it with
+            // actual extents before it can request a whole page of tall cards.
+            guard WinUIView.arranging == 0, let placed else { break }
+            if cells.built != built || measuredRevision != measurementRevision || cells.anchorShift != 0 {
+                _ = contentSize(width: standsAt ?? placed.width)
+                arrange(width: placed.width, height: placed.height)
+            }
+            let after = grid ? cells.runs.revision : cells.extents.revision
+            guard cells.needsMeasurement || cells.window?.revision != after else { break }
+            // A handler deferred by a patch cannot mount this run yet. Its
+            // next layout resumes; never spin on rows that are not available.
+            guard cells.built != built || after != before else { break }
         }
     }
 
@@ -272,7 +277,8 @@ class WinUILazyView: WinUITravellingLayout {
                 return
             }
             let revision = self is WinUILazyGridView ? self.cells.runs.revision : self.cells.extents.revision
-            if self.cells.window?.span != (self.span ?? 0..<0) || self.cells.window?.revision != revision {
+            if self.cells.needsMeasurement || self.cells.window?.span != (self.span ?? 0..<0)
+                || self.cells.window?.revision != revision {
                 if let viewport = self.viewport { self.viewportChanged(viewport, effective: false) }
             }
         }
@@ -497,7 +503,7 @@ final class WinUILazyStackView: WinUILazyView {
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>) {
-        cells.show(span, realize: realize)
+        cells.show(span, realize: realize, measureBeforeExpanding: true)
     }
 }
 
@@ -677,7 +683,7 @@ final class WinUILazyGridView: WinUILazyView {
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>) {
-        cells.show(span, perRun: perRun, grid: true, realize: realize)
+        cells.show(span, perRun: perRun, grid: true, realize: realize, measureBeforeExpanding: true)
     }
 }
 

@@ -138,6 +138,12 @@ extension WinUIElement {
 
     /// Forgets the sizes kept by this element's layout and every one above it, and asks WinUI to measure again.
     func invalidateMeasurements() {
+        var invalidated: Set<ObjectIdentifier> = []
+        func invalidate(_ view: WinUIView?) {
+            guard let view, invalidated.insert(ObjectIdentifier(view)).inserted else { return }
+            (view as? WinUILayoutView)?.forgetMeasurements()
+            view.invalidateMeasure()
+        }
         var element: WinUIElement? = self
         while let each = element {
             // An entry of an List is measured by its cell; the list's own size never follows its items.
@@ -145,8 +151,7 @@ extension WinUIElement {
                 items.remeasure(each.element)
                 break
             }
-            (each.view as? WinUILayoutView)?.forgetMeasurements()
-            each.view?.invalidateMeasure()
+            invalidate(each.view)
             // A popover's card is its own room: nothing its content asks reaches the layout its anchor stands in.
             if each.type == .popover { break }
             element = each.parent
@@ -156,8 +161,9 @@ extension WinUIElement {
         // placing parents even after their Swift arithmetic was discarded.
         var layout = (view ?? parent?.nearestView)?.placingLayout
         while let parent = layout {
-            parent.forgetMeasurements()
-            parent.invalidateMeasure()
+            // Most placing parents are also mounted ancestors. Only the extra
+            // native layouts (notably scroll documents) need another invalidation.
+            invalidate(parent)
             layout = (parent as? WinUIScrollDocument)?.scrollView ?? parent.placingLayout
         }
     }

@@ -57,6 +57,12 @@ final class WinUIScrollerView: WinUIView {
         }
     }
 
+    /// The room the bars floating over the scroller keep from its indicators, in DIPs: each indicator's track
+    /// starts past a bar's extent on its own edge, the document's room untouched.
+    func insetScrollbars(_ insets: EdgeInsets) {
+        swiftomniui_winui_scroller_insets(handle, insets.top, insets.right, insets.bottom, insets.left)
+    }
+
     /// Moves the view to `target` at once; the scroller says where it stands once it has moved.
     /// Each ear hears the landing first, so a lazy run can realize its window
     /// before the compositor shows the new offset.

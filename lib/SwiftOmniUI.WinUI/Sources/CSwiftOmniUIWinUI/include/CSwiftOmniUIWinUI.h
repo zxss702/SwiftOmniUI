@@ -399,6 +399,9 @@ void swiftomniui_winui_panel_set_children(SwiftOmniUIObjectRef panel, SwiftOmniU
 /// around them in DIPs.
 void swiftomniui_winui_set_font(SwiftOmniUIObjectRef element, double size, bool bold, bool italic, char const *family,
                                int32_t textStyle, double weight);
+
+/// Native text-style readers created; repeated rows reuse these rather than making temporary controls.
+uint64_t swiftomniui_winui_font_probes(void);
 void swiftomniui_winui_set_foreground(SwiftOmniUIObjectRef element, bool has, uint32_t argb);
 void swiftomniui_winui_set_padding(SwiftOmniUIObjectRef element, double left, double top, double right, double bottom);
 
@@ -801,6 +804,10 @@ void swiftomniui_winui_scroller_offset(SwiftOmniUIObjectRef scroller, double *of
 /// relative to the native scroll content presenter. The last pair preserves ancestor clipping.
 void swiftomniui_winui_scroller_viewport(SwiftOmniUIObjectRef scroller, SwiftOmniUIObjectRef descendant, double *viewport);
 
+/// The room the bars floating over the scroller keep from its indicators, in DIPs: each indicator's track is
+/// inset past a bar's extent on its own edge, the document's room untouched.
+void swiftomniui_winui_scroller_insets(SwiftOmniUIObjectRef scroller, double top, double right, double bottom, double left);
+
 /// An ItemsView: WinUI's ItemsView over the identities the host gives it; the cell of each entry is the host's
 /// (`itemCell`, `itemHeld`, `itemLetGo`), and what stands in view, the user's choice and an item invoked are told.
 SwiftOmniUIObjectRef swiftomniui_winui_items_make(int64_t view);
@@ -1056,8 +1063,7 @@ bool swiftomniui_winui_image_set(SwiftOmniUIObjectRef image, char const *const *
 bool swiftomniui_winui_image_set_symbol(SwiftOmniUIObjectRef image, char const *glyph, int32_t aspect,
                                        double fontSize, double fontWeight, int32_t textStyle, double *size);
 
-/// The size of the bitmap `image` shows, in DIPs; zero until it is read, and for an SVG. Once it is read, the
-/// layout holding the image is asked to measure again.
+/// The synchronously decoded bitmap size, or an SVG's declared intrinsic size, in DIPs.
 void swiftomniui_winui_image_size(SwiftOmniUIObjectRef image, double *size);
 
 /// Places the picture or symbol at its rendered size, centred in the image's layout frame.
@@ -1066,10 +1072,20 @@ void swiftomniui_winui_image_place(SwiftOmniUIObjectRef image, double width, dou
 /// Draws an SVG `image` shows at `width` by `height` DIPs, at the display's scale; nothing for a bitmap.
 void swiftomniui_winui_image_draw(SwiftOmniUIObjectRef image, double width, double height);
 
+/// Changes when the application's picture folder changes, including back to its default.
+uint64_t swiftomniui_winui_pictures_revision(void);
+
+/// Whether two native Images hold the same ready, decoded source.
+bool swiftomniui_winui_images_share_source(SwiftOmniUIObjectRef left, SwiftOmniUIObjectRef right);
+
+/// An Image's decoded premultiplied RGBA pixels, available before the first XAML frame.
+bool swiftomniui_winui_image_decoded_pixels(SwiftOmniUIObjectRef image, int32_t *size, uint8_t *rgba, int64_t capacity);
+
 /// The pixels of the first of the `count` files `names` lists that the pictures hold, as premultiplied RGBA rows:
 /// `size` takes the picture's width and height in pixels, and `rgba` - where it holds `capacity` bytes of at
 /// least `width * height * 4` - the pixels themselves. Answers whether a picture answered, so a call with no
-/// `rgba` asks the size, and one with it takes a copy; an SVG, or a name no picture bears, answers false.
+/// `rgba` asks the size, and one with it takes a copy. SVGs use their synchronously rendered intrinsic viewport;
+/// a name no picture bears answers false.
 bool swiftomniui_winui_picture_pixels(char const *const *names, int32_t count, int32_t *size, uint8_t *rgba,
                                       int64_t capacity);
 

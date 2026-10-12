@@ -124,9 +124,11 @@ final class GTKScrollView: GTKLayoutView {
                 ? bar.gtk.view?.measure(width: width, height: nil).height
                 : bar.gtk.view?.measure(width: nil, height: nil).width
         } ?? EdgeInsets(0)
-        guard insets != barsInsets else { return }
-        barsInsets = insets
-        document.padding = writtenPadding + insets
+        if insets != barsInsets {
+            barsInsets = insets
+            document.padding = writtenPadding + insets
+        }
+        scroller.insetScrollbars(insets)
     }
 
     /// Stands GTK's scroller over the whole of the room, then an offset the tree wrote before there was one - or,

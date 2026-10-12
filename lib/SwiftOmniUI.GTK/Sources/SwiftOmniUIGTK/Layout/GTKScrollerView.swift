@@ -96,6 +96,24 @@ final class GTKScrollerView: GTKView {
         }
     }
 
+    /// The room the bars floating over the scroller keep from its indicators: each bar's extent on its own
+    /// edge goes on the indicator's margin there, the document's room untouched.
+    func insetScrollbars(_ insets: EdgeInsets) {
+        var child = gtk_widget_get_first_child(widget)
+        while let bar = child {
+            defer { child = gtk_widget_get_next_sibling(bar) }
+            guard g_type_check_instance_is_a(bar.of(GTypeInstance.self), gtk_scrollbar_get_type()) != 0
+            else { continue }
+            if gtk_orientable_get_orientation(bar.opaque) == GTK_ORIENTATION_VERTICAL {
+                gtk_widget_set_margin_top(bar, Int32(insets.top.rounded()))
+                gtk_widget_set_margin_bottom(bar, Int32(insets.bottom.rounded()))
+            } else {
+                gtk_widget_set_margin_start(bar, Int32(insets.left.rounded()))
+                gtk_widget_set_margin_end(bar, Int32(insets.right.rounded()))
+            }
+        }
+    }
+
     /// Moves the view to `target` at once.
     func move(to target: Point) {
         gtk_adjustment_set_value(horizontal, target.x)

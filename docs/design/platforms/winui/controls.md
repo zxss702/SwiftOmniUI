@@ -14,6 +14,11 @@ adds its lines, its alignment across itself and down itself, the space
 between its letters and its lines, the lines under or through its words, and
 what it is drawn over.
 
+System text-style sizes and weights are read through one native `TextBlock`
+per style, shared by text and symbol images. Applying a font to another row
+does not construct another temporary control. The reader checks the current
+application style resource, so replacing that resource still changes the font.
+
 A label is a `TextBlock` standing in a `Border`: a text block draws nothing
 behind its words and stands them at its top whatever its height, so the
 border draws the label's background and stands the text block at the label's
@@ -260,20 +265,22 @@ picture](../../host/layout.md#a-picture)), so where the tree asks for a PNG
 the folder holds as an SVG, the SVG is shown - the application's pictures are
 written once, as SVGs, for every host.
 
-A picture is its own size, whatever room its layout offers: an SVG the size
-it declares - its width and height, or its viewBox - and a bitmap its pixels,
-once WinUI has read it. WinUI measures an `Image` at as much room as it is
-offered, and an SVG at the size it last drew it, so the host reads the size
-itself, and the image asks WinUI for no room
+A picture is decoded synchronously before its source is attached to the
+native `Image`: bitmaps use the system WIC decoder, and SVGs use
+Direct2D's SVG parser and renderer, the same system engine underlying
+`SvgImageSource`. The completed pixels are copied into a `WriteableBitmap`;
+ordinary Image uses no asynchronous source setter, URI loading or completion
+callback. It is its own size, whatever room its layout offers: an SVG the size
+it declares - its width and height, or its viewBox - and a bitmap its pixels.
+The host reads that intrinsic size itself, and the image asks WinUI for no room
 ([no room asked](layout.md#no-room-asked)): it is drawn in the place its
-layout gives it. A bitmap is read after its layouts were measured; once it
-is, the relay asks the layout holding it to measure again
-([a change told upward](layout.md#a-change-told-upward)).
+layout gives it, with no later decode changing its ancestors' first size.
 
-WinUI draws an SVG into pixels and takes those pixels for DIPs. The host has
-it drawn at the size it shows at in its room, in its own proportions, at the
-display's scale - again only for more pixels, so a size in animation does not
-draw it every frame - and WinUI's `Stretch` fits it, fills with it, or
+SVG documents are parsed once per full path and aspect mode. Ready rasters
+are shared by path, aspect mode and physical pixel size, with a 64 MiB cache
+budget; images still showing an evicted entry retain it. A resized image or
+a changed display scale synchronously supplies additional pixels only when
+needed, and WinUI's `Stretch` fits it, fills with it, or
 centres it. A centred SVG gives the image its declared size, in the middle
 of the room. A stretched picture keeps no proportions, and WinUI draws a
 stretched SVG at its room's size, where the SVG would keep its own and leave
@@ -282,4 +289,7 @@ let go (`preserveAspectRatio="none"`).
 
 `PicturePixels(named:)` answers through `swiftomniui_winui_picture_pixels`:
 the file decoded to premultiplied RGBA by the platform's imaging component,
-kept by path as the bitmaps are, or nil for an SVG, which it does not read.
+or an SVG's ready Direct2D raster at its intrinsic size. Both share the
+synchronous decoding caches with native Image. Toolbar and inline pictures
+use the same ready sources. Inherited font changes leave a file image's
+source in place; symbol font changes still update the native `FontIcon`.

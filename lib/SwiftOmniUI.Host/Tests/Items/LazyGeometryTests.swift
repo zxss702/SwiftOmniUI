@@ -7,6 +7,73 @@ import XCTest
 
 final class LazyGeometryTests: XCTestCase {
     @MainActor
+    func testIncrementalWindowMeasuresTallRowsBeforeExpandingItsEstimate() throws {
+        let runtime = HostRuntime.still()
+        let identities = (0..<10_000).map(String.init)
+        var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+        patch.properties = [.items: .strings(identities)]
+        runtime.tree.apply(patch, complete: true)
+        let cells = LazyCells(try XCTUnwrap(runtime.tree.root), in: runtime)
+        cells.takeItems()
+        XCTAssertEqual(cells.extents.estimate, 44)
+        cells.show(0..<240, realize: 0..<480, measureBeforeExpanding: true)
+        XCTAssertEqual(cells.built, 0..<1, "an estimate must not build twelve unmeasured tall cards")
+        XCTAssertTrue(cells.needsMeasurement)
+        cells.extents.measure("0", extent: 360)
+        cells.show(0..<240, realize: 0..<480, measureBeforeExpanding: true)
+        XCTAssertEqual(cells.built, 0..<2)
+        cells.extents.measure("1", extent: 360)
+        cells.show(0..<240, realize: 0..<480, measureBeforeExpanding: true)
+        XCTAssertEqual(cells.built, 0..<3, "two intersecting cards plus the existing neighbour policy")
+        XCTAssertFalse(cells.needsMeasurement)
+    }
+
+    @MainActor
+    func testIncrementalWindowResumesWhenActualHeightEqualsTheEstimate() throws {
+        let runtime = HostRuntime.still()
+        var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+        patch.properties = [.items: .strings((0..<100).map(String.init))]
+        runtime.tree.apply(patch, complete: true)
+        let cells = LazyCells(try XCTUnwrap(runtime.tree.root), in: runtime)
+        cells.takeItems()
+        cells.show(0..<88, measureBeforeExpanding: true)
+        let revision = cells.extents.revision
+        cells.extents.measure("0", extent: 44)
+        XCTAssertEqual(cells.extents.revision, revision)
+        cells.show(0..<88, measureBeforeExpanding: true)
+        XCTAssertEqual(cells.built, 0..<2, "measurement completion must resume even without a geometry revision")
+        cells.extents.measure("1", extent: 44)
+        cells.show(0..<88, measureBeforeExpanding: true)
+        XCTAssertEqual(cells.built, 0..<3)
+        XCTAssertFalse(cells.needsMeasurement)
+    }
+
+    @MainActor
+    func testIncrementalGridRequestsWholeRunsAndKeepsSurvivingSeats() throws {
+        let runtime = HostRuntime.still()
+        var patch = HostPatch(id: .manual("lazy"), type: .lazyVGrid)
+        patch.properties = [.items: .strings((0..<100).map(String.init))]
+        runtime.tree.apply(patch, complete: true)
+        let element = try XCTUnwrap(runtime.tree.root)
+        let cells = LazyCells(element, in: runtime)
+        cells.takeItems()
+        cells.show(0..<240, perRun: 4, grid: true, measureBeforeExpanding: true)
+        XCTAssertEqual(cells.built, 0..<4)
+        cells.runs.measure(0, extent: 360)
+        cells.show(0..<240, perRun: 4, grid: true, measureBeforeExpanding: true)
+        XCTAssertEqual(cells.built, 0..<8)
+
+        // A surviving seat in the requested window remains mounted while the
+        // preceding inserted rows have not been measured yet.
+        patch.children = .arranged([HostPatch(id: .manual("7"), type: .text)])
+        runtime.tree.apply(patch, complete: false)
+        cells.runs.reset()
+        cells.show(0..<240, perRun: 4, grid: true, measureBeforeExpanding: true)
+        XCTAssertGreaterThanOrEqual(cells.built.upperBound, 8)
+        XCTAssertTrue(element.children.contains { $0.id == .manual("7") })
+    }
+
+    @MainActor
     func testExplicitViewIdentityKeepsItsLazySourcePositionAcrossUpdates() throws {
         let runtime = HostRuntime.still()
         var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)

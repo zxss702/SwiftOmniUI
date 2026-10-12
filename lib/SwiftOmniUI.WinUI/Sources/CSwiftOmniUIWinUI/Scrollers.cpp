@@ -11,6 +11,7 @@
 #include <cmath>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Numerics.h>
@@ -274,6 +275,35 @@ extern "C" void swiftomniui_winui_scroller_offset(SwiftOmniUIObjectRef handle, d
         offset[3] = scroller.ScrollableHeight();
     } catch (...) {
         report("reading a scroller");
+    }
+}
+
+extern "C" void swiftomniui_winui_scroller_insets(
+    SwiftOmniUIObjectRef handle, double top, double right, double bottom, double left
+) {
+    try {
+        auto scroller = borrow<controls::ScrollView>(handle);
+        // The indicators are template parts: each bar's extent goes on its own
+        // edge's margin, found again while the scroller's template reloads.
+        std::vector<xaml::DependencyObject> pending{scroller};
+        while (!pending.empty()) {
+            auto at = pending.back();
+            pending.pop_back();
+            if (auto bar = at.try_as<xaml::Controls::Primitives::ScrollBar>()) {
+                auto margin = bar.Orientation() == controls::Orientation::Vertical
+                    ? xaml::Thickness{0, top, 0, bottom}
+                    : xaml::Thickness{left, 0, right, 0};
+                auto current = bar.Margin();
+                if (current.Left != margin.Left || current.Top != margin.Top
+                    || current.Right != margin.Right || current.Bottom != margin.Bottom)
+                    bar.Margin(margin);
+            }
+            for (int32_t index = 0, count = xaml::Media::VisualTreeHelper::GetChildrenCount(at);
+                 index < count; ++index)
+                pending.push_back(xaml::Media::VisualTreeHelper::GetChild(at, index));
+        }
+    } catch (...) {
+        report("insetting a scroller's bars");
     }
 }
 

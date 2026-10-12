@@ -17,11 +17,21 @@ final class WinUIImageView: WinUIView {
     /// How the picture fills its room.
     private var aspect = ContentMode.center
 
-    /// The size an SVG declares, in DIPs; nil for a bitmap, whose size WinUI knows once it has read it.
+    /// The synchronously decoded bitmap size or SVG's intrinsic size, in DIPs.
     private var declared: LayoutSize?
 
-    /// The size an SVG is drawn at, in DIPs; nil while it is not drawn.
-    private var drawn: LayoutSize?
+    /// The size last assigned to the native picture inside its room.
+    private var picturePlace: LayoutSize?
+
+    private struct Load: Equatable {
+        var source: ImageSource?
+        var aspect: ContentMode
+        var fontSize: Double
+        var fontWeight: Double
+        var textStyle: Int32
+        var folder: UInt64
+    }
+    private var loaded: Load?
 
     init() {
         super.init { _ in swiftomniui_winui_image_make() }
@@ -34,9 +44,19 @@ final class WinUIImageView: WinUIView {
     /// nothing from a picture that asks it for no room. A source naming a symbol shows it as a Segoe Fluent Icons
     /// glyph - the platform's own symbol set, where the name is the glyph.
     func apply(source: ImageSource?, aspect: ContentMode, resizable: Bool = false, font: TextLook = TextLook()) {
-        symbol = source?.symbol != nil
-        file = source?.file ?? ""
         let aspect = resizable ? aspect : .center
+        let symbol = source?.symbol != nil
+        let load = Load(source: source, aspect: aspect,
+                        fontSize: symbol ? font.size ?? 0 : 0,
+                        fontWeight: symbol ? font.weight ?? (font.attributes.contains(.bold) ? 700 : 0) : 0,
+                        textStyle: symbol ? font.textStyle?.rawValue ?? -1 : -1,
+                        folder: symbol ? 0 : swiftomniui_winui_pictures_revision())
+        // Inherited font changes do not reload a file image. A real source,
+        // aspect or asset-folder change still takes effect synchronously.
+        guard load != loaded || !found else { return }
+        loaded = load
+        self.symbol = symbol
+        file = source?.file ?? ""
         self.aspect = aspect
         var size = [0.0, 0.0]
         if let name = source?.symbol {
@@ -45,13 +65,15 @@ final class WinUIImageView: WinUIView {
             if !found { WinUIRenderer.log.error("no symbol \(name) the platform knows") }
         } else {
             let files = PictureArithmetic.files(for: file)
-            found = WinUIStrings.withCStrings(files) { names in
-                swiftomniui_winui_image_set(handle, names, Int32(files.count), aspect.rawValue, &size)
+            found = WinUIRenderer.timed("winui.imageLoad") {
+                WinUIStrings.withCStrings(files) { names in
+                    swiftomniui_winui_image_set(handle, names, Int32(files.count), aspect.rawValue, &size)
+                }
             }
             if !found { WinUIRenderer.log.error("no picture \(file) among the application's pictures") }
         }
         declared = size[0] > 0 && size[1] > 0 ? LayoutSize(width: size[0], height: size[1]) : nil
-        drawn = nil
+        picturePlace = nil
         if let placed { draw(in: placed) }
         placingLayout?.invalidateMeasurements()
     }
@@ -74,20 +96,22 @@ final class WinUIImageView: WinUIView {
         draw(in: place)
     }
 
-    /// Draws an SVG at the size it shows at in `room`, in its own proportions, so WinUI fills the room from it;
-    /// again only for more pixels, so a size in animation does not draw it every frame. A stretched SVG has given up
-    /// its proportions, and WinUI draws it at the room's size.
+    /// Places the picture and synchronously supplies any additional SVG pixels
+    /// this size and the native DPI need. Ready rasters are shared across rows.
     private func draw(in room: Rect) {
-        guard let declared, aspect != .stretch, room.width > 0, room.height > 0 else { return }
+        guard room.width > 0, room.height > 0 else { return }
+        guard let declared else { return }
 
         let shown = PictureArithmetic.place(declared, in: LayoutSize(width: room.width, height: room.height), aspect: aspect)
         let size = LayoutSize(width: shown.width, height: shown.height)
         guard size.width > 0, size.height > 0 else { return }
-        swiftomniui_winui_image_place(handle, size.width, size.height)
+        if picturePlace != size {
+            swiftomniui_winui_image_place(handle, size.width, size.height)
+            picturePlace = size
+        }
         guard !symbol else { return }
-        if let drawn, drawn.width >= size.width, drawn.height >= size.height { return }
-
-        drawn = size
-        swiftomniui_winui_image_draw(handle, size.width, size.height)
+        WinUIRenderer.timed("winui.imageDraw") {
+            swiftomniui_winui_image_draw(handle, size.width, size.height)
+        }
     }
 }

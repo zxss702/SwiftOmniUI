@@ -143,13 +143,19 @@ final class WinUIScrollView: WinUILayoutView {
     /// pass, whose invalidation comes back through `contentSize` again.
     private func refreshBarsInsets(width: Double?) {
         let insets = contentElement?.ancestorSafeAreaInsets { bar, edge in
-            edge == .top || edge == .bottom
-                ? bar.winUI.view?.measure(width: width, height: nil).height
-                : bar.winUI.view?.measure(width: nil, height: nil).width
+            guard let view = bar.winUI.view else { return nil }
+            let vertical = edge == .top || edge == .bottom
+            // A layout inside a placing layout asks WinUI for no room, where `measure`
+            // says zero by design; its own arithmetic answers the bar's extent.
+            let size = (view as? WinUILayoutView).map { $0.naturalSize(width: vertical ? width : nil) }
+                ?? view.measure(width: vertical ? width : nil, height: nil)
+            return vertical ? size.height : size.width
         } ?? EdgeInsets(0)
-        guard insets != barsInsets else { return }
-        barsInsets = insets
-        document.padding = writtenPadding + insets
+        if insets != barsInsets {
+            barsInsets = insets
+            document.padding = writtenPadding + insets
+        }
+        scroller.insetScrollbars(insets)
     }
 
     /// The scroller is measured at the room it stands in and nowhere else: the offer it was measured at is all

@@ -41,6 +41,10 @@
     /// not perform another range lookup or send another render.
     public var window: (span: Range<Double>, revision: Int, perRun: Int, realize: Range<Double>)?
 
+    /// An incremental host stopped at an unmeasured run. Measure it before
+    /// expanding the same window; an unchanged 44-point estimate still resumes.
+    public private(set) var needsMeasurement = false
+
     /// Diagnostic counts for the work a lazy window actually performs.
     public private(set) var requests = 0
     /// Viewport range lookups performed.
@@ -89,6 +93,7 @@
             extents.adopt(positions: positions)
             built = 0..<0
             window = nil
+            needsMeasurement = false
             runs.reset()
         }
         identities = now
@@ -146,11 +151,12 @@
     /// under its own power can show before the next notice: the cells it covers
     /// are mounted while `span`'s own arithmetic - shown places, the anchor -
     /// keeps reading the true viewport.
-    public func show(_ span: Range<Double>, perRun: Int = 1, grid: Bool = false, realize: Range<Double>? = nil) {
+    public func show(_ span: Range<Double>, perRun: Int = 1, grid: Bool = false, realize: Range<Double>? = nil,
+                     measureBeforeExpanding: Bool = false) {
         let revision = grid ? runs.revision : extents.revision
         let realize = realize ?? span
         guard window?.span != span || window?.revision != revision || window?.perRun != perRun
-            || window?.realize != realize else { return }
+            || window?.realize != realize || needsMeasurement else { return }
         let moved = window?.revision == revision && window?.span != span
         window = (span, revision, perRun, realize)
         searches += 1
@@ -174,9 +180,36 @@
         }
         guard let element, let runtime else { return }
         let lower = min(identities.count, max(0, wanted.lowerBound - 1) * perRun)
-        let upper = min(identities.count, (wanted.upperBound + 1) * perRun)
+        var upper = min(identities.count, (wanted.upperBound + 1) * perRun)
+        let requestedUpper = upper
+        needsMeasurement = false
+        if measureBeforeExpanding, !wanted.isEmpty {
+            // The estimate describes scroll room, not permission to build an
+            // entire set of potentially tall cards. Include one unknown run,
+            // let its native measurement correct the range, then continue.
+            for run in (lower / perRun)..<((upper + perRun - 1) / perRun) {
+                let known = grid ? runs.hasMeasurement(for: run)
+                    : extents.hasMeasurement(for: identities[run])
+                if !known {
+                    let end = min(identities.count, (run + 1) * perRun)
+                    needsMeasurement = end < upper
+                    upper = end
+                    break
+                }
+            }
+            // Keep surviving native seats within this window attached while
+            // learning an inserted row's size. A partial fill must not briefly
+            // evict a focused control and recreate it on the following fill.
+            for child in element.children {
+                guard case .manual(let identity) = child.id,
+                      let place = positions[child.lazyIdentity ?? identity],
+                      place >= lower, place < requestedUpper else { continue }
+                upper = max(upper, min(requestedUpper, (place / perRun + 1) * perRun))
+            }
+            needsMeasurement = upper < requestedUpper
+        }
         let within = !wanted.isEmpty && lower < upper ? lower..<upper : 0..<0
-        inserting.formIntersection(identities[within])
+        if !needsMeasurement { inserting.formIntersection(identities[within]) }
         guard within != built else { return }
         if !inserting.isDisjoint(with: identities[within]) { animatesChanges = true }
         built = within
@@ -208,6 +241,7 @@
         guard let element, let runtime, built != 0..<identities.count else { return }
         if !inserting.isEmpty { animatesChanges = true }
         built = 0..<identities.count
+        needsMeasurement = false
         requests += 1
         element.send(.realizedChanged, [.strings(identities)], in: runtime)
     }
@@ -315,6 +349,9 @@ private struct MeasuredSums: Sendable {
         measured[identity] ?? estimate
     }
 
+    /// Whether this child's estimate has been replaced by a native measurement.
+    public func hasMeasurement(for identity: String) -> Bool { measured[identity] != nil }
+
     private var gap: Double { spacing ?? StackArithmetic.automaticSpacing }
 
     private mutating func sync(_ identities: [String]) {
@@ -408,6 +445,9 @@ private struct MeasuredSums: Sendable {
     public func extent(of run: Int) -> Double {
         measured[run] ?? estimate
     }
+
+    /// Whether this complete grid run has been measured.
+    public func hasMeasurement(for run: Int) -> Bool { measured[run] != nil }
 
     private mutating func sync(_ count: Int) {
         guard runs != count else { return }

@@ -18,7 +18,6 @@ extension WinUIElement {
         if let items = view as? WinUIItemsView { return items.childrenChanged() }
         if let lazy = view as? WinUILazyView {
             if lazy.cells.takeItems() {
-                lazy.measured = [:]
                 lazy.invalidateMeasurements()
             }
             lazy.direction = element.layoutDirection

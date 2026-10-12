@@ -62,8 +62,14 @@ hands it each message's tally.
 The tally also writes `SwiftOmniUI timings:` lines for the turn, core render,
 patch application and window presentation. WinUI adds native view creation,
 native Measure calls, panel MeasureOverride, ArrangeOverride, effective
-viewport callbacks, window sizing and chrome measurement. Those phases cover
-work outside patch application, including XAML's later layout passes. Each
+viewport callbacks, window sizing and chrome measurement.
+WinUI also records native property application, synchronous image loading
+and additional SVG raster preparation as `winui.properties`,
+`winui.imageLoad` and `winui.imageDraw`.
+`winui.nativeApply` covers the complete native update, `winui.children` its
+child arrangements, and `winui.font` the native font application. These split
+view construction from the work that follows it in a large lazy patch.
+Those phases cover work outside patch application, including XAML's later layout passes. Each
 line contains cumulative call counts, outer call counts (`roots`), and the
 outer calls' average, worst and total time. Recursive calls of the same phase
 are counted but timed only once; different phases can contain each other, so

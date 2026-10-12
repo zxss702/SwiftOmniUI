@@ -68,6 +68,92 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testTallGroupedPagesDoNotBuildTheirEstimatedScreenfulBeforeMeasuring() throws {
+        try onUIThread {
+            let showing = State(wrappedValue: true)
+            let builds = ModifiedLazyBuilds()
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                if showing.wrappedValue {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(0..<100) { number in
+                                builds.numbers.insert(number)
+                                return VStack(spacing: 0) {
+                                    ForEach(0..<9) { group in
+                                        HStack {
+                                            Text("Group \(number)-\(group)").font(.headline)
+                                            Picker("", selection: Binding(get: { 0 }, set: { _ in })) {
+                                                Text("First").tag(0)
+                                                Text("Second").tag(1)
+                                            }
+                                        }
+                                        .frame(height: 40)
+                                    }
+                                }
+                                .frame(height: 360)
+                            }
+                            .transition(.opacity)
+                        }
+                    }
+                    .frame(width: 320, height: 240)
+                } else {
+                    Text("Other page")
+                }
+            }
+            for visit in 0..<3 {
+                if visit > 0 {
+                    showing.wrappedValue = false
+                    for _ in 0..<8 { host.step() }
+                    builds.numbers.removeAll()
+                    showing.wrappedValue = true
+                }
+                for _ in 0..<12 { host.step() }
+                let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+                XCTAssertEqual(builds.numbers, Set(0..<3), "build the measured window, not the provisional 44-point window")
+                XCTAssertEqual(lazy.mounted.count, 3)
+                XCTAssertEqual(host.views(WinUIPickerView.self).count, 27)
+                XCTAssertFalse(lazy.cells.needsMeasurement)
+                XCTAssertEqual(lazy.cells.total, 36_000, accuracy: 1)
+            }
+        }
+    }
+
+    func testFolderExpansionMeasuresOnlyNewRowsAndRetainsSurvivingMeasurements() throws {
+        try onUIThread {
+            let original = Array(0..<1_000)
+            let rows = State(wrappedValue: original)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            HStack {
+                                Text("File \(number)")
+                                Text("Kind").font(.caption)
+                            }
+                            .frame(height: 40)
+                        }
+                        .transition(.opacity)
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            for list in [Array(0..<3) + [1_000, 1_001] + Array(3..<1_000), original] {
+                let before = lazy.cells.measurements
+                let held = lazy.mounted.mapValues(\.view)
+                rows.wrappedValue = list
+                for _ in 0..<12 { host.step() }
+                let incoming = lazy.mounted.filter { held[$0.key] !== $0.value.view }
+                XCTAssertEqual(lazy.cells.measurements - before, incoming.count,
+                               "a new lazy content closure must not discard unchanged rows' native sizes")
+                for (identity, view) in held where lazy.mounted[identity] != nil {
+                    XCTAssertTrue(lazy.mounted[identity]?.view === view)
+                }
+            }
+        }
+    }
+
     func testModifiedSourcesStayWindowedAcrossRepeatedPageSwitches() throws {
         try onUIThread {
             let showing = State(wrappedValue: true)

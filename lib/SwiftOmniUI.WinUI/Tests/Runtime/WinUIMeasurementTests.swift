@@ -37,6 +37,25 @@ private func nest(_ depth: Int, _ words: String) -> Node {
 }
 
 final class WinUIMeasurementTests: XCTestCase {
+    func testAPropertyInvalidatesEachMountedAndPlacingAncestorOnce() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                ScrollView {
+                    VStack { HStack { VStack { Text("File") } } }
+                }
+                .frame(width: 320, height: 240)
+            }
+            let text = try XCTUnwrap(host.runtime.tree.root?.first(type: .text))
+            let layouts = host.views(WinUILayoutView.self)
+            let revisions = layouts.map(\.measurementRevision)
+            text.winUI.invalidateMeasurements()
+            for (layout, revision) in zip(layouts, revisions) {
+                XCTAssertEqual(layout.measurementRevision, revision + 1,
+                               "the mounted-parent and placing-parent paths must not invalidate the same layout twice")
+            }
+        }
+    }
+
     func testNativePreparationReusesArithmeticAtTheSameWidth() {
         onUIThread {
             let child = CountedMeasureLayout()

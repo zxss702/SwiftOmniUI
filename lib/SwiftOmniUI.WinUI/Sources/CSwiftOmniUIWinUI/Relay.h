@@ -63,6 +63,11 @@ namespace swiftomniui {
     /// The text block of the label `handle` names; throws for any other element.
     controls::TextBlock labelWords(SwiftOmniUIObjectRef handle);
 
+    /// Font values from the system's current text style, read through a reused
+    /// native probe rather than making a throwaway TextBlock for every row.
+    struct TextFontDefaults { double size; uint16_t weight; };
+    TextFontDefaults textFontDefaults(int32_t textStyle);
+
     /// What assistive technology meets of an element: a label's words, or the element itself.
     xaml::UIElement metOf(IInspectable const &element);
 

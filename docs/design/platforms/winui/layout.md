@@ -144,7 +144,10 @@ A safe-area bar floats over the scroller's whole room: the view draws its
 background under the bar, and the content scrolls beneath it. The document
 insets the content by the bars' extents, measured up the tree from its first
 child and added to the padding the tree wrote, so the last of the content
-draws clear; a way the view does not scroll is inert room instead.
+draws clear; a way the view does not scroll is inert room instead. The
+indicators keep clear of a bar too, its extent put on the template
+`ScrollBar`'s `Margin` on its own edge - the track starts past the bar while
+the document's room is untouched.
 
 The scroller says where its view stands through `ViewChanged`, and that the
 user holds it through `DirectManipulationStarted` and `Completed`. The user's
