@@ -279,3 +279,7 @@ of the room. A stretched picture keeps no proportions, and WinUI draws a
 stretched SVG at its room's size, where the SVG would keep its own and leave
 bands: the relay hands WinUI the picture from memory with its proportions
 let go (`preserveAspectRatio="none"`).
+
+`PicturePixels(named:)` answers through `swiftomniui_winui_picture_pixels`:
+the file decoded to premultiplied RGBA by the platform's imaging component,
+kept by path as the bitmaps are, or nil for an SVG, which it does not read.

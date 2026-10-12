@@ -18,6 +18,10 @@
 
 #include <shcore.h>
 #include <shlwapi.h>
+#include <wincodec.h>
+
+#include <optional>
+#include <vector>
 
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Storage.Streams.h>
@@ -143,6 +147,43 @@ namespace {
         return text;
     }
 
+    /// A bitmap's pixels, decoded once: premultiplied RGBA rows, kept by path like `bitmapSource`'s bitmaps.
+    struct DecodedPixels {
+        UINT width = 0, height = 0;
+        std::vector<uint8_t> rgba;
+    };
+
+    /// The pixels of the picture at `path`, decoded to premultiplied RGBA by the platform's imaging component;
+    /// nil where the file is no bitmap it reads - an SVG, or a format it does not know.
+    DecodedPixels const *decodedPixels(std::wstring const &path) {
+        static std::map<std::wstring, std::optional<DecodedPixels>> decoded;
+        if (auto kept = decoded.find(path); kept != decoded.end())
+            return kept->second ? &*kept->second : nullptr;
+        std::optional<DecodedPixels> result;
+        winrt::com_ptr<IWICImagingFactory> factory;
+        winrt::com_ptr<IWICBitmapDecoder> decoder;
+        winrt::com_ptr<IWICBitmapFrameDecode> frame;
+        winrt::com_ptr<IWICFormatConverter> converted;
+        if (SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(factory.put())))
+            && SUCCEEDED(factory->CreateDecoderFromFilename(
+                path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, decoder.put()))
+            && SUCCEEDED(decoder->GetFrame(0, frame.put()))
+            && SUCCEEDED(factory->CreateFormatConverter(converted.put()))
+            && SUCCEEDED(converted->Initialize(frame.get(), GUID_WICPixelFormat32bppPRGBA,
+                WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom))) {
+            DecodedPixels out;
+            if (SUCCEEDED(converted->GetSize(&out.width, &out.height)) && out.width > 0 && out.height > 0) {
+                out.rgba.resize(static_cast<size_t>(out.width) * out.height * 4);
+                if (SUCCEEDED(converted->CopyPixels(
+                        nullptr, out.width * 4, static_cast<UINT>(out.rgba.size()), out.rgba.data())))
+                    result = std::move(out);
+            }
+        }
+        auto placed = decoded.emplace(path, std::move(result));
+        return placed.first->second ? &*placed.first->second : nullptr;
+    }
+
     /// An SVG source drawing `text`, read from memory.
     imaging::SvgImageSource drawing(std::string const &text) {
         winrt::com_ptr<IStream> memory;
@@ -183,6 +224,29 @@ extern "C" void swiftomniui_winui_set_pictures(char const *utf8) {
         if (!folder.empty() && folder.back() != L'\\' && folder.back() != L'/') folder += L'\\';
     } catch (...) {
         report("naming the pictures' folder");
+    }
+}
+
+extern "C" bool swiftomniui_winui_picture_pixels(
+    char const *const *names, int32_t count, int32_t *size, uint8_t *rgba, int64_t capacity
+) {
+    size[0] = size[1] = 0;
+    try {
+        std::string listed;
+        for (int32_t index = 0; index < count; ++index)
+            listed += std::string(names[index] ? names[index] : "") + "\n";
+        auto file = pictureFile(listed.c_str());
+        if (file.empty()) return false;
+        auto found = decodedPixels(pictures() + file);
+        if (!found) return false;
+        size[0] = static_cast<int32_t>(found->width);
+        size[1] = static_cast<int32_t>(found->height);
+        if (rgba && capacity >= static_cast<int64_t>(found->rgba.size()))
+            std::memcpy(rgba, found->rgba.data(), found->rgba.size());
+        return true;
+    } catch (...) {
+        report("reading a picture's pixels");
+        return false;
     }
 }
 

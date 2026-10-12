@@ -1057,6 +1057,13 @@ void swiftomniui_winui_image_place(SwiftOmniUIObjectRef image, double width, dou
 /// Draws an SVG `image` shows at `width` by `height` DIPs, at the display's scale; nothing for a bitmap.
 void swiftomniui_winui_image_draw(SwiftOmniUIObjectRef image, double width, double height);
 
+/// The pixels of the first of the `count` files `names` lists that the pictures hold, as premultiplied RGBA rows:
+/// `size` takes the picture's width and height in pixels, and `rgba` - where it holds `capacity` bytes of at
+/// least `width * height * 4` - the pixels themselves. Answers whether a picture answered, so a call with no
+/// `rgba` asks the size, and one with it takes a copy; an SVG, or a name no picture bears, answers false.
+bool swiftomniui_winui_picture_pixels(char const *const *names, int32_t count, int32_t *size, uint8_t *rgba,
+                                      int64_t capacity);
+
 /// What WinUI holds of `element`'s property named `what`, in UTF-8, as far as `capacity` goes - a colour as #AARRGGBB,
 /// a number, 0 or 1, words, sides and corners as four numbers - answering its whole length; -1 for a property the
 /// element has none of. What a test reads.

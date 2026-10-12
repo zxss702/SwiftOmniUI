@@ -90,3 +90,15 @@ one colour, while a second file keeps artwork of any colours as it was drawn.
 `Background` is one colour or one brush, and the two stay apart in the
 patch: a colour crosses as a colour and a brush as its kind and parts,
 so a host paints a plain colour as the plain colour it is.
+
+## A picture's own pixels
+
+Code that works on the picture itself - an average colour an icon's tint
+follows - reads its pixels back with `PicturePixels(named:)`. The name is
+the one `Image` takes, so the file crosses no boundary: the pixels are asked
+for where the picture already stands, and the host that shows it is the one
+that reads them. Each host binds `PicturePixels.read` to its platform's own
+decoder as it starts; where no host is bound, or the name stands for a
+picture the decoder does not read - an SVG where only bitmaps are - the
+answer is nil. The pixels cross as premultiplied RGBA rows on every host,
+so code reading them is written once.

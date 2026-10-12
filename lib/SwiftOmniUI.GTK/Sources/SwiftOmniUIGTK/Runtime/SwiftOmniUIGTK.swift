@@ -27,6 +27,7 @@ public enum SwiftOmniUIGTK {
     /// - Returns: the process's exit code.
     @discardableResult
     public static func run(applicationID: String) -> Int32 {
+        PicturePixels.read = { name in MainActor.assumeIsolated { GTKPictures.pixels(of: name) } }
         let application = adw_application_new(
             applicationID, GApplicationFlags(G_APPLICATION_HANDLES_OPEN.rawValue))!
         gtk_window_set_default_icon_name(applicationID)

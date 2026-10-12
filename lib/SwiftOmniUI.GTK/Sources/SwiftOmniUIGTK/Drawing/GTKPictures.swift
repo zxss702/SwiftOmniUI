@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+@_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIGTK
 
@@ -12,6 +13,18 @@ enum GTKPictures {
     /// The folders pictures are read from: `Images` beside the executable, and
     /// each resource bundle beside it - a package's own assets land at its root.
     static var folders = besideExecutable()
+
+    /// The pixels of the picture `name` names: premultiplied RGBA rows as `PicturePixels` hands back; nil for no
+    /// picture, or one the platform's loaders do not read - an SVG with no loader installed.
+    static func pixels(of name: String) -> PicturePixels? {
+        guard let path = path(of: name), let texture = gdk_texture_new_from_filename(path, nil) else { return nil }
+        defer { g_object_unref(UnsafeMutableRawPointer(texture)) }
+        let width = Int(gdk_texture_get_width(texture)), height = Int(gdk_texture_get_height(texture))
+        guard width > 0, height > 0 else { return nil }
+        var rgba = [UInt8](repeating: 0, count: width * height * 4)
+        gdk_texture_download(texture, &rgba, gsize(width * 4))
+        return PicturePixels(width: width, height: height, rgba: rgba)
+    }
 
     /// The file `name` names (`PictureArithmetic.files`): a PNG the folder holds as an SVG is the SVG. Nil for none.
     static func path(of name: String) -> String? {

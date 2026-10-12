@@ -25,6 +25,22 @@ public enum SwiftOmniUIWinUI {
     /// - Returns: the process's exit code - 0, or the failure WinUI started with.
     @discardableResult
     public static func run() -> Int32 {
+        PicturePixels.read = { name in
+            let files = PictureArithmetic.files(for: name)
+            var size = [Int32](repeating: 0, count: 2)
+            var answered = WinUIStrings.withCStrings(files) { names in
+                swiftomniui_winui_picture_pixels(names, Int32(files.count), &size, nil, 0)
+            }
+            guard answered, size[0] > 0, size[1] > 0 else { return nil }
+            var rgba = [UInt8](repeating: 0, count: Int(size[0]) * Int(size[1]) * 4)
+            answered = rgba.withUnsafeMutableBufferPointer { buffer in
+                WinUIStrings.withCStrings(files) { names in
+                    swiftomniui_winui_picture_pixels(
+                        names, Int32(files.count), &size, buffer.baseAddress, Int64(buffer.count))
+                }
+            }
+            return answered ? PicturePixels(width: Int(size[0]), height: Int(size[1]), rgba: rgba) : nil
+        }
         var callbacks = WinUICallbacks.table
         return swiftomniui_winui_run(&callbacks)
     }

@@ -47,6 +47,10 @@ of logical pixels across: GTK reads the file - an SVG through gdk-pixbuf's
 loader - at that size times the display's scale, and again when the scale
 changes.
 
+`PicturePixels(named:)` answers through `GTKPictures.pixels`: the file's
+`GdkTexture` downloaded as the premultiplied RGBA rows GTK already reads, or
+nil where no loader reads the file.
+
 ## The shapes
 
 Each of the six shapes is a panel drawing its geometry with GSK's own paths

@@ -424,14 +424,14 @@ extension Color {
     public func mix(with rhs: Color, by fraction: Double, in colorSpace: RGBColorSpace = .sRGB) -> Color {
         let t = min(1, max(0, fraction))
         func mixed(_ a: Rgba, _ b: Rgba) -> Rgba {
-            var (r, g, b) = colorSpace.components(
+            var (r, g, bl) = colorSpace.components(
                 Double(a.red) / 255, Double(a.green) / 255, Double(a.blue) / 255)
             let (r2, g2, b2) = colorSpace.components(
                 Double(b.red) / 255, Double(b.green) / 255, Double(b.blue) / 255)
-            (r, g, b) = (r + (r2 - r) * t, g + (g2 - g) * t, b + (b2 - b) * t)
-            (r, g, b) = colorSpace.channels(r, g, b)
+            (r, g, bl) = (r + (r2 - r) * t, g + (g2 - g) * t, bl + (b2 - bl) * t)
+            (r, g, bl) = colorSpace.channels(r, g, bl)
             return Rgba(
-                red: Color.channel(r), green: Color.channel(g), blue: Color.channel(b),
+                red: Color.channel(r), green: Color.channel(g), blue: Color.channel(bl),
                 alpha: Color.channel(Int((Double(a.alpha) + (Double(b.alpha) - Double(a.alpha)) * t).rounded())))
         }
         return Color(
