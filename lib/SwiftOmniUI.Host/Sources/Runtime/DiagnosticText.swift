@@ -25,6 +25,7 @@ import CRT
     public var views: (() -> Int)?
 
     private let output: (String) -> Void
+    private let timings: DiagnosticTimings?
     private var applies = 0
     private var nodes = 0
     private var made = 0
@@ -38,12 +39,26 @@ import CRT
         self.tallies = tallies
         self.inspects = inspects
         self.output = write
+        timings = tallies ? DiagnosticTimings(write: write) : nil
     }
 
     /// The switches this process's environment sets, written to its standard error.
     public static var environment: DiagnosticText {
         DiagnosticText(
             tallies: switched("SWIFTOMNIUI_TALLY"), inspects: switched("SWIFTOMNIUI_INSPECT"), write: HostLog.writeStandardError)
+    }
+
+    /// Times a synchronous phase only when the tally is enabled. Copies of the
+    /// diagnostic text share these totals, including native work between renders.
+    @MainActor public func measure<Result>(_ phase: String, _ body: () -> Result) -> Result {
+        guard let timings else { return body() }
+        return timings.measure(phase, body)
+    }
+
+    /// Writes accumulated phase costs at most every tenth of a second. Times in
+    /// different phases can overlap; recursive calls within one phase are timed once.
+    @MainActor public func writeTimings(now: Double) {
+        timings?.write(now: now)
     }
 
     /// One message applied, which began at `began` milliseconds on the runtime's clock.
@@ -78,7 +93,7 @@ import CRT
     }
 
     /// Microseconds as milliseconds with two decimals.
-    private static func milliseconds(_ micros: Double) -> String {
+    fileprivate static func milliseconds(_ micros: Double) -> String {
         let hundredths = Int((micros / 10).rounded())
         let fraction = hundredths % 100
         return "\(hundredths / 100).\(fraction < 10 ? "0" : "")\(fraction)"
@@ -94,5 +109,57 @@ import CRT
         #else
         return getenv(name).map { String(cString: $0) == "1" } ?? false
         #endif
+    }
+}
+
+/// Phase totals are kept apart from patch costs: XAML can do most of its work
+/// after a patch and its window presentation have returned.
+final class DiagnosticTimings {
+    private struct Sample {
+        var calls = 0
+        var roots = 0
+        var micros = 0.0
+        var worst = 0.0
+    }
+
+    private var samples: [String: Sample] = [:]
+    private var active: Set<String> = []
+    private var printedAt = -Double.infinity
+    private var changed = false
+    private let output: (String) -> Void
+
+    init(write: @escaping (String) -> Void) { output = write }
+
+    func measure<Result>(_ phase: String, _ body: () -> Result) -> Result {
+        samples[phase, default: Sample()].calls += 1
+        // A native Measure recursively calls Measure on its children. Count all
+        // calls, but charge elapsed time only to the outer call of this phase.
+        guard active.insert(phase).inserted else { return body() }
+        let began = ContinuousClock.now
+        defer {
+            active.remove(phase)
+            let micros = RenderTally.micros(ContinuousClock.now - began)
+            var sample = samples[phase] ?? Sample()
+            sample.roots += 1
+            sample.micros += micros
+            sample.worst = max(sample.worst, micros)
+            samples[phase] = sample
+            changed = true
+        }
+        return body()
+    }
+
+    func write(now: Double) {
+        guard changed, now - printedAt >= 100 else { return }
+        printedAt = now
+        changed = false
+        let phases = samples.keys.sorted().compactMap { phase -> String? in
+            guard let sample = samples[phase], sample.roots > 0 else { return nil }
+            return "\(phase) calls \(sample.calls) roots \(sample.roots) "
+                + "\(DiagnosticText.milliseconds(sample.micros / Double(sample.roots))) ms avg / "
+                + "\(DiagnosticText.milliseconds(sample.worst)) ms worst / "
+                + "\(DiagnosticText.milliseconds(sample.micros)) ms total"
+        }
+        output("SwiftOmniUI timings: " + phases.joined(separator: " | ") + "\n")
     }
 }

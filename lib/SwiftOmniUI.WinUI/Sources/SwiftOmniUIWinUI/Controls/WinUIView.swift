@@ -221,7 +221,9 @@ class WinUIView {
             return desiredSize
         }
         var size = [0.0, 0.0]
-        swiftomniui_winui_measure(handle, width ?? .infinity, height ?? .infinity, &size)
+        WinUIRenderer.timed("winui.nativeMeasure") {
+            swiftomniui_winui_measure(handle, width ?? .infinity, height ?? .infinity, &size)
+        }
         let measured = LayoutSize(width: size[0], height: size[1])
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.

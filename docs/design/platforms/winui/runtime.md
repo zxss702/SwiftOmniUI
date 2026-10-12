@@ -115,7 +115,14 @@ it as it stands: `ResizeClient` would add the title bar's height again, which
 the content already covers.
 
 The bounds are the presenter's preferred least and greatest size. The
-traits ([a window's traits](../../host/tree.md#a-windows-traits)) are the
+caption height is read by measuring the chrome alone; attaching it already
+applies its template. Reading that height must not call `UpdateLayout`, which
+would flush pending page layout inside window presentation and can realize
+another lazy window before the current render returns. Window requests and
+presenter properties are written only when their native pixel values differ;
+the comparison uses the current presenter and DPI, rather than a DIP cache.
+
+The traits ([a window's traits](../../host/tree.md#a-windows-traits)) are the
 presenter's too - its maximize and minimize buttons, a button left unsaid
 being WinUI's own, which lets the user press it, and its standing on top of
 other windows for one that floats - and the backdrop: a translucent window's

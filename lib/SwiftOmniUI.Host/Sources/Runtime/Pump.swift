@@ -64,9 +64,10 @@
         turning = true
         repeat {
             again = false
-            step()
+            tree.diagnostics.measure("turn") { step() }
         } while again
         turning = false
+        if tree.diagnostics.tallies { tree.diagnostics.writeTimings(now: now()) }
     }
 
     /// Raises a native event's handler, then a turn; one raised while a patch applies, or inside the user's
@@ -116,19 +117,25 @@
 
     /// Applies the core's render; a drifted one is asked for whole, once.
     private func render() {
-        let rendered = core.render(baseline: intake.baseline)
+        let rendered = tree.diagnostics.measure("core.render") { core.render(baseline: intake.baseline) }
 
-        if !intake.take(rendered.root, generation: rendered.generation, apply: {
-            tree.apply($0, complete: rendered.complete)
+        if !tree.diagnostics.measure("host.apply", {
+            intake.take(rendered.root, generation: rendered.generation) {
+                tree.apply($0, complete: rendered.complete)
+            }
         }) {
             log("the interface drifted and is asked for whole: \(intake.lastDrift ?? "")")
-            let complete = core.render(baseline: 0)
-            intake.take(complete.root, generation: complete.generation, apply: {
-                tree.apply($0, complete: complete.complete)
-            })
+            let complete = tree.diagnostics.measure("core.render") { core.render(baseline: 0) }
+            _ = tree.diagnostics.measure("host.apply") {
+                intake.take(complete.root, generation: complete.generation) {
+                    tree.apply($0, complete: complete.complete)
+                }
+            }
         }
 
-        displayCycle.presentStateChannels()
-        presenter?.presentRendered()
+        tree.diagnostics.measure("host.present") {
+            displayCycle.presentStateChannels()
+            presenter?.presentRendered()
+        }
     }
 }

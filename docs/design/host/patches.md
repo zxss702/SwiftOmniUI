@@ -58,3 +58,14 @@ burst, since writing after every message moves the timing it measures.
 every pass once the host has reported on it, the way the inspector shows it.
 `DiagnosticText` reads both switches, keeps the totals and writes; the tree
 hands it each message's tally.
+
+The tally also writes `SwiftOmniUI timings:` lines for the turn, core render,
+patch application and window presentation. WinUI adds native view creation,
+native Measure calls, panel MeasureOverride, ArrangeOverride, effective
+viewport callbacks, window sizing and chrome measurement. Those phases cover
+work outside patch application, including XAML's later layout passes. Each
+line contains cumulative call counts, outer call counts (`roots`), and the
+outer calls' average, worst and total time. Recursive calls of the same phase
+are counted but timed only once; different phases can contain each other, so
+their times must not be added. Lines are throttled to one per tenth of a
+second while work continues. With the tally disabled, no timing clock is read.

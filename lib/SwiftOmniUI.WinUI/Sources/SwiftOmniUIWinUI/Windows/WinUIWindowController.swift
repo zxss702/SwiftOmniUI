@@ -63,17 +63,19 @@ final class WinUIWindowController {
         let sizing: WindowContentSizing
         if quiet, keepingSizing || LazyCells.realizing, let sized { sizing = sized } else {
             var asked: [Double?: [ObjectIdentifier: LayoutSize]] = [:]
-            sizing = WindowContentSizing(of: element, content: presentation.arrangement) { node, width in
-                guard let item = node.winUI.layoutItem else { return nil }
-                if let known = asked[width]?[ObjectIdentifier(node)] { return known }
-                let size = SingleChildArithmetic.size(of: item, padding: EdgeInsets(0), width: width)
-                asked[width, default: [:]][ObjectIdentifier(node)] = size
-                return size
+            sizing = WinUIRenderer.timed("winui.windowSizing") {
+                WindowContentSizing(of: element, content: presentation.arrangement) { node, width in
+                    guard let item = node.winUI.layoutItem else { return nil }
+                    if let known = asked[width]?[ObjectIdentifier(node)] { return known }
+                    let size = SingleChildArithmetic.size(of: item, padding: EdgeInsets(0), width: width)
+                    asked[width, default: [:]][ObjectIdentifier(node)] = size
+                    return size
+                }
             }
             sized = sizing
         }
         if let traits { window.apply(traits, isResizable: sizing.isResizable) }
-        let chromeHeight = window.chromeHeight
+        let chromeHeight = WinUIRenderer.timed("winui.chromeMeasure") { window.chromeHeight }
         window.boundContent(sizing.bounds, chromeHeight: chromeHeight)
         if let requested { window.requestContent(requested, chromeHeight: chromeHeight) }
         let frame = sizing.constrain(window.contentSize(chromeHeight: chromeHeight))

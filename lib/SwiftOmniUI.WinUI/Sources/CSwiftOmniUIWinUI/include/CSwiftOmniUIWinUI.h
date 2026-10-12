@@ -297,6 +297,9 @@ void swiftomniui_winui_window_set_traits(SwiftOmniUIObjectRef window, bool maxim
 /// maximizable, minimizable, translucent, floating and shown as 1 or 0.
 void swiftomniui_winui_window_frame(SwiftOmniUIObjectRef window, double *values);
 
+/// The client width and height in DIPs, without reading the window's position, limits or traits.
+void swiftomniui_winui_window_client_size(SwiftOmniUIObjectRef window, double *size);
+
 /// The window's name the system shows - the taskbar's, Alt+Tab's - in UTF-8, as far as `capacity` goes; answers its
 /// length.
 int32_t swiftomniui_winui_window_system_title(SwiftOmniUIObjectRef window, char *utf8, int32_t capacity);

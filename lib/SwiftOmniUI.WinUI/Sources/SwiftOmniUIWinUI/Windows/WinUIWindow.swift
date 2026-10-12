@@ -83,15 +83,15 @@ final class WinUIWindow {
     }
 
     private var clientSize: LayoutSize {
-        var values = [Double](repeating: 0, count: 13)
-        swiftomniui_winui_window_frame(handle, &values)
-        return LayoutSize(width: values[2], height: values[3])
+        var values = [0.0, 0.0]
+        swiftomniui_winui_window_client_size(handle, &values)
+        return LayoutSize(width: values[0], height: values[1])
     }
 
     var chromeHeight: Double {
-        // Resolve the attached title bar's template and visual states before turning its height into
-        // window limits; a later navigation must not correct an initial, unsettled caption measure.
-        swiftomniui_winui_update_layout(titleBar.handle)
+        // Attaching the chrome applies the TitleBar template. Measure just these bars:
+        // UpdateLayout would synchronously flush the page's pending layout as well,
+        // including EffectiveViewportChanged and another lazy realization/render.
         let width = clientSize.width
         let measuredCaption = titleBar.measure(width: width, height: nil).height
         let caption = max(swiftomniui_winui_window_title_bar_height(handle),

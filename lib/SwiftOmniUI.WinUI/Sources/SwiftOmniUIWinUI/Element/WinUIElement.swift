@@ -26,7 +26,7 @@ final class WinUIElement: NativeElement {
     init(_ element: MountedElement, host: WinUIRenderer) {
         self.element = element
         self.host = host
-        view = makeView()
+        view = WinUIRenderer.timed("winui.makeView") { makeView() }
     }
 
     // MARK: - The element's tree, read through its mounted element

@@ -287,18 +287,20 @@ extern "C" void swiftomniui_winui_window_set_frame(SwiftOmniUIObjectRef handle, 
         auto pixels = scale(window);
         if (has[0] || has[1]) {
             auto area = workArea(window);
-            auto at = app.Position();
+            auto previous = app.Position();
+            auto at = previous;
             if (has[0]) at.X = area.X + static_cast<int32_t>(std::lround(values[0] * pixels));
             if (has[1]) at.Y = area.Y + static_cast<int32_t>(std::lround(values[1] * pixels));
-            app.Move(at);
+            if (at.X != previous.X || at.Y != previous.Y) app.Move(at);
         }
         if (has[2] || has[3]) {
             // The content covers the title bar, which ResizeClient would add again: the frame is what stands now.
-            auto outer = app.Size();
+            auto previous = app.Size();
+            auto outer = previous;
             auto client = app.ClientSize();
             if (has[2]) outer.Width += static_cast<int32_t>(std::lround(values[2] * pixels)) - client.Width;
             if (has[3]) outer.Height += static_cast<int32_t>(std::lround(values[3] * pixels)) - client.Height;
-            app.Resize(outer);
+            if (outer.Width != previous.Width || outer.Height != previous.Height) app.Resize(outer);
         }
     } catch (...) {
         report("placing a window");
@@ -331,10 +333,20 @@ extern "C" void swiftomniui_winui_window_set_limits(SwiftOmniUIObjectRef handle,
             if (dips <= 0) return nullptr;
             return static_cast<int32_t>(std::lround(dips * pixels)) + border;
         };
-        presenter.PreferredMinimumWidth(size(limits[0], outer.Width - client.Width));
-        presenter.PreferredMinimumHeight(size(limits[1], outer.Height - client.Height));
-        presenter.PreferredMaximumWidth(size(limits[2], outer.Width - client.Width));
-        presenter.PreferredMaximumHeight(size(limits[3], outer.Height - client.Height));
+        auto equal = [](winrt::Windows::Foundation::IReference<int32_t> const &a,
+                        winrt::Windows::Foundation::IReference<int32_t> const &b) {
+            return (!a && !b) || (a && b && a.Value() == b.Value());
+        };
+        auto minimumWidth = size(limits[0], outer.Width - client.Width);
+        auto minimumHeight = size(limits[1], outer.Height - client.Height);
+        auto maximumWidth = size(limits[2], outer.Width - client.Width);
+        auto maximumHeight = size(limits[3], outer.Height - client.Height);
+        // Compare the actual pixel constraints, rather than caching DIPs in Swift:
+        // moving between displays or changing the presenter can change their conversion.
+        if (!equal(presenter.PreferredMinimumWidth(), minimumWidth)) presenter.PreferredMinimumWidth(minimumWidth);
+        if (!equal(presenter.PreferredMinimumHeight(), minimumHeight)) presenter.PreferredMinimumHeight(minimumHeight);
+        if (!equal(presenter.PreferredMaximumWidth(), maximumWidth)) presenter.PreferredMaximumWidth(maximumWidth);
+        if (!equal(presenter.PreferredMaximumHeight(), maximumHeight)) presenter.PreferredMaximumHeight(maximumHeight);
     } catch (...) {
         report("bounding a window");
     }
@@ -346,10 +358,10 @@ extern "C" void swiftomniui_winui_window_set_traits(
     try {
         auto window = borrow<xaml::Window>(handle);
         if (auto presenter = window.AppWindow().Presenter().try_as<windowing::OverlappedPresenter>()) {
-            presenter.IsMaximizable(maximizable);
-            presenter.IsMinimizable(minimizable);
-            presenter.IsResizable(resizable);
-            presenter.IsAlwaysOnTop(floats);
+            if (presenter.IsMaximizable() != maximizable) presenter.IsMaximizable(maximizable);
+            if (presenter.IsMinimizable() != minimizable) presenter.IsMinimizable(minimizable);
+            if (presenter.IsResizable() != resizable) presenter.IsResizable(resizable);
+            if (presenter.IsAlwaysOnTop() != floats) presenter.IsAlwaysOnTop(floats);
         }
         // The backdrop is made again only where it turns.
         auto acrylic = window.SystemBackdrop().try_as<xaml::Media::DesktopAcrylicBackdrop>();
@@ -368,6 +380,19 @@ extern "C" double swiftomniui_winui_window_title_bar_height(SwiftOmniUIObjectRef
     } catch (...) {
         report("reading the title bar height");
         return 0;
+    }
+}
+
+extern "C" void swiftomniui_winui_window_client_size(SwiftOmniUIObjectRef handle, double *size) {
+    size[0] = size[1] = 0;
+    try {
+        auto window = borrow<xaml::Window>(handle);
+        auto pixels = scale(window);
+        auto client = window.AppWindow().ClientSize();
+        size[0] = client.Width / pixels;
+        size[1] = client.Height / pixels;
+    } catch (...) {
+        report("reading a window's client size");
     }
 }
 
