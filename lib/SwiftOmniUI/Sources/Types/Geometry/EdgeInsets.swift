@@ -68,6 +68,14 @@ public struct EdgeInsets: Equatable, Sendable, HostRepresentable, ExpressibleByI
 
         self.init(numbers[0], numbers[1], numbers[2], numbers[3])
     }
+
+    /// The two added side by side - a scroll view's own padding and the room
+    /// a bar over it keeps clear, among the things they add up to.
+    public static func + (one: EdgeInsets, other: EdgeInsets) -> EdgeInsets {
+        EdgeInsets(
+            one.left + other.left, one.top + other.top,
+            one.right + other.right, one.bottom + other.bottom)
+    }
 }
 
 

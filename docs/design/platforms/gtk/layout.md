@@ -72,6 +72,12 @@ least is nothing, so a viewport giving it its least would scroll nothing. A
 way the view does not scroll holds the document to the viewport; a bar asked
 never to show still scrolls.
 
+A safe-area bar floats over the scroller's whole room: the view draws its
+background under the bar, and the content scrolls beneath it. The document
+insets the content by the bars' extents, measured up the tree from its first
+child and added to the padding the tree wrote, so the last of the content
+draws clear; a way the view does not scroll is inert room instead.
+
 The scroller says where its view stands through its adjustments'
 `value-changed`, and that the user holds it - a touchpad's fingers down -
 through a scroll controller's `scroll-begin` and `scroll-end`. The user's

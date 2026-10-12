@@ -36,6 +36,16 @@ final class GTKScrollView: GTKLayoutView {
     /// The offset the tree writes, kept for the first layout where it comes before it.
     private var writtenOffset = WrittenScrollOffset()
 
+    /// The element the content's first child mounts; the bars over the
+    /// scroller's room are read up the tree from it.
+    private weak var contentElement: MountedElement?
+
+    /// The padding the tree wrote, and the room the bars floating over the
+    /// scroller keep clear of the document's content, added to it: a bar lets
+    /// the content scroll under it, the last of the content drawing clear.
+    private var writtenPadding = EdgeInsets(0)
+    private var barsInsets = EdgeInsets(0)
+
     private var bars = (vertical: ScrollIndicatorVisibility.automatic, horizontal: ScrollIndicatorVisibility.automatic)
 
     override init() {
@@ -52,6 +62,7 @@ final class GTKScrollView: GTKLayoutView {
     /// The content: one child, or several stacked down.
     @discardableResult
     override func setItems(_ items: [GTKLayoutItem]) -> Bool {
+        contentElement = items.first?.element
         if items.count > 1 { wraps = true }
 
         var changed = false
@@ -88,7 +99,8 @@ final class GTKScrollView: GTKLayoutView {
             bars = (verticalBar, horizontalBar)
             configure()
         }
-        document.padding = padding
+        writtenPadding = padding
+        document.padding = padding + barsInsets
         document.orientation = orientation
         if let defaultAnchor { self.defaultAnchor = (defaultAnchor.x, defaultAnchor.y) }
 
@@ -98,12 +110,29 @@ final class GTKScrollView: GTKLayoutView {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        document.contentSize(width: width)
+        refreshBarsInsets(width: width)
+        return document.contentSize(width: width)
+    }
+
+    /// The insets the bars over this scroller keep inside the room: each bar's
+    /// extent measured at the room's width, a bar's height or its width by its
+    /// edge. A bar standing later is caught the next pass; one already stood
+    /// answers now.
+    private func refreshBarsInsets(width: Double?) {
+        let insets = contentElement?.ancestorSafeAreaInsets { bar, edge in
+            edge == .top || edge == .bottom
+                ? bar.gtk.view?.measure(width: width, height: nil).height
+                : bar.gtk.view?.measure(width: nil, height: nil).width
+        } ?? EdgeInsets(0)
+        guard insets != barsInsets else { return }
+        barsInsets = insets
+        document.padding = writtenPadding + insets
     }
 
     /// Stands GTK's scroller over the whole of the room, then an offset the tree wrote before there was one - or,
     /// first time only, the default anchor a reader asked it to open at.
     override func arrange(in bounds: Rect) {
+        refreshBarsInsets(width: bounds.width)
         scroller.layout(bounds)
         if let target = writtenOffset.laidOutNow() {
             move(to: target)

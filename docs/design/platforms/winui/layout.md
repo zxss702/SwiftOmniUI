@@ -140,6 +140,12 @@ room in the directions it scrolls: it measures its document without bound
 there itself, so the extent is the document's, and asking for no room it
 stands exactly where the layout places it.
 
+A safe-area bar floats over the scroller's whole room: the view draws its
+background under the bar, and the content scrolls beneath it. The document
+insets the content by the bars' extents, measured up the tree from its first
+child and added to the padding the tree wrote, so the last of the content
+draws clear; a way the view does not scroll is inert room instead.
+
 The scroller says where its view stands through `ViewChanged`, and that the
 user holds it through `DirectManipulationStarted` and `Completed`. The user's
 movement is joined up to the display's next frame, which reports it to its

@@ -52,4 +52,16 @@ private struct PaddedFrameLabel: View {
         XCTAssertEqual(patch.subtree.first {
             $0.props["safeAreaInsetEdge"] != nil }?.props["safeAreaInsetEdge"], .enumeration(4))
     }
+
+    /// A safe-area bar floats over the content, not beside it: the stack
+    /// holding it is a ZStack, the room the content's alone, and the bar a
+    /// decoration pinned to the edge it answers.
+    func testASafeAreaBarStandsOverItsContent() {
+        let patch = Renders().render(
+            Text("body").safeAreaInset(edge: VerticalEdge.bottom) { Text("bar") }.node)
+        let stack = patch.subtree.first { $0.props["safeAreaInsetEdge"] != nil }
+        XCTAssertEqual(stack?.type.name, "ZStack")
+        let bar = patch.subtree.first { $0.props["isLayoutDecoration"] == .bool(true) }
+        XCTAssertEqual(bar?.props["verticalAlignment"], .enumeration(2))
+    }
 }

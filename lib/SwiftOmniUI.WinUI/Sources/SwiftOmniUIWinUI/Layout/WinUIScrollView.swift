@@ -40,6 +40,16 @@ final class WinUIScrollView: WinUILayoutView {
     /// The offset the tree writes, kept for the first layout where it comes before it.
     private var writtenOffset = WrittenScrollOffset()
 
+    /// The element the content's first child mounts; the bars over the
+    /// scroller's room are read up the tree from it.
+    private weak var contentElement: MountedElement?
+
+    /// The padding the tree wrote, and the room the bars floating over the
+    /// scroller keep clear of the document's content, added to it: a bar lets
+    /// the content scroll under it, the last of the content drawing clear.
+    private var writtenPadding = EdgeInsets(0)
+    private var barsInsets = EdgeInsets(0)
+
     private var bars = (vertical: ScrollIndicatorVisibility.automatic, horizontal: ScrollIndicatorVisibility.automatic)
 
     override init() {
@@ -60,6 +70,7 @@ final class WinUIScrollView: WinUILayoutView {
     /// The content: one child, or several stacked down.
     @discardableResult
     override func setItems(_ items: [WinUILayoutItem]) -> Bool {
+        contentElement = items.first?.element
         if items.count > 1 { wraps = true }
 
         var changed = false
@@ -110,7 +121,8 @@ final class WinUIScrollView: WinUILayoutView {
         } else {
             scroller.setModes(vertical: modes.vertical, horizontal: modes.horizontal)
         }
-        document.padding = padding
+        writtenPadding = padding
+        document.padding = padding + barsInsets
         document.orientation = orientation
         if let defaultAnchor { self.defaultAnchor = (defaultAnchor.x, defaultAnchor.y) }
 
@@ -120,7 +132,24 @@ final class WinUIScrollView: WinUILayoutView {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        document.contentSize(width: width)
+        refreshBarsInsets(width: width)
+        return document.contentSize(width: width)
+    }
+
+    /// The insets the bars over this scroller keep inside the room: each bar's
+    /// extent measured at the room's width, a bar's height or its width by its
+    /// edge. A bar standing later is caught the next pass - measuring one while
+    /// WinUI arranges reads its last size and completes the proposal after the
+    /// pass, whose invalidation comes back through `contentSize` again.
+    private func refreshBarsInsets(width: Double?) {
+        let insets = contentElement?.ancestorSafeAreaInsets { bar, edge in
+            edge == .top || edge == .bottom
+                ? bar.winUI.view?.measure(width: width, height: nil).height
+                : bar.winUI.view?.measure(width: nil, height: nil).width
+        } ?? EdgeInsets(0)
+        guard insets != barsInsets else { return }
+        barsInsets = insets
+        document.padding = writtenPadding + insets
     }
 
     /// The scroller is measured at the room it stands in and nowhere else: the offer it was measured at is all
@@ -130,6 +159,7 @@ final class WinUIScrollView: WinUILayoutView {
     /// Stands WinUI's scroller over the whole of the room, then an offset the tree wrote before there was one - or,
     /// first time only, the default anchor a reader asked it to open at.
     override func arrange(in bounds: Rect) {
+        refreshBarsInsets(width: bounds.width)
         // Measured natively at the room it stands in - a no-op until the document changed: the presenter then
         // measures and arranges, holding its anchor, before the document's rows move.
         var measured = [0.0, 0.0]

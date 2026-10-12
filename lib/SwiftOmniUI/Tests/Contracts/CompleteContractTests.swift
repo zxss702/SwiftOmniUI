@@ -241,9 +241,9 @@ import XCTest
         "Layout.swift": ["Layout"],
         "StyleSheet.swift": ["VisualElement"],
         "Toggle.swift": ["Button", "Image"],
-        // `.safeAreaInset` is written out as a VStack or an HStack holding
-        // the view and its bar - the stacks' `spacing` is theirs to write.
-        "View+SafeArea.swift": ["VStack", "HStack"],
+        // `.safeAreaInset` is written out as a ZStack holding the view with
+        // its bar over the edge - the stack's `spacing` is StackBase's.
+        "View+SafeArea.swift": ["ZStack", "StackBase"],
         // `.padding` writes the padding element's `contentPadding` too.
         "View.swift": ["PaddingElement"],
         // Builds its node through `Node(shape:)`, which the scan cannot read.

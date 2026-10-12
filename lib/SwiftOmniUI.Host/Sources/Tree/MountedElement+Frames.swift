@@ -9,16 +9,32 @@ extension MountedElement {
     /// Insets reserved above this reader, measured in the same native layout as its frame.
     public func contentSafeAreaInsets(frameOf: (MountedElement) -> Rect?) -> EdgeInsets {
         guard value(.isGeometryReader)?.bool == true else { return EdgeInsets(0) }
+        return ancestorSafeAreaInsets { element, edge in
+            frameOf(element).map { edge == .top || edge == .bottom ? $0.height : $0.width }
+        }
+    }
+
+    /// The bars over this element, edge by edge: every `.safeAreaInset` ancestor's bar - the
+    /// stack's last child, the content its first, this element's way up lying in the first -
+    /// its extent on the edge's axis answered by the caller, a frame stood or a measure taken,
+    /// with the stack's spacing. A bar floats over the content's whole room and adds itself to
+    /// the safe area the content reads: an `ignoresSafeArea` lets the frame under it, the
+    /// contribution it tells unchanged.
+    public func ancestorSafeAreaInsets(extentOf: (MountedElement, Edge) -> Double?) -> EdgeInsets {
         var insets = EdgeInsets(0), child = self
         while let parent = child.parent {
             defer { child = parent }
+
             guard let edge = parent.value(.safeAreaInsetEdge).flatMap(Edge.init(propValue:)) else { continue }
-            let leading = edge == .top || edge == .leading
+
             let children = parent.currentChildren
-            guard children.count == 2, children[leading ? 1 : 0] === child,
-                  let frame = frameOf(children[leading ? 0 : 1]) else { continue }
-            let extent = (edge == .top || edge == .bottom ? frame.height : frame.width)
-                + (parent.value(.spacing)?.number ?? 0)
+            guard children.count == 2, children[0] === child,
+                  children[1].value(.isVisible)?.bool != false else { continue }
+
+            guard let extent = extentOf(children[1], edge).map({
+                $0 + (parent.value(.spacing)?.number ?? 0)
+            }) else { continue }
+
             switch edge {
             case .top: insets.top += extent
             case .bottom: insets.bottom += extent
