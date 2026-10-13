@@ -13,7 +13,7 @@ final class WinUICanvasView: WinUIView {
     var onPressed: ((Point) -> Void)?
     var onDragged: ((Point) -> Void)?
     var onReleased: ((Point) -> Void)?
-    private var drawing: [DrawCommand]?
+    private var drawnCommands: [DrawCommand]?
 
     init() {
         super.init { number in swiftomniui_winui_canvas_make(number) }
@@ -22,8 +22,8 @@ final class WinUICanvasView: WinUIView {
     /// The drawing, its instructions in the order they were written; nil draws nothing.
     func draw(_ drawing: [DrawCommand]?) {
         let commands = drawing ?? []
-        guard self.drawing != commands else { return }
-        self.drawing = commands
+        guard drawnCommands != commands else { return }
+        drawnCommands = commands
         let flat = HostDrawing(commands)
         let words = flat.strings.flatMap { $0.utf8.map { CChar(bitPattern: $0) } }
         let lengths = flat.strings.map { Int32($0.utf8.count) }

@@ -8,6 +8,7 @@
 #include "Figure.h"
 
 #include <winrt/Windows.UI.h>
+#include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Xaml.Shapes.h>
 
@@ -70,6 +71,20 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_shape_make(SwiftOmniUIOutline 
         return detach(shapes::Rectangle());
     } catch (...) {
         report("making a shape");
+        return nullptr;
+    }
+}
+
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_divider_make(void) {
+    try {
+        // Keep the ThemeResource expression on Fill: a one-time resource lookup would freeze the brush to the
+        // startup theme. XAML owns light/dark and high-contrast updates for this native separator.
+        auto line = xaml::Markup::XamlReader::Load(
+            LR"(<Rectangle xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                           Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />)").as<shapes::Rectangle>();
+        return detach(line);
+    } catch (...) {
+        report("making a divider");
         return nullptr;
     }
 }

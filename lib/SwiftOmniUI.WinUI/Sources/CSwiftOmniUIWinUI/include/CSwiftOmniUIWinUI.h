@@ -275,6 +275,7 @@ void swiftomniui_winui_window_set_safe_area_bars(SwiftOmniUIObjectRef window,
 /// (-1).
 void swiftomniui_winui_window_set_chrome(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef titleBar, SwiftOmniUIObjectRef menuBar,
                                      SwiftOmniUIObjectRef tabs);
+/// Restores and shows the window, then requests native foreground activation, including redirected launches.
 void swiftomniui_winui_window_activate(SwiftOmniUIObjectRef window);
 void swiftomniui_winui_window_close(SwiftOmniUIObjectRef window);
 /// Hides the window, or shows it again without activating it.
@@ -755,6 +756,9 @@ SwiftOmniUIObjectRef swiftomniui_winui_shape_make(SwiftOmniUIOutline outline);
 void swiftomniui_winui_shape_set(SwiftOmniUIObjectRef shape, double radius, SwiftOmniUIBrush fill, SwiftOmniUIBrush stroke,
                              double strokeWidth);
 
+/// A content divider: a native rectangle filled by the live DividerStrokeColorDefaultBrush ThemeResource.
+SwiftOmniUIObjectRef swiftomniui_winui_divider_make(void);
+
 /// A shape: one WinUI Path, drawn by `swiftomniui_winui_path_draw` and painted by `swiftomniui_winui_path_paint`.
 SwiftOmniUIObjectRef swiftomniui_winui_path_make(int64_t view);
 
@@ -1060,6 +1064,7 @@ void swiftomniui_winui_read_file(int64_t ticket, char const *path);
 /// Hands the file at the path `target`, or the address `target`, to Windows to open in the application it gives it;
 /// whether one took it comes back through `launchAnswered`, under `ticket`, on the UI thread.
 void swiftomniui_winui_launch(int64_t ticket, char const *target, bool file);
+void swiftomniui_winui_reveal(int64_t ticket, char const *path);
 
 /// What a test does: while `held`, a launch is answered as taken and Windows is asked nothing.
 void swiftomniui_winui_hold_launches(bool held);
@@ -1135,6 +1140,8 @@ bool swiftomniui_winui_picture_pixels(char const *const *names, int32_t count, i
 /// a number, 0 or 1, words, sides and corners as four numbers - answering its whole length; -1 for a property the
 /// element has none of. What a test reads.
 int32_t swiftomniui_winui_read(SwiftOmniUIObjectRef element, char const *what, char *utf8, int32_t capacity);
+/// Requests a native element theme (0 system, 1 light, 2 dark), without a Swift tree update. What a test does.
+void swiftomniui_winui_set_theme_for_testing(SwiftOmniUIObjectRef element, int32_t theme);
 
 /// The question showing over `element`'s window, in UTF-8, as far as `capacity` goes: its title, message, accepting
 /// and cancelling captions, its field's words (0x01 for none) and its choices, each ended by the unit separator

@@ -47,7 +47,10 @@ Activation arguments are held as agile references until the first render and
 drained on the UI dispatcher, including redirected requests received during
 startup. A plain launch reuses the earliest scene's declared main window,
 reopening it if only secondary windows remain; it restores a minimized window
-before activation. File and protocol activations retain their URL delivery.
+before activation. After showing and activating the XAML window, the relay
+requests foreground activation with `SetForegroundWindow`, using the permission
+granted by the sender, so an existing first window is raised in front of other
+applications. File and protocol activations retain their URL delivery.
 
 The process is held only while the tree declares windows, rather than while
 it retains scenes. When no windows remain, a low-priority dispatcher task

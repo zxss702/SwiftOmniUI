@@ -30,6 +30,15 @@ using namespace swiftomniui;
 namespace media = winrt::Microsoft::UI::Xaml::Media;
 namespace shapes = winrt::Microsoft::UI::Xaml::Shapes;
 
+extern "C" void swiftomniui_winui_set_theme_for_testing(SwiftOmniUIObjectRef handle, int32_t theme) {
+    try {
+        as<xaml::FrameworkElement>(handle).RequestedTheme(
+            theme == 1 ? xaml::ElementTheme::Light : theme == 2 ? xaml::ElementTheme::Dark : xaml::ElementTheme::Default);
+    } catch (...) {
+        report("requesting a native theme for testing");
+    }
+}
+
 namespace {
     /// What the screen reader was told, in order.
     std::vector<std::string> announcements;

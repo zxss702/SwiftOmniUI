@@ -356,6 +356,9 @@ extern "C" void swiftomniui_winui_window_activate(SwiftOmniUIObjectRef handle) {
         }
         app.Show();
         window.Activate();
+        // XAML activation alone can leave an existing window behind another process. A redirected launch's
+        // sender has granted this process foreground permission; let Windows activate and raise the window.
+        SetForegroundWindow(reinterpret_cast<HWND>(app.Id().Value));
     } catch (...) {
         report("showing a window");
     }

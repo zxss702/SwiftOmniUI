@@ -37,6 +37,13 @@ an empty geometry hides everything, and removing the clip restores the panel.
 A ColorPicker is a `Border` of one colour, its four corners rounded each as the
 element says; a `Rectangle` rounds all four alike.
 
+A content `Divider` is a native `Rectangle` filled by
+`{ThemeResource DividerStrokeColorDefaultBrush}`. The live XAML resource
+expression keeps its light, dark and high-contrast appearance with WinUI,
+without encoding a themed Swift colour as an unresolved native brush. The
+host's existing divider axis still supplies its one-point thickness and
+expanding dimension; menu separators remain the menu's own controls.
+
 ## A placed child
 
 A ZStack whose places a state drives stands each child where the run says, and
