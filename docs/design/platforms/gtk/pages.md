@@ -40,8 +40,12 @@ Removing the colour restores GTK's background.
 
 Hiding `.windowToolbar` removes the header's reserved height. A native
 `GtkWindowControls` with only the close action stands over the top-right corner
-of the content, without contributing to its measurement or safe area. Showing
-the toolbar again hides those controls and restores the page's header.
+of the content, without contributing to its measurement or safe area. The
+page's content stands in a `GtkWindowHandle`: GTK's bubbling gestures leave
+native controls their input and let the window manager move the window from
+unclaimed content, including blank space inside a scroller. Window overlays
+and the close controls stand outside that handle. Showing the toolbar again
+unwraps the same content, hides the floating controls and restores the header.
 
 The chrome is composed by one function from what the window shows, after
 every render, and written on the header bar of each page shown:

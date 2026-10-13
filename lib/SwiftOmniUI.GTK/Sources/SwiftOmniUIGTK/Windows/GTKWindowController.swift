@@ -140,7 +140,7 @@ final class GTKWindowController {
         let chrome = WindowChrome(window: element, arrangement: presentation.arrangement)
         window.setTitle(chrome.title ?? element.value(.title)?.string)
         window.setBackground(chrome.windowBackground)
-        window.showFloatingControls(chrome.toolbarVisibility?.enumeration == Visibility.hidden.rawValue)
+        window.showToolbarlessChrome(chrome.toolbarVisibility?.enumeration == Visibility.hidden.rawValue)
     }
 
     /// The element the window's bar belongs to: a page that wraps only an

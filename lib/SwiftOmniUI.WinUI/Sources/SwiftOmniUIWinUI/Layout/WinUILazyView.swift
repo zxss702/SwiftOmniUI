@@ -71,6 +71,9 @@ class WinUILazyView: WinUITravellingLayout {
     }
     private var preparedWindow: WindowPreparation?
     private var preparedAtWidth: Double?
+    /// A changed source/window may still be rendering a missing fragment,
+    /// even when its surviving identity retains a previously known extent.
+    private var unconfirmedFragments = false
 
     private struct ArrangedWindow {
         let preparation: WindowPreparation
@@ -344,8 +347,10 @@ class WinUILazyView: WinUITravellingLayout {
     func tellWindow(_ span: Range<Double>, realize: Range<Double>) {}
 
     private var windowPreparation: WindowPreparation {
-        WindowPreparation(built: cells.built, content: cells.element?.lazyContentRevision ?? 0,
-                          current: cells.requestedItemsAreCurrent)
+        let pendingFragment = unconfirmedFragments || (cells.needsMeasurement
+            && cells.identities[cells.built].contains { mounted[$0] == nil })
+        return WindowPreparation(built: cells.built, content: cells.element?.lazyContentRevision ?? 0,
+                                 current: !pendingFragment || cells.requestedItemsAreCurrent)
     }
 
     /// A newly requested empty fragment changes no native child list. Its
@@ -361,8 +366,15 @@ class WinUILazyView: WinUITravellingLayout {
     /// XAML measurement that does not enter prepareMeasure above.
     func didPrepareWindow(width: Double?) {
         let width = width.map { Double(Float($0)) }
+        let content = cells.element?.lazyContentRevision ?? 0
         updateCacheBasis(width: width)
         preparedAtWidth = width
+        if cells.requestedItemsAreCurrent {
+            unconfirmedFragments = false
+        } else if preparedWindow?.built != cells.built
+            || preparedWindow?.content != content {
+            unconfirmedFragments = cells.identities[cells.built].contains { mounted[$0] == nil }
+        }
         preparedWindow = windowPreparation
     }
 
@@ -432,8 +444,25 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     private func finishCacheAfterArrangement(waitForRender: Bool) {
-        guard !isDetached, !preparingProgrammaticMove, programmaticTarget == nil,
+        guard !isDetached else { cacheBuildPending = false; return }
+        watchClip()
+        guard !preparingProgrammaticMove, programmaticTarget == nil,
               let scroll = watching else { cacheBuildPending = false; return }
+        var raw = [Double](repeating: 0, count: 6)
+        swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
+        let latest = Rect(x: raw[0], y: raw[1], width: raw[2], height: raw[3])
+        let allocation = committedLayoutFrame
+        // The native read is the parent's full viewport in this panel's
+        // coordinates. It must intersect the panel before end clamping; an
+        // offscreen lazy section must not build a fictitious first screen.
+        guard latest.x.isFinite, latest.y.isFinite,
+              latest.width > 0, latest.height > 0,
+              latest.width.isFinite, latest.height.isFinite,
+              latest.x + latest.width > 0, latest.x < allocation.width,
+              latest.y + latest.height > 0, latest.y < allocation.height else {
+            cacheBuildPending = false
+            return
+        }
         guard cells.requestedItemsAreCurrent else {
             // Doorbell works run before that turn's runtime pump. An unrelated
             // pending render can therefore hide an already arranged window.
@@ -452,23 +481,13 @@ class WinUILazyView: WinUITravellingLayout {
         cacheBuildPending = false
         guard !cells.needsMeasurement, windowIsArranged else {
             // A requested fragment or changed extent resumes the ordinary
-            // prepare/arrange path; a stable retell also attempts cache work.
-            retell()
+            // prepare/arrange path. Even before the first effective viewport
+            // arrives, this intersecting native window can complete it.
+            announcedRect = latest
+            viewportChanged(latest, effective: false, target: latest)
             return
         }
-        var raw = [Double](repeating: 0, count: 6)
-        swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
-        let latest = Rect(x: raw[0], y: raw[1], width: raw[2], height: raw[3])
-        guard latest.x.isFinite, latest.y.isFinite,
-              latest.width > 0, latest.height > 0,
-              latest.width.isFinite, latest.height.isFinite else { return }
-        let origin = axis == .vertical ? latest.y : latest.x
         let room = axis == .vertical ? latest.height : latest.width
-        let own = axis == .vertical ? committedLayoutFrame.height : committedLayoutFrame.width
-        // The native read is the parent's full viewport in this panel's
-        // coordinates. It must intersect the panel before end clamping; an
-        // offscreen lazy section must not build a fictitious first screen.
-        guard origin + room > 0, origin < own else { return }
         if coversVisibleWindow(in: latest) {
             cacheViewportRoom = (room * 64).rounded() / 64
             cacheEnabled = true
@@ -536,6 +555,7 @@ class WinUILazyView: WinUITravellingLayout {
         announcedRect = nil
         preparingProgrammaticMove = false
         programmaticTarget = nil
+        unconfirmedFragments = false
         cacheViewportRoom = nil
         resetCache()
         scrollEar = nil
@@ -636,6 +656,7 @@ class WinUILazyView: WinUITravellingLayout {
         announcedRect = nil
         preparingProgrammaticMove = false
         programmaticTarget = nil
+        unconfirmedFragments = false
         cacheViewportRoom = nil
         resetCache()
         watching = nil

@@ -25,6 +25,10 @@ final class GTKWindow {
     /// Native close controls over full-size content while the window's toolbar is hidden.
     private(set) var floatingControls: GTKWidget?
 
+    /// GTK's own window-move gestures around the content only while the toolbar is hidden.
+    private(set) var dragHandle: GTKWidget?
+    private var backgroundDraggable = false
+
     /// The layers the window's content and its overlay stand in.
     private let layers: GTKWidget
 
@@ -106,6 +110,7 @@ final class GTKWindow {
             UnsafeMutableRawPointer(widget), SWIFTOMNIUI_SIGNAL_MATCH_DATA, 0, 0, nil, nil,
             UnsafeMutableRawPointer(bitPattern: Int(number)))
         gtk_window_destroy(widget.of(GtkWindow.self))
+        if let dragHandle { g_object_unref(dragHandle) }
         g_object_unref(layers)
         g_object_unref(widget)
     }
@@ -148,8 +153,15 @@ final class GTKWindow {
         fillClass = wanted
     }
 
-    /// Keep GTK's close action reachable without adding a header row or consuming content's safe area.
-    func showFloatingControls(_ shows: Bool) {
+    /// Keep GTK's drag gestures and close action reachable without reserving a header row or safe area.
+    func showToolbarlessChrome(_ shows: Bool) {
+        if backgroundDraggable != shows {
+            let child = backgroundDraggable
+                ? dragHandle.flatMap { gtk_window_handle_get_child($0.opaque) }
+                : gtk_overlay_get_child(layers.opaque)
+            backgroundDraggable = shows
+            setContent(child)
+        }
         if shows, floatingControls == nil {
             let controls = gtk_window_controls_new(GTK_PACK_END)!
             gtk_window_controls_set_decoration_layout(controls.opaque, ":close")
@@ -267,7 +279,27 @@ final class GTKWindow {
     }
 
     private func setContent(_ widget: GTKWidget?) {
-        gtk_overlay_set_child(layers.opaque, widget)
+        // Keep the child alive across unparenting even when the window owns its only native reference.
+        if let widget { g_object_ref(widget) }
+        defer { if let widget { g_object_unref(widget) } }
+        gtk_overlay_set_child(layers.opaque, nil)
+        if let dragHandle { gtk_window_handle_set_child(dragHandle.opaque, nil) }
+        if backgroundDraggable, let widget {
+            let handle: GTKWidget
+            if let dragHandle {
+                handle = dragHandle
+            } else {
+                handle = gtk_window_handle_new()!
+                g_object_ref_sink(handle)
+                dragHandle = handle
+            }
+            // GtkWindowHandle's bubbling gestures let native buttons/text controls handle their input first.
+            // The window manager performs the move, including under Wayland; no manual position tracking.
+            gtk_window_handle_set_child(handle.opaque, widget)
+            gtk_overlay_set_child(layers.opaque, handle)
+        } else {
+            gtk_overlay_set_child(layers.opaque, widget)
+        }
         guard widget != nil, contentReady, !presented, !hidden else { return }
 
         presented = true
