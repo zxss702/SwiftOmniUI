@@ -232,7 +232,7 @@ extension Node {
     /// A view shown as a screen: an arrangement as it is, any other view on a
     /// page element of its own, which holds the view's `PageSession`.
     /// Design: docs/design/views/pages.md#a-page-around-a-view
-    static func page(_ shown: any Page) -> Node {
+    @MainActor static func page(_ shown: any Page) -> Node {
         // A modifier on an arrangement makes a `ModifiedContent`, whose node
         // still is the arrangement's - the arrangement shows as it is.
         let content = shown.node

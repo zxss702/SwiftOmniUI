@@ -24,7 +24,9 @@ import CRT
 ///
 /// Every platform accepts the same grammar: the host parses the path itself
 /// before drawing it.
-public struct Path: Shape, VisualElement, ShapeProperties, PathProperties {
+/// Geometry construction and transforms are independent of the UI actor;
+/// describing the path's view and applying view modifiers stay on MainActor.
+nonisolated public struct Path: Shape, VisualElement, ShapeProperties, PathProperties {
     // Geometry is independent of the node and any frame wrappers.
     private var properties: Node
     private var commands: [HostPathCommand] = []
@@ -32,7 +34,7 @@ public struct Path: Shape, VisualElement, ShapeProperties, PathProperties {
     private var subpathStart: Point?
 
     /// The native description, encoded once when the view is requested.
-    public var node: Node {
+    @MainActor public var node: Node {
         get {
             var result = properties
             result.write(PathContract.commands, geometry.numbers)

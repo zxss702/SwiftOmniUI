@@ -127,7 +127,7 @@ enum Input {
 /// walk. Each box comes back under the path the walk reached it by, which pairs
 /// it with its predecessor next render.
 /// Design: docs/design/core/identity-and-diffing.md#paths-pair-state
-func stateParts(
+@MainActor func stateParts(
     in value: Any
 ) -> (
     boxes: [(path: String, box: StateBox)],
@@ -141,7 +141,7 @@ func stateParts(
     return (boxes, slots, inputs)
 }
 
-private func collectStateParts(
+@MainActor private func collectStateParts(
     in value: Any,
     at path: String,
     boxes: inout [(path: String, box: StateBox)],
@@ -436,7 +436,7 @@ extension Node {
     /// sent.
     ///
     /// - Parameter scene: the scene this view is, where it is one.
-    static func composed(
+    @MainActor static func composed(
         _ view: Any,
         type: String,
         scene: SceneRecord? = nil,

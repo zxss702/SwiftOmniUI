@@ -230,7 +230,7 @@ namespace {
                 for (auto const &command : commands) {
                     auto button = commandOf(command);
                     if (!button) continue;
-                    auto icon = button->icon ? button->icon.try_as<controls::ImageIcon>() : nullptr;
+                    auto icon = button->icon ? button->icon.template try_as<controls::ImageIcon>() : nullptr;
                     auto file = icon && icon.Tag() ? winrt::unbox_value<winrt::hstring>(icon.Tag()) : winrt::hstring();
                     files += (files.empty() ? "" : ";") + narrow(file);
                 }

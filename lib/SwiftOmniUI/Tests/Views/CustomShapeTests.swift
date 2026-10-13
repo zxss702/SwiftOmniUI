@@ -119,6 +119,24 @@ private struct NotchedShape: Shape {
         XCTAssertNil(custom.props[ShapeContract.fill.token])
     }
 
+    nonisolated func testPathGeometryCanBeBuiltOutsideTheMainActor() throws {
+        var path = Path {
+            $0.move(to: Point(5, 10))
+            $0.addLine(to: Point(20, 10))
+            $0.addQuadCurve(to: Point(30, 20), control: Point(30, 10))
+            $0.addCurve(to: Point(5, 30), control1: Point(30, 40), control2: Point(5, 40))
+            $0.closeSubpath()
+        }
+        let original = path
+        path.addPath(Path(ellipseIn: Rect(40, 10, 20, 20)))
+        XCTAssertNotEqual(path.geometry, original.geometry)
+        XCTAssertEqual(original.currentPoint, Point(5, 10))
+        XCTAssertEqual(Path(path.description).geometry, path.geometry)
+        XCTAssertEqual(try XCTUnwrap(HostPath(numbers: path.geometry.numbers)), path.geometry)
+        let moved = original.applying(.translate(10, -5)).offsetBy(dx: -10, dy: 5)
+        XCTAssertEqual(moved.geometry, original.geometry)
+    }
+
     func testStructuredGeometryRoundTripsArcsSubpathsAndNegativeCoordinates() throws {
         var path = Path(Rect(-20, 30, 60, 40))
         path.move(to: Point(5, 5))

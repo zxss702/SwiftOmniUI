@@ -129,10 +129,10 @@ public struct SymbolEffectOptions: OptionSet, Equatable, Sendable {
     public static let repeating = SymbolEffectOptions(rawValue: 1 << 0)
 
     /// Play once - the default.
-    public static let nonRepeating = SymbolEffectOptions(rawValue: 0)
+    public static let nonRepeating: SymbolEffectOptions = []
 
     /// The platform's own pace - the default.
-    public static let `default` = SymbolEffectOptions(rawValue: 0)
+    public static let `default`: SymbolEffectOptions = []
 }
 
 /// How a view swaps its content - what `.contentTransition` takes.
