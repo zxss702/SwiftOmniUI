@@ -119,7 +119,7 @@ final class GTKWindowController {
             let entries = GTKElement.appMenuEntries(of: element)
             // Commands belong to a window, not to the page that supplies its title. Resolve their host from
             // the actual native frames, and write them once while composing every bar (including inactive ones).
-            let show: (GTKPageFrame, GTKPageChrome) -> Void = { frame, chrome in
+            let show: @MainActor @Sendable (GTKPageFrame, GTKPageChrome) -> Void = { frame, chrome in
                 var chrome = chrome
                 chrome.appMenu = frame === commandFrame ? entries : []
                 frame.show(chrome)
