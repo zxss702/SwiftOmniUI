@@ -72,16 +72,23 @@ final class GTKPageFrame {
             previous = gtk_widget_get_parent(parent)
         }
         adw_toolbar_view_set_content(widget.opaque, page.widget)
+        page.safeAreaContext = nil
         page.rootSafeAreaContext = { [weak self] bounds in
             guard let self else { return SafeAreaContext(bounds: bounds) }
             self.requestSafeBars()
-            guard !self.safeBars.isEmpty else { return SafeAreaContext(bounds: bounds) }
-            // The content extends below all top bars. Reserve the native
-            // header here; source inset modifiers reserve their own bars.
             let headerHeight = self.chrome.showsBar ? Double(gtk_widget_get_height(self.header)) : 0
             let tabsHeight = self.tabsBar.map { Double(gtk_widget_get_height($0)) } ?? 0
+            let top = headerHeight + tabsHeight
+            if self.safeBars.isEmpty {
+                // Native row layout already excluded chrome from this
+                // allocation, but did not consume its safe-area environment.
+                return SafeAreaContext(bounds: Rect(bounds.x, bounds.y - top, bounds.width, bounds.height + top),
+                                       layout: bounds, container: bounds)
+            }
+            // The content extends below all top bars. Reserve the native
+            // header here; source inset modifiers reserve their own bars.
             return SafeAreaContext(bounds: bounds).padding(
-                EdgeInsets(top: headerHeight + tabsHeight, leading: 0, bottom: 0, trailing: 0))
+                EdgeInsets(top: top, leading: 0, bottom: 0, trailing: 0))
         }
     }
 

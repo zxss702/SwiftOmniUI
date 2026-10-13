@@ -104,6 +104,11 @@ public enum ViewContract: Contract {
     public static let namedFramesChanged = ElementEvent<Self, [NamedSpaceFrame]>(
         "namedFramesChanged", layer: .native)
 
+    /// The remaining safe-area environment, independent of the allocated
+    /// frame. Carried beside the existing ten-number frame report.
+    public static let safeAreaInsetsChanged = ElementEvent<Self, EdgeInsets>(
+        "safeAreaInsetsChanged", layer: .native)
+
     /// The space kept outside the view, between it and its neighbours.
     public static let padding = ElementProperty<Self, EdgeInsets>("padding", layer: .native, moves: .spacing)
 
@@ -178,7 +183,7 @@ public enum ViewContract: Contract {
         dragOver, dragStarting, dragText, drop, dropCompleted, dropPaths, flex, frameChanged, gridColumn,
         gridColumnSpan, gridRow, gridRowSpan, horizontalAlignment, horizontalContentAlignment, horizontalGuide,
         layoutPriority,
-        namedFramesChanged, padding, panTouchCount,
+        namedFramesChanged, safeAreaInsetsChanged, padding, panTouchCount,
         panUpdated, panXChannel, panYChannel, pinchUpdated, pointerEntered, pointerExited,
         pointerMoved, pointerPressed, pointerReleased, pointerStyle, swipeDirection, swipeThreshold, swiped,
         tag, tapCount, tapGesture, verticalAlignment, verticalContentAlignment, verticalGuide,

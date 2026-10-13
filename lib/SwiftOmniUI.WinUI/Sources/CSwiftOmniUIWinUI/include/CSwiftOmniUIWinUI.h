@@ -330,6 +330,8 @@ void swiftomniui_winui_origin(SwiftOmniUIObjectRef element, double *origin);
 
 /// Where WinUI laid the element out in its parent: x, y, width, height, in DIPs.
 void swiftomniui_winui_frame(SwiftOmniUIObjectRef element, double *frame);
+/// Whether the element is loaded in a live XAML tree; detached pages report no geometry.
+bool swiftomniui_winui_is_attached(SwiftOmniUIObjectRef element);
 
 /// A control's IsEnabled.
 void swiftomniui_winui_set_enabled(SwiftOmniUIObjectRef control, bool enabled);

@@ -104,7 +104,7 @@ extension Node {
         }
         guard inheritedMembers[property] == nil || (mergesAttributes && inheritedMembers[property] != member) else { return }
         inheritedMembers[property] = member
-        if LibraryContracts.byType[type]?.worn.contains(where: {
+        if !member.isDefault, LibraryContracts.byType[type]?.worn.contains(where: {
             ObjectIdentifier($0) == member.owner
         }) == true, props[property] == nil || mergesAttributes {
             props[property] = member.value
@@ -112,5 +112,24 @@ extension Node {
         for index in children.indices {
             children[index].inherit(property, member: member)
         }
+    }
+
+    // Design: docs/design/types/brushes.md#foreground-fill
+    mutating func writeForeground(_ brush: Brush, textIsExplicit: Bool = false) {
+        inherit(.fill, member: InheritedMember(
+            owner: ObjectIdentifier(ShapeContract.self), value: brush.propValue, isDefault: true))
+        if let color = brush.firstColor {
+            if textIsExplicit { writeOrInherit(TextStyleElementContract.foregroundStyle, color) }
+            else { writeInherited(TextStyleElementContract.foregroundStyle, color) }
+        }
+    }
+
+    mutating func resolveShapeFill() {
+        guard LibraryContracts.byType[type]?.worn.contains(where: {
+            ObjectIdentifier($0) == ObjectIdentifier(ShapeContract.self)
+        }) == true else { return }
+        let paint: [Prop] = [.fill, .stroke, .strokeBorder]
+        guard paint.allSatisfy({ props[$0] == nil && driven[$0] == nil }) else { return }
+        props[.fill] = inheritedMembers[.fill]?.value ?? Brush.solidColor(.primary).propValue
     }
 }

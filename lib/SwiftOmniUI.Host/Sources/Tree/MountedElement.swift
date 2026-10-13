@@ -77,6 +77,7 @@ import CRT
 
     /// The frame report this element last said, which a report the same says again to nobody.
     var reportedFrame: [Double] = []
+    var reportedSafeAreaInsets: EdgeInsets?
 
     /// The named spaces the element last reported enclosing it.
     var reportedNamedFrames: [NamedSpaceFrame] = []

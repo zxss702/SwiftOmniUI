@@ -101,7 +101,9 @@ class GTKZStackView: GTKTravellingLayout {
     }
     override func context(for child: GTKView, at place: Rect) -> SafeAreaContext {
         if sourceElement?.safeAreaInsetEdge != nil {
-            if insetBase === child, let insetContext { return insetContext.child(in: place) }
+            if insetBase === child, let insetContext {
+                return insetContext.child(in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
+            }
             // The inset's content receives the incoming edge proposal, not its
             // own contribution, so GeometryReader inside a bar cannot loop.
             return SafeAreaContext(bounds: Rect(0, 0, place.width, place.height))

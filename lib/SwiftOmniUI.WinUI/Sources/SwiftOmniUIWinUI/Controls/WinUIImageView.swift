@@ -81,12 +81,19 @@ final class WinUIImageView: WinUIView {
     /// gives it.
     /// Design: docs/design/platforms/winui/controls.md#pictures
     override func measure(width: Double?, height: Double?) -> LayoutSize {
-        _ = super.measure(width: 0, height: 0)
-        if let declared { return declared }
-        if symbol { return LayoutSize(width: 16, height: 16) }
-        var size = [0.0, 0.0]
-        swiftomniui_winui_image_size(handle, &size)
-        return LayoutSize(width: size[0], height: size[1])
+        let intrinsic: LayoutSize
+        if let declared { intrinsic = declared }
+        else if symbol { intrinsic = LayoutSize(width: 16, height: 16) }
+        else {
+            var size = [0.0, 0.0]
+            swiftomniui_winui_image_size(handle, &size)
+            intrinsic = LayoutSize(width: size[0], height: size[1])
+        }
+        // Preparing a Viewbox/FontIcon at zero clips its native content even
+        // though Swift's intrinsic result is nonzero. Prepare the same box
+        // the arithmetic reports, before its first native arrangement.
+        _ = super.measure(width: intrinsic.width, height: intrinsic.height)
+        return intrinsic
     }
 
     override func layout(_ place: Rect) {

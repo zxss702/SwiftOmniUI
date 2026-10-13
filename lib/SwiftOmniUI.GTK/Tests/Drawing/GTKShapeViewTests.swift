@@ -10,6 +10,43 @@ final class GTKShapeViewTests: XCTestCase {
     private static let red: UInt32 = 0xFFFF_0000
     private static let blue: UInt32 = 0xFF00_00FF
 
+    func testACapsuleForegroundDrawsItsLowOpacityFill() throws {
+        let colours = try drawn(width: 100, height: 20, at: [(50, 10), (1, 1)]) {
+            Capsule(style: .continuous).foregroundStyle(.black.opacity(0.03)).frame(width: 100, height: 20)
+        }
+        XCTAssertEqual(Double(colours[0] >> 24), 8, accuracy: 1)
+        XCTAssertEqual(colours[0] & 0x00FF_FFFF, 0)
+        XCTAssertEqual(colours[1], 0, "outside the capsule stays transparent")
+    }
+
+    func testACapsuleInheritsACompleteGradientThroughAModifiedContainer() throws {
+        let colours = try drawn(width: 100, height: 20, at: [(1, 10), (99, 10)]) {
+            ZStack {
+                Capsule(style: .continuous).frame(width: 100, height: 20)
+            }
+            .frame(width: 100, height: 20)
+            .foregroundStyle(LinearGradient(colors: [.red, .blue], startPoint: .leading, endPoint: .trailing))
+        }
+        XCTAssertGreaterThan(colours[0] >> 16 & 0xFF, 0xE0)
+        XCTAssertGreaterThan(colours[1] & 0xFF, 0xE0)
+    }
+
+    func testChangingCapsuleForegroundRepaintsTheSameNativeShape() throws {
+        try onUIThread {
+            let alpha = State(wrappedValue: 0.03)
+            let host = GTKRenderer.running(reducesMotion: true) {
+                Capsule(style: .continuous).frame(width: 100, height: 20)
+                    .foregroundStyle(.black.opacity(alpha.wrappedValue))
+            }
+            let shape = try XCTUnwrap(host.views(GTKShapeView.self).first)
+            host.settle { shape.pixels(at: [(50, 10)])[0] >> 24 == 8 }
+            alpha.wrappedValue = 0.2
+            host.settle { shape.pixels(at: [(50, 10)])[0] >> 24 == 51 }
+            XCTAssertTrue(host.views(GTKShapeView.self).first === shape)
+            XCTAssertEqual(shape.pixels(at: [(50, 10), (1, 1)]), [0x3300_0000, 0])
+        }
+    }
+
     /// A rectangle fills its room, its corners rounded away.
     func testARectangleFillsItsRoomItsCornersRounded() throws {
         let colours = try drawn(width: 100, height: 60, at: [(50, 30), (50, 1), (1, 1)]) {

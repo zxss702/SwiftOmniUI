@@ -82,6 +82,30 @@ private struct LazyPage: View {
         return renders.revisit(changed: Renderer.shared.pendingChanges)
     }
 
+    func testForegroundOnAModifiedRowSourceFillsOnlyRequestedShapes() throws {
+        let built = Built()
+        let renders = Renders()
+        let container = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack {
+                ForEach(0..<10_000) { number in
+                    built.numbers[number, default: 0] += 1
+                    return Capsule(style: .continuous)
+                }
+                .transition(.opacity)
+                .foregroundStyle(.black.opacity(0.03))
+            }
+        }.node))
+        let ids = try XCTUnwrap(container.props[.items]?.strings)
+        XCTAssertTrue(built.numbers.isEmpty)
+
+        let shown = try lazy(.lazyVStack, in: realize([ids[20], ids[21]], in: renders, lazy: container))
+        XCTAssertEqual(Set(built.numbers.keys), [20, 21])
+        XCTAssertEqual(shown.children.count, 2)
+        for child in shown.children {
+            XCTAssertEqual(child.props[.fill], Brush.solidColor(.black.opacity(0.03)).propValue)
+        }
+    }
+
     func testModifiedSourcesBuildOnlyRequestedRowsInEveryLazyContainer() throws {
         for type in [NodeType.lazyVStack, .lazyHStack, .lazyVGrid, .lazyHGrid] {
             let built = Built()

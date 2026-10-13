@@ -168,7 +168,27 @@ final class WinUIWindow {
 
     /// Shows `view` as the window's content - the first one activates the window, unless its scene hides it.
     func show(_ view: WinUIView?, present: Bool = true) {
+        if content !== view {
+            content?.rootSafeAreaContext = nil
+            view?.placingLayout = nil
+            view?.safeAreaContext = nil
+        }
         content = view
+        view?.rootSafeAreaContext = { [weak self] bounds in
+            guard let self else { return SafeAreaContext(bounds: bounds) }
+            // Native chrome already removed these rows from the content's
+            // allocation. Keep the outside strips in its safe environment;
+            // readers still observe them and scrollers can extend behind them.
+            // Read committed metrics here; measuring chrome during Arrange
+            // would recursively enter the native layout engine.
+            let caption = max(swiftomniui_winui_window_title_bar_height(self.handle),
+                              self.titleBar.laidOutFrame.height)
+            let menu = self.menuBarStands ? self.menuBar.laidOutFrame.height : 0
+            let tabs = self.tabsStandInWindow ? self.tabRow.laidOutFrame.height : 0
+            let top = max(0, caption + menu + tabs)
+            return SafeAreaContext(bounds: Rect(bounds.x, bounds.y - top, bounds.width, bounds.height + top),
+                                   layout: bounds, container: bounds)
+        }
         swiftomniui_winui_window_set_content(handle, view?.handle)
         if present { activateFirstTime() }
     }

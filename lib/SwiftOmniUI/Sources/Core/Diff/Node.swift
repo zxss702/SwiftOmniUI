@@ -271,6 +271,7 @@ public struct Node {
     struct InheritedMember: Equatable {
         let owner: ObjectIdentifier
         let value: PropValue
+        var isDefault = false
     }
     var inheritedMembers: [Prop: InheritedMember] = [:]
     var hasExplicitFontBasis = false
@@ -326,7 +327,8 @@ public struct Node {
 
     /// Whether this element reports its own frame, so its own size never animates.
     var reportsFrame: Bool {
-        events[.frameChanged] != nil || events[.namedFramesChanged] != nil || driven[.frame] != nil
+        events[.frameChanged] != nil || events[.namedFramesChanged] != nil
+            || events[.safeAreaInsetsChanged] != nil || driven[.frame] != nil
     }
 
     /// Whether this layout's children take their sizes at once: it or one of them is

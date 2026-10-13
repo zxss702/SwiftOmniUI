@@ -47,14 +47,15 @@ extension MountedElement {
     /// origin report. Only business geometry reads set `framesRead`.
     public var readsOwnFrame: Bool {
         driven[.frame] != nil || events[.frameChanged] != nil
-            || events[.namedFramesChanged] != nil || events[.textFrameChanged] != nil
+            || events[.namedFramesChanged] != nil || events[.safeAreaInsetsChanged] != nil
+            || events[.textFrameChanged] != nil
     }
 
     /// Says where the element stands - `numbers`, a frame report's ten, and the named spaces enclosing it -
     /// where that changed since it last said: its place in its parent onto the state its frame drives, the
     /// named spaces ahead of the numbers so one pass hears them together, and the whole report to its handler.
     public func reportFrame(_ numbers: [Double], named: [NamedSpaceFrame], in runtime: HostRuntime,
-                            contentInsets: EdgeInsets = EdgeInsets(0)) {
+                            contentInsets: EdgeInsets = EdgeInsets(0), geometryInsets: EdgeInsets? = nil) {
         guard readsOwnFrame else { return }
         var numbers = numbers
         if contentInsets != EdgeInsets(0), numbers.count == 10 {
@@ -73,7 +74,14 @@ extension MountedElement {
                 runtime.dispatch(handler, payload: [named.propValue])
             }
         }
-        guard numbers != reportedFrame else { return }
+        let insetsChanged = geometryInsets.map { $0 != reportedSafeAreaInsets } ?? false
+        if let geometryInsets, insetsChanged {
+            reportedSafeAreaInsets = geometryInsets
+            if let handler = handler(.safeAreaInsetsChanged) {
+                runtime.dispatch(handler, payload: [geometryInsets.propValue])
+            }
+        }
+        guard numbers != reportedFrame || insetsChanged else { return }
         reportedFrame = numbers
         if let binding = driven[.frame] {
             runtime.report(.lanes(Array(numbers.prefix(4))), through: binding)

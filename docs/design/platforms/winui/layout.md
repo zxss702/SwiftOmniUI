@@ -50,6 +50,27 @@ arrangement is answered with what its last real measure said. The place a
 child is newly put in is measured once the pass ends, posted on the
 doorbell: the pass after measures it there, and the one after settles.
 
+An arithmetic query that needed such an unprepared native proposal is
+provisional and is not cached. Its temporary DesiredSize cannot become a lazy
+row's committed natural extent. Native invalidation and child attachment are
+also deferred when MeasureOverride or ArrangeOverride is active. Deferred
+changes clear affected arithmetic and request native measure/arrange at the
+owning root; they do not measure that root with an invented unbounded height.
+Viewport realization includes the measurement revision, even if the viewport
+coordinates have not changed. The current ArrangeOverride bounds propagate
+safe contexts instead of reading the previous ActualSize during the callback.
+Lazy rows and tracks prefer the current finite width to `standsAt`; the old
+allocation is only a fallback when the parent left the width unspecified.
+
+GeometryReader accepts a safe allocation while retaining the remaining
+environment. Native window chrome that already sits outside the content row
+remains in that environment as an outside strip, read from committed metrics.
+ScrollView can extend its viewport behind it; native chrome has an explicit
+drawing order above that viewport. Geometry carries these remaining insets
+beside the existing ten-number physical report. Unloaded views report no
+geometry, so a retained navigation page cannot publish a false zero frame.
+Native Image/Viewbox content is prepared at its intrinsic size rather than 0x0.
+
 ## A place between passes
 
 A child's `Arrange` written outside its parent's arrangement does nothing, so

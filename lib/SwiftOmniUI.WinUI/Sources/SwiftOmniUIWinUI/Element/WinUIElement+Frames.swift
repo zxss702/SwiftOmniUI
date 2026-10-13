@@ -14,7 +14,11 @@ extension WinUIElement: FrameReporter {
 
     /// Says where the element stands, where that changed (`MountedElement.reportFrame`).
     func reportFrame() {
-        guard let host, let view else { return }
+        guard let host, let view, view.isAttached else { return }
+        let frame = view.laidOutFrame
+        // Retained navigation pages have no current layout. Their temporary
+        // empty attachment must not replace a reader's last real proposal.
+        if element.isGeometryReader, frame.width <= 0 || frame.height <= 0 { return }
         let named = element.namedSpaceFrames { ancestor in
             guard let ancestorView = (ancestor.native as? WinUIElement)?.view else { return nil }
             let origin = ancestorView.origin
@@ -22,7 +26,8 @@ extension WinUIElement: FrameReporter {
             return Rect(x: origin.x, y: origin.y, width: frame.width, height: frame.height)
         }
         element.reportFrame(
-            view.frameReport(safeArea: host.safeArea(of: element)), named: named, in: host.runtime)
+            view.frameReport(safeArea: host.safeArea(of: element)), named: named, in: host.runtime,
+            geometryInsets: view.safeAreaContext?.insets)
     }
 }
 

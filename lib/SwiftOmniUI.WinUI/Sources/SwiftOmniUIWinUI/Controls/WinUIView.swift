@@ -103,6 +103,7 @@ class WinUIView {
 
     /// How deep the layout passes under way stand: a place written inside one lands at once.
     static var arranging = 0
+    static var measuring = 0
 
     /// Where the view was last placed, in DIPs of its parent; nil before its first place.
     private(set) var placed: Rect?
@@ -110,6 +111,7 @@ class WinUIView {
     /// How opaque the view's own property draws it, and whether it shows, as the host last wrote them.
     private(set) var opacity = 1.0
     private(set) var isShown = true
+    private(set) var isDetached = false
 
     /// How the view's own properties move, turn and scale it.
     private var transform = HostDrawingTransform.identity
@@ -133,6 +135,10 @@ class WinUIView {
     /// both an unconstrained size and a wrapped size before arranging either one.
     private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize)] = []
     private var pendingMeasures: [(width: Double?, height: Double?)] = []
+    private var nativeMeasurePending = false
+    /// Any arithmetic that encountered an unprepared native proposal is
+    /// provisional; ancestors must not retain it as a completed measurement.
+    static var provisionalMeasureRevision = 0
     /// Changes when properties or a native size change invalidate this view, not on a repeated Measure query.
     var measurementRevision = 0
 
@@ -257,6 +263,23 @@ class WinUIView {
     func invalidateMeasure() {
         measurementRevision &+= 1
         measuredSizes.removeAll(keepingCapacity: true)
+        guard Self.arranging == 0, Self.measuring == 0 else {
+            guard !nativeMeasurePending else { return }
+            nativeMeasurePending = true
+            WinUIDoorbell.afterPass { [weak self] in
+                guard let self, !self.isDetached, self.nativeMeasurePending else { return }
+                self.nativeMeasurePending = false
+                self.invalidateNativeMeasure()
+            }
+            return
+        }
+        nativeMeasurePending = false
+        invalidateNativeMeasure()
+    }
+
+    /// Native invalidation is separate from discarding Swift's arithmetic:
+    /// a viewport notice may update the tree inside ArrangeOverride.
+    func invalidateNativeMeasure() {
         swiftomniui_winui_invalidate_measure(handle)
     }
 
@@ -287,6 +310,7 @@ class WinUIView {
             // A new width can first appear during arrangement (a centred child, a resized column). Complete
             // that proposal after this pass and discard the ancestors' provisional arithmetic. Coalesce all
             // proposals for this view into one turn; once measured, the same arrangement posts nothing.
+            Self.provisionalMeasureRevision &+= 1
             if !pendingMeasures.contains(where: { $0.width == width && $0.height == height }) {
                 let scheduled = !pendingMeasures.isEmpty
                 pendingMeasures.append((width, height))
@@ -304,9 +328,13 @@ class WinUIView {
             }
             return desiredSize
         }
+        let startedAt = Self.provisionalMeasureRevision
         var size = [0.0, 0.0]
+        Self.measuring += 1
+        defer { Self.measuring -= 1 }
         swiftomniui_winui_measure(handle, width ?? .infinity, height ?? .infinity, &size)
         let measured = LayoutSize(width: size[0], height: size[1])
+        guard startedAt == Self.provisionalMeasureRevision else { return measured }
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.
         if measuredSizes.count == 8 { measuredSizes.removeFirst() }
@@ -397,6 +425,8 @@ class WinUIView {
         swiftomniui_winui_frame(handle, &frame)
         return Rect(x: frame[0], y: frame[1], width: frame[2], height: frame[3])
     }
+
+    var isAttached: Bool { swiftomniui_winui_is_attached(handle) }
 
     /// The control's one accent colour; nil for the platform's.
     /// Design: docs/design/platforms/winui/controls.md#a-controls-accent
@@ -529,6 +559,7 @@ class WinUIView {
     /// The element left the tree: the view lets go of everything that would call back into it. A view that
     /// overrides this lets go of what every view holds first, then of its own.
     func detach() {
+        isDetached = true
         hear([]) { _ in }
         setFocusChanged(nil)
         menuActions = []

@@ -117,6 +117,16 @@ extern "C" void swiftomniui_winui_frame(SwiftOmniUIObjectRef handle, double *fra
     }
 }
 
+extern "C" bool swiftomniui_winui_is_attached(SwiftOmniUIObjectRef handle) {
+    try {
+        auto element = as<xaml::FrameworkElement>(handle);
+        return element.IsLoaded() && element.XamlRoot();
+    } catch (...) {
+        report("reading an element's attachment");
+        return false;
+    }
+}
+
 extern "C" void swiftomniui_winui_origin(SwiftOmniUIObjectRef handle, double *origin) {
     origin[0] = origin[1] = 0;
     try {

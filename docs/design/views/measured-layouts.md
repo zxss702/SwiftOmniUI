@@ -56,18 +56,20 @@ children do not determine its natural size, finite proposals are accepted,
 and unspecified axes have an ideal extent of ten. Children stack from the
 leading top corner with the allocated proposal.
 
-An ordered safe-area boundary preserves the proposal for a reader or scroller,
-including transparent wrappers around them. The reader reports the actual full
-allocation and its remaining inset; the ScrollView resolves that inset into
-document margins. Ordinary content is placed within the safe region instead.
+An ordered safe-area boundary gives a reader the safe allocation while retaining
+its remaining safe-area environment. A scroller retains the extended viewport,
+including through transparent wrappers, and resolves that environment into
+document margins. Ordinary content placed safely consumes the excluded strips.
 
 The ten-number report still carries parent frame, window origin and safe
-rectangle. GTK and WinUI use actual native dimensions and the same remaining
-safe region that placed the view; `geometry.size` is its allocated size and
-`safeAreaInsets` is the intersection with that view's bounds. A reader
-already placed clear of a bar, or inside a scroll document that consumed it,
-reports zero for that contribution. `onGeometryChange` uses the same report.
-Before first allocation the closure still receives a zero rectangle.
+rectangle. GTK and WinUI use actual native dimensions for `geometry.size` and
+send the remaining environment alongside it in `safeAreaInsetsChanged`.
+Safe allocation alone does not consume a reader's environment. An ordinary
+content boundary or scroll document that consumed it reports zero for that
+contribution. `onGeometryChange` combines the same context with the matching
+physical report; the existing ten-number wire format remains compatible.
+Before first allocation the reader accepts space without mounting its closure,
+so a fabricated zero size cannot produce a visible initial placement.
 
 ## A frame feed
 

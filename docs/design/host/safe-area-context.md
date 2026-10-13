@@ -10,8 +10,10 @@ and consumed avoidance. A child touching a safe edge retains the associated
 unsafe strip for a ScrollView viewport or `ignoresSafeArea`; a local child
 inside the region cannot inherit a window-wide viewport. The bar receives its
 incoming edge proposal without its own contribution. Only the base receives
-the reduced safe region. Readers, scrollers and transparent wrappers keep the
-layout proposal until a consumer places ordinary content in that safe region.
+the reduced safe region. Scrollers retain a viewport spanning the unsafe
+strips. Readers accept the safe allocation and keep the unconsumed safe-area
+environment; transparent wrappers forward those responsibilities. Ordinary
+content placed safely consumes the excluded strips.
 Hidden bars reserve no extent or spacing; retained removal
 branches are excluded from current layout.
 
@@ -25,22 +27,38 @@ GeometryReader accepts its allocated room independently of its closure. A
 finite native allocation supplies its size; an unspecified axis has ideal
 extent ten. Content starts at the leading top corner. The frame-report wire
 format remains `[x, y, width, height, windowX, windowY, safeX, safeY, safeWidth,
-safeHeight]`. All geometry reads use the placed context, with insets bounded
-by the actual native dimensions. A scroll document consumes its enclosing
+safeHeight]`. Actual size and coordinate conversion still come from that
+physical report. An accompanying `safeAreaInsetsChanged` event carries the
+remaining environment independently of the allocated size, for both
+GeometryReader and onGeometryChange. Hosts without that context retain the
+ten-number fallback. A scroll document consumes its enclosing
 contribution and gives content a clean context; its moving origin cannot
 reintroduce an outer inset. New local insets can reserve space again.
 
 For the original FOPage structure, the outer top inset changes the safe region
-while GeometryReader retains the full incoming allocation. Its report contains
-that actual size and the unconsumed heading inset. The existing
-`geometry.size.height - geometry.safeAreaInsets.top` expression subtracts the
-heading from this proposal. ScrollView keeps the full native viewport, resolves
+while GeometryReader accepts the remaining allocation and observes the
+unconsumed heading inset. Allocated size is not forced to equal the native
+viewport. If the incoming height is H and the total top contribution is T,
+the reader's height is H-T and its remaining top inset is T. The existing
+`geometry.size.height - geometry.safeAreaInsets.top` expression therefore
+requests H-2T. ScrollView keeps the full native viewport, resolves
 the region to document/indicator margins, and then passes a clean context into
-the document. Physically reducing the reader and declaring its heading inset
-consumed before scrolling had erased information from this calculation. The
+the document. With top margin T, that frame's centre is T+(H-2T)/2 = H/2,
+matching the user's macOS reference. The previous full-proposal model instead
+centred it at (H+T)/2. The size and remaining environment must not be collapsed
+into a single intersection rectangle. The
 application needs no compensating frame expression or offset. This does not
 assert that every reader has the window's size: an enclosing fixed frame or
 padding can propose a smaller container.
+
+WinUI's native title/menu/tab rows already sit outside the page allocation.
+Those outside strips remain in the window root's safe environment rather than
+being silently consumed by the native row layout. Their committed metrics are
+read without measuring during arrangement. Native chrome draws above any
+extended viewport. With native chrome C outside the page's allocated height P
+and an authored top bar B, the reader receives P-B and observes C+B; the
+unchanged FO expression centres its short content at (P+C)/2 in window
+coordinates. This prevents a residual half-titlebar displacement.
 
 GTK page roots join the existing AdwToolbarView after header/tabs, enabling
 content extension. Libadwaita explicitly disables its flat undershoot when
@@ -87,11 +105,36 @@ bounds, and the label's inner TextBlock uses the same DIP rounding policy as
 its outer Border. A native label's Loaded notification invalidates its initial
 measurement once attached to the real XAML tree. Deferred measurement changes
 are coalesced at the owning placed root; affected ancestor caches are cleared,
-the placed proposal is prepared, and a new arrange is requested asynchronously.
+and native measure/arrange is requested asynchronously. XAML supplies the new
+proposal; the root is not speculatively measured with an unbounded height.
 There is no input-triggered refresh or synchronous UpdateLayout in Measure or
 Arrange. These are source corrections; the screenshots' missing
 captions, continuation visibility and platform appearance have not been
 confirmed with a running application.
+
+The next static audit also corrected shared HStack measurement: finite widths
+are distributed before cross-axis heights are measured, and placement uses
+those same wrapped sizes. Declared minima survive compression. WinUI arithmetic
+does not cache results that encountered a missing native proposal during
+arrangement. Measurement invalidations, arrange invalidations and native child
+attachment are coalesced outside MeasureOverride/ArrangeOverride. Current
+allocation bounds, rather than a previous ActualSize, propagate child contexts.
+Split views use finite current proposals and compare page layout values as well
+as identity. Lazy viewport processing includes measurement revisions, so an
+unchanged viewport cannot suppress pending remeasurement.
+LazyVStack/LazyVGrid use the current finite width before the previous `standsAt`.
+An old zero allocation must not replace a new 560-point proposal and turn text
+wrapping into a large committed row height. Unbounded proposals fall back to
+the last allocation, and changed widths reset the corresponding row measures.
+
+GeometryReader mounts its closure only after a real report, rather than first
+building a zero-size content tree. Unloaded WinUI pages do not publish geometry;
+a temporarily empty reader attachment does not overwrite its retained report.
+Native Image/Viewbox content is prepared at its intrinsic dimensions, instead
+of 0x0. These changes address concrete initialization and retention risks;
+the missing sidebar icons, blank return page and tutorial spacing remain
+runtime-unverified. No application-specific offset, title or font workaround
+was added. No tests were added or run, and no platform was compiled.
 
 The semantic references are Apple's [GeometryReader](https://developer.apple.com/documentation/swiftui/geometryreader),
 [safeAreaInset](https://developer.apple.com/documentation/swiftui/view/safeareainset(edge:alignment:spacing:content:))

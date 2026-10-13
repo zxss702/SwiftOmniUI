@@ -59,10 +59,19 @@
                 height: padding.top + padding.bottom + gaps + along)
 
         case .horizontal:
-            for item in visible {
-                let size = item.size(offered: nil)
+            let ideal = visible.map { $0.size(offered: nil) }
+            let available = offered.flatMap { $0.isFinite ? max(0, $0 - padding.left - padding.right) : nil }
+            let widths = available.map {
+                alongs(visible, naturals: ideal, axis: axis, spacing: spacing,
+                       in: Rect(0, 0, $0, 0))
+            }
+            for (index, item) in visible.enumerated() {
+                // A row's height belongs to the widths it actually gives its
+                // children. In particular, a text column beside an icon and
+                // Spacer must wrap during measurement, before placement.
+                let size = widths.map { item.size(offered: $0[index]) } ?? ideal[index]
                 let margin = item.values.margin
-                along += max(size.width, item.values.flex ?? 0) + margin.left + margin.right
+                along += (widths?[index] ?? max(size.width, item.values.flex ?? 0)) + margin.left + margin.right
                 across = max(across, size.height + margin.top + margin.bottom)
             }
             return LayoutSize(
@@ -88,13 +97,18 @@
         of items: [Child], axis: Axis, spacing: Double?, padding: EdgeInsets, in bounds: Rect
     ) -> [Rect?] {
         let content = bounds.inset(padding)
-        let naturals = items.map { item -> LayoutSize in
+        var naturals = items.map { item -> LayoutSize in
             guard item.isShown else { return .zero }
             let margin = item.values.margin
             let cross = axis == .vertical ? content.width : content.height
             return item.size(offered: axis == .vertical ? max(0, cross - margin.left - margin.right) : nil)
         }
         let extents = alongs(items, naturals: naturals, axis: axis, spacing: spacing, in: content)
+        if axis == .horizontal {
+            for index in items.indices where items[index].isShown {
+                naturals[index] = items[index].size(offered: extents[index])
+            }
+        }
 
         // A baseline is a line the row shares: its place is the deepest
         // baseline any shown child asks for, each child landing its own on it.
@@ -212,7 +226,9 @@
                 let group = shown.filter { items[$0].values.priority == lowest }
                 let part = deficit / Double(group.count)
                 for index in group {
-                    let gave = min(part, extents[index])
+                    let minimum = axis == .vertical
+                        ? items[index].values.minimumHeight : items[index].values.minimumWidth
+                    let gave = min(part, max(0, extents[index] - (minimum ?? 0)))
                     extents[index] -= gave
                     deficit -= gave
                 }

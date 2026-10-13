@@ -191,6 +191,7 @@ class WinUILazyView: WinUITravellingLayout {
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)
             || cells.window?.realize != (realize ?? 0..<0)
             || cells.window?.revision != revision || cells.needsMeasurement
+            || measuredRevision != measurementRevision || geometryChanged
         else { return }
         let previous = lastTargetViewport
         lastTargetViewport = target
@@ -282,7 +283,8 @@ class WinUILazyView: WinUITravellingLayout {
             }
             let revision = self is WinUILazyGridView ? self.cells.runs.revision : self.cells.extents.revision
             if self.cells.needsMeasurement || self.cells.window?.span != (self.span ?? 0..<0)
-                || self.cells.window?.revision != revision {
+                || self.cells.window?.revision != revision
+                || self.measuredRevision != self.measurementRevision {
                 if let viewport = self.viewport { self.viewportChanged(viewport, effective: false) }
             }
         }
@@ -405,12 +407,13 @@ final class WinUILazyStackView: WinUILazyView {
         }
     }
 
-    /// The children are measured at the width the run stands at - a parent's other proposals ask only for the
-    /// size - and the measures land in the extents at once, before the scroll room is applied.
+    /// The current finite proposal determines row wrapping. A previous
+    /// allocation is only a fallback for an unspecified proposal, never a
+    /// replacement for the new width during initialization or resize.
     override func contentSize(width: Double?) -> LayoutSize {
-        let width = width.map { Double(Float($0)) }
+        let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         let across = axis == .vertical
-            ? (standsAt ?? width).map { max(0, $0 - padding.left - padding.right) } : nil
+            ? (width ?? standsAt).map { max(0, $0 - padding.left - padding.right) } : nil
         if WinUIView.arranging == 0 {
             let revision = cells.extents.revision
             if measuredAcross != across {
@@ -577,12 +580,12 @@ final class WinUILazyGridView: WinUILazyView {
     /// The runs the cells make.
     private var runCount: Int { (cells.identities.count + perRun - 1) / perRun }
 
-    /// The cells are measured at the room the grid stands in - a parent's other proposals ask only for the
-    /// size - and the measures land in the runs at once, before the scroll room is applied.
+    /// Tracks and row heights use the current finite proposal. A previous
+    /// allocation only answers when the parent left that proposal unspecified.
     override func contentSize(width: Double?) -> LayoutSize {
-        let width = width.map { Double(Float($0)) }
+        let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         let room = max(0, axis == .vertical
-            ? ((standsAt ?? width).map { $0 - padding.left - padding.right } ?? acrossRoom)
+            ? ((width ?? standsAt).map { $0 - padding.left - padding.right } ?? acrossRoom)
             : acrossRoom)
         let proposed = LazyGridTracks.resolve(tracks, width: room, spacing: trackSpacing)
         let widths = LazyGridTracks.extents(proposed, width: room, spacing: trackSpacing)

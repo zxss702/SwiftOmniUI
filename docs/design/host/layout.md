@@ -84,8 +84,11 @@ the application (`0xc000027b`, a layout cycle).
 A stack sets its shown children one after another with its spacing between
 them, inside its padding. Along its axis each child takes its natural size;
 across, its slot's rule. A vertical stack offers each child its own width, so
-wrapped text is measured at the width it will have; a horizontal stack offers
-none, because the width is what the children decide. A hidden child takes no
+wrapped text is measured at the width it will have. A horizontal stack first
+asks for ideal widths, distributes its finite proposal, then measures heights
+at those assigned widths. With no finite proposal the ideal widths stand.
+Measurement and placement use the same distribution; declared minima survive
+compression. A hidden child takes no
 room and no spacing.
 
 An explicit spacing, including zero, is used directly. A nil spacing follows

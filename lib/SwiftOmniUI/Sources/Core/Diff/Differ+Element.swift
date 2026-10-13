@@ -373,6 +373,8 @@ extension Differ {
             }
         }
 
+        node.resolveShapeFill()
+
         // Inside a publishing branch any element may be the one holding the
         // focus - it reports the platform's moves, which is how the store
         // knows what the chain publishes now.

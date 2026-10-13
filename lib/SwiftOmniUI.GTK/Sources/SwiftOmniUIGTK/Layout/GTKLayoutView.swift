@@ -35,6 +35,7 @@ class GTKLayoutView: GTKPanelView {
 
     /// The views the panel holds, in the order it draws them, back to front.
     private var held: [GTKView] = []
+    private(set) var allocatedBounds = Rect(0, 0, 0, 0)
 
     /// Puts `items` in the panel, in order, where they differ from the children it holds; whether they did.
     @discardableResult
@@ -162,6 +163,7 @@ class GTKLayoutView: GTKPanelView {
     override func allocate(width: Double, height: Double) {
         GTKView.allocating += 1
         defer { GTKView.allocating -= 1 }
+        allocatedBounds = Rect(0, 0, width, height)
         arrange(in: Rect(x: 0, y: 0, width: width, height: height))
         holdDeparting()
     }
@@ -182,8 +184,8 @@ class GTKLayoutView: GTKPanelView {
     /// Context inherited by a placed child. Special modifiers override this;
     /// ordinary overlays only inherit the region and reserve no space.
     func context(for child: GTKView, at place: Rect) -> SafeAreaContext {
-        let frame = placedFrame
-        return layoutSafeArea(in: Rect(0, 0, frame.width, frame.height)).child(in: place)
+        layoutSafeArea(in: allocatedBounds).child(
+            in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
     }
 
     /// Places the children in `bounds`.

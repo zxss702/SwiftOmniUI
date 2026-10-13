@@ -79,10 +79,9 @@ final class GTKGridView: GTKTravellingLayout {
         }
     }
     override func context(for child: GTKView, at place: Rect) -> SafeAreaContext {
-        let frame = placedFrame
-        let context = layoutSafeArea(in: Rect(0, 0, frame.width, frame.height))
+        let context = layoutSafeArea(in: allocatedBounds)
             .padding(SafeAreaArithmetic.physicalInsets(sourceElement?.safeAreaPadding ?? EdgeInsets(0), direction: direction))
-        return context.child(in: place)
+        return context.child(in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
     }
 
 }

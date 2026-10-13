@@ -57,22 +57,18 @@ extension View {
         }
     }
 
-    /// The style every text inside draws in - the container spelling of
-    /// `Text`'s `.foregroundStyle`. A text naming its own keeps its own.
+    /// The foreground style inherited by text, symbols and shapes inside.
+    /// An explicit text colour or shape fill keeps its own style.
     @_disfavoredOverload
     public func foregroundStyle(_ style: some ShapeStyle) -> ModifiedContent {
-        revised { node in
-            guard let color = style.brush.firstColor else { return }
-            node.writeInherited(TextStyleElementContract.foregroundStyle, color)
-        }
+        revised { $0.writeForeground(style.brush) }
     }
 
-    /// The colour every text inside draws in - SwiftUI's `.foregroundColor`
-    /// on a subtree.
+    /// The foreground colour inherited by text, symbols and shapes inside.
     public func foregroundColor(_ color: Color?) -> ModifiedContent {
         revised { node in
             guard let color else { return }
-            node.writeInherited(TextStyleElementContract.foregroundStyle, color)
+            node.writeForeground(color.brush)
         }
     }
 

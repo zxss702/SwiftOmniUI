@@ -49,6 +49,10 @@ class WinUILayoutView: WinUIView {
     /// The elements the panel holds, in the order it draws them, back to front.
     private var held: [WinUIView] = []
     private var heldBox: WinUIShapeView?
+    private var nativeArrangePending = false
+    private(set) var allocatedBounds = Rect(0, 0, 0, 0)
+    private var pendingChildren: [WinUIView]?
+    private var childrenCommitPending = false
 
     init() {
         super.init { number in swiftomniui_winui_panel_make(number) }
@@ -82,6 +86,23 @@ class WinUILayoutView: WinUIView {
     var allowsNativeSafeBars = false
 
     func setChildren(_ proposed: [WinUIView]) {
+        if WinUIView.arranging > 0 || WinUIView.measuring > 0 {
+            pendingChildren = proposed
+            guard !childrenCommitPending else { return }
+            childrenCommitPending = true
+            WinUIDoorbell.afterPass { [weak self] in
+                guard let self else { return }
+                self.childrenCommitPending = false
+                let children = self.pendingChildren
+                self.pendingChildren = nil
+                guard !self.isDetached, let children else { return }
+                self.setChildren(children)
+                self.invalidateMeasurements()
+                self.invalidateArrange()
+            }
+            return
+        }
+        pendingChildren = nil
         let views = allowsNativeSafeBars ? proposed : proposed.filter { $0.nativeSafeBarOwner == nil }
         guard boxView !== heldBox || views.count != held.count || !zip(views, held).allSatisfy({ $0 === $1 })
         else { return }
@@ -129,6 +150,17 @@ class WinUILayoutView: WinUIView {
 
     /// Asks WinUI to arrange the children again: a place in the air lands in the pass it asks for.
     func invalidateArrange() {
+        guard WinUIView.arranging == 0, WinUIView.measuring == 0 else {
+            guard !nativeArrangePending else { return }
+            nativeArrangePending = true
+            WinUIDoorbell.afterPass { [weak self] in
+                guard let self, !self.isDetached, self.nativeArrangePending else { return }
+                self.nativeArrangePending = false
+                self.invalidateArrange()
+            }
+            return
+        }
+        nativeArrangePending = false
         swiftomniui_winui_invalidate_arrange(handle)
     }
 
@@ -141,11 +173,10 @@ class WinUILayoutView: WinUIView {
 
     private var measurementCommitPending = false
 
-    /// A deferred native measurement changed our arithmetic while panels still
-    /// report zero DesiredSize to XAML. Prepare the placed tree and explicitly
-    /// request its new arrangement rather than waiting for an input repaint.
+    /// Discard affected arithmetic and request one native measure/arrange at
+    /// the placed root. XAML supplies the real proposal in its next pass;
+    /// preparing the root with an invented unbounded height loses that order.
     func commitMeasurementChange() {
-        guard WinUIView.arranging == 0 else { return }
         invalidateMeasurements()
         var root = self
         while let parent = (root as? WinUIScrollDocument)?.scrollView ?? root.placingLayout {
@@ -154,10 +185,8 @@ class WinUILayoutView: WinUIView {
         guard !root.measurementCommitPending else { return }
         root.measurementCommitPending = true
         WinUIDoorbell.afterPass { [weak root] in
-            guard let root else { return }
+            guard let root, !root.isDetached else { return }
             root.measurementCommitPending = false
-            let width = root.standsAt ?? root.placedFrame.width
-            if width.isFinite, width > 0 { root.prepareMeasure(width: width) }
             root.invalidateArrange()
         }
     }
@@ -197,8 +226,12 @@ class WinUILayoutView: WinUIView {
         // again for ever.
         guard WinUIView.arranging == 0 else { return desiredSize }
 
-        Self.measuring += 1
-        defer { Self.measuring -= 1 }
+        Self.arithmeticMeasuring += 1
+        WinUIView.measuring += 1
+        defer {
+            Self.arithmeticMeasuring -= 1
+            WinUIView.measuring -= 1
+        }
 
         let offered = width.isFinite ? width : nil
         if !preparingMeasure || !hasSizing || lastSizingWidth != offered { forgetMeasurements() }
@@ -214,7 +247,7 @@ class WinUILayoutView: WinUIView {
     }
 
     /// How many SwiftOmniUI layouts are measuring, one inside another.
-    private static var measuring = 0
+    private static var arithmeticMeasuring = 0
 
     /// The width of the place this layout was last put in; nil before its first.
     var standsAt: Double?
@@ -227,7 +260,7 @@ class WinUILayoutView: WinUIView {
     /// Design: docs/design/platforms/winui/layout.md#a-change-told-upward
     private func reportChange(of size: LayoutSize, offered: Double?) {
         defer { measured = (offered, size) }
-        guard let placingLayout, Self.measuring == 1, let measured, measured.offered == offered, measured.size != size
+        guard let placingLayout, Self.arithmeticMeasuring == 1, let measured, measured.offered == offered, measured.size != size
         else { return }
 
         measurementRevision &+= 1
@@ -246,9 +279,16 @@ class WinUILayoutView: WinUIView {
         let width = width.map { Double(Float($0)) }
         return measurements.size(offering: width) {
             Self.sizings += 1
+            let startedAt = WinUIView.provisionalMeasureRevision
             let size = contentSize(width: width)
             lastSizingWidth = width
-            hasSizing = true
+            hasSizing = startedAt == WinUIView.provisionalMeasureRevision
+            if !hasSizing {
+                // The next deferred proposal completes this result. Do not
+                // let a previous DesiredSize become a row's natural extent.
+                measurements.invalidate()
+                preparedMeasure = nil
+            }
             return size
         }
     }
@@ -260,6 +300,7 @@ class WinUILayoutView: WinUIView {
     func arrange(width: Double, height: Double) {
         WinUIView.arranging += 1
         defer { WinUIView.arranging -= 1 }
+        allocatedBounds = Rect(0, 0, width, height)
         boxView?.layout(backgroundBounds(in: Rect(0, 0, width, height)))
         writeCut(width: width, height: height)
         arrange(in: Rect(x: 0, y: 0, width: width, height: height))
@@ -298,8 +339,8 @@ class WinUILayoutView: WinUIView {
     /// Context inherited by a placed child. Special modifiers override this;
     /// ordinary overlays only inherit the region and reserve no space.
     func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
-        let frame = placedFrame
-        return layoutSafeArea(in: Rect(0, 0, frame.width, frame.height)).child(in: place)
+        layoutSafeArea(in: allocatedBounds).child(
+            in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
     }
 
     /// Places the children in `bounds`, in DIPs.

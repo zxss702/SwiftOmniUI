@@ -49,3 +49,18 @@ A stop's colour may be a `Color(light:dark:)` pair. It crosses as both
 halves until the differ builds the element wearing the brush and picks the
 half in force, and that element builds again when the system color scheme changes;
 see [a pair for each color scheme](colour-and-color-scheme.md#a-pair-for-each-color-scheme).
+
+## Foreground fill
+
+`foregroundStyle` carries a complete brush to shapes, including every gradient
+stop and its opacity. Text and symbols retain their existing single-colour
+rendering, using the brush's first colour. Both the general view modifier and
+the property modifier offered by a modified view preserve this inheritance.
+
+A shape resolves its default fill after explicit properties, styles and visual
+states have been applied. A stated or driven fill takes precedence. A shape
+with a stated or driven stroke alone stays unfilled. Otherwise it uses the
+nearest foreground brush, or `Color.primary` when no foreground was supplied.
+The differ resolves themed stops afterward, so a color scheme change updates
+the fill through the usual invalidation path. Frames, composed views, fragments
+and lazy row sources retain the inherited brush without building extra rows.

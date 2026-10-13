@@ -395,6 +395,7 @@ extension NodeType {
     static let frameChanged = ViewContract.frameChanged.token
     static let textFrameChanged = Event("textFrameChanged")
     static let namedFramesChanged = ViewContract.namedFramesChanged.token
+    static let safeAreaInsetsChanged = ViewContract.safeAreaInsetsChanged.token
     static let isFocusedChanged = VisualElementContract.isFocusedChanged.token
     static let isSidebarVisibleChanged = NavigationSplitViewContract.isSidebarVisibleChanged.token
     static let columnVisibilityChanged = NavigationSplitViewContract.columnVisibilityChanged.token

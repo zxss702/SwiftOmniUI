@@ -276,6 +276,11 @@ extern "C" void swiftomniui_winui_window_set_chrome(
         standInRow(grid, 0, titleBar);
         standInRow(grid, 1, menuBar);
         standInRow(grid, 2, tabs);
+        // A page's scroller can extend into these rows. Native chrome stays
+        // above that viewport, independent of the root grid's child order.
+        for (auto handle : {titleBar, menuBar, tabs}) {
+            if (handle) controls::Canvas::SetZIndex(as<xaml::UIElement>(handle), 2);
+        }
         if (titleBar && !window.ExtendsContentIntoTitleBar()) {
             auto bar = as<controls::TitleBar>(titleBar);
             window.ExtendsContentIntoTitleBar(true);

@@ -63,6 +63,7 @@ final class WinUISplitView: WinUILayoutView {
     private var arranged: LayoutSize?
     private var asked = LayoutSize.zero
     private var adaptation = SidebarAdaptation()
+    private var configurationPending = false
 
     override init() {
         super.init()
@@ -103,7 +104,7 @@ final class WinUISplitView: WinUILayoutView {
     /// The pages go in WinUI's navigation view, which places them; the panel holds it alone.
     @discardableResult
     override func setItems(_ items: [WinUILayoutItem]) -> Bool {
-        guard items.count != pages.count || !zip(items, pages).allSatisfy({ $0.view === $1.view }) else { return false }
+        guard items.count != pages.count || !zip(items, pages).allSatisfy({ $0.arranges(like: $1) }) else { return false }
 
         pages = items
         for page in items { page.view.placingLayout = nil }
@@ -158,10 +159,13 @@ final class WinUISplitView: WinUILayoutView {
         asked
     }
 
-    /// Measures WinUI's navigation view at the size it was last arranged at, the one its pages are laid out in.
+    /// Measures at the current finite proposal; a previous allocation only
+    /// supplies axes left unspecified by a speculative parent measurement.
     /// Design: docs/design/platforms/winui/pages.md#a-native-arrangement
     override func measure(width: Double, height: Double) -> LayoutSize {
-        let size = arranged ?? LayoutSize(width: width, height: height)
+        guard WinUIView.arranging == 0 else { return super.measure(width: width, height: height) }
+        let size = LayoutSize(width: width.isFinite ? width : arranged?.width ?? width,
+                              height: height.isFinite ? height : arranged?.height ?? height)
         asked = sidebar.measure(width: size.width, height: size.height)
         return super.measure(width: width, height: height)
     }
@@ -185,6 +189,17 @@ final class WinUISplitView: WinUILayoutView {
     }
 
     private func configure() {
+        if WinUIView.arranging > 0 || WinUIView.measuring > 0 {
+            guard !configurationPending else { return }
+            configurationPending = true
+            WinUIDoorbell.afterPass { [weak self] in
+                guard let self else { return }
+                self.configurationPending = false
+                guard !self.isDetached else { return }
+                self.configure()
+            }
+            return
+        }
         ProgramWrite.perform {
             if pages.count > 2, detailWidthBounds?.last != 0 {
                 middle.set(

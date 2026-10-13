@@ -8,7 +8,9 @@
 
 extension TextStyleElement {
     /// The colour of the text; a `Color(light:dark:)` follows the system color scheme.
-    public func foregroundStyle(_ value: Color) -> Modified { setValue(TextStyleElementContract.foregroundStyle, value) }
+    public func foregroundStyle(_ value: Color) -> Modified {
+        modified { $0.writeForeground(value.brush, textIsExplicit: true) }
+    }
 
     /// The style the text is painted with: a colour paints it in that colour;
     /// a gradient or a material paints it in the style's first colour, a
@@ -17,7 +19,7 @@ extension TextStyleElement {
     ///     Text("…").foregroundStyle(.secondary)
     ///     Image(symbol: "checkmark").foregroundStyle(.green, .mint)
     public func foregroundStyle(_ style: some ShapeStyle) -> Modified {
-        style.brush.firstColor.map { foregroundStyle($0) } ?? modified { _ in }
+        modified { $0.writeForeground(style.brush, textIsExplicit: true) }
     }
 
     /// The symbol-palette spelling of `foregroundStyle`: the first style tints

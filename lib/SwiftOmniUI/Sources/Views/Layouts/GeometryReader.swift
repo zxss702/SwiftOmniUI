@@ -98,6 +98,7 @@ private final class LastGeometry<T: Equatable>: @unchecked Sendable {
 
     /// The named spaces the last report travelled with.
     var named: [NamedSpaceFrame] = []
+    var insets: EdgeInsets?
 
     /// The value the handler last ran with.
     var value: T?
@@ -129,6 +130,7 @@ extension View {
         nonisolated(nonsending) func report() async throws {
             guard var report = last.report else { return }
             report.named = last.named
+            report.reportedInsets = last.insets
             let value = transform(GeometryProxy(report: report))
             guard value != last.value else { return }
             last.value = value
@@ -144,6 +146,11 @@ extension View {
             last.named = frames
             try await report()
         }
+        .hearing(ViewContract.safeAreaInsetsChanged) { insets in
+            last.insets = insets
+            // The host follows this environment with the matching frame,
+            // even when only the insets changed. Transform one coherent pair.
+        }
     }
 }
 
@@ -156,8 +163,9 @@ public struct GeometryProxy: Sendable {
     /// The size the view was laid out at.
     public var size: Size { Size(report.frame.width, report.frame.height) }
 
-    /// Where the safe area still covers this view's bounds: positive on each
-    /// side the view reaches past where content can safely sit.
+    /// The container's remaining safe-area contributions. A safe allocation
+    /// can exclude these strips from `size` while still observing them here;
+    /// a scroll document consumes them before reporting its inner geometry.
     public var safeAreaInsets: EdgeInsets { report.safeAreaInsets }
 
     /// The view's frame in the space named - `.local` for its own bounds,
@@ -177,16 +185,18 @@ public struct GeometryProxy: Sendable {
 ///             .frame(width: proxy.size.width / 2)
 ///     }
 ///
-/// The closure runs again whenever the frame settles somewhere new; before the
-/// first layout it reads a zero size; native hosts settle that report before painting. Several views stack from the leading top
+/// The closure runs when the host has allocated the reader, and again whenever
+/// its frame settles somewhere new. Several views stack from the leading top
 /// corner. Content does not determine the reader's natural size. To report a frame rather than build from it, write
 /// `.onFrameChanged` on the view.
 public struct GeometryReader: View {
-    /// The last report the layout settled on - zero until the first one.
-    @State private var report = FrameReport.zero
+    /// The closure cannot lay out from an invented zero proposal. The empty
+    /// reader still accepts space and reports it, before mounting its content.
+    @State private var report: FrameReport? = nil
 
     /// The named spaces the last report travelled with.
     @State private var named: [NamedSpaceFrame] = []
+    @State private var insets: EdgeInsets? = nil
 
     /// What to show, given the space it will live in.
     private let build: (GeometryProxy) -> any View
@@ -205,11 +215,14 @@ public struct GeometryReader: View {
     public var body: some View { AnyView(content) }
 
     private var content: any View {
-        var report = report
-        report.named = named
-
+        let proxy = report.map { report in
+            var report = report
+            report.named = named
+            report.reportedInsets = insets
+            return GeometryProxy(report: report)
+        }
         var container = Grid {
-            build(GeometryProxy(report: report))
+            if let proxy { build(proxy) }
         }
         container.node.props[.isGeometryReader] = true.propValue
         return container
@@ -219,6 +232,12 @@ public struct GeometryReader: View {
             var transaction = Transaction()
             transaction.isGeometryFeedback = true
             withTransaction(transaction) { self.named = frames }
+        }
+        .hearing(ViewContract.safeAreaInsetsChanged) { insets in
+            guard insets != self.insets else { return }
+            var transaction = Transaction()
+            transaction.isGeometryFeedback = true
+            withTransaction(transaction) { self.insets = insets }
         }
         .hearing(ViewContract.frameChanged) { numbers in
             guard let report = FrameReport(numbers), report != self.report else { return }
@@ -245,6 +264,10 @@ struct FrameReport: Equatable, Sendable {
     /// coordinates; carried by `namedFramesChanged`, which travels with a
     /// report rather than inside its numbers.
     var named: [NamedSpaceFrame] = []
+    /// Optional context supplied by hosts that distinguish the allocated
+    /// safe proposal from the viewport extending outside it. Legacy hosts
+    /// still derive the value from the physical rectangle below.
+    var reportedInsets: EdgeInsets?
 
     /// A report of nothing, before the host's first answer.
     static let zero = FrameReport(
@@ -258,7 +281,8 @@ struct FrameReport: Equatable, Sendable {
     /// Where the safe area still covers the view's bounds: positive on each
     /// side the view reaches past it.
     var safeAreaInsets: EdgeInsets {
-        EdgeInsets(
+        if let reportedInsets { return reportedInsets }
+        return EdgeInsets(
             top: min(frame.height, max(0, safeAreaRect.y - global.y)),
             leading: min(frame.width, max(0, safeAreaRect.x - global.x)),
             bottom: min(frame.height, max(0, global.y + frame.height - safeAreaRect.y - safeAreaRect.height)),

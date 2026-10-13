@@ -80,8 +80,8 @@ final class WinUIScrollerView: WinUIView {
 
     /// The presenter inside measures and arranges again too: it picks the anchor it holds the view by before the
     /// document moves.
-    override func invalidateMeasure() {
-        super.invalidateMeasure()
+    override func invalidateNativeMeasure() {
+        super.invalidateNativeMeasure()
         swiftomniui_winui_scroller_invalidate_presenter(handle)
     }
 

@@ -25,11 +25,13 @@
     /// usable region to that proposal before placing a local bar or its base.
     public var safe: Rect { Self.intersection(bounds, Self.intersection(container, keyboard)) }
 
-    public var insets: EdgeInsets { Self.insets(of: safe, in: layout) }
+    /// Remaining safe-area contributions, including strips outside a safe
+    /// allocation. The layout size and this environment are separate values.
+    public var insets: EdgeInsets { Self.insets(of: safe, in: bounds) }
 
     /// A child keeps the enclosing proposal's unsafe strips only at edges where
     /// it touches the safe region. A local card cannot acquire a window-wide bar.
-    public func child(in frame: Rect) -> Self {
+    public func child(in frame: Rect, preservingOutsets: Bool = true) -> Self {
         let safe = self.safe
         let left = frame.x <= safe.x ? min(frame.x, bounds.x) : frame.x
         let top = frame.y <= safe.y ? min(frame.y, bounds.y) : frame.y
@@ -40,9 +42,14 @@
         func local(_ rect: Rect) -> Rect {
             Rect(rect.x - frame.x, rect.y - frame.y, rect.width, rect.height)
         }
-        return Self(bounds: local(Rect(left, top, max(0, right - left), max(0, bottom - top))),
+        let extended = Rect(left, top, max(0, right - left), max(0, bottom - top))
+        let used = preservingOutsets ? EdgeInsets(0) : EdgeInsets(
+            top: frame.y - extended.y, leading: frame.x - extended.x,
+            bottom: extended.y + extended.height - frame.y - frame.height,
+            trailing: extended.x + extended.width - frame.x - frame.width)
+        return Self(bounds: local(preservingOutsets ? extended : frame),
                     layout: Rect(0, 0, frame.width, frame.height),
-                    container: local(container), keyboard: local(keyboard), consumed: consumed)
+                    container: local(container), keyboard: local(keyboard), consumed: consumed + used)
     }
 
     public func padding(_ insets: EdgeInsets) -> Self {
@@ -121,11 +128,22 @@ extension MountedElement {
         safeAreaInsetEdge != nil || safeAreaPadding != nil || ignoresSafeArea != nil
     }
 
-    /// Readers and scrollers observe the incoming proposal and its safe area
-    /// separately. A transparent composition/frame passes that responsibility
-    /// to its content; ordinary content consumes the safe placement instead.
+    /// Scrollers span unsafe strips with their viewport. A reader instead
+    /// accepts the safe allocation while observing the remaining contributions.
     public var preservesSafeAreaProposal: Bool {
+        if isGeometryReader { return false }
+        if isSafeAreaBoundary || type == .scrollView { return true }
+        return safeAreaForwardedChild?.preservesSafeAreaProposal == true
+    }
+
+    /// Transparent wrappers forward the safe-area environment without
+    /// consuming it. Ordinary content that was placed safely consumes it.
+    public var observesSafeArea: Bool {
         if isSafeAreaBoundary || isGeometryReader || type == .scrollView { return true }
+        return safeAreaForwardedChild?.observesSafeArea == true
+    }
+
+    private var safeAreaForwardedChild: MountedElement? {
         guard value(.clipsContent)?.bool != true,
               number(.width) == nil, number(.height) == nil,
               number(.maximumWidth).map({ !$0.isFinite || $0 < 0 }) ?? true,
@@ -134,8 +152,8 @@ extension MountedElement {
               currentChildren.count == 1,
               type == .page || !native.presentsView
                 || (type == .grid && currentChildren[0].value(.isFrameContent)?.bool == true)
-        else { return false }
-        return currentChildren[0].preservesSafeAreaProposal
+        else { return nil }
+        return currentChildren[0]
     }
 
     public var safeBarAllowsInput: Bool {
