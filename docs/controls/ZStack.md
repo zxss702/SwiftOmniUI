@@ -23,7 +23,7 @@ Inherits: [PropertyContainer](tiers/PropertyContainer.md) · [VisualElement](tie
 
 See [the dictionary](README.md) for how a mark is given.
 
-| Host | Created | Members (109) | Realization | Notes |
+| Host | Created | Members (111) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
 | Android Views | ◐ | 51 ✅ · 1 ☑️ · 3 – | custom `ViewGroup` | cannot read what reaches ColorPicker - Android's driver has no path for it yet |
 | WinUI 3 | ✅ | 55 ✅ · 3 – | `Canvas` |  |
@@ -168,6 +168,8 @@ What every layout has: the screen's unsafe strips it keeps clear of, and whether
 | `letsInputThrough` | property | `Bool` | native |  |  | · |  | not realized; WinUI 3: not realized; GTK 4: cannot read letsInputThrough of ZStack - GTK's driver has no path for it yet |
 | `hitShape` | property | `ContainerShape` | native |  |  | · |  | GTK 4: cannot read hitShape of ZStack - GTK's driver has no path for it yet |
 | `scrollTargetLayout` | property | `Bool` | adaptive |  |  |  |  | GTK 4: not realized |
+| `clipPath` | property | `[Double]` | native |  |  |  |  |  |
+| `clipFillRule` | property | `FillRule` | native |  |  |  |  |  |
 
 ## From [PaddingElement](tiers/PaddingElement.md)
 

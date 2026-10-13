@@ -23,7 +23,7 @@ Inherits: [PropertyContainer](tiers/PropertyContainer.md) · [VisualElement](tie
 
 See [the dictionary](README.md) for how a mark is given.
 
-| Host | Created | Members (123) | Realization | Notes |
+| Host | Created | Members (125) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
 | Android Views | ✅ | 52 ✅ · 1 ☑️ · 3 – | `ScrollView` / `HorizontalScrollView` |  |
 | WinUI 3 | ✅ | 60 ✅ · 3 – | `ScrollViewer` |  |
@@ -182,6 +182,8 @@ What every layout has: the screen's unsafe strips it keeps clear of, and whether
 | `letsInputThrough` | property | `Bool` | native |  |  |  |  | GTK 4: not realized |
 | `hitShape` | property | `ContainerShape` | native |  |  |  |  | GTK 4: not realized |
 | `scrollTargetLayout` | property | `Bool` | adaptive |  |  |  |  | GTK 4: not realized |
+| `clipPath` | property | `[Double]` | native |  |  |  |  |  |
+| `clipFillRule` | property | `FillRule` | native |  |  |  |  |  |
 
 ## From [PaddingElement](tiers/PaddingElement.md)
 

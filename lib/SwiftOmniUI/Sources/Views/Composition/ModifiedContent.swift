@@ -20,4 +20,4 @@ public struct ModifiedContent: VisualElement {
 /// is decides which of them draw anything.
 extension ModifiedContent: LayoutView, TextElement, FontElement, TextAlignmentElement,
     ImageElement, TintElement, LineHeightElement, DecorableTextElement, BarElement,
-    PageElement, ShapeProperties {}
+    PageElement {}

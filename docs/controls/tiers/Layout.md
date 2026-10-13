@@ -19,3 +19,5 @@ How each of them realizes these members is on its own page.
 | `letsInputThrough` | property | `Bool` | native |
 | `hitShape` | property | `ContainerShape` | native |
 | `scrollTargetLayout` | property | `Bool` | adaptive |
+| `clipPath` | property | `[Double]` | native |
+| `clipFillRule` | property | `FillRule` | native |

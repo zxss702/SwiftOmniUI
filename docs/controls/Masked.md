@@ -23,7 +23,7 @@ Inherits: [PropertyContainer](tiers/PropertyContainer.md) · [VisualElement](tie
 
 See [the dictionary](README.md) for how a mark is given.
 
-| Host | Created | Members (109) | Realization | Notes |
+| Host | Created | Members (111) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
 | Android Views |  |  | custom `ViewGroup` masked the same | no run of it on these sources |
 | WinUI 3 |  |  | `Opacity` over a masked `Panel` | not realized |
@@ -168,6 +168,8 @@ What every layout has: the screen's unsafe strips it keeps clear of, and whether
 | `letsInputThrough` | property | `Bool` | native |  |  | · |  | GTK 4: cannot read letsInputThrough of Masked - GTK's driver has no path for it yet |
 | `hitShape` | property | `ContainerShape` | native |  |  | · |  | GTK 4: cannot read hitShape of Masked - GTK's driver has no path for it yet |
 | `scrollTargetLayout` | property | `Bool` | adaptive |  |  |  |  | GTK 4: not realized |
+| `clipPath` | property | `[Double]` | native |  |  |  |  |  |
+| `clipFillRule` | property | `FillRule` | native |  |  |  |  |  |
 
 ## From [PaddingElement](tiers/PaddingElement.md)
 

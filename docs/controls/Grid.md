@@ -23,7 +23,7 @@ Inherits: [PropertyContainer](tiers/PropertyContainer.md) · [VisualElement](tie
 
 See [the dictionary](README.md) for how a mark is given.
 
-| Host | Created | Members (114) | Realization | Notes |
+| Host | Created | Members (116) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
 | Android Views | ✅ | 55 ✅ · 1 ☑️ · 3 – | composed by SwiftOmniUI |  |
 | WinUI 3 | ✅ | 59 ✅ · 3 – | composed by SwiftOmniUI |  |
@@ -174,6 +174,8 @@ What every layout has: the screen's unsafe strips it keeps clear of, and whether
 | `letsInputThrough` | property | `Bool` | native |  |  | · |  | not realized; WinUI 3: not realized; GTK 4: cannot read letsInputThrough of Grid - GTK's driver has no path for it yet |
 | `hitShape` | property | `ContainerShape` | native |  |  | · |  | GTK 4: cannot read hitShape of Grid - GTK's driver has no path for it yet |
 | `scrollTargetLayout` | property | `Bool` | adaptive |  |  |  |  | GTK 4: not realized |
+| `clipPath` | property | `[Double]` | native |  |  |  |  |  |
+| `clipFillRule` | property | `FillRule` | native |  |  |  |  |  |
 
 ## From [PaddingElement](tiers/PaddingElement.md)
 

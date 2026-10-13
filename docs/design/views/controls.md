@@ -104,12 +104,33 @@ object with a draw method is the one thing the boundary cannot carry; the host
 replays the calls on the platform's own canvas. A drawing reading a state is
 described again when the state changes, and so redrawn.
 
-A path's outline crosses as SVG path text, and a parser shared by the hosts
-normalizes it to absolute moves, lines, curves, arcs and closes before each
-toolkit draws that closed set, so the grammar accepted is not any one
-platform's. A toolkit with no SVG arc draws each as the cubic Bézier segments
-the shared parser works out, a quarter turn at most each, so an arc bends the
-same on every host.
+A path stores normalized commands: absolute moves, lines, quadratic and cubic
+curves, elliptical arcs and closes. Imperative construction appends these
+commands directly. SVG input is parsed once into the same representation;
+malformed input yields an empty path. Shape, clipping and Canvas share the
+encoding and arc conversion. Hosts without SVG arcs receive cubic segments of
+a quarter turn at most.
+
+A custom `Shape` supplies `path(in:)` and needs no writable node. Its default
+adapter mounts an empty native Path, then evaluates the shape in its allocated
+local rectangle. Only size changes trigger geometry feedback; parameter and
+state updates evaluate the latest shape at the retained size. The feedback
+transaction changes drawing without changing measurement or native identity.
+
+Path coordinates are local by default: offsets, margins and negative coordinates
+stay where authored. An explicit `.aspect(.fit/.fill/.stretch/.center)` opts into
+bounds-based fitting or centering. Built-in shapes retain their native nodes.
+Inherited foreground styles keep the entire brush, while an explicit fill wins.
+`fill(_:style:)` supplies winding or even-odd filling; complete `StrokeStyle`
+values include miter, dash lengths and phase in path units. The older SPI dash
+setters continue to use stroke widths, independently for pattern and phase.
+
+`clipShape(_:style:)` uses the existing fast outline for fixed shapes. A custom
+shape uses an independent path clip evaluated at the content's allocated size.
+An empty path clips everything; removing the property restores ordinary drawing.
+GTK snapshots push a GSK fill around the content; WinUI uses a Direct2D geometry
+source in a Composition geometric clip, retaining the clip object as paths change.
+Custom `.background(_:in:)` draws the same shape adapter behind the content.
 
 ## Text runs
 

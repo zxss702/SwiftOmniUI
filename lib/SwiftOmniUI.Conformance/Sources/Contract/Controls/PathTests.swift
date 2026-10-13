@@ -13,7 +13,7 @@
         [
             Aspects.standsAlone("Path"),
             ConformanceCase("aPathIsFilledInsideTheFigureItsDataDraws", proves: [
-                Covered(PathContract.data),
+                Covered(PathContract.commands),
             ], needs: [Covered(ButtonContract.clicked)]) { s in
                 let flipped = State(wrappedValue: false)
                 s.start {
@@ -31,6 +31,16 @@
                 try s.perform(.activate, on: s.element("change"))
                 try s.settle { try s.color(of: shape, at: Point(35, 35)) == .red }
                 s.expect(try s.color(of: shape, at: Point(5, 5)), nil, "the new figure's outside")
+            },
+            ConformanceCase("legacySVGDataRemainsAccepted", proves: [Covered(PathContract.data)]) { s in
+                s.start {
+                    var node = Node(shape: PathContract.self)
+                    node.write(PathContract.data, "M 0 0 L 40 0 L 0 40 Z")
+                    ModifiedContent(node: node).fill(.red).frame(width: 40, height: 40).id("shape")
+                }
+                let shape = try s.element("shape")
+                try s.settle { try s.color(of: shape, at: Point(5, 5)) == .red }
+                s.expect(try s.color(of: shape, at: Point(35, 35)), nil, "outside the SVG triangle")
             },
         ]
     }

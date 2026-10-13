@@ -152,10 +152,11 @@ extension GTKRegistrations {
             scroll.applies([
                 VisualElementContract.background,
                 BorderElementContract.shape, BorderElementContract.stroke, BorderElementContract.strokeWidth,
+                LayoutContract.clipPath, LayoutContract.clipFillRule,
             ]) { view, values in
                 // A scroller cuts what it shows to its bounds; a shape cuts it to the shape.
                 view.setPathClip(values[LayoutContract.clipPath], evenOdd: (values[LayoutContract.clipFillRule] ?? .nonzero) == .evenOdd)
-        view.setBackground(values[VisualElementContract.background]?.propValue)
+                view.setBackground(values[VisualElementContract.background]?.propValue)
                 view.setOutline(
                     stroke: values[BorderElementContract.stroke]?.propValue,
                     width: values[BorderElementContract.strokeWidth],

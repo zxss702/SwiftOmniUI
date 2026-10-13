@@ -242,16 +242,19 @@ pictures there at that size, and one at its file's size stands far taller.
 
 A line, a path, a polygon and a polyline draw a geometry of their own
 numbers, which every host places in the room the shape's layout gives it by
-one rule (`ShapeArithmetic`): scaled by the shape's aspect - to fit keeping
-its proportions, to cover, each axis on its own, or not at all - and centred;
+one rule (`ShapeArithmetic`), when an aspect is set: scaled to fit keeping its
+proportions, to cover, each axis on its own, or not at all - and centred;
 then moved by the shape's own transform, as a transform moves a view after
 its layout, so a translation shows under every aspect. A geometry flat along
 one axis, a straight line, fits by the axis it has.
 
 A polygon's and a polyline's points are joined by lines - the same curve
 commands a path's data reads as - closed where the shape is, a point that is
-no number left out; a stroke's dashes and gaps are measured in stroke widths
-(`ShapeArithmetic.curves`, `dashLengths`). A host drawing in Swift takes the
+no number left out. Path defaults to local coordinates with no bounds-based
+placement, preserving empty margins, offsets and negative points; an explicit
+aspect opts into the placement rule. Public `StrokeStyle` dashes and phase use
+path units. Legacy SPI setters use stroke widths (`ShapeArithmetic.dashLengths`),
+and backends normalize the two forms independently. A host drawing in Swift takes the
 commands as they are; one whose relay reads numbers hands it each command's.
 
 ## Right to left

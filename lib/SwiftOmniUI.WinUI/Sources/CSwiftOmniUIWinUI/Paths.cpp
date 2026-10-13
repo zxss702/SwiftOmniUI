@@ -73,15 +73,22 @@ namespace {
         media::PathGeometry geometry;
         geometry.FillRule(evenOdd ? media::FillRule::EvenOdd : media::FillRule::Nonzero);
         media::PathFigure figure{nullptr};
+        Point start = at(0, 0);
         for (int32_t index = 0; index < count;) {
             auto op = static_cast<int32_t>(commands[index++]);
             auto need = op == 0 || op == 1 ? 2 : op == 2 ? 6 : op == 3 ? 4 : 0;
             if (index + need > count) break;
             auto const *p = commands + index;
             index += need;
+            if (op == 4) {
+                if (figure) figure.IsClosed(true);
+                figure = nullptr;
+                continue;
+            }
             if (op == 0 || !figure) {
+                if (op == 0) start = at(p[0], p[1]);
                 figure = media::PathFigure();
-                figure.StartPoint(op == 0 ? at(p[0], p[1]) : at(0, 0));
+                figure.StartPoint(start);
                 figure.IsFilled(true);
                 geometry.Figures().Append(figure);
                 if (op == 0) continue;
@@ -108,9 +115,6 @@ namespace {
                 figure.Segments().Append(segment);
                 break;
             }
-            case 4:
-                figure.IsClosed(true);
-                break;
             }
         }
         return geometry;
@@ -139,7 +143,7 @@ extern "C" void swiftomniui_winui_path_paint(
         path.Fill(brush(fill));
         path.Stroke(brush(stroke));
         path.StrokeThickness(width);
-        // Dashes and their offset are outline widths, in WinUI as in SwiftOmniUI.
+        // The Swift boundary has normalized dashes and phase to WinUI's width units.
         media::DoubleCollection pattern;
         for (int32_t index = 0; index < dashCount; ++index) pattern.Append(dashes[index]);
         path.StrokeDashArray(pattern);

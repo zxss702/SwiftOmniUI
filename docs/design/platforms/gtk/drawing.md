@@ -17,7 +17,10 @@ rounded rectangle. A stroke is drawn in one colour: a gradient's first stop.
 
 A layout that clips cuts what it holds to its outline as it draws it, and
 takes `overflow: hidden`, so a child cut away also takes no click. A layout
-that does not clip cuts nothing.
+that does not clip cuts nothing. A custom `clipShape` instead pushes a GSK path
+fill around both the box and its children, with its winding or even-odd rule.
+The native path is retained until its geometry changes; an empty path hides all
+content, and removing it restores drawing.
 
 A colour box is a panel of one colour, its corners rounded each by its own
 radius; it takes the room its layout gives it and asks for none.
@@ -71,13 +74,16 @@ in its snapshot, for the room its layout gives it, again whenever that room
 changes. A rectangle and an ellipse fill the room, drawn half their outline in
 from its edges so the outline stays inside; a rectangle's corners are each
 its own radius, an ellipse a rounded rectangle whose corners meet. A line, a
-path, a polygon and a polyline draw a geometry of their own - a path's data
-read by the core's parser, its arcs as curves - placed in the room by the host
+path, a polygon and a polyline draw a geometry of their own - a path's structured commands,
+its arcs converted by the shared geometry code - placed in the room by the host
 layer's rule ([a shape's own geometry](../../host/layout.md#a-shapes-own-geometry))
-from the bounds GSK measures. The fill and the outline are the shape's
+from the bounds GSK measures. Path uses local coordinates unless an aspect
+is explicitly set. Native paths are cached by geometry, allocated size and
+outline inset. The fill and the outline are the shape's
 brushes painted through the path - a gradient runs across the shape it fills;
-dashes, gaps and their offset are outline widths in SwiftOmniUI and lengths in
-GSK, so they are multiplied by the width. A shape has no size of its own: it
+public `StrokeStyle` dashes and phase are lengths in path units, as GSK expects.
+The old SPI setters still use outline widths, converted independently for
+pattern and offset. A shape has no size of its own: it
 takes the room its layout gives it.
 
 ## A canvas
@@ -87,8 +93,8 @@ each against the pen the host layer keeps for it
 ([settings hold until changed](../../types/drawing.md#settings-hold-until-changed)):
 a path the records name is built with GSK's builder - its arcs arriving as
 cubic curves already - and pushed as a fill or a stroke, the stroke's cap and
-join GSK's own; a fill's rule is GSK's fill rule. A transform multiplies the
-snapshot's, and `saveState` and `restoreState` are the snapshot's own, so a
+join, miter, dash lengths and phase GSK's own; a fill's rule is GSK's fill rule.
+A transform multiplies the snapshot's, and `saveState` and `restoreState` are the snapshot's own, so a
 turned shape turns nothing after it. Text is a Pango layout, its pixel size
 measured so the two alignments can place it in its box, which clips it.
 

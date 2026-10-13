@@ -75,6 +75,35 @@ final class GTKCustomShapeTests: XCTestCase {
         }
     }
 
+    func testCustomShapeKeepsItsGradientAndLowOpacityWhileSpacerStaysTransparent() throws {
+        try onUIThread {
+            let host = GTKRenderer.running {
+                VStack(spacing: 0) {
+                    NativeBubbleShape(right: true)
+                        .foregroundStyle(LinearGradient(colors: [.red, .blue], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: 100, height: 60)
+                    NativeBubbleShape(right: false).fill(.black.opacity(0.03)).foregroundStyle(.red)
+                        .frame(width: 100, height: 60)
+                    Spacer().frame(width: 100, height: 20).background { Color.blue }.foregroundStyle(.red)
+                }.horizontalAlignment(.start).verticalAlignment(.start)
+            }
+            let stack = try XCTUnwrap(host.views(GTKStackView.self).first)
+            let points: [(Double, Double)] = [(5, 25), (95, 25), (50, 85), (1, 61), (50, 130)]
+            host.settle {
+                let samples = stack.pixels(at: points)
+                return samples.count == 5 && samples[0] >> 24 == 255 && samples[2] >> 24 > 0
+                    && samples[4] == 0xFF00_00FF
+            }
+            let samples = stack.pixels(at: points)
+            XCTAssertGreaterThan(samples[0] >> 16 & 0xFF, 0xE0)
+            XCTAssertGreaterThan(samples[1] & 0xFF, 0xE0)
+            XCTAssertEqual(Double(samples[2] >> 24), 8, accuracy: 1)
+            XCTAssertEqual(samples[2] & 0x00FF_FFFF, 0)
+            XCTAssertEqual(samples[3], 0)
+            XCTAssertEqual(samples[4], 0xFF00_00FF)
+        }
+    }
+
     func testEvenOddFillAndPathClipLeaveAHoleAndUpdateInPlace() throws {
         try onUIThread {
             let hole = State(wrappedValue: true)
@@ -102,6 +131,24 @@ final class GTKCustomShapeTests: XCTestCase {
         }
     }
 
+    func testASegmentAfterCloseStartsAtTheClosedSubpathOrigin() throws {
+        try onUIThread {
+            let host = GTKRenderer.running {
+                VStack(spacing: 0) {
+                    Path("M 10 10 L 40 10 L 10 40 Z L 90 40").fill(.red).frame(width: 100, height: 60)
+                    Canvas { context, _ in
+                        context.fill(Path("M 10 10 L 40 10 L 10 40 Z L 90 40"), with: .color(.red))
+                    }.frame(width: 100, height: 60)
+                }.horizontalAlignment(.start).verticalAlignment(.start)
+            }
+            let stack = try XCTUnwrap(host.views(GTKStackView.self).first)
+            let points: [(Double, Double)] = [(15, 15), (50, 35), (15, 75), (50, 95)]
+            let expected = [Self.red, 0, Self.red, 0]
+            host.settle { stack.pixels(at: points) == expected }
+            XCTAssertEqual(stack.pixels(at: points), expected)
+        }
+    }
+
     func testPublicDashLengthsAndPhaseAgreeAcrossWidthsAndCanvas() throws {
         for width in [2.0, 4.0] {
             try onUIThread {
@@ -117,11 +164,15 @@ final class GTKCustomShapeTests: XCTestCase {
                         Path("M 0 10 L 100 10").stroke(.red,
                             style: StrokeStyle(lineWidth: width, dash: [8, 4], dashPhase: 6))
                             .frame(width: 100, height: 20)
+                        Canvas { context, _ in
+                            context.stroke(Path("M 0 10 L 100 10"), with: .color(.red),
+                                style: StrokeStyle(lineWidth: width, dash: [8, 4], dashPhase: 6))
+                        }.frame(width: 100, height: 20)
                     }.horizontalAlignment(.start).verticalAlignment(.start)
                 }
                 let stack = try XCTUnwrap(host.views(GTKStackView.self).first)
-                let points: [(Double, Double)] = [(3, 10), (10, 10), (3, 30), (10, 30), (3, 50), (10, 50)]
-                let expected = [Self.red, 0, Self.red, 0, 0, Self.red]
+                let points: [(Double, Double)] = [(3, 10), (10, 10), (3, 30), (10, 30), (3, 50), (10, 50), (3, 70), (10, 70)]
+                let expected = [Self.red, 0, Self.red, 0, 0, Self.red, 0, Self.red]
                 host.settle { stack.pixels(at: points) == expected }
                 XCTAssertEqual(stack.pixels(at: points), expected)
             }

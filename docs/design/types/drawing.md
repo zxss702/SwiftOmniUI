@@ -54,7 +54,7 @@ holds, as `HostDrawing` lays it out in three flat lists:
   Draw.drawText("Go", 0, 0, 90, 30, .center)   strings  ["Go"]
 ```
 
-A path's arcs arrive as the shared parser's cubic curves, so no relay parses
+A path's arcs arrive as the shared geometry's cubic curves, so no relay parses
 SVG; an arc or a wedge of an oval arrives as a path, its curves the host
 layer's (`CanvasArithmetic.arc` - a turn or more the whole oval), so no relay
 works out an arc. The records are read once, as every host drawing in Swift
@@ -80,21 +80,21 @@ shape from turning the rest of the drawing.
 `ViewBuilder`, has `buildArray`, so a plain `for` loop inside a drawing
 compiles: a chart draws a bar per value that way.
 
-A `strokeStyle` sets a stroke's width, cap and join together - the three a
-`StrokeStyle` carries - and a `fillStyle` the fill's rule, and both hold
-until the next of their kind like every other setting. They are how the
-closure form says `StrokeStyle` and `FillStyle`, which are spellings for the
-author; on the wire they are the same two records.
+The existing `strokeStyle` record (23) sets width, cap and join. `fillStyle`
+(24) sets the fill rule. Their numbers and layouts remain unchanged. The complete
+stroke record (27) carries width, cap, join, miter, dash lengths and phase; dash
+lengths and phase use path units. Relays whose native API uses stroke widths
+convert them at drawing time. Saved pen state includes every stroke parameter.
 
 ## A canvas drawn from its size
 
 SwiftUI's `Canvas { context, size in … }` is a `GeometryReader` whose report
-builds the canvas: the context's calls gather into `Draw` records - a fill a
-`fillColor`, a `fillStyle` and a `fillPath`, a stroke a `strokeColor`, a
-`strokeStyle` and a `drawPath` - and the frame's report redraws it, so what
-depends on `size` is drawn at the size the layout lands. The records the
-context writes are the ones above: the closure form adds no kind to the
-contract.
+builds the canvas. Fill records contain the brush colour, fill rule and structured
+geometry (26); stroke records contain the colour, complete stroke style (27) and
+structured geometry (25). Records 25 and 26 use the same command encoding as
+Path, including arcs until the shared host decoder converts them to curves.
+The relay reuses its existing draw-path (11) and fill-path (16) geometry format.
+Legacy SVG instructions remain accepted; no existing instruction is renumbered.
 
 ## Text in a box
 

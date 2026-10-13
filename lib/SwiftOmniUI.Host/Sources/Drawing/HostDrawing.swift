@@ -34,6 +34,7 @@
         static let translate: Int32 = 18, rotate: Int32 = 19, scale: Int32 = 20
         static let saveState: Int32 = 21, restoreState: Int32 = 22
         static let strokeStyle: Int32 = 23, fillStyle: Int32 = 24
+        static let completeStrokeStyle: Int32 = 27
     }
 
     private mutating func append(_ instruction: CanvasInstruction) {
@@ -74,7 +75,7 @@
         case .fillStyle(let evenOdd):
             ints += [Kind.fillStyle, evenOdd ? 1 : 0]
         case .completeStrokeStyle(let style):
-            ints += [27, style.lineCap.rawValue, style.lineJoin.rawValue, Int32(style.dash.count)]
+            ints += [Kind.completeStrokeStyle, style.lineCap.rawValue, style.lineJoin.rawValue, Int32(style.dash.count)]
             numbers += [style.lineWidth, style.miterLimit, style.dashPhase] + style.dash
         }
     }

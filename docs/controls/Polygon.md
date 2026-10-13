@@ -23,10 +23,10 @@ Inherits: [PropertyContainer](tiers/PropertyContainer.md) · [VisualElement](tie
 
 See [the dictionary](README.md) for how a mark is given.
 
-| Host | Created | Members (113) | Realization | Notes |
+| Host | Created | Members (116) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
-| Android Views | ✅ | 51 ✅ · 1 ☑️ · 3 – | `View` drawing `Path` |  |
-| WinUI 3 | ✅ | 60 ✅ · 3 – | `Microsoft.UI.Xaml.Shapes` |  |
+| Android Views | ✅ | 52 ✅ · 1 ☑️ · 3 – | `View` drawing `Path` |  |
+| WinUI 3 | ✅ | 61 ✅ · 3 – | `Microsoft.UI.Xaml.Shapes` |  |
 | GTK 4 | ✅ | 17 ✅ · 14 – | `GskPath` in a snapshot |  |
 | Web |  |  | inline SVG | no host yet |
 
@@ -177,3 +177,6 @@ What every drawn shape has: what fills it, the line around it, how it fits its r
 | `strokeLineJoin` | property | `LineJoin` | stateUI | · | ✅ | · |  | cannot read strokeLineJoin of Polygon - SwiftOmniUI draws a shape in its view's onDraw, which holds none of its strokeLineJoin; its drawing proves it; GTK 4: cannot read strokeLineJoin of Polygon - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeLineJoin; its drawing proves it |
 | `strokeMiterLimit` | property | `Double` | stateUI | · | ✅ | · |  | cannot read strokeMiterLimit of Polygon - SwiftOmniUI draws a shape in its view's onDraw, which holds none of its strokeMiterLimit; its drawing proves it; GTK 4: cannot read strokeMiterLimit of Polygon - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeMiterLimit; its drawing proves it |
 | `strokeWidth` | property | `Double` | stateUI | ◐ | ✅ | · |  | cannot read strokeWidth of Polygon - SwiftOmniUI draws a shape in its view's onDraw, which holds none of its strokeWidth; its drawing proves it; GTK 4: cannot read the colour of Polygon - GTK's driver has no path for it yet |
+| `fillRule` | property | `FillRule` | stateUI | ✅ | ✅ | · |  | GTK 4: cannot read the colour of Grid - GTK's driver has no path for it yet |
+| `strokeDashInPathUnits` | property | `Bool` | stateUI |  |  |  |  |  |
+| `strokePhaseInPathUnits` | property | `Bool` | stateUI |  |  |  |  |  |

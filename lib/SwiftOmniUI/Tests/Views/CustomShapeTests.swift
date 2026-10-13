@@ -104,6 +104,21 @@ private struct NotchedShape: Shape {
         XCTAssertEqual(path?.props[ShapeContract.fill.token], Color.red.brush.propValue)
     }
 
+    func testCustomStrokeUsesTheSameCompleteStyleAsANativePath() {
+        let style = StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .bevel,
+                                miterLimit: 3, dash: [8, 4], dashPhase: 2)
+        let custom = Renders().render(NotchedShape(depth: 10, probe: ShapeProbe()).stroke(.red, style: style).node)
+        let native = Renders().render(Path().stroke(.red, style: style).node)
+        for member in [ShapeContract.stroke.token, ShapeContract.strokeWidth.token,
+                       ShapeContract.strokeLineCap.token, ShapeContract.strokeLineJoin.token,
+                       ShapeContract.strokeMiterLimit.token, ShapeContract.strokeDashPattern.token,
+                       ShapeContract.strokeDashOffset.token, ShapeContract.strokeDashInPathUnits.token,
+                       ShapeContract.strokePhaseInPathUnits.token] {
+            XCTAssertEqual(custom.props[member], native.props[member])
+        }
+        XCTAssertNil(custom.props[ShapeContract.fill.token])
+    }
+
     func testStructuredGeometryRoundTripsArcsSubpathsAndNegativeCoordinates() throws {
         var path = Path(Rect(-20, 30, 60, 40))
         path.move(to: Point(5, 5))

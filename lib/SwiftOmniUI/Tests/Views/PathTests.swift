@@ -4,8 +4,8 @@
 @_spi(Host) @testable import SwiftOmniUICore
 import XCTest
 
-/// `Path`'s imperative face: every statement writes SVG the wire parser reads
-/// back, and the arcs' ends land where the angles put them.
+/// `Path`'s imperative face: statements retain structured geometry, SVG export
+/// round-trips it, and the arcs' ends land where the angles put them.
 @MainActor final class PathTests: XCTestCase {
     /// Lines and quadratic curves write the commands they name.
     func testLinesAndQuadCurvesParseBack() throws {

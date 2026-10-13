@@ -86,7 +86,9 @@ final class GTKShapeView: GTKPanelView {
     /// The path for a room `width` by `height`: a rectangle and an ellipse fill it, half their outline in from its
     /// edges; a geometry of the shape's own is placed in it. Whether it fills by the even-odd rule.
     private func path(width: Double, height: Double, outlined: Bool) -> (OpaquePointer, Bool)? {
-        let inset = outlined ? strokeWidth / 2 : 0
+        let inset: Double
+        if case .authored = geometry { inset = 0 }
+        else { inset = outlined ? strokeWidth / 2 : 0 }
         if let cached, cached.geometry == geometry, cached.width == width, cached.height == height, cached.inset == inset {
             return (gsk_path_ref(cached.path)!, cached.evenOdd)
         }

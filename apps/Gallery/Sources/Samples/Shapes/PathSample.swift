@@ -173,7 +173,7 @@ private struct MadeAndReused: ExampleContent {
                 .frame(height: 56)
 
             VStack(spacing: 0) {
-                let card = Path(roundedRect: Rect(18, 8, 20, 40), cornerRadius: 4)
+                let card = Path(roundedRect: Rect(18, 4, 20, 20), cornerRadius: 4)
                 card.stroke(Palette.accent, lineWidth: 2)
                     .frame(width: 56)
                     .frame(height: 28)
@@ -198,7 +198,7 @@ private struct MadeAndReused: ExampleContent {
     }
 
     var notes: (any View)? {
-        Text("`Path` conforms to `Sendable` and is a value: `offsetBy(dx:dy:)` "
+        Text("`Path` keeps its local coordinates and is a value: `offsetBy(dx:dy:)` "
             + "shifts a copy, `applying(_:)` runs a `ViewTransform` over every "
             + "command's points - the skewed card is the same outline bent, not "
             + "a view leaning.")

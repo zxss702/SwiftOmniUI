@@ -178,7 +178,7 @@ holds its reasons. A type's extensions stand in its folder, named
                     reader, host events
   Core/Threads      the UI thread's executor, the doorbell, the lock      concurrency
   Core/Boundary     the typed SPI: HostBoundary, HostRender, HostPatch     (this note)
-                    and the values it carries, SVG path data
+                    and the values it carries, structured path commands and SVG input
   Core/Contract     contracts and tiers, members, their facts and         contracts
                     values, the tokens
   Core/Realization  a host's registry and reports, realizations and       contracts

@@ -15,23 +15,23 @@ extension Shape {
         Node.composed(self, type: String(reflecting: Self.self)) { SizedShape(shape: self).node }
     }
 
-    @_disfavoredOverload public func fill(_ value: Brush) -> ModifiedContent { setting(ShapeContract.fill, value) }
+    @_disfavoredOverload public func fill(_ value: Brush) -> ModifiedContent { revised { $0.write(ShapeContract.fill, value) } }
     @_disfavoredOverload public func fill(_ value: Color) -> ModifiedContent { fill(value.brush) }
     @_disfavoredOverload public func fill(_ style: some ShapeStyle) -> ModifiedContent { fill(style.brush) }
     @_disfavoredOverload public func fill(_ style: some ShapeStyle, style fillStyle: FillStyle) -> ModifiedContent {
-        fill(style.brush).setting(ShapeContract.fillRule, fillStyle.isEOFilled ? .evenOdd : .nonzero)
+        fill(style.brush).setValue(ShapeContract.fillRule, fillStyle.isEOFilled ? .evenOdd : .nonzero)
     }
     @_disfavoredOverload @_spi(Host) public func aspect(_ value: ContentMode) -> ModifiedContent {
-        setting(ShapeContract.aspect, value)
+        revised { $0.write(ShapeContract.aspect, value) }
     }
-    @_disfavoredOverload public func stroke(_ value: Brush) -> ModifiedContent { setting(ShapeContract.stroke, value) }
+    @_disfavoredOverload public func stroke(_ value: Brush) -> ModifiedContent { revised { $0.write(ShapeContract.stroke, value) } }
     @_disfavoredOverload public func stroke(_ value: Color) -> ModifiedContent { stroke(value.brush) }
     @_disfavoredOverload public func stroke(_ style: some ShapeStyle) -> ModifiedContent { stroke(style.brush) }
     @_disfavoredOverload public func stroke(_ style: some ShapeStyle, lineWidth: Double) -> ModifiedContent {
-        stroke(style.brush).strokeWidth(lineWidth)
+        stroke(style.brush).setValue(ShapeContract.strokeWidth, lineWidth)
     }
     @_disfavoredOverload public func stroke(_ style: some ShapeStyle, style strokeStyle: StrokeStyle) -> ModifiedContent {
-        stroke(style.brush).stroke(style, style: strokeStyle)
+        revised { $0.applyStrokeStyle(style.brush, strokeStyle) }
     }
 }
 
@@ -110,17 +110,7 @@ extension ShapeProperties {
     /// `style` stroked as `strokeStyle` says - the SwiftUI spelling carrying
     /// width, cap, join, miter and dashes together.
     public func stroke(_ style: some ShapeStyle, style strokeStyle: StrokeStyle) -> Modified {
-        modified {
-            $0.write(ShapeContract.stroke, style.brush)
-            $0.write(ShapeContract.strokeWidth, strokeStyle.lineWidth)
-            $0.write(ShapeContract.strokeLineCap, strokeStyle.lineCap)
-            $0.write(ShapeContract.strokeLineJoin, strokeStyle.lineJoin)
-            $0.write(ShapeContract.strokeMiterLimit, strokeStyle.miterLimit)
-            $0.write(ShapeContract.strokeDashPattern, strokeStyle.dash)
-            $0.write(ShapeContract.strokeDashOffset, strokeStyle.dashPhase)
-            $0.write(ShapeContract.strokeDashInPathUnits, true)
-            $0.write(ShapeContract.strokePhaseInPathUnits, true)
-        }
+        modified { $0.applyStrokeStyle(style.brush, strokeStyle) }
     }
 
     /// How thick the outline is, in device units - 1 unless said. A thickness
@@ -225,5 +215,22 @@ extension ShapeProperties {
     /// The same, in one colour.
     public func strokeBorder(_ value: Color, lineWidth: Double = 1) -> Modified {
         strokeBorder(.solidColor(value), lineWidth: lineWidth)
+    }
+}
+
+// Shape view modifiers and native shape properties write exactly the same
+// members. ModifiedContent keeps its existing layout/image tiers, avoiding
+// conflicting stroke/aspect overloads for every other modified view.
+extension Node {
+    fileprivate mutating func applyStrokeStyle(_ brush: Brush, _ style: StrokeStyle) {
+        write(ShapeContract.stroke, brush)
+        write(ShapeContract.strokeWidth, style.lineWidth)
+        write(ShapeContract.strokeLineCap, style.lineCap)
+        write(ShapeContract.strokeLineJoin, style.lineJoin)
+        write(ShapeContract.strokeMiterLimit, style.miterLimit)
+        write(ShapeContract.strokeDashPattern, style.dash)
+        write(ShapeContract.strokeDashOffset, style.dashPhase)
+        write(ShapeContract.strokeDashInPathUnits, true)
+        write(ShapeContract.strokePhaseInPathUnits, true)
     }
 }

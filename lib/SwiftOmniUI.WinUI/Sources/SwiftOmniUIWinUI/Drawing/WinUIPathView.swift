@@ -129,7 +129,9 @@ final class WinUIPathView: WinUIView {
 
     /// Hands WinUI the geometry for `room`, again only where the room or the geometry changed.
     private func draw(in room: Rect) {
-        let inset = outlineWidth / 2
+        let inset: Double
+        if case .authored = geometry { inset = 0 }
+        else { inset = outlineWidth / 2 }
         if let drawn, drawn.geometry == geometry, drawn.width == room.width, drawn.height == room.height,
            drawn.inset == inset { return }
 

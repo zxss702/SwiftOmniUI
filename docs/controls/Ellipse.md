@@ -23,7 +23,7 @@ Inherits: [PropertyContainer](tiers/PropertyContainer.md) · [VisualElement](tie
 
 See [the dictionary](README.md) for how a mark is given.
 
-| Host | Created | Members (111) | Realization | Notes |
+| Host | Created | Members (114) | Realization | Notes |
 | --- | :---: | --- | --- | --- |
 | Android Views | ✅ | 49 ✅ · 1 ☑️ · 3 – | `View` drawing `Path` |  |
 | WinUI 3 | ✅ | 58 ✅ · 3 – | `Microsoft.UI.Xaml.Shapes` |  |
@@ -174,3 +174,6 @@ What every drawn shape has: what fills it, the line around it, how it fits its r
 | `strokeLineJoin` | property | `LineJoin` | stateUI | · | ✅ | · |  | cannot read strokeLineJoin of Ellipse - SwiftOmniUI draws a shape in its view's onDraw, which holds none of its strokeLineJoin; its drawing proves it; GTK 4: cannot read strokeLineJoin of Ellipse - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeLineJoin; its drawing proves it |
 | `strokeMiterLimit` | property | `Double` | stateUI | · | ✅ | · |  | cannot read strokeMiterLimit of Ellipse - SwiftOmniUI draws a shape in its view's onDraw, which holds none of its strokeMiterLimit; its drawing proves it; GTK 4: cannot read strokeMiterLimit of Ellipse - SwiftOmniUI draws a shape on GTK's snapshot, which holds none of its strokeMiterLimit; its drawing proves it |
 | `strokeWidth` | property | `Double` | stateUI | ◐ | ✅ | · |  | cannot read strokeWidth of Ellipse - SwiftOmniUI draws a shape in its view's onDraw, which holds none of its strokeWidth; its drawing proves it; GTK 4: cannot read the colour of Ellipse - GTK's driver has no path for it yet |
+| `fillRule` | property | `FillRule` | stateUI |  |  |  |  |  |
+| `strokeDashInPathUnits` | property | `Bool` | stateUI |  |  |  |  |  |
+| `strokePhaseInPathUnits` | property | `Bool` | stateUI |  |  |  |  |  |

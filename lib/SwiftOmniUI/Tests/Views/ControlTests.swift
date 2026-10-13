@@ -456,6 +456,9 @@ private struct ControlCase {
                     // with a lean in it exercises the part only a geometry
                     // can draw.
                     .renderTransform(Self.leaned))
+        var legacyPath = Node(shape: PathContract.self)
+        legacyPath.write(PathContract.data, "M 0,40 L 20,0 L 40,40 Z")
+        let case32b = ControlCase("PathSVG", source: "Path.swift", legacyPath)
         let case33 =             ControlCase("Polygon", source: "Polygon.swift",
                 Polygon([Point(20, 0), Point(40, 40), Point(0, 40)])
                     .points([Point(20, 0), Point(40, 40), Point(0, 40)])
@@ -781,7 +784,7 @@ private struct ControlCase {
                 .mask { RoundedRectangle(cornerRadius: 8).fill(.tomato) })
 
         return [
-            case0, case0b, case1, case2, case3, case4, case5, case6, case7, case8, case9, case10, case11, case12, case13, case14, case15, case16, case17, case18, case19, case20, case20a, case20b, case20c, case20d, case20e, case21, case22, case23, case24, case25, case26, case27, case28, case29, case30, case31, case32, case33, case34, case35, case36, case36b, case36c, case36d, case37, case38, case39,
+            case0, case0b, case1, case2, case3, case4, case5, case6, case7, case8, case9, case10, case11, case12, case13, case14, case15, case16, case17, case18, case19, case20, case20a, case20b, case20c, case20d, case20e, case21, case22, case23, case24, case25, case26, case27, case28, case29, case30, case31, case32, case32b, case33, case34, case35, case36, case36b, case36c, case36d, case37, case38, case39,
         ]
     }
 

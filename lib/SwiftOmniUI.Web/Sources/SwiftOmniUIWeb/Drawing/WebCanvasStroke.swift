@@ -69,7 +69,7 @@ struct WebCanvasStroke {
     private mutating func fill(_ curves: [HostCurveCommand], _ pen: CanvasPen) {
         guard let color = Self.color(pen.fill, pen) else { return }
         path(curves)
-        numbers += [15, pen.fillEvenOdd ? 1 : 0] + color
+        numbers += (pen.fillEvenOdd ? [15, 1] : [11]) + color
     }
 
     private mutating func path(_ curves: [HostCurveCommand]) {

@@ -28,7 +28,11 @@ figure's box - the room less its outline, or its own geometry as placed.
 The cut is a clip on the panel's composition visual, a rounded rectangle or an
 ellipse of the layout's size, written in the arrangement that gives the size
 and only where it differs from the last. `UIElement.Clip` takes only a plain
-rectangle, and a panel's own corner radius cuts none of its children.
+rectangle, and a panel's own corner radius cuts none of its children. A custom
+`clipShape` builds Direct2D geometry from the same commands the drawn Path uses,
+then supplies it through `IGeometrySource2D` to `CompositionPathGeometry` and
+`CompositionGeometricClip`. The clip object is retained across geometry updates;
+an empty geometry hides everything, and removing the clip restores the panel.
 
 A ColorPicker is a `Border` of one colour, its four corners rounded each as the
 element says; a `Rectangle` rounds all four alike.
@@ -70,10 +74,11 @@ outline drawn, none without a colour (`BoxArithmetic.outlineWidth`), while
 the `Path` holds the width the tree gave - then
 moved by their transform; a rectangle's corners are its own arcs, each
 corner its radius. A line, a
-path, a polygon and a polyline draw a geometry of their own - a path's data
-read by the core's parser, its arcs as curves - placed in the room by their
+path, a polygon and a polyline draw a geometry of their own - a path's structured commands,
+its arcs converted by the shared geometry code - placed in the room by their
 aspect: fitted, covering, stretched or at their own size, centred, then
-moved by their transform, as every host places them
+moved by their transform. Path keeps local coordinates unless an aspect is
+explicitly set, as every host places them
 ([a shape's own geometry](../../host/layout.md#a-shapes-own-geometry)). WinUI
 measures the geometry's bounds, once for each geometry, and the host hands
 the relay the place the arithmetic gives for the room; a geometry left where
@@ -84,8 +89,9 @@ layout gives it. WinUI cuts an element to the place it is put in where it
 measured larger, so a figure a lean or a cap takes past its room would be
 cut there: the figure measures its `Path` with no bound, which tells how far
 it reaches, and puts it in a place from the room's corner as far as that -
-the frame SwiftOmniUI reports stays the room. Dashes, gaps and their offset are outline widths in WinUI
-as in SwiftOmniUI; a mitred corner's limit WinUI measures against half the
+the frame SwiftOmniUI reports stays the room. WinUI measures dashes and their offset in outline widths. Public `StrokeStyle`
+uses path lengths, divided by the current width for WinUI, while the old SPI
+setters retain their width units; a mitred corner's limit WinUI measures against half the
 outline's width and SwiftOmniUI against the whole, so it is doubled.
 
 
@@ -139,7 +145,9 @@ transform as the instructions set them, a saved set on a stack. A wedge, an
 arc of an oval and a path each arrive as curves - an arc as the host layer
 works it out, a whole turn the whole oval ([three lists for a
 relay](../../types/drawing.md#three-lists-for-a-relay)) - filled by the
-nonzero rule. Text is DirectWrite's, in the
+pen's winding or even-odd rule. Complete stroke styles retain cap, join, miter,
+dash lengths and phase; Direct2D receives dashes and phase divided by width.
+Text is DirectWrite's, in the
 system's family - Segoe UI Variable where Windows has it - at 14 until the
 drawing says otherwise, wrapped in its box, set in it by the two alignments,
 and cut at its edges by a layer, which cuts a turned box exactly where a clip

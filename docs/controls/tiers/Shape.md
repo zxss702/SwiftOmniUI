@@ -25,3 +25,6 @@ How each of them realizes these members is on its own page.
 | `strokeLineJoin` | property | `LineJoin` | stateUI |
 | `strokeMiterLimit` | property | `Double` | stateUI |
 | `strokeWidth` | property | `Double` | stateUI |
+| `fillRule` | property | `FillRule` | stateUI |
+| `strokeDashInPathUnits` | property | `Bool` | stateUI |
+| `strokePhaseInPathUnits` | property | `Bool` | stateUI |
