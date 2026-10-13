@@ -261,7 +261,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view) 
                 page.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
                 page.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
                 page.Background(nullptr);
-                page.Content(args.Parameter());
+                page.Content(args.Parameter().as<xaml::UIElement>());
             }));
         held.Children().Append(owner->navigation);
         return detach(held);
