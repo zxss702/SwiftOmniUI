@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include <winrt/Microsoft.UI.Composition.h>
@@ -28,8 +29,17 @@ namespace {
 
     void removeUnused(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
                       std::vector<xaml::UIElement> const &held) {
-        for (uint32_t index = items.Size(); index > 0; --index) {
-            if (std::find(held.begin(), held.end(), items.GetAt(index - 1)) == held.end()) items.RemoveAt(index - 1);
+        auto const count = items.Size();
+        if (count == 0) return;
+        // C++/WinRT's equality and hash both use the object's IUnknown
+        // identity, including different interface pointers to the same child.
+        // Stable lazy rows need one membership lookup rather than a scan of
+        // every retained row each time another row joins the window.
+        std::unordered_set<IInspectable> retained;
+        retained.reserve(held.size());
+        for (auto const &child : held) retained.insert(child);
+        for (uint32_t index = count; index > 0; --index) {
+            if (retained.find(items.GetAt(index - 1)) == retained.end()) items.RemoveAt(index - 1);
         }
     }
 

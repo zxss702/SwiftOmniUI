@@ -78,12 +78,12 @@ final class WindowPresentationTests: XCTestCase {
         XCTAssertNil(presentation.show(root, in: runtime.lifecycle).bounds, "said once until they change")
     }
 
-    /// A window of a kind of its own belongs to its scene's main window, and a main window to none - said the first
-    /// time, whatever it is, and then only where it changes.
-    func testAWindowOfItsOwnBelongsToItsScenesMainWindow() throws {
+    /// Only an explicitly floating tool has a native owner, said once until
+    /// it changes. A scene's main window itself remains independent.
+    func testAnExplicitlyFloatingToolBelongsToItsScenesMainWindow() throws {
         let runtime = HostRuntime.still()
         var tool = HostPatch(id: .manual("tool"), type: .windowScene)
-        tool.properties = [.windowType: .name("tool")]
+        tool.properties = [.windowType: .name("tool"), .floatsOnTop: .bool(true)]
         var scene = HostPatch(id: .manual("scene"), type: .scene)
         scene.children = .arranged([tool, HostPatch(id: .manual("main"), type: .windowScene)])
         runtime.tree.apply(scene, complete: true)
@@ -96,5 +96,55 @@ final class WindowPresentationTests: XCTestCase {
         XCTAssertTrue(toolPresentation.show(owned, in: runtime.lifecycle).owner??.id == .manual("main"),
                       "wherever it stands among the scene's windows")
         XCTAssertTrue(toolPresentation.show(owned, in: runtime.lifecycle).owner == nil, "said once until it changes")
+    }
+
+    func testNamedAndValueBackedWindowsRemainIndependentInTheSameScene() throws {
+        let runtime = HostRuntime.still()
+        var settings = HostPatch(id: .manual("settings"), type: .windowScene)
+        settings.properties = [.windowType: .name("settings")]
+        var document = HostPatch(id: .manual("document"), type: .windowScene)
+        document.properties = [.windowType: .name("document"), .windowValue: .string("folder")]
+        var scene = HostPatch(id: .manual("scene"), type: .scene)
+        scene.children = .arranged([HostPatch(id: .manual("main"), type: .windowScene), settings, document])
+        runtime.tree.apply(scene, complete: true)
+
+        for id in ["settings", "document"] {
+            let window = try XCTUnwrap(runtime.tree.root?.first(id: .manual(id)))
+            let presentation = WindowPresentation()
+            let owner = try XCTUnwrap(presentation.show(window, in: runtime.lifecycle).owner)
+            XCTAssertNil(owner, "a window kind is not a request for native ownership")
+            XCTAssertTrue(presentation.show(window, in: runtime.lifecycle).owner == nil)
+        }
+    }
+
+    func testChangingTheFloatingPolicyReleasesAndRestoresNativeOwnership() throws {
+        let runtime = HostRuntime.still()
+        var tool = HostPatch(id: .manual("tool"), type: .windowScene)
+        tool.properties = [.windowType: .name("tool"), .floatsOnTop: .bool(true)]
+        var scene = HostPatch(id: .manual("scene"), type: .scene)
+        scene.children = .arranged([HostPatch(id: .manual("main"), type: .windowScene), tool])
+        runtime.tree.apply(scene, complete: true)
+        let window = try XCTUnwrap(runtime.tree.root?.first(id: .manual("tool")))
+        let presentation = WindowPresentation()
+        XCTAssertEqual(presentation.show(window, in: runtime.lifecycle).owner??.id, .manual("main"))
+
+        var update = HostPatch(id: tool.id, type: .windowScene)
+        update.properties = [.floatsOnTop: .bool(false)]
+        scene.children = .changed([update])
+        runtime.tree.apply(scene, complete: false)
+        let released = try XCTUnwrap(presentation.show(window, in: runtime.lifecycle).owner)
+        XCTAssertNil(released, "removing a floating policy must clear the native owner")
+
+        update.properties = [.floatsOnTop: .bool(true)]
+        scene.children = .changed([update])
+        runtime.tree.apply(scene, complete: false)
+        XCTAssertEqual(presentation.show(window, in: runtime.lifecycle).owner??.id, .manual("main"))
+
+        update.properties = [:]
+        update.clearedProperties = [.floatsOnTop]
+        scene.children = .changed([update])
+        runtime.tree.apply(scene, complete: false)
+        let cleared = try XCTUnwrap(presentation.show(window, in: runtime.lifecycle).owner)
+        XCTAssertNil(cleared, "clearing the modifier restores ordinary platform ownership")
     }
 }

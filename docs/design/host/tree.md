@@ -106,10 +106,12 @@ stack of them, tabs, a split view - the pages its modal stack presents as
 sheets, what it lays over them, and whether its scene hides it ([the
 application's phase](runtime.md#the-applications-phase)), and says each to
 its host only when it changed (`WindowPresentation`). It says too the window
-it belongs to: a window of a kind of its own is its scene's main window's,
-and a main window is nobody's (`MountedElement.ownerWindow`); a toolkit that
-knows owned windows stands the one above the other, hides it with it and
-leaves it out of the system's list of the application's windows. The page
+it belongs to natively: an explicitly floating tool belongs to its scene's
+main window (`MountedElement.ownerWindow`). Ordinary named and value-backed
+windows remain independent platform windows. A kind associates a window with
+its scene for lifetime and restoration; it does not request native ownership.
+A toolkit that knows owned windows stands an explicit tool above its owner,
+hides it with it and leaves it out of the system's list of windows. The page
 the user sees hears it is shown
 ([a page's phases](pages.md#a-pages-phases)), then the window hears, once,
 that it was made - in their turn, before the host first shows the window,

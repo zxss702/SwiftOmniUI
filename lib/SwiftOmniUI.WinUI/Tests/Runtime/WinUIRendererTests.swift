@@ -6,6 +6,7 @@ import CSwiftOmniUIWinUI
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
 import XCTest
+import WinSDK
 
 /// A page and its counter: a click raises the count, and the caption reads it.
 struct CounterPage: View {
@@ -110,20 +111,72 @@ final class WinUIRendererTests: XCTestCase {
         }
     }
 
-    /// A window of a kind of its own belongs to its scene's main window, as a tool window does on Windows: above it,
-    /// hidden with it, out of the switchers; the main window belongs to none.
-    func testAWindowOfItsOwnBelongsToTheMainWindow() throws {
+    /// Native owner ordering is reserved for a group's explicit floating policy.
+    func testAnExplicitlyFloatingToolBelongsToTheMainWindow() throws {
         try onUIThread {
-            let host = WinUIRenderer.running(application: { ToolApplication() })
+            let host = WinUIRenderer.running(application: { ToolApplication(floating: true) })
             let open = try XCTUnwrap(host.views(WinUIButtonView.self).first)
 
             swiftomniui_winui_button_invoke(open.handle)
             for _ in 0..<30 where host.windows.count < 2 { host.step() }
             XCTAssertEqual(host.windows.count, 2)
+            guard host.windows.count == 2 else { return }
             let (main, tool) = (host.windows[0].window, host.windows[1].window)
             XCTAssertTrue(swiftomniui_winui_window_belongs_to(tool.handle, main.handle))
             XCTAssertFalse(swiftomniui_winui_window_belongs_to(main.handle, tool.handle))
         }
+    }
+
+    func testAnOrdinaryGroupedWindowHasNoNativeOwner() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(application: { ToolApplication() })
+            let open = try XCTUnwrap(host.views(WinUIButtonView.self).first)
+            swiftomniui_winui_button_invoke(open.handle)
+            host.settle { host.windows.count == 2 }
+            XCTAssertEqual(host.windows.count, 2)
+            guard host.windows.count == 2 else { return }
+            let (main, other) = (host.windows[0].window, host.windows[1].window)
+            let mainHandle = try nativeHandle(main, title: "SOUITest-main-\(main.number)")
+            let otherHandle = try nativeHandle(other, title: "SOUITest-group-\(other.number)")
+            XCTAssertNil(GetWindow(mainHandle, UINT(GW_OWNER)))
+            XCTAssertNil(GetWindow(otherHandle, UINT(GW_OWNER)), "a grouped window must be an independent top-level window")
+            XCTAssertFalse(swiftomniui_winui_window_belongs_to(other.handle, main.handle))
+            XCTAssertFalse(swiftomniui_winui_window_belongs_to(main.handle, other.handle))
+            for window in [main, other] {
+                var frame = [Double](repeating: 0, count: 13)
+                swiftomniui_winui_window_frame(window.handle, &frame)
+                XCTAssertEqual(frame[11], 0, "ordinary windows do not request a topmost presenter")
+            }
+
+            // Ask WinUI to activate each window and inspect the actual native
+            // order. Never force an order with SetWindowPos/BringWindowToTop.
+            for (window, front, back) in [(main, mainHandle, otherHandle),
+                                           (other, otherHandle, mainHandle),
+                                           (main, mainHandle, otherHandle)] {
+                swiftomniui_winui_window_activate(window.handle)
+                host.settle { GetActiveWindow() == front && Self.isAbove(front, back) }
+                XCTAssertEqual(GetActiveWindow(), front)
+                XCTAssertTrue(Self.isAbove(front, back), "native activation must raise an ordinary window above its peer")
+                host.step()
+                XCTAssertTrue(Self.isAbove(front, back), "a presentation update must preserve the system's order")
+            }
+        }
+    }
+
+    @MainActor private func nativeHandle(_ window: WinUIWindow, title: String) throws -> HWND {
+        window.setTitle(title)
+        let name = Array(title.utf16) + [0]
+        return try XCTUnwrap(name.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+    }
+
+    private static func isAbove(_ front: HWND, _ back: HWND) -> Bool {
+        var next = GetTopWindow(nil)
+        while let window = next {
+            if window == front { return true }
+            if window == back { return false }
+            next = GetWindow(window, UINT(GW_HWNDNEXT))
+        }
+        return false
     }
 
     /// The page reads the screen its window stands on: its size, and how it is turned - not at all on this machine.
@@ -164,12 +217,15 @@ private struct PhasePage: View {
 
 /// An application whose main window opens a tool window of its scene.
 private struct ToolApplication: App {
-    var body: some Scene { ToolScene() }
+    var floating = false
+    var body: some Scene { ToolScene(floating: floating) }
 }
 
 private struct ToolScene: Scene {
+    var floating: Bool
     var windows: Windows {
-        Windows({ WindowGroup(WindowType("renderer.tool")) { ToolWindow() } }, main: { ToolMainWindow() })
+        Windows({ WindowGroup(WindowType("renderer.tool")) { ToolWindow() }.floatsOnTop(floating) },
+                main: { ToolMainWindow() })
     }
 }
 

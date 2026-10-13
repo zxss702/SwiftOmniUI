@@ -18,6 +18,8 @@
 /// platform restores it to its scene for the same value, which is why the
 /// value is `Codable`. A host without independent windows refuses
 /// `openWindow` with `WindowError.unsupported`.
+/// Group membership does not make an ordinary window a native owned or
+/// transient window; explicit floating tools opt into that platform policy.
 public struct WindowGroup {
     /// The kind of window.
     let type: WindowType

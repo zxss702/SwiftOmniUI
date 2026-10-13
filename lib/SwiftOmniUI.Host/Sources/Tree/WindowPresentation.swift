@@ -33,8 +33,8 @@
         /// Whether its scene hides it, where that changed - the first time whatever it is.
         public var hidden: Bool?
 
-        /// The window it belongs to, where that changed - the first time whatever it is: its scene's main window for
-        /// a window of a kind of its own, nil for a main one.
+        /// The native owner, said initially and when it changes: the scene's
+        /// main window for an explicit floating tool, nil for ordinary windows.
         public var owner: MountedElement??
     }
 
