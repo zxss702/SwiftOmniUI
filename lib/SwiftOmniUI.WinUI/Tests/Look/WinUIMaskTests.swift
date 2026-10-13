@@ -84,19 +84,25 @@ final class WinUIMaskTests: XCTestCase {
             let masked = try XCTUnwrap(host.views(WinUIMaskedView.self).first)
             let alpha = try XCTUnwrap(masked.items.last?.view)
             let alphaShape = try XCTUnwrap((alpha as? WinUIZStackView)?.items.first?.view)
+            let reference = try XCTUnwrap(root.items.last?.view)
             let points: [(Double, Double)] = [(50, 30), (50, 90)]
             for value in [0.5, 1.0, 0.0, 0.75] {
                 opacity.wrappedValue = value
                 host.step()
+                // Capture only the ordinary XAML reference row. Its current
+                // pixels keep two stale, equal desktop rows from passing.
+                let expected = try XCTUnwrap(reference.pixels(at: [(50, 30)]).first)
                 host.settle {
                     let samples = root.presentedPixels(at: points, in: window)
                     return samples.count == 2 && Self.close(samples[0], samples[1])
+                        && Self.close(samples[1], expected)
                         && alphaShape.drawnOpacity == value
                 }
                 let samples = root.presentedPixels(at: points, in: window)
                 XCTAssertEqual(samples.count, 2)
                 if samples.count == 2 {
                     XCTAssertTrue(Self.close(samples[0], samples[1]), "mask alpha equals native opacity: \(samples)")
+                    XCTAssertTrue(Self.close(samples[0], expected))
                     if value > 0 {
                         XCTAssertNotEqual(samples[0], Self.red)
                         XCTAssertNotEqual(samples[0], Self.blue)
@@ -197,6 +203,50 @@ final class WinUIMaskTests: XCTestCase {
             XCTAssertGreaterThan(samples[1] & 255, samples[2] & 255)
             XCTAssertNotEqual(samples[1], Self.red)
             XCTAssertNotEqual(samples[1], Self.blue)
+        }
+    }
+
+    func testCanvasAndImageAlphaUseTheirDrawingInsteadOfTheirBoxes() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                VStack(spacing: 0) {
+                    ZStack {
+                        Color.blue
+                        Rectangle().fill(.red).mask {
+                            Canvas { context, _ in
+                                context.fill(Path(Rect(10, 10, 20, 20)), with: .color(.black))
+                                context.fill(Path(Rect(70, 30, 20, 20)), with: .color(.white))
+                            }
+                        }
+                    }.frame(width: 100, height: 60)
+                    ZStack {
+                        Color.blue
+                        Rectangle().fill(.red).mask {
+                            Image("test_wide.svg").resizable().scaledToFit()
+                        }
+                    }.frame(width: 100, height: 100)
+                }.frame(width: 100, height: 160)
+            }
+            let window = try XCTUnwrap(host.window)
+            let root = try XCTUnwrap(host.views(WinUIStackView.self).first)
+            let points: [(Double, Double)] = [(15, 15), (75, 35), (50, 30),
+                                            (50, 110), (50, 65), (50, 155)]
+            let expected = [Self.red, Self.red, Self.blue, Self.red, Self.blue, Self.blue]
+            host.settle { root.presentedPixels(at: points, in: window) == expected }
+            XCTAssertEqual(root.presentedPixels(at: points, in: window), expected)
+        }
+    }
+
+    func testMaskDescendantsCannotTakeKeyboardFocus() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                TextEditor("").frame(width: 220, height: 80).mask { Button("Alpha source") }
+            }
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            let button = try XCTUnwrap(host.views(WinUIButtonView.self).first)
+            XCTAssertTrue(swiftomniui_winui_focus(editor.handle, true))
+            XCTAssertFalse(swiftomniui_winui_focus(button.handle, true))
+            XCTAssertTrue(swiftomniui_winui_focused(editor.handle))
         }
     }
 

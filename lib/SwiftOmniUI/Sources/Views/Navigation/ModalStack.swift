@@ -35,10 +35,11 @@ public struct ModalStack {
     /// - Parameter stack: what is presented, the FIRST element presented first
     ///   and the last of them on top - the author's own type, borrowed two-way.
     ///   A modal the user dismisses truncates it.
-    /// - Parameter destination: the page for one element, asked in stack order.
+    /// - Parameter destination: the page for one element, asked in stack order
+    ///   on the main actor when the window builds its presented pages.
     public init<Sheet: Hashable>(
         _ stack: Binding<[Sheet]>,
-        destination: @escaping (Sheet) -> any Page
+        destination: @escaping @MainActor (Sheet) -> any Page
     ) {
         build = {
             Node(
