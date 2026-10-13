@@ -103,10 +103,7 @@ private struct CanvasSizeReader: View {
     var body: some View {
         var container = Grid {
             if let size {
-                var context = GraphicsContext()
-                renderer(&context, size)
-                Canvas { context.commands }
-                    .frame(width: size.width, height: size.height)
+                canvas(for: size)
             }
         }
         container.node.props[.isGeometryReader] = true.propValue
@@ -119,6 +116,15 @@ private struct CanvasSizeReader: View {
                 transaction.isGeometryFeedback = true
                 withTransaction(transaction) { self.size = next }
             }
+    }
+
+    /// Runs the imperative renderer before handing its commands to the view
+    /// builder, which only accepts view expressions.
+    private func canvas(for size: Size) -> some View {
+        var context = GraphicsContext()
+        renderer(&context, size)
+        return Canvas { context.commands }
+            .frame(width: size.width, height: size.height)
     }
 }
 
