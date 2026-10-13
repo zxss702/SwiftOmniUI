@@ -101,10 +101,17 @@ extension MountedElement {
         guard let tree else { return }
 
         let law = transition.animation ?? animation
-        for (property, standing) in phaseValues(transition.insertion, room: room) {
+        let components = phaseValues(transition.insertion, room: room)
+        for (property, standing) in components {
             _ = tree.receiveProperty(
                 mount: mount, property: property, standing: standing,
                 target: resolvedValue(property) ?? resting(of: property), animation: law)
+        }
+        // Layout can snapshot a newly placed view before the next clock tick.
+        // Commit the complete insertion drawing now, rather than briefly
+        // showing the authored identity and then jumping to the phase's start.
+        if !components.isEmpty {
+            ProgramWrite.perform { native.presentFrame(Set(components.map { $0.0 })) }
         }
     }
 
@@ -138,9 +145,11 @@ extension MountedElement {
                     guard pending == 0, let self,
                           self.isDeparting, self.departureSerial == serial
                     else { return }
-                    self.isDeparting = false
-                    self.leave()
+                    // Drop the native child while its removal presentation
+                    // and departing status still stand. Cleanup must not let
+                    // an attached view fall back to its authored identity.
                     closed()
+                    self.leave()
                 }
             if !started { pending -= 1 }
         }

@@ -109,7 +109,7 @@
 
     private func follow(_ steps: [AnimationStep]) {
         stateChannels.follow(steps)
-        describedMotion.follow(steps)
+        describedMotion.follow(steps, deferringLandings: true)
         layoutMotion.follow(steps)
         collectStateChannels()
 
@@ -137,6 +137,17 @@
 
         states.removeAll(keepingCapacity: true)
         properties.removeAll(keepingCapacity: true)
+
+        let landings = describedMotion.takeLandings()
+        if !landings.isEmpty {
+            ProgramWrite.perform {
+                for landing in landings { landing() }
+            }
+            // A removal can consume its own final property outputs. Its
+            // parent's changed child list and native bars still need the
+            // same frame's structural presentation, even with no values left.
+            presenter?.present(states: [:], properties: [:])
+        }
 
         for completion in stateChannels.takeCompletions() {
             _ = core.complete(completion.id, succeeded: completion.succeeded)

@@ -50,6 +50,19 @@ and releases that target; leaving clears all retained targets for the mount.
 These settled targets hold no frame clock and do not affect ordinary property
 animations.
 
+The display cycle presents a component's final value before running its landing
+callback. A removal therefore cannot erase its last output while the native view
+is still attached. The parent drops that view while its departing status and
+retained drawing still stand, then the element clears its motions and listeners.
+The cycle also commits the resulting child-list and native-bar changes in the
+same frame, even when no other property or state animation remains.
+
+An insertion's supported drawing components are committed immediately when its
+layout starts the transition. A snapshot between allocation and the next clock
+tick sees the insertion phase, rather than briefly drawing the authored identity
+before returning to the animation's start. This write changes drawing only;
+it does not rebind children or rebuild the core tree.
+
 A value moves as numeric lanes and only within one shape: a number, a list of
 numbers of one length, a colour, or a structure whose kind and parts stay the
 same - a gradient moves its geometry, stops and colours, never its kind or

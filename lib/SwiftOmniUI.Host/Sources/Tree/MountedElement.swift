@@ -375,6 +375,7 @@ import CRT
         isLeaving = false
         native.leave()
         for child in children { child.leave() }
+        isDeparting = false
     }
 
     /// The first element of `type` in this subtree, this one first.

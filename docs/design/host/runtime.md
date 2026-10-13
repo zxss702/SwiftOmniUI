@@ -103,6 +103,12 @@ An opacity, colour or drawing transform update presents drawing without
 rebinding the view's children; layout properties and a viewless child's
 arrangement still reach the parent that places them.
 
+Finished described animations run their landing callbacks after their final
+values have been presented. A callback can remove a child and clear its motion
+outputs; the cycle then commits those structural changes even with an empty
+value batch. This keeps native page bars and child ownership in step without
+asking the core for another render or waiting for another frame.
+
 ## One turn
 
 A thread parked in `CoreLink.waitForWork()` wakes the UI thread whenever the

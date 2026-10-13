@@ -42,7 +42,13 @@
     /// A removal's components can finish on different frames. A finished
     /// component keeps its target until the whole element leaves or revives.
     private var retainedTargets: [DescribedKey: HostValue] = [:]
+    /// A callback can hide a view whose authored value differs from its final
+    /// animation value. Keep that final value through this frame's presentation.
+    private var landingValues: [DescribedKey: HostValue] = [:]
     private var outputs: [DescribedOutput] = []
+    /// Runtime frames present the final values before a landing removes a
+    /// view. Standalone advances can still complete their callbacks inline.
+    private var landings: [(key: DescribedKey, complete: () -> Void)] = []
 
     /// Described animation whose animations `animator` advances.
     public init(animator: Animator) {
@@ -55,7 +61,7 @@
     /// The value a transition draws, including a finished removal component
     /// held while the rest of that element's transition still runs.
     public func presentedValue(for key: DescribedKey) -> HostValue? {
-        transitions[key]?.presented ?? retainedTargets[key]
+        transitions[key]?.presented ?? retainedTargets[key] ?? landingValues[key]
     }
 
     /// Starts, retargets or cuts short a property's animation; a nil `animation` snaps.
@@ -74,7 +80,8 @@
         reducesMotion: Bool
     ) -> Bool {
         let retained = retainedTargets.removeValue(forKey: key)
-        var source = standing ?? retained
+        let landing = landingValues.removeValue(forKey: key)
+        var source = standing ?? retained ?? landing
         var carriedLanes: [Double] = []
         var carriedVelocity: [Double] = []
         func arrive() -> Bool {
@@ -127,7 +134,8 @@
     }
 
     /// Takes the values an animator advance gave for the animations, in key order.
-    public func follow(_ steps: [AnimationStep]) {
+    /// A display cycle defers landings until it has presented those values.
+    public func follow(_ steps: [AnimationStep], deferringLandings: Bool = false) {
         for step in steps {
             guard case .described(let key) = step.target,
                   let transition = transitions[key]
@@ -140,7 +148,14 @@
                 if transition.retainingTarget { retainedTargets[key] = presented.value }
                 transitions[key] = nil
                 animator.halt(.described(key))
-                transition.landed?()
+                if let landed = transition.landed {
+                    if deferringLandings {
+                        if !transition.retainingTarget { landingValues[key] = presented.value }
+                        landings.append((key, landed))
+                    } else {
+                        landed()
+                    }
+                }
             }
         }
     }
@@ -149,7 +164,9 @@
     public func remove(mount: UInt64) {
         transitions = transitions.filter { $0.key.mount != mount }
         retainedTargets = retainedTargets.filter { $0.key.mount != mount }
+        landingValues = landingValues.filter { $0.key.mount != mount }
         outputs.removeAll { $0.key.mount == mount }
+        landings.removeAll { $0.key.mount == mount }
         animator.retain { target in
             guard case .described(let key) = target else { return true }
             return key.mount != mount
@@ -160,6 +177,15 @@
     public func takeOutputs() -> [DescribedOutput] {
         defer { outputs.removeAll(keepingCapacity: true) }
         return outputs
+    }
+
+    /// Takes the callbacks whose final values the display cycle just presented.
+    public func takeLandings() -> [() -> Void] {
+        defer {
+            landings.removeAll(keepingCapacity: true)
+            landingValues.removeAll(keepingCapacity: true)
+        }
+        return landings.map { $0.complete }
     }
 }
 
