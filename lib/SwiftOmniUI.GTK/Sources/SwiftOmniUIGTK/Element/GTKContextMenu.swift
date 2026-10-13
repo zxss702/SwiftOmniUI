@@ -65,13 +65,26 @@ final class GTKContextMenu {
     private func listen() {
         let click = gtk_gesture_click_new()!
         gtk_gesture_single_set_button(click, guint(GDK_BUTTON_SECONDARY))
-        connectSignal(UnsafeMutableRawPointer(click), "pressed", number: number) { _, _, x, y, data in
-            MainActor.assumeIsolated { GTKContextMenu.shown[viewNumber(data)]?.open(atX: x, y: y) }
+        connectSignal(UnsafeMutableRawPointer(click), "pressed", number: number) { gesture, _, x, y, data in
+            let number = viewNumber(data)
+            nonisolated(unsafe) let gesture = gesture
+            MainActor.assumeIsolated {
+                guard let menu = GTKContextMenu.shown[number] else { return }
+                // A row's context menu handles this press before an ancestor's native titlebar menu.
+                if let gesture { gtk_gesture_set_state(OpaquePointer(gesture), GTK_EVENT_SEQUENCE_CLAIMED) }
+                menu.open(atX: x, y: y)
+            }
         }
         let hold = gtk_gesture_long_press_new()!
         gtk_gesture_single_set_touch_only(hold, 1)
-        connectSignal(UnsafeMutableRawPointer(hold), "pressed", number: number) { _, x, y, data in
-            MainActor.assumeIsolated { GTKContextMenu.shown[viewNumber(data)]?.open(atX: x, y: y) }
+        connectSignal(UnsafeMutableRawPointer(hold), "pressed", number: number) { gesture, x, y, data in
+            let number = viewNumber(data)
+            nonisolated(unsafe) let gesture = gesture
+            MainActor.assumeIsolated {
+                guard let menu = GTKContextMenu.shown[number] else { return }
+                if let gesture { gtk_gesture_set_state(OpaquePointer(gesture), GTK_EVENT_SEQUENCE_CLAIMED) }
+                menu.open(atX: x, y: y)
+            }
         }
         for controller in [click, hold] {
             gtk_widget_add_controller(widget, controller)
