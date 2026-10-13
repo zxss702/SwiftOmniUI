@@ -75,6 +75,26 @@ extension MountedElement {
         return contentValueBelow(prop)
     }
 
+    /// The naming page's navigation metadata, falling back through its enclosing arrangements.
+    /// An explicit empty value stops inheritance. Sidebar/auxiliary columns and presented content
+    /// keep their own titles rather than borrowing the main window's detail title.
+    public func navigationValue(_ prop: Prop) -> HostValue? {
+        var current: MountedElement? = titledPage ?? self
+        while let element = current {
+            if element.type == .windowScene {
+                return element.currentChildren.first { $0.type == .titleBar }?.value(prop) ?? element.value(prop)
+            }
+            if let found = element.pageValue(prop) { return found }
+            guard let parent = element.parent,
+                  parent.type != .modalStack, parent.type != .overlay
+            else { return nil }
+            if parent.type == .navigationSplitView,
+               parent.currentChildren.dropFirst().first !== element { return nil }
+            current = parent
+        }
+        return nil
+    }
+
     /// This element's `prop`, else the nearest one below it; slots and nested arrangements stand in no page's path.
     private func contentValue(_ prop: Prop) -> HostValue? {
         value(prop) ?? contentValueBelow(prop)

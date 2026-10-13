@@ -31,9 +31,8 @@ extension GTKElement {
     var chrome: GTKPageChrome {
         if type == .tabView {
             var chrome = element.selectedTab?.visiblePage?.gtk.chrome ?? GTKPageChrome()
-            chrome.title = element.titledPage?.pageValue(.title)?.string
-                ?? element.enclosing(type: .windowScene)?.value(.title)?.string ?? ""
-            chrome.subtitle = element.titledPage?.pageValue(.subtitle)?.string ?? ""
+            chrome.title = element.navigationValue(.title)?.string ?? ""
+            chrome.subtitle = element.navigationValue(.subtitle)?.string ?? ""
             chrome.tabs = (view as? GTKTabbedView)?.switcher
             chrome.showsBar = value(.hasNavigationBar)?.bool != false
             chrome.offersBack = value(.hasBackButton)?.bool != false
@@ -43,8 +42,8 @@ extension GTKElement {
 
         let page = element.chromePage
         var chrome = GTKPageChrome()
-        chrome.title = page.pageValue(.title)?.string ?? ""
-        chrome.subtitle = page.pageValue(.subtitle)?.string ?? ""
+        chrome.title = page.navigationValue(.title)?.string ?? ""
+        chrome.subtitle = page.navigationValue(.subtitle)?.string ?? ""
         chrome.titleView = page.slotContent(.titleView)?.gtk.view
         chrome.showsBar = page.pageValue(.hasNavigationBar)?.bool != false
         chrome.offersBack = page.pageValue(.hasBackButton)?.bool != false
@@ -137,7 +136,7 @@ extension GTKElement {
                 if index == pages.count - 1 { chrome.sidebar = sidebar }
                 show(frame, chrome)
                 navigation.describe(
-                    frame, title: page.element.visiblePage?.pageValue(.title)?.string ?? "", canPop: chrome.offersBack)
+                    frame, title: chrome.title, canPop: chrome.offersBack)
                 page.composeChrome(show: show)
             }
         case .navigationSplitView:

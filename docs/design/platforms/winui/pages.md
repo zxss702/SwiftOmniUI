@@ -44,6 +44,9 @@ that the application may not render for - a tab chosen, the sidebar shown:
 - the title of the page that names the window, on the chrome and to the
   system - the visible page, but tabs on a stack name it by their own title,
   else by the page beneath ([the window's chrome](../../host/pages.md#the-windows-chrome));
+- the resolved `navigationSubtitle` is written to the same native
+  `TitleBar.Subtitle` property, and cleared when it becomes empty or absent.
+  WinUI owns its placement and compact-mode visibility;
 - the way back is the chrome's own back button, while the visible stack's
   top page can go back;
 - a split view adds the chrome's pane toggle, which shows and hides its
@@ -88,6 +91,16 @@ stays too.
 A navigation stack shows its top page across its whole frame; the pages below
 are kept by their elements and held by no view, so each keeps what it showed
 for when the user comes back to it. Its bar is the window's chrome.
+
+The layout panel holds a native `Frame`. Its `Navigate` call creates a stock
+`Page` shell whose content is the retained Swift view: forward navigation uses
+`SlideNavigationTransitionInfo` with `FromRight`, return uses `FromLeft`.
+The first presentation and reduced-motion navigation suppress transitions.
+`IsNavigationStackEnabled` is false and page caching is disabled; Swift's path
+remains the only navigation history. A view still held by an old page during a
+rapid return is released from that page before attachment to the new one.
+The panel continues to supply Swift layout and safe-area context, while the
+Frame measures and arranges its native shells and owns the transition timing.
 
 ## The way back
 

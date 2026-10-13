@@ -31,6 +31,9 @@ final class WinUITitleBarView: WinUIView {
 
         let background = chrome.background?.argb
         let foreground = chrome.foreground?.argb
+        if previous.subtitle != chrome.subtitle {
+            swiftomniui_winui_title_bar_set_subtitle(handle, chrome.subtitle)
+        }
         // Words on a bar the tree paints: light on a dark one, dark on a light one (`BandWords`).
         let light = chrome.background.flatMap(BandWords.light(on:))
         if previous.title != chrome.title || (previous.back == nil) != (chrome.back == nil)

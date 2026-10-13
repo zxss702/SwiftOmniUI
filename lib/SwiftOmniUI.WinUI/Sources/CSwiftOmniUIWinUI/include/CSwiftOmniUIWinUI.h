@@ -405,6 +405,13 @@ bool swiftomniui_winui_animations_enabled(void);
 int32_t swiftomniui_winui_text(SwiftOmniUIObjectRef element, char *utf8, int32_t capacity);
 
 SwiftOmniUIObjectRef swiftomniui_winui_panel_make(int64_t view);
+/// A layout panel whose native Frame owns page transitions; Swift owns the path.
+SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view);
+void swiftomniui_winui_navigation_set(
+    SwiftOmniUIObjectRef panel, SwiftOmniUIObjectRef background, SwiftOmniUIObjectRef content,
+    bool animated, bool back
+);
+void swiftomniui_winui_navigation_clear(SwiftOmniUIObjectRef panel);
 void swiftomniui_winui_panel_set_children(SwiftOmniUIObjectRef panel, SwiftOmniUIObjectRef const *children, int32_t count);
 
 /// A panel that redirects its live XAML source and mask through CompositionMaskBrush.
@@ -905,6 +912,10 @@ SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view);
 void swiftomniui_winui_title_bar_set(SwiftOmniUIObjectRef bar, char const *title, bool back, bool paneToggle,
                                  bool hasBackground, uint32_t background, bool hasForeground, uint32_t foreground,
                                  int32_t words);
+
+/// The native title bar's subtitle; an empty string clears the previous value.
+void swiftomniui_winui_title_bar_set_subtitle(SwiftOmniUIObjectRef bar, char const *subtitle);
+
 /// The page's actions on a window's chrome: each one's words, the identifier automation finds it by (empty for
 /// none), the files its picture may stand in - each ended by a line feed, empty for none - the Segoe Fluent glyph
 /// it shows where its picture is a symbol (empty for none), whether it stands in the overflow, and whether it can be

@@ -71,11 +71,10 @@
     public init(window: MountedElement, arrangement: MountedElement?) {
         let page = arrangement?.visiblePage
         let titleBar = window.children.first { $0.type == .titleBar }
-        title = arrangement?.titledPage?.pageValue(.title)?.string ?? window.value(.title)?.string
-        subtitle = arrangement?.titledPage?.pageValue(.subtitle)?.string
-            ?? arrangement?.value(.subtitle)?.string
-        document = arrangement?.titledPage?.pageValue(.document)?.string
-            ?? arrangement?.value(.document)?.string
+        title = arrangement?.navigationValue(.title)?.string
+            ?? titleBar?.value(.title)?.string ?? window.value(.title)?.string
+        subtitle = arrangement?.navigationValue(.subtitle)?.string ?? titleBar?.value(.subtitle)?.string
+        document = arrangement?.navigationValue(.document)?.string
         windowBackground = arrangement?.titledPage?.pageValue(.windowBackground)
             ?? arrangement?.pageValue(.windowBackground)
         toolbarVisibility = arrangement?.titledPage?.pageValue(.toolbarVisibility)
@@ -100,6 +99,11 @@
     /// colours, a stack's or a tabbed view's bar colours - the chrome is composed again as they move.
     public static func follows(_ type: NodeType) -> Bool {
         followed.contains(type)
+    }
+
+    /// A bound title can live on ordinary content instead of a page/arrangement node.
+    public static func follows(_ type: NodeType, changing properties: Set<Prop>) -> Bool {
+        follows(type) || !properties.isDisjoint(with: [.title, .titleKey, .subtitle, .subtitleKey, .document])
     }
 
     private static let followed: Set<NodeType> = [.windowScene, .titleBar, .navigationStack, .tabView, .navigationSplitView]

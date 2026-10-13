@@ -99,6 +99,16 @@ in its own chrome. A host whose pages each stand under a header bar of their
 own takes the same parts page by page: a page's actions (`chromeActions`)
 and its bar's colours.
 
+Title, subtitle and document metadata use `navigationValue`: the naming
+page's value first, then enclosing stacks, split views and wrapper content,
+finally the authored title bar or window where applicable. This includes a
+`navigationTitle`/`navigationSubtitle` written on the outer split rather than
+its detail page. Empty strings are explicit values; removing a modifier
+restores inheritance. The walk does not borrow the main title for a sidebar,
+auxiliary split column, sheet or overlay. Existing tab naming rules still
+select the naming page. Bound navigation metadata on ordinary content also
+asks the host to refresh chrome when the carried value changes.
+
 A stack shows its bar over what stands on it once (`showsTheStacksBar`): over
 a page that keeps its bar, and over tabs or a split view only where the page
 they show stands in no stack of their own - that stack's bar is the one, so

@@ -91,7 +91,7 @@ final class WinUIWindowController {
         sheets = pages.map { page in
             let sheet = sheets.first { $0.element === page }?.sheet ?? WinUISheetView()
             let shown = page.visiblePage
-            sheet.show(title: shown?.pageValue(.title)?.string ?? "", page: page.winUI.view, height: Self.height(shown))
+            sheet.show(title: page.navigationValue(.title)?.string ?? "", page: page.winUI.view, height: Self.height(shown))
             return (page, sheet)
         }
         window.showSheets(sheets.map(\.sheet))
@@ -138,6 +138,7 @@ final class WinUIWindowController {
         let composed = WindowChrome(window: element, arrangement: presentation.arrangement)
         var chrome = WinUIWindowChrome()
         chrome.title = composed.title ?? ""
+        chrome.subtitle = composed.subtitle ?? ""
         chrome.showsToolbar = composed.toolbarVisibility?.enumeration != Visibility.hidden.rawValue
         chrome.back = composed.back.map { back in
             WinUIToolbarAction(title: back.title, isEnabled: true, perform: { [weak element, weak stack = back.stack] in

@@ -180,8 +180,8 @@ extension View {
         return written
     }
 
-    /// The second line the page's title area shows, where the platform takes
-    /// one - a macOS window's subtitle:
+    /// The secondary text the page's title area shows, beside or below the title
+    /// according to the platform's own title bar:
     ///
     ///     ContentView()
     ///         .navigationSubtitle("New conversation")

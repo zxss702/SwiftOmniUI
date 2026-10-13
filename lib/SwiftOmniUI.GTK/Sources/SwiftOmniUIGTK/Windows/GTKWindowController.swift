@@ -134,7 +134,7 @@ final class GTKWindowController {
             let shown = Self.shownArrangement(page)
             let chrome = shown.gtk.chrome
             sheet.frame?.show(chrome)
-            sheet.setTitle(shown.visiblePage?.pageValue(.title)?.string ?? chrome.title)
+            sheet.setTitle(shown.navigationValue(.title)?.string ?? chrome.title)
             shown.gtk.composeChrome()
         }
         let chrome = WindowChrome(window: element, arrangement: presentation.arrangement)
