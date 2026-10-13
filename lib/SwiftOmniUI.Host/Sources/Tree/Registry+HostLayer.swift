@@ -57,6 +57,7 @@ extension Registry {
     public func everyElementHearsTheUser() {
         everyElementRealizes(VisualElementContract.frame)
         everyElementRaises(ViewContract.frameChanged)
+        everyElementRaises(ViewContract.drawingSizeChanged)
         everyElementRaises(ViewContract.safeAreaInsetsChanged)
         everyElementRaises(ViewContract.tapGesture)
         everyElementRealizes(ViewContract.tapCount)

@@ -432,6 +432,7 @@ namespace {
         /// The drawing to replay from now on: at once where the canvas is sized and in a tree, else on the
         /// frame the room or the root arrives.
         void show(Drawing next) {
+            if (drawing.ints == next.ints && drawing.numbers == next.numbers && drawing.words == next.words) return;
             drawing = std::move(next);
             stale = true;
             if (!paint()) invalidate();
@@ -459,31 +460,42 @@ namespace {
             auto down = static_cast<int32_t>(std::ceil(size.Height * scale));
             if (!stale && across == drawnAcross && down == drawnDown && scale == drawnScale) return true;
 
-            stale = false;
-            drawnScale = scale;
             try {
                 if (across <= 0 || down <= 0) {
                     surface = nullptr;
                     drawnAcross = drawnDown = 0;
+                    drawnScale = scale;
+                    stale = false;
                     Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
                     return true;
                 }
                 for (int attempt = 0; attempt < 2; ++attempt) {
                     prepare();
+                    auto target = surface;
+                    bool replacement = false;
                     if (!surface || across != drawnAcross || down != drawnDown || made != devices.made) {
-                        surface = media::Imaging::SurfaceImageSource(across, down, false);
-                        winrt::check_hresult(surface.as<ISurfaceImageSourceNativeWithD2D>()->SetDevice(devices.device.get()));
-                        media::ImageBrush painted;
-                        painted.ImageSource(surface);
-                        painted.Stretch(media::Stretch::Fill);
-                        Background(painted);
-                        drawnAcross = across;
-                        drawnDown = down;
-                        made = devices.made;
+                        target = media::Imaging::SurfaceImageSource(across, down, false);
+                        winrt::check_hresult(target.as<ISurfaceImageSourceNativeWithD2D>()->SetDevice(devices.device.get()));
+                        replacement = true;
                     }
-                    auto result = draw(scale);
+                    auto result = draw(target, across, down, scale);
                     if (!lost(result)) {
                         winrt::check_hresult(result);
+                        // Publish a completed surface. A resized or newly realized
+                        // row must never expose a new transparent backing while
+                        // its drawing is still being replayed.
+                        if (replacement) {
+                            media::ImageBrush painted;
+                            painted.ImageSource(target);
+                            painted.Stretch(media::Stretch::Fill);
+                            Background(painted);
+                            surface = target;
+                        }
+                        drawnAcross = across;
+                        drawnDown = down;
+                        drawnScale = scale;
+                        made = devices.made;
+                        stale = false;
                         return true;
                     }
                     // Windows took the device away: a new one, a new surface, and the drawing again.
@@ -492,15 +504,15 @@ namespace {
             } catch (...) {
                 report("drawing a canvas");
             }
-            return true;
+            return false;
         }
 
         /// Replays the drawing on the whole surface, cleared first: the canvas's DIPs at `scale` pixels each.
-        HRESULT draw(float scale) {
-            auto native = surface.as<ISurfaceImageSourceNativeWithD2D>();
+        HRESULT draw(media::Imaging::SurfaceImageSource const &target, int32_t across, int32_t down, float scale) {
+            auto native = target.as<ISurfaceImageSourceNativeWithD2D>();
             winrt::com_ptr<ID2D1DeviceContext> context;
             POINT offset{};
-            auto began = native->BeginDraw(RECT{0, 0, drawnAcross, drawnDown}, __uuidof(ID2D1DeviceContext),
+            auto began = native->BeginDraw(RECT{0, 0, across, down}, __uuidof(ID2D1DeviceContext),
                                            context.put_void(), &offset);
             if (FAILED(began)) return began;
 
@@ -509,15 +521,18 @@ namespace {
             context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
             auto base = D2D1::Matrix3x2F::Translation(offset.x / scale, offset.y / scale);
             context->SetTransform(base);
-            context->PushAxisAlignedClip(D2D1::RectF(0, 0, drawnAcross / scale, drawnDown / scale), D2D1_ANTIALIAS_MODE_ALIASED);
+            context->PushAxisAlignedClip(D2D1::RectF(0, 0, across / scale, down / scale), D2D1_ANTIALIAS_MODE_ALIASED);
             context->Clear(D2D1::ColorF(0, 0, 0, 0));
+            HRESULT replayed = S_OK;
             try {
                 replay(context.get(), base, drawing);
             } catch (...) {
+                replayed = winrt::to_hresult();
                 report("replaying a drawing");
             }
             context->PopAxisAlignedClip();
-            return native->EndDraw();
+            auto ended = native->EndDraw();
+            return FAILED(ended) ? ended : replayed;
         }
 
         void pressed(IInspectable const &sender, input::PointerRoutedEventArgs const &args) {

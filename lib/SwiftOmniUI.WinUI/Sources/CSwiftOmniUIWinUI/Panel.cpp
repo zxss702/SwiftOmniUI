@@ -15,6 +15,9 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.Provider.h>
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
+#include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
+#include <winrt/Microsoft.UI.Xaml.Navigation.h>
+#include <winrt/Windows.UI.Xaml.Interop.h>
 
 using namespace swiftomniui;
 using winrt::Windows::Foundation::Size;
@@ -201,17 +204,21 @@ namespace {
             if (alphaMask) alphaMask->measure(available);
             double size[2] = {0, 0};
             callbacks.measure(view, available.Width, available.Height, size);
+            if (navigation) navigation.Measure(available);
             return Size(static_cast<float>(size[0]), static_cast<float>(size[1]));
         }
 
         Size ArrangeOverride(Size final) {
             if (alphaMask) alphaMask->arrange(final);
             callbacks.arrange(view, final.Width, final.Height);
+            if (navigation) navigation.Arrange(Rect(0, 0, final.Width, final.Height));
             return final;
         }
 
         int64_t view;
         std::unique_ptr<AlphaMask> alphaMask;
+        controls::Frame navigation{nullptr};
+        xaml::UIElement navigationContent{nullptr};
 
         /// Whether assistive technology meets none of what stands in the panel.
         bool childrenHidden = false;
@@ -237,6 +244,88 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_panel_make(int64_t view) {
         report("making a panel");
         return nullptr;
     }
+}
+
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view) {
+    try {
+        auto held = winrt::make<SwiftOmniUIPanel>(view).as<controls::Panel>();
+        auto owner = panel(held);
+        owner->navigation = controls::Frame();
+        owner->navigation.IsNavigationStackEnabled(false);
+        owner->navigation.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
+        owner->navigation.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
+        owner->navigation.Navigated(guarded("hosting a navigated page",
+            [](IInspectable const &, xaml::Navigation::NavigationEventArgs const &args) {
+                auto page = args.Content().as<controls::Page>();
+                page.NavigationCacheMode(xaml::Navigation::NavigationCacheMode::Disabled);
+                page.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
+                page.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
+                page.Background(nullptr);
+                page.Content(args.Parameter());
+            }));
+        held.Children().Append(owner->navigation);
+        return detach(held);
+    } catch (...) {
+        report("making a navigation frame");
+        return nullptr;
+    }
+}
+
+extern "C" void swiftomniui_winui_navigation_set(
+    SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef background, SwiftOmniUIObjectRef content,
+    bool animated, bool back
+) {
+    try {
+        auto held = as<controls::Panel>(handle);
+        auto owner = panel(held);
+        auto frame = owner->navigation;
+        if (!frame) return;
+        std::vector<xaml::UIElement> children;
+        if (background) children.push_back(as<xaml::UIElement>(background));
+        children.push_back(frame);
+        removeUnused(held.Children(), children);
+        insertInOrder(held.Children(), children);
+        auto next = content ? as<xaml::UIElement>(content) : xaml::UIElement{nullptr};
+        if (next == owner->navigationContent) return;
+        if (!next) {
+            frame.Content(nullptr);
+            owner->navigationContent = nullptr;
+            return;
+        }
+        // A rapid return may find the retained Swift view in a Page whose
+        // native transition is still finishing. It must have only one parent.
+        for (auto parent = xaml::Media::VisualTreeHelper::GetParent(next); parent;
+             parent = xaml::Media::VisualTreeHelper::GetParent(parent)) {
+            if (auto page = parent.try_as<controls::Page>(); page && page.Content() == next) {
+                page.Content(nullptr);
+                break;
+            }
+        }
+        using namespace xaml::Media::Animation;
+        NavigationTransitionInfo transition{nullptr};
+        if (animated && swiftomniui_winui_animations_enabled()) {
+            SlideNavigationTransitionInfo slide;
+            slide.Effect(back ? SlideNavigationTransitionEffect::FromLeft : SlideNavigationTransitionEffect::FromRight);
+            transition = slide;
+        } else {
+            transition = SuppressNavigationTransitionInfo();
+        }
+        if (!frame.Navigate(winrt::xaml_typename<controls::Page>(), next, transition))
+            throw winrt::hresult_error(E_FAIL, L"WinUI refused the navigation page");
+        owner->navigationContent = next;
+    } catch (...) {
+        report("navigating the retained page");
+    }
+}
+
+extern "C" void swiftomniui_winui_navigation_clear(SwiftOmniUIObjectRef handle) {
+    try {
+        auto owner = panel(as<xaml::UIElement>(handle));
+        if (owner->navigation) owner->navigation.Content(nullptr);
+        owner->navigationContent = nullptr;
+        owner->navigation = nullptr;
+        as<controls::Panel>(handle).Children().Clear();
+    } catch (...) { report("releasing a navigation frame"); }
 }
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_masked_panel_make(int64_t view) {

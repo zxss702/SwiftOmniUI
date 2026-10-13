@@ -17,7 +17,7 @@
                 s.start { VStack { Ellipse().fill(.red).frame(width: 100).frame(height: 60).id("shape") }.horizontalAlignment(.start) }
                 let shape = try s.element("shape")
 
-                try s.settle { try s.color(of: shape, at: Point(50, 30)) == .red }
+                try s.settle { try s.shows(.red, on: shape, at: Point(50, 30)) }
                 s.expect(try s.color(of: shape, at: Point(50, 30)), .red, "its middle")
                 s.expect(try s.color(of: shape, at: Point(5, 30)), .red, "its left, inside the curve")
                 s.expect(try s.color(of: shape, at: Point(3, 3)), nil, "its corner, beyond the curve")

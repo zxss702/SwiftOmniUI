@@ -393,6 +393,7 @@ extension NodeType {
     static let dropCompleted = ViewContract.dropCompleted.token
     static let dropPaths = ViewContract.dropPaths.token
     static let frameChanged = ViewContract.frameChanged.token
+    static let drawingSizeChanged = ViewContract.drawingSizeChanged.token
     static let textFrameChanged = Event("textFrameChanged")
     static let namedFramesChanged = ViewContract.namedFramesChanged.token
     static let safeAreaInsetsChanged = ViewContract.safeAreaInsetsChanged.token

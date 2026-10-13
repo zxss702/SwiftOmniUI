@@ -35,9 +35,9 @@ import XCTest
     /// written twice, the second writing stands where the first did.
     func testAStateIsDataAndTheSecondWritingWins() {
         var node = Switch()
-            .visualState(.on) { $0.background(.green) }
-            .visualState(.off) { $0.background(.gray) }
-            .visualState(.on) { $0.background(.blue) }
+            .visualState(.on) { $0.background(Color("#008000")) }
+            .visualState(.off) { $0.background(Color("#808080")) }
+            .visualState(.on) { $0.background(Color("#0000FF")) }
             .node
         node.materialize()
 
@@ -50,12 +50,12 @@ import XCTest
     /// never mentioned joins after the style's.
     func testAControlsStatesAreWrittenOverItsStyles() {
         let sheet = StyleSheet {
-            Style<Switch>().visualState(.disabled) { $0.opacity(0.5).background(.gray) }
+            Style<Switch>().visualState(.disabled) { $0.opacity(0.5).background(Color("#808080")) }
         }
         let node = styled(
             Switch()
-                .visualState(.disabled) { $0.background(.blue) }
-                .visualState(.on) { $0.background(.green) }
+                .visualState(.disabled) { $0.background(Color("#0000FF")) }
+                .visualState(.on) { $0.background(Color("#008000")) }
                 .node,
             with: sheet)
 
@@ -71,7 +71,7 @@ import XCTest
     /// nothing.
     func testAControlArrivesWithTheValuesOfTheStatesItIsIn() {
         func control(_ enabled: Bool) -> Node {
-            Button("Save").disabled(!enabled).visualState(.disabled) { $0.background(.gray) }.id("c").node
+            Button("Save").disabled(!enabled).visualState(.disabled) { $0.background(Color("#808080")) }.id("c").node
         }
 
         let enabled = render(Renders(), control(true))
@@ -85,9 +85,9 @@ import XCTest
     func testLeavingAStateGivesTheControlItsOwnValuesBack() {
         func control(_ enabled: Bool) -> Node {
             Button("Save")
-                .background(.blue)
+                .background(Color("#0000FF"))
                 .disabled(!enabled)
-                .visualState(.disabled) { $0.background(.gray).opacity(0.5) }
+                .visualState(.disabled) { $0.background(Color("#808080")).opacity(0.5) }
                 .id("c")
                 .node
         }
@@ -106,8 +106,8 @@ import XCTest
     func testEveryStateThatHoldsShowsTheFirstWinningAValue() {
         let patch = render(Renders(), Switch(true)
             .disabled(!false)
-            .visualState(.on) { $0.background(.green).offset(x: 4) }
-            .visualState(.disabled) { $0.opacity(0.5).background(.gray) }
+            .visualState(.on) { $0.background(Color("#008000")).offset(x: 4) }
+            .visualState(.disabled) { $0.opacity(0.5).background(Color("#808080")) }
             .id("c")
             .node)
 
@@ -121,7 +121,7 @@ import XCTest
     func testAStateFollowsTheValueItsControlIsBoundTo() {
         let on = State(wrappedValue: false)
         let renders = Renders()
-        let first = render(renders, Switch(on.projectedValue).visualState(.on) { $0.background(.green) }.id("c").node)
+        let first = render(renders, Switch(on.projectedValue).visualState(.on) { $0.background(Color("#008000")) }.id("c").node)
         XCTAssertNil(first?.props["background"])
 
         Renderer.shared.clearInvalidation()
@@ -134,7 +134,7 @@ import XCTest
     func testTheUsersTurnEntersTheStateItFollows() throws {
         let on = State(wrappedValue: false)
         let renders = Renders()
-        let first = try XCTUnwrap(render(renders, Switch(on.projectedValue).visualState(.on) { $0.background(.green) }.id("c").node))
+        let first = try XCTUnwrap(render(renders, Switch(on.projectedValue).visualState(.on) { $0.background(Color("#008000")) }.id("c").node))
         let binding = try XCTUnwrap(first.driven?.bindings["isOn"], "isOn is carried")
 
         Renderer.shared.clearInvalidation()
@@ -149,7 +149,7 @@ import XCTest
     /// in its pressed look, and the release gives its own back.
     func testAPressDescribesTheButtonAgainInItsPressedLook() throws {
         let renders = Renders()
-        let button = try XCTUnwrap(render(renders, Button("Save").visualState(.pressed) { $0.background(.green) }.id("c").node))
+        let button = try XCTUnwrap(render(renders, Button("Save").visualState(.pressed) { $0.background(Color("#008000")) }.id("c").node))
         XCTAssertEqual(button.eventNames, ["pressed", "released"])
 
         XCTAssertEqual(fire(renders, button, "pressed")?.props["background"], green)
@@ -176,8 +176,8 @@ import XCTest
 
         let disabled = try XCTUnwrap(render(Renders(), Button("Save")
             .disabled(!false)
-            .visualState(.pressed) { $0.background(.green) }
-            .visualState(.disabled) { $0.background(.gray) }
+            .visualState(.pressed) { $0.background(Color("#008000")) }
+            .visualState(.disabled) { $0.background(Color("#808080")) }
             .id("c")
             .node))
         XCTAssertEqual(disabled.props["background"], gray, "disabled before pressed")
@@ -191,7 +191,7 @@ import XCTest
         let renders = Renders()
         var heard: [String] = []
         let button = try XCTUnwrap(render(renders, Button("Save")
-            .visualState(.pressed) { $0.background(.green) }
+            .visualState(.pressed) { $0.background(Color("#008000")) }
             .onVisualStateChanged { heard.append($0.name) }
             .id("c")
             .node))
@@ -222,7 +222,7 @@ import XCTest
     /// A style's states are the control's: its pressed look shows on a press, and declaring the state to hear it
     /// keeps that look.
     func testAStylesStateShowsAndHearingItKeepsItsLook() throws {
-        let sheet = StyleSheet { Style<Button>().visualState(.pressed) { $0.background(.green) } }
+        let sheet = StyleSheet { Style<Button>().visualState(.pressed) { $0.background(Color("#008000")) } }
         let renders = Renders()
         var heard: [String] = []
         let button = try XCTUnwrap(renders.render(

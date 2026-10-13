@@ -42,7 +42,7 @@ final class WinUICustomShapeTests: XCTestCase {
         try onUIThread {
             let host = WinUIRenderer.running {
                 VStack {
-                    Path(Rect(-10, 10, 40, 20)).fill(.red).frame(width: 100, height: 60)
+                    Path(Rect(-10, 10, 40, 20)).fill(Color("#FF0000")).frame(width: 100, height: 60)
                 }.frame(width: 100, height: 60)
             }
             let stack = try XCTUnwrap(host.views(WinUIStackView.self).first)
@@ -57,7 +57,7 @@ final class WinUICustomShapeTests: XCTestCase {
             let right = State(wrappedValue: true), width = State(wrappedValue: 100.0)
             let host = WinUIRenderer.running(reducesMotion: true) {
                 VStack {
-                    NativeBubbleShape(right: right.wrappedValue).fill(.red).frame(width: width.wrappedValue, height: 60)
+                    NativeBubbleShape(right: right.wrappedValue).fill(Color("#FF0000")).frame(width: width.wrappedValue, height: 60)
                 }.horizontalAlignment(.start).verticalAlignment(.start)
             }
             let shape = try XCTUnwrap(host.views(WinUIPathView.self).first)
@@ -80,11 +80,11 @@ final class WinUICustomShapeTests: XCTestCase {
             let host = WinUIRenderer.running {
                 VStack(spacing: 0) {
                     NativeBubbleShape(right: true)
-                        .foregroundStyle(LinearGradient(colors: [.red, .blue], startPoint: .leading, endPoint: .trailing))
+                        .foregroundStyle(LinearGradient(colors: [Color("#FF0000"), Color("#0000FF")], startPoint: .leading, endPoint: .trailing))
                         .frame(width: 100, height: 60)
-                    NativeBubbleShape(right: false).fill(.black.opacity(0.03)).foregroundStyle(.red)
+                    NativeBubbleShape(right: false).fill(.black.opacity(0.03)).foregroundStyle(Color("#FF0000"))
                         .frame(width: 100, height: 60)
-                    Spacer().frame(width: 100, height: 20).background { Color.blue }.foregroundStyle(.red)
+                    Spacer().frame(width: 100, height: 20).background { Color("#0000FF") }.foregroundStyle(Color("#FF0000"))
                 }.horizontalAlignment(.start).verticalAlignment(.start)
             }
             let stack = try XCTUnwrap(host.views(WinUIStackView.self).first)
@@ -109,7 +109,7 @@ final class WinUICustomShapeTests: XCTestCase {
             let hole = State(wrappedValue: true)
             let host = WinUIRenderer.running(reducesMotion: true) {
                 VStack {
-                    Rectangle().fill(.red).frame(width: 100, height: 60)
+                    Rectangle().fill(Color("#FF0000")).frame(width: 100, height: 60)
                         .clipShape(NativeHoleShape(hole: hole.wrappedValue), style: FillStyle(eoFill: true, antialiased: true))
                 }.horizontalAlignment(.start).verticalAlignment(.start)
             }
@@ -135,9 +135,9 @@ final class WinUICustomShapeTests: XCTestCase {
         try onUIThread {
             let host = WinUIRenderer.running {
                 VStack(spacing: 0) {
-                    Path("M 10 10 L 40 10 L 10 40 Z L 90 40").fill(.red).frame(width: 100, height: 60)
+                    Path("M 10 10 L 40 10 L 10 40 Z L 90 40").fill(Color("#FF0000")).frame(width: 100, height: 60)
                     Canvas { context, _ in
-                        context.fill(Path("M 10 10 L 40 10 L 10 40 Z L 90 40"), with: .color(.red))
+                        context.fill(Path("M 10 10 L 40 10 L 10 40 Z L 90 40"), with: .color(Color("#FF0000")))
                     }.frame(width: 100, height: 60)
                 }.horizontalAlignment(.start).verticalAlignment(.start)
             }
@@ -154,18 +154,18 @@ final class WinUICustomShapeTests: XCTestCase {
             try onUIThread {
                 let host = WinUIRenderer.running {
                     VStack(spacing: 0) {
-                        Path("M 0 10 L 100 10").stroke(.red,
+                        Path("M 0 10 L 100 10").stroke(Color("#FF0000"),
                             style: StrokeStyle(lineWidth: width, dash: [8, 4], dashPhase: 0))
                             .frame(width: 100, height: 20)
                         Canvas { context, _ in
-                            context.stroke(Path("M 0 10 L 100 10"), with: .color(.red),
+                            context.stroke(Path("M 0 10 L 100 10"), with: .color(Color("#FF0000")),
                                 style: StrokeStyle(lineWidth: width, dash: [8, 4], dashPhase: 0))
                         }.frame(width: 100, height: 20)
-                        Path("M 0 10 L 100 10").stroke(.red,
+                        Path("M 0 10 L 100 10").stroke(Color("#FF0000"),
                             style: StrokeStyle(lineWidth: width, dash: [8, 4], dashPhase: 6))
                             .frame(width: 100, height: 20)
                         Canvas { context, _ in
-                            context.stroke(Path("M 0 10 L 100 10"), with: .color(.red),
+                            context.stroke(Path("M 0 10 L 100 10"), with: .color(Color("#FF0000")),
                                 style: StrokeStyle(lineWidth: width, dash: [8, 4], dashPhase: 6))
                         }.frame(width: 100, height: 20)
                     }.horizontalAlignment(.start).verticalAlignment(.start)
@@ -183,13 +183,13 @@ final class WinUICustomShapeTests: XCTestCase {
         try onUIThread {
             let host = WinUIRenderer.running {
                 VStack(spacing: 0) {
-                    NativeHoleShape(hole: true).fill(.red, style: FillStyle(eoFill: true, antialiased: true))
+                    NativeHoleShape(hole: true).fill(Color("#FF0000"), style: FillStyle(eoFill: true, antialiased: true))
                         .frame(width: 100, height: 60)
                     NativeHoleShape(hole: true).path(in: Rect(0, 0, 100, 60))
-                        .fill(.red, style: FillStyle(eoFill: true, antialiased: true)).frame(width: 100, height: 60)
+                        .fill(Color("#FF0000"), style: FillStyle(eoFill: true, antialiased: true)).frame(width: 100, height: 60)
                     Canvas { context, size in
                         context.fill(NativeHoleShape(hole: true).path(in: Rect(0, 0, size.width, size.height)),
-                            with: .color(.red), style: FillStyle(eoFill: true, antialiased: true))
+                            with: .color(Color("#FF0000")), style: FillStyle(eoFill: true, antialiased: true))
                     }.frame(width: 100, height: 60)
                 }.horizontalAlignment(.start).verticalAlignment(.start)
             }

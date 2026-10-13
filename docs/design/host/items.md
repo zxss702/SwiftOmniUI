@@ -151,3 +151,11 @@ An empty fragment is a zero-size row once its requested render has committed.
 Zero-size rows leave unseen rows' 44-point estimates intact, so an empty
 header cannot hide all the cards behind it.
 
+A source insertion can move an existing row's destination outside the requested
+window while its presentation remains on screen. Hosts retain those already
+mounted, travelling identities until their placement journey ends, then release
+them on the next viewport reconciliation. They also retain surviving mounted
+rows for the first changed arrangement. These extra identities are requested
+individually in source order; unbuilt rows between them and the viewport are
+not realized. The normal bounded range still controls new initialization.
+

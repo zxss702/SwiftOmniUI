@@ -88,8 +88,12 @@ convert them at drawing time. Saved pen state includes every stroke parameter.
 
 ## A canvas drawn from its size
 
-SwiftUI's `Canvas { context, size in … }` is a `GeometryReader` whose report
-builds the canvas. Fill records contain the brush colour, fill rule and structured
+SwiftUI's `Canvas { context, size in … }` uses an internal size reader whose
+allocated width and height build and size the canvas. Its passive
+`drawingSizeChanged` report does not depend on scroll position, named spaces or
+safe-area insets, and does not make ancestor layouts business frame readers.
+Changing a drawing's position alone therefore does not rebuild its instructions.
+Fill records contain the brush colour, fill rule and structured
 geometry (26); stroke records contain the colour, complete stroke style (27) and
 structured geometry (25). Records 25 and 26 use the same command encoding as
 Path, including arcs until the shared host decoder converts them to curves.

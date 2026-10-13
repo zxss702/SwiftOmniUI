@@ -25,10 +25,10 @@ final class AndroidCanvasViewTests: XCTestCase {
         try onMainActor {
             let host = AndroidRenderer.running {
                 Canvas {
-                    Draw.fillColor(.red)
+                    Draw.fillColor(Color("#FF0000"))
                     Draw.fillRectangle(x: 0, y: 0, width: 15, height: 10)
                     Draw.translate(dx: 10, dy: 0)
-                    Draw.fillColor(.blue)
+                    Draw.fillColor(Color("#0000FF"))
                     Draw.fillRectangle(x: 0, y: 0, width: 10, height: 10)
                 }
                 .frame(width: 20).frame(height: 10).horizontalAlignment(.start)
@@ -46,7 +46,7 @@ final class AndroidCanvasViewTests: XCTestCase {
         try onMainActor {
             let host = AndroidRenderer.running {
                 Canvas {
-                    Draw.fillColor(.red)
+                    Draw.fillColor(Color("#FF0000"))
                     Draw.fillArc(x: 0, y: 0, width: 20, height: 20, startAngle: 0, endAngle: 90, clockwise: true)
                 }
                 .frame(width: 20).frame(height: 20).horizontalAlignment(.start)

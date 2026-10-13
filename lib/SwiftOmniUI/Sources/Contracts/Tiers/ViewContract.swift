@@ -50,6 +50,9 @@ public enum ViewContract: Contract {
     /// window's x and y, and the safe area's frame in the window.
     public static let frameChanged = ElementEvent<Self, [Double]>("frameChanged", layer: .native)
 
+    /// Internal drawing feedback: width and height, independent of scroll position.
+    @_spi(Host) public static let drawingSizeChanged = ElementEvent<Self, [Double]>("drawingSizeChanged", layer: .native)
+
     /// The pointer's look while it is over the view; `.pointerStyle` writes it.
     public static let pointerStyle = ElementProperty<Self, PointerStyle>("pointerStyle", layer: .native)
 
@@ -180,7 +183,7 @@ public enum ViewContract: Contract {
     /// The tier's own members.
     public static let members: [any ContractMember] = [
         allowDrop, area, canDrag, coordinateSpaceName, dragLeave,
-        dragOver, dragStarting, dragText, drop, dropCompleted, dropPaths, flex, frameChanged, gridColumn,
+        dragOver, dragStarting, dragText, drop, dropCompleted, dropPaths, flex, frameChanged, drawingSizeChanged, gridColumn,
         gridColumnSpan, gridRow, gridRowSpan, horizontalAlignment, horizontalContentAlignment, horizontalGuide,
         layoutPriority,
         namedFramesChanged, safeAreaInsetsChanged, padding, panTouchCount,

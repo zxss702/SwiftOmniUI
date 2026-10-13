@@ -345,7 +345,7 @@ final class GTKLazyTests: XCTestCase {
                                 Text("Cell \(cell)")
                                     .frame(height: height.wrappedValue)
                                     .frame(maxWidth: .infinity)
-                                    .background(.red)
+                                    .background(Color("#FF0000"))
                                     .onAppear { standing.wrappedValue += 1 }
                                     .onDisappear { standing.wrappedValue -= 1 }
                             }
@@ -669,7 +669,7 @@ private struct NaturalLazyPage: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(8)
-                            .background(.red)
+                            .background(Color("#FF0000"))
                             .animation(.inherited)
                             .onAppear { standing.insert(row) }
                             .onDisappear { standing.remove(row) }

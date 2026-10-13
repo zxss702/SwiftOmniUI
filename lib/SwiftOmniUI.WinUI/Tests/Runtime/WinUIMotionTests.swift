@@ -39,7 +39,7 @@ final class WinUIMotionTests: XCTestCase {
             let host = WinUIRenderer.running(clock: clock) {
                 VStack {
                     ColorPicker()
-                        .color(wide.wrappedValue ? Color(red: 255, green: 0, blue: 0) : Color(red: 0, green: 0, blue: 255))
+                        .color(wide.wrappedValue ? Color("#FF0000") : Color("#0000FF"))
                         .frame(width: wide.wrappedValue ? 300 : 100)
                         .frame(height: 60)
                         .horizontalAlignment(.start)

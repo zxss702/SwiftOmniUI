@@ -54,6 +54,13 @@ class WinUILazyView: WinUITravellingLayout {
     private var inViewportChange = false
     private var pendingViewport = false
 
+    var travellingIdentities: Set<String> {
+        if cells.animatesChanges { return Set(mounted.keys) }
+        return Set(mounted.compactMap { identity, item in
+            places.layoutMotion?.isTravelling(mount: item.mount) == true ? identity : nil
+        })
+    }
+
     init(axis: StackArithmetic.Axis, cells: LazyCells) {
         self.axis = axis
         self.cells = cells
@@ -151,6 +158,7 @@ class WinUILazyView: WinUITravellingLayout {
         guard let target = override ?? announcedRect ?? viewport else { return }
         let grid = self is WinUILazyGridView
         let revision = grid ? cells.runs.revision : cells.extents.revision
+        let keeping = travellingIdentities
         // Anchor geometry follows the actual native window. Only an explicit
         // program jump selects a different window before that position changes.
         let incoming = windowSpan(in: target)
@@ -171,6 +179,7 @@ class WinUILazyView: WinUITravellingLayout {
             || cells.window?.realize != (realize ?? 0..<0)
             || cells.window?.revision != revision || cells.needsMeasurement
             || measuredRevision != measurementRevision || geometryChanged
+            || cells.retained != keeping
         else { return }
         let previous = lastTargetViewport
         lastTargetViewport = target
@@ -185,7 +194,7 @@ class WinUILazyView: WinUITravellingLayout {
             let lower = min(cells.identities.count, max(0, wanted.lowerBound - 1) * perRun)
             let upper = min(cells.identities.count, (wanted.upperBound + 1) * perRun)
             if !wanted.isEmpty, (lower..<upper) == cells.built {
-                cells.show(span, perRun: perRun, grid: grid, realize: realize)
+                cells.show(span, perRun: perRun, grid: grid, realize: realize, keeping: keeping)
                 return
             }
         }
@@ -267,7 +276,8 @@ class WinUILazyView: WinUITravellingLayout {
             let revision = self is WinUILazyGridView ? self.cells.runs.revision : self.cells.extents.revision
             if self.cells.needsMeasurement || self.cells.window?.span != (self.span ?? 0..<0)
                 || self.cells.window?.revision != revision
-                || self.measuredRevision != self.measurementRevision {
+                || self.measuredRevision != self.measurementRevision
+                || self.cells.retained != self.travellingIdentities {
                 if let viewport = self.viewport { self.viewportChanged(viewport, effective: false) }
             }
         }
@@ -346,7 +356,7 @@ class WinUILazyView: WinUITravellingLayout {
     override func arrange(in bounds: Rect) {
         places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                         axis == .vertical ? cells.anchorShift : 0))
+                                         axis == .vertical ? cells.anchorShift : 0), refining: true)
         cells.animatesChanges = false
         cells.anchorShift = 0
         retell()
@@ -499,7 +509,7 @@ final class WinUILazyStackView: WinUILazyView {
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>) {
-        cells.show(span, realize: realize)
+        cells.show(span, realize: realize, keeping: travellingIdentities)
     }
 }
 
@@ -686,7 +696,7 @@ final class WinUILazyGridView: WinUILazyView {
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>) {
-        cells.show(span, perRun: perRun, grid: true, realize: realize)
+        cells.show(span, perRun: perRun, grid: true, realize: realize, keeping: travellingIdentities)
     }
 }
 

@@ -86,7 +86,7 @@ final class AndroidPagesTests: XCTestCase {
     func testWordsOnAPaintedBarFollowHowDarkItIs() throws {
         try onMainActor {
             let dark = State(wrappedValue: true)
-            let (navy, yellow) = (Color(red: 0, green: 0, blue: 128), Color(red: 255, green: 230, blue: 0))
+            let (navy, yellow) = (Color("#000080"), Color("#FFE600"))
             let host = AndroidRenderer.running(reducesMotion: true) {
                 NavigationStack(State(wrappedValue: [Int]()).projectedValue) {
                     TitledPage(title: "Root")
@@ -315,7 +315,7 @@ extension AndroidPagesTests {
                 } destination: { number in
                     FurnishedPage(title: "Page \(number)", hasBackButton: number != 1, hasNavigationBar: number != 2)
                 }
-                .barBackgroundColor(.red)
+                .barBackgroundColor(Color("#FF0000"))
                 .barForegroundColor(.white)
             }
             host.layOut()
@@ -535,7 +535,7 @@ private struct FurnishedPage: View {
         let bar = hasNavigationBar
         return Text(title).onAppear {
             page.title = title
-            page.background = .blue
+            page.background = Color("#0000FF")
             page.contentPadding = EdgeInsets(8)
             page.hasBackButton = back
             page.hasNavigationBar = bar

@@ -60,6 +60,8 @@ import CRT
 
     /// Whether this element's frame, or any frame under it, is read.
     public private(set) var framesRead = false
+    /// Last passive drawing size, independent of the full coordinate report.
+    var reportedDrawingSize: Size?
 
     /// Whether this page tree is shown, as its phases last told.
     public internal(set) var isPagePresented = false
@@ -495,7 +497,7 @@ import CRT
             content: true,
             arrangement: !native.presentsView
                 || !changed.subtracting(ownPlacementRun).isDisjoint(with: Self.arrangedProperties),
-            windowChrome: WindowChrome.follows(type))
+            windowChrome: WindowChrome.follows(type, changing: changed))
     }
 
     /// The value `property` presents: a running animation's, else the described or bound one -

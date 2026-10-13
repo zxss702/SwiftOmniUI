@@ -9,7 +9,7 @@ import XCTest
     func testShapePathAndCanvasUseTheSameGeometryAndArcConversion() throws {
         let path = Path("M -10 20 Q 5 -5 20 20 C 40 50 60 -10 80 20 A 10 20 30 0 1 100 40 Z")
         var context = GraphicsContext()
-        context.fill(path, with: .color(.red), style: FillStyle(eoFill: true, antialiased: true))
+        context.fill(path, with: .color(Color("#FF0000")), style: FillStyle(eoFill: true, antialiased: true))
         let decoded = CanvasInstruction.instructions(context.commands)
         XCTAssertEqual(decoded.last, .fillPath(path.geometry.arcsAsCubics))
         XCTAssertEqual(try XCTUnwrap(HostPath(numbers: path.node.props[PathContract.commands.token]!.numbers!)), path.geometry)
@@ -21,7 +21,7 @@ import XCTest
     func testCompleteStrokeStyleCrossesTheRelayAndSavedStateWithoutLosingUnits() {
         let style = StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .bevel, miterLimit: 3, dash: [8, 4], dashPhase: 2)
         var context = GraphicsContext()
-        context.stroke(Path("M 10 20 L 90 20"), with: .color(.blue), style: style)
+        context.stroke(Path("M 10 20 L 90 20"), with: .color(Color("#0000FF")), style: style)
         let instructions = CanvasInstruction.instructions(context.commands)
         XCTAssertEqual(instructions[1], .completeStrokeStyle(style))
         let relay = HostDrawing(context.commands)

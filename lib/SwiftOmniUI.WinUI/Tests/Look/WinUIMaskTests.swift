@@ -43,8 +43,8 @@ final class WinUIMaskTests: XCTestCase {
         try onUIThread {
             let host = WinUIRenderer.running {
                 ZStack {
-                    Color.blue
-                    Rectangle().fill(.red).mask {
+                    Color("#0000FF")
+                    Rectangle().fill(Color("#FF0000")).mask {
                         Path(Rect(5, 5, 25, 25)).fill(.black)
                         Path(Rect(70, 30, 20, 20)).fill(.white)
                     }
@@ -68,14 +68,14 @@ final class WinUIMaskTests: XCTestCase {
             let host = WinUIRenderer.running(reducesMotion: true) {
                 VStack(spacing: 0) {
                     ZStack {
-                        Color.blue
-                        Rectangle().fill(.red).mask {
+                        Color("#0000FF")
+                        Rectangle().fill(Color("#FF0000")).mask {
                             Rectangle().fill(.black.opacity(0.5)).opacity(opacity.wrappedValue)
                         }
                     }.frame(width: 100, height: 60)
                     ZStack {
-                        Color.blue
-                        Rectangle().fill(.red).opacity(0.5 * opacity.wrappedValue)
+                        Color("#0000FF")
+                        Rectangle().fill(Color("#FF0000")).opacity(0.5 * opacity.wrappedValue)
                     }.frame(width: 100, height: 60)
                 }.frame(width: 100, height: 120)
             }
@@ -120,8 +120,8 @@ final class WinUIMaskTests: XCTestCase {
             let right = State(wrappedValue: true), width = State(wrappedValue: 100.0)
             let host = WinUIRenderer.running(reducesMotion: true) {
                 ZStack {
-                    Color.blue
-                    Rectangle().fill(.red).mask { MaskBubble(right: right.wrappedValue).fill(.black) }
+                    Color("#0000FF")
+                    Rectangle().fill(Color("#FF0000")).mask { MaskBubble(right: right.wrappedValue).fill(.black) }
                 }.frame(width: width.wrappedValue, height: 60)
             }
             let window = try XCTUnwrap(host.window)
@@ -154,8 +154,8 @@ final class WinUIMaskTests: XCTestCase {
                     if mode.wrappedValue == 0 { path.addEllipse(in: Rect(30, 10, 40, 40)) }
                 }
                 return ZStack {
-                    Color.blue
-                    Rectangle().fill(.red).mask {
+                    Color("#0000FF")
+                    Rectangle().fill(Color("#FF0000")).mask {
                         path.fill(.black, style: FillStyle(eoFill: true, antialiased: true))
                     }
                 }.frame(width: 100, height: 60)
@@ -180,8 +180,8 @@ final class WinUIMaskTests: XCTestCase {
         try onUIThread {
             let host = WinUIRenderer.running {
                 ZStack {
-                    Color.blue
-                    Rectangle().fill(.red).mask {
+                    Color("#0000FF")
+                    Rectangle().fill(Color("#FF0000")).mask {
                         LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
                     }
                 }.frame(width: 100, height: 60)
@@ -211,8 +211,8 @@ final class WinUIMaskTests: XCTestCase {
             let host = WinUIRenderer.running {
                 VStack(spacing: 0) {
                     ZStack {
-                        Color.blue
-                        Rectangle().fill(.red).mask {
+                        Color("#0000FF")
+                        Rectangle().fill(Color("#FF0000")).mask {
                             Canvas { context, _ in
                                 context.fill(Path(Rect(10, 10, 20, 20)), with: .color(.black))
                                 context.fill(Path(Rect(70, 30, 20, 20)), with: .color(.white))
@@ -220,8 +220,8 @@ final class WinUIMaskTests: XCTestCase {
                         }
                     }.frame(width: 100, height: 60)
                     ZStack {
-                        Color.blue
-                        Rectangle().fill(.red).mask {
+                        Color("#0000FF")
+                        Rectangle().fill(Color("#FF0000")).mask {
                             Image("test_wide.svg").resizable().scaledToFit()
                         }
                     }.frame(width: 100, height: 100)

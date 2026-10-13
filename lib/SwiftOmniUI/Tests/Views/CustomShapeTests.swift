@@ -72,7 +72,7 @@ private struct NotchedShape: Shape {
         let probe = ShapeProbe()
         let gradient = LinearGradient(colors: [.red, .blue], startPoint: .leading, endPoint: .trailing)
         let inherited = Renders().render(NotchedShape(depth: 5, probe: probe).foregroundStyle(gradient).node)
-        XCTAssertEqual(inherited.props[ShapeContract.fill.token], gradient.brush.propValue)
+        XCTAssertEqual(inherited.props[ShapeContract.fill.token], gradient.brush.propValue.resolvingColorScheme())
         let explicit = Renders().render(NotchedShape(depth: 5, probe: probe)
             .fill(.black.opacity(0.03), style: FillStyle(eoFill: true, antialiased: true))
             .foregroundStyle(gradient).node)
@@ -101,7 +101,7 @@ private struct NotchedShape: Shape {
         let patch = Renders().render(Text("bubble").background(.red, in: NotchedShape(depth: 10, probe: ShapeProbe())).node)
         let path = patch.subtree.first { $0.type == PathContract.nodeType }
         XCTAssertNotNil(path)
-        XCTAssertEqual(path?.props[ShapeContract.fill.token], Color.red.brush.propValue)
+        XCTAssertEqual(path?.props[ShapeContract.fill.token], Color.red.brush.propValue.resolvingColorScheme())
     }
 
     func testCustomStrokeUsesTheSameCompleteStyleAsANativePath() {
@@ -173,7 +173,7 @@ private struct NotchedShape: Shape {
         let patch = Renders().render(path.node)
         let inner = try XCTUnwrap(patch.subtree.first { $0.type == PathContract.nodeType })
         XCTAssertEqual(inner.props[PathContract.commands.token], .numbers([0, 2, 3, 1, 4, 5]))
-        XCTAssertEqual(inner.props[ShapeContract.stroke.token], Color.red.brush.propValue)
+        XCTAssertEqual(inner.props[ShapeContract.stroke.token], Color.red.brush.propValue.resolvingColorScheme())
         XCTAssertEqual(inner.props[ShapeContract.strokeDashPattern.token], .numbers([6, 3]))
     }
 

@@ -16,9 +16,9 @@ struct LayeredBoxes: View {
     var body: some View {
         VStack {
             ZStack {
-                ColorPicker(.red).frame(width: 10).zIndex(blueInFront ? 0 : 1)
-                ColorPicker(.blue).frame(width: 20).zIndex(blueInFront ? 1 : 0)
-                ColorPicker(.green).frame(width: 30).zIndex($green)
+                ColorPicker(Color("#FF0000")).frame(width: 10).zIndex(blueInFront ? 0 : 1)
+                ColorPicker(Color("#0000FF")).frame(width: 20).zIndex(blueInFront ? 1 : 0)
+                ColorPicker(Color("#008000")).frame(width: 30).zIndex($green)
             }
             .frame(height: 40)
 
@@ -45,8 +45,8 @@ final class AndroidZStackViewTests: XCTestCase {
         onMainActor {
             let host = AndroidRenderer.running {
                 ZStack {
-                    ColorPicker(.red).area(.absolute(10, 20, 30, 40))
-                    ColorPicker(.blue).area(.proportional(0.5, 0.5, 0.5, 0.5))
+                    ColorPicker(Color("#FF0000")).area(.absolute(10, 20, 30, 40))
+                    ColorPicker(Color("#0000FF")).area(.proportional(0.5, 0.5, 0.5, 0.5))
                 }
             }
 
@@ -67,7 +67,7 @@ final class AndroidZStackViewTests: XCTestCase {
             let host = AndroidRenderer.running(clock: clock) {
                 VStack {
                     PlacedLayout(["back", "front"], id: \.self) { name in
-                        ColorPicker(name == "back" ? .red : .blue)
+                        ColorPicker(name == "back" ? Color("#FF0000") : Color("#0000FF"))
                     }
                     .placement(run.projectedValue)
                     .frame(height: 200)
@@ -139,8 +139,8 @@ final class AndroidZStackViewTests: XCTestCase {
         onMainActor {
             let host = AndroidRenderer.running {
                 ZStack {
-                    ColorPicker(.red)
-                    ColorPicker(.blue).area(.absolute(10, 20, 30, 40))
+                    ColorPicker(Color("#FF0000"))
+                    ColorPicker(Color("#0000FF")).area(.absolute(10, 20, 30, 40))
                 }
                 .contentPadding(10, 5, 20, 15)
             }
@@ -160,7 +160,7 @@ final class AndroidZStackViewTests: XCTestCase {
         onMainActor {
             let host = AndroidRenderer.running {
                 VStack {
-                    ZStack { ColorPicker(.red) }
+                    ZStack { ColorPicker(Color("#FF0000")) }
                         .contentPadding(10)
                         .background(Color("#00FF00"))
                         .stroke(Color("#0000FF"))
@@ -170,7 +170,7 @@ final class AndroidZStackViewTests: XCTestCase {
                         .frame(width: 100)
                         .frame(height: 80)
                         .horizontalAlignment(.start)
-                    ZStack { ColorPicker(.red) }
+                    ZStack { ColorPicker(Color("#FF0000")) }
                         .shape(.roundedRectangle(20))
                         .frame(width: 100)
                         .frame(height: 80)
@@ -200,7 +200,7 @@ final class AndroidZStackViewTests: XCTestCase {
     func testALayoutWithAPlainColourKeepsAPlainBackground() throws {
         try onMainActor {
             let host = AndroidRenderer.running {
-                ZStack { ColorPicker(.red).frame(width: 10).frame(height: 10) }
+                ZStack { ColorPicker(Color("#FF0000")).frame(width: 10).frame(height: 10) }
                     .background(Color("#00FF00"))
                     .frame(width: 100)
                     .frame(height: 80)

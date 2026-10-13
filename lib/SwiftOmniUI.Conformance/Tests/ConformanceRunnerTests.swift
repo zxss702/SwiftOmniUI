@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-@_spi(Host) import SwiftOmniUICore
+@_spi(Host) @testable import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
 @_spi(Host) @testable import SwiftOmniUIConformance
 import XCTest
@@ -213,18 +213,29 @@ final class ConformanceRunnerTests: XCTestCase {
     /// A colour SwiftOmniUI draws shows as the screen shows it: each channel a few steps off, as smoothing an edge leaves
     /// it, is the colour; more is another, and nothing is none.
     func testAColourShowsWithinTheStepsSmoothingTakes() {
-        let red = Color(red: 255, green: 0, blue: 0)
-        XCTAssertTrue(Session.shows(Color(red: 253, green: 0, blue: 0), red))
+        let red = Color("#FF0000")
+        XCTAssertTrue(Session.shows(Color("#FD0000"), red))
         XCTAssertTrue(Session.shows(Color(red: 251, green: 4, blue: 0, alpha: 251), red))
-        XCTAssertFalse(Session.shows(Color(red: 250, green: 0, blue: 0), red))
-        XCTAssertFalse(Session.shows(Color(red: 255, green: 0, blue: 5), red))
+        XCTAssertFalse(Session.shows(Color("#FA0000"), red))
+        XCTAssertFalse(Session.shows(Color("#FF0005"), red))
         XCTAssertFalse(Session.shows(nil, red))
 
         run([ConformanceCase("paints", proves: [Covered(SwitchContract.isOn)]) { s in
-            s.expect(Color(red: 253, green: 0, blue: 0), shows: red)
+            s.expect(Color("#FD0000"), shows: red)
             s.expect(nil, shows: red, "on its outline")
         }], on: RegisterOnly(realizing: [.complete("Switch", "isOn")]))
         XCTAssertEqual(failures, ["Nowhere · paints: \(red) expected, nothing came - on its outline"])
+    }
+
+    func testAPaletteExpectationUsesTheCurrentAppearance() {
+        let previous = StandardEnvironment.appInfo.colorScheme
+        defer { HostBoundary.setColorScheme(previous) }
+        HostBoundary.setColorScheme(.light)
+        XCTAssertTrue(Session.shows(Color("#00C0E8"), .cyan))
+        XCTAssertFalse(Session.shows(Color("#00FFFF"), .cyan))
+        HostBoundary.setColorScheme(.dark)
+        XCTAssertTrue(Session.shows(Color("#3CD3FE"), .cyan))
+        XCTAssertFalse(Session.shows(Color("#00C0E8"), .cyan))
     }
 
     /// What a driver cannot do is a failure unless the driver says why it cannot; where it says why, the members stay

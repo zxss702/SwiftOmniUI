@@ -7,10 +7,20 @@ nothing in a host binds anything.
 
 ## Four channels
 
-`Color` holds four 8-bit sRGB channels. Every initializer produces them, so
-nothing the API can express is lost, and equality means the colour rather
-than its spelling: `Color("#ff0000")` and `.red` are one value, so two
-spellings of one colour are not a change and nothing is sent for them.
+`Color` holds four 8-bit sRGB channels, with an optional dark appearance.
+Constant colors compare by their channels: `Color("#ff0000")` and
+`Color(red: 1, green: 0, blue: 0)` are one value. A named UI color such as
+`.red` is a light/dark palette entry, rather than that constant RGB primary.
+Equality and hashing keep both appearances without reading the current theme.
+
+The SwiftUI component initializer uses 0-1 values, including integer literals:
+`Color(red: 0, green: 1, blue: 1)` is full-intensity RGB cyan. The older byte
+overload remains for typed `Int` channels, with `alpha:` in byte units, but
+does not take precedence over SwiftUI component literals. Hex is an explicit
+way to spell constant byte colors. Linear sRGB and Display P3 input are
+converted once into gamma-encoded sRGB before crossing the host boundary.
+The current boundary quantizes to 8 bits and clips out-of-gamut values;
+extended sRGB, HDR and full wide-gamut color transport are not represented.
 
 A colour crosses as its own kind of value, four channels of a byte. It is
 the value a tree carries most of and the cheapest to say exactly, and no host
@@ -37,9 +47,18 @@ text: a colour crosses as bytes wherever it crosses.
 
 ## Named colours
 
-The named colours are the ones that come up in practice, each with its CSS
-name and value; any other colour is one hex literal away. `darkGray` is
-lighter than `gray`, as its CSS value is.
+Names shared with SwiftUI's standard UI palette (`red`, `orange`, `yellow`,
+`green`, `mint`, `teal`, `cyan`, `blue`, `indigo`, `purple`, `pink`, `brown`,
+and `gray`) carry reference light/dark sRGB variants. The palette follows
+[Apple's published system color specifications](https://developer.apple.com/design/human-interface-guidelines/color).
+For example, cyan is `#00C0E8` in light appearances and `#3CD3FE` in dark ones,
+instead of CSS's `#00FFFF`. These references do not implement Apple's
+increased-contrast or vibrancy variants.
+
+Black, white and clear stay constant. Additional CSS-only names such as
+`cornflowerBlue`, `magenta`, `lime`, `lightGray`, and `darkGray` keep their
+constant channels. A particular CSS or brand color can always use explicit
+hex or RGB components.
 
 ## A pair for each color scheme
 

@@ -7,8 +7,8 @@ import XCTest
 
 /// A fill, a box's corners and outline, and a shape's lines, as every host reads what the tree sends.
 final class DrawingRulesTests: XCTestCase {
-    private let red = Color(red: 255, green: 0, blue: 0).propValue
-    private let blue = Color(red: 0, green: 0, blue: 255).propValue
+    private let red = Color("#FF0000").propValue
+    private let blue = Color("#0000FF").propValue
 
     /// A bare colour is one colour; a gradient's stops stand between 0 and 1, and it runs top to bottom where it
     /// gives no geometry; its first colour is what a line of one colour draws.
@@ -35,7 +35,7 @@ final class DrawingRulesTests: XCTestCase {
     func testARadialGradientIsReadFromItsCentreToItsRadius() {
         let stops = [HostBrush.Stop(offset: 0, color: red), HostBrush.Stop(offset: 1, color: blue)]
         let authored = Brush.radialGradient(
-            [GradientStop(Color(red: 255, green: 0, blue: 0), 0), GradientStop(Color(red: 0, green: 0, blue: 255), 1)],
+            [GradientStop(Color("#FF0000"), 0), GradientStop(Color("#0000FF"), 1)],
             center: Point(0.25, 0.75), radius: 0.4)
 
         let brush = HostBrush(authored.propValue)

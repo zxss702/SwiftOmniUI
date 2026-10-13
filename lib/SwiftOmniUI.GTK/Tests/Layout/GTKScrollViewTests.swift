@@ -29,7 +29,7 @@ final class GTKScrollViewTests: XCTestCase {
         try onUIThread {
             let host = GTKRenderer.running {
                 VStack {
-                    ScrollView { ColorPicker(.red).frame(height: 2000) }.frame(height: 100)
+                    ScrollView { ColorPicker(Color("#FF0000")).frame(height: 2000) }.frame(height: 100)
                 }
                 .frame(height: 300)
                 .verticalAlignment(.start)
@@ -154,7 +154,7 @@ final class GTKScrollViewTests: XCTestCase {
         try onUIThread {
             let host = GTKRenderer.running {
                 ScrollView {
-                    ColorPicker(.red).frame(height: 400)
+                    ColorPicker(Color("#FF0000")).frame(height: 400)
                 }
                 .contentPadding(10)
                 .shape(.roundedRectangle(20))

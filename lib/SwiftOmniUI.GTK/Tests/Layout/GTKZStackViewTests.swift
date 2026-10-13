@@ -17,9 +17,9 @@ struct LayeredBoxes: View {
     var body: some View {
         VStack {
             ZStack {
-                ColorPicker(.red).frame(width: 10).zIndex(blueInFront ? 0 : 1)
-                ColorPicker(.blue).frame(width: 20).zIndex(blueInFront ? 1 : 0)
-                ColorPicker(.green).frame(width: 30).zIndex($green)
+                ColorPicker(Color("#FF0000")).frame(width: 10).zIndex(blueInFront ? 0 : 1)
+                ColorPicker(Color("#0000FF")).frame(width: 20).zIndex(blueInFront ? 1 : 0)
+                ColorPicker(Color("#008000")).frame(width: 30).zIndex($green)
             }
             .frame(width: 40)
             .frame(height: 40)
@@ -41,8 +41,8 @@ final class GTKZStackViewTests: XCTestCase {
         try onUIThread {
             let host = GTKRenderer.running {
                 ZStack {
-                    ColorPicker(.red).area(.absolute(10, 20, 30, 40))
-                    ColorPicker(.blue).area(.proportional(0.5, 0.5, 0.5, 0.5))
+                    ColorPicker(Color("#FF0000")).area(.absolute(10, 20, 30, 40))
+                    ColorPicker(Color("#0000FF")).area(.proportional(0.5, 0.5, 0.5, 0.5))
                 }
             }
             let room = try XCTUnwrap(host.views(GTKZStackView.self).first).frame
@@ -66,7 +66,7 @@ final class GTKZStackViewTests: XCTestCase {
             let host = GTKRenderer.running(clock: clock) {
                 VStack {
                     PlacedLayout(["back", "front"], id: \.self) { name in
-                        ColorPicker(name == "back" ? .red : .blue)
+                        ColorPicker(name == "back" ? Color("#FF0000") : Color("#0000FF"))
                     }
                     .placement(run.projectedValue)
                     .frame(height: 200)
@@ -123,8 +123,8 @@ final class GTKZStackViewTests: XCTestCase {
         try onUIThread {
             let host = GTKRenderer.running {
                 ZStack {
-                    ColorPicker(.red)
-                    ColorPicker(.blue).area(.absolute(10, 20, 30, 40))
+                    ColorPicker(Color("#FF0000"))
+                    ColorPicker(Color("#0000FF")).area(.absolute(10, 20, 30, 40))
                 }
                 .contentPadding(10, 5, 20, 15)
             }
@@ -143,7 +143,7 @@ final class GTKZStackViewTests: XCTestCase {
         try onUIThread {
             let host = GTKRenderer.running {
                 VStack {
-                    ColorPicker(.red).frame(width: 100).frame(height: 40).rotation3DEffect(y: 60).horizontalAlignment(.start)
+                    ColorPicker(Color("#FF0000")).frame(width: 100).frame(height: 40).rotation3DEffect(y: 60).horizontalAlignment(.start)
                 }
             }
             let box = try XCTUnwrap(host.views(GTKColorBoxView.self).first)
@@ -166,7 +166,7 @@ final class GTKZStackViewTests: XCTestCase {
         onUIThread {
             let host = GTKRenderer.running {
                 VStack {
-                    ZStack { ColorPicker(.red) }
+                    ZStack { ColorPicker(Color("#FF0000")) }
                         .contentPadding(10)
                         .background(Color("#00FF00"))
                         .stroke(Color("#0000FF"))
@@ -176,12 +176,12 @@ final class GTKZStackViewTests: XCTestCase {
                         .frame(width: 100)
                         .frame(height: 80)
                         .horizontalAlignment(.start)
-                    ZStack { ColorPicker(.red) }
+                    ZStack { ColorPicker(Color("#FF0000")) }
                         .shape(.roundedRectangle(20))
                         .frame(width: 100)
                         .frame(height: 80)
                         .horizontalAlignment(.start)
-                    ZStack { ColorPicker(.red) }
+                    ZStack { ColorPicker(Color("#FF0000")) }
                         .shape(.roundedRectangle(20))
                         .clipsContent(true)
                         .frame(width: 100)

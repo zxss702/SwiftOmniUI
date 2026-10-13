@@ -81,7 +81,8 @@ public enum PropValue: Equatable, Sendable {
     }
 
     /// This value with the half in force picked - a read of the color scheme.
-    func resolvingColorScheme() -> PropValue {
+    /// The conformance harness uses the same resolution for its expected native values.
+    @_spi(Host) public func resolvingColorScheme() -> PropValue {
         switch self {
         case .themed(let light, let dark):
             (StandardEnvironment.appInfo.colorScheme == .dark ? dark : light).resolvingColorScheme()

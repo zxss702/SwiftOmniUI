@@ -148,6 +148,14 @@ GTK continues to composite alpha with `gtk_snapshot_push_mask`.
 
 ## A canvas
 
+The closure-based Canvas listens to allocated width and height through passive
+drawing feedback, independent of scrolling position. Identical commands are
+filtered before Swift flattens them and before native Direct2D replay. A newly
+sized surface is painted and committed with `EndDraw` before its brush replaces
+the displayed surface; replay failures leave the drawing stale instead of
+marking it complete. Device-loss recreation uses the same completed-surface
+handoff.
+
 A Canvas replays its drawing with Direct2D, the drawing API WinUI itself
 draws with. The canvas is a panel of the relay's with no size of its own,
 painted with a `SurfaceImageSource` that Direct2D draws into: the drawing

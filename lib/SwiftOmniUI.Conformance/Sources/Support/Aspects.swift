@@ -24,11 +24,13 @@
                 ])
             }
             let specimen = try s.specimen(element)
-            s.expect(try s.held(member, on: specimen), first, "the value the tree gave")
+            let firstShown = Value(propValue: first.propValue.resolvingColorScheme()) ?? first
+            s.expect(try s.held(member, on: specimen), firstShown, "the value the tree gave")
 
             try s.perform(.activate, on: s.element("change"))
-            try s.settle { try s.held(member, on: specimen) == second }
-            s.expect(try s.held(member, on: specimen), second, "the value the tree changed it to")
+            let secondShown = Value(propValue: second.propValue.resolvingColorScheme()) ?? second
+            try s.settle { try s.held(member, on: specimen) == secondShown }
+            s.expect(try s.held(member, on: specimen), secondShown, "the value the tree changed it to")
         }
     }
 

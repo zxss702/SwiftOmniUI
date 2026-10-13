@@ -66,11 +66,7 @@ public struct Canvas: VisualElement, CanvasProperties{
     /// the room its layout gave it: the closure runs again as the size
     /// settles, so what depends on it is drawn at the size it lands.
     public init(renderer: @escaping (inout GraphicsContext, Size) -> Void) {
-        node = GeometryReader { proxy in
-            var context = GraphicsContext()
-            renderer(&context, proxy.size)
-            return Canvas { context.commands }
-        }.node
+        node = CanvasSizeReader(renderer: renderer).node
     }
 
     /// A finger went down, or a mouse button was pressed.
@@ -90,6 +86,39 @@ public struct Canvas: VisualElement, CanvasProperties{
     /// It was lifted, with where it left off.
     @_spi(Host) public func onReleased(_ handler: @escaping ValueEventHandler<Point>) -> Self {
         onEvent(CanvasContract.released, handler)
+    }
+}
+
+/// A drawing depends on its allocated size, not its position in a scrolling
+/// window. Unlike business GeometryReader feedback, this passive measurement
+/// neither rebuilds on every scroll nor prevents ancestor placement animations.
+private struct CanvasSizeReader: View {
+    @State private var size: Size? = nil
+    let renderer: (inout GraphicsContext, Size) -> Void
+
+    init(renderer: @escaping (inout GraphicsContext, Size) -> Void) {
+        self.renderer = renderer
+    }
+
+    var body: some View {
+        var container = Grid {
+            if let size {
+                var context = GraphicsContext()
+                renderer(&context, size)
+                Canvas { context.commands }
+                    .frame(width: size.width, height: size.height)
+            }
+        }
+        container.node.props[.isGeometryReader] = true.propValue
+        return container.flex(0)
+            .hearing(ViewContract.drawingSizeChanged) { numbers in
+                guard numbers.count == 2 else { return }
+                let next = Size(numbers[0], numbers[1])
+                guard next != self.size else { return }
+                var transaction = Transaction()
+                transaction.isGeometryFeedback = true
+                withTransaction(transaction) { self.size = next }
+            }
     }
 }
 

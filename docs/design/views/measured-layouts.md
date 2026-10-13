@@ -73,6 +73,11 @@ so a fabricated zero size cannot produce a visible initial placement.
 
 ## A frame feed
 
+Canvas size feedback is passive drawing information rather than a business
+frame feed. The internal `drawingSizeChanged` event carries only width and
+height when either changes. It does not mark ancestors as frame readers and
+does not rebuild a drawing merely because scrolling changed its global origin.
+
 `.frame($room)` writes the same frame into a state with no render at all: the
 arithmetic that lays views out has it, and no view is built for it - the
 difference from `GeometryReader`, whose answer is a value the tree can show. Only

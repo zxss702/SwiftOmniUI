@@ -187,7 +187,7 @@ final class WinUIPagesTests: XCTestCase {
     func testWordsOnAPaintedBarFollowHowDarkItIs() throws {
         try onUIThread {
             let dark = State(wrappedValue: true)
-            let (navy, yellow) = (Color(red: 0, green: 0, blue: 128), Color(red: 255, green: 230, blue: 0))
+            let (navy, yellow) = (Color("#000080"), Color("#FFE600"))
             let host = WinUIRenderer.running {
                 NavigationStack(State(wrappedValue: [Int]()).projectedValue) {
                     Text("Root")

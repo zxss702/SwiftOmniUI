@@ -62,7 +62,7 @@ final class AndroidColorBoxViewTests: XCTestCase {
         try onMainActor {
             let host = AndroidRenderer.running {
                 VStack {
-                    ColorPicker(.red).frame(height: 10).horizontalAlignment(.start)
+                    ColorPicker(Color("#FF0000")).frame(height: 10).horizontalAlignment(.start)
                 }
             }
             host.layOut()

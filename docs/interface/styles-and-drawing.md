@@ -80,13 +80,15 @@ driven bindings are not style values.
 let surface = Color(light: .white, dark: Color("#18181B"))
 let accent = Color("#5B5BD6")
 let translucent = Color("#805B5BD6")
-let sameTranslucent = Color(red: 91, green: 91, blue: 214, alpha: 128)
+let sameTranslucent = Color(red: 91.0 / 255, green: 91.0 / 255, blue: 214.0 / 255, opacity: 128.0 / 255)
 ```
 
 Hex input accepts `#RGB`, `#ARGB`, `#RRGGBB`, or `#AARRGGBB`, the alpha first
-when it is written. Named colors are static members checked by the compiler.
-`Color(red:green:blue:alpha:)` takes whole-number channels from 0 through 255;
-the alpha is 255, opaque, unless it is given.
+when it is written. `Color(red:green:blue:opacity:)` uses SwiftUI's 0-1
+components; `Color(red: 1, green: 0, blue: 0)` is opaque RGB red. Typed `Int`
+byte channels and the older `alpha:` spelling remain supported for compatibility.
+Named UI colors such as `.red` and `.cyan` carry light/dark palette variants,
+so `.cyan` differs from constant RGB cyan (`Color("#00FFFF")`).
 
 `ImageSource` follows the same color scheme rule:
 

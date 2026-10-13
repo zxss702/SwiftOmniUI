@@ -48,7 +48,7 @@ extension MountedElement {
     public var readsOwnFrame: Bool {
         driven[.frame] != nil || events[.frameChanged] != nil
             || events[.namedFramesChanged] != nil || events[.safeAreaInsetsChanged] != nil
-            || events[.textFrameChanged] != nil
+            || events[.textFrameChanged] != nil || events[.drawingSizeChanged] != nil
     }
 
     /// Says where the element stands - `numbers`, a frame report's ten, and the named spaces enclosing it -
@@ -79,6 +79,13 @@ extension MountedElement {
             reportedSafeAreaInsets = geometryInsets
             if let handler = handler(.safeAreaInsetsChanged) {
                 runtime.dispatch(handler, payload: [geometryInsets.propValue])
+            }
+        }
+        if numbers.count >= 4, let handler = handler(.drawingSizeChanged) {
+            let size = Size(numbers[2], numbers[3])
+            if size != reportedDrawingSize {
+                reportedDrawingSize = size
+                runtime.dispatch(handler, payload: [.numbers([size.width, size.height])])
             }
         }
         guard numbers != reportedFrame || insetsChanged else { return }

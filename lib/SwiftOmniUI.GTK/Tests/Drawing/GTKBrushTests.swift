@@ -11,8 +11,8 @@ private let blue: UInt32 = 0xFF00_00FF
 
 /// Red out to 0.6 of the reach from the middle, blue past it: the edge between says how far the gradient reaches.
 private let circle = Brush.radialGradient([
-    GradientStop(Color(red: 255, green: 0, blue: 0), 0), GradientStop(Color(red: 255, green: 0, blue: 0), 0.6),
-    GradientStop(Color(red: 0, green: 0, blue: 255), 0.6), GradientStop(Color(red: 0, green: 0, blue: 255), 1),
+    GradientStop(Color("#FF0000"), 0), GradientStop(Color("#FF0000"), 0.6),
+    GradientStop(Color("#0000FF"), 0.6), GradientStop(Color("#0000FF"), 1),
 ])
 
 final class GTKBrushTests: XCTestCase {

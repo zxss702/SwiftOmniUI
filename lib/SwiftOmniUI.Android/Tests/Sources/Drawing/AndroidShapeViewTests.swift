@@ -23,8 +23,8 @@ final class AndroidShapeViewTests: XCTestCase {
         onMainActor {
             let host = AndroidRenderer.running {
                 VStack {
-                    Rectangle().fill(.red).frame(width: 20).frame(height: 20).horizontalAlignment(.start)
-                    Ellipse().fill(.red).frame(width: 20).frame(height: 20).horizontalAlignment(.start)
+                    Rectangle().fill(Color("#FF0000")).frame(width: 20).frame(height: 20).horizontalAlignment(.start)
+                    Ellipse().fill(Color("#FF0000")).frame(width: 20).frame(height: 20).horizontalAlignment(.start)
                 }
             }
             host.layOut()
@@ -40,7 +40,7 @@ final class AndroidShapeViewTests: XCTestCase {
     func testDrawnGeometryFitsItsRoom() throws {
         try onMainActor {
             let host = AndroidRenderer.running {
-                Polygon([Point(0, 10), Point(5, 0), Point(10, 10)]).fill(.red)
+                Polygon([Point(0, 10), Point(5, 0), Point(10, 10)]).fill(Color("#FF0000"))
                     .frame(width: 40).frame(height: 20).horizontalAlignment(.start)
             }
             host.layOut()
@@ -54,7 +54,7 @@ final class AndroidShapeViewTests: XCTestCase {
     func testAPathsArcBendsToItsTop() throws {
         try onMainActor {
             let host = AndroidRenderer.running {
-                Path("M 0 10 A 10 10 0 0 1 20 10 Z").fill(.red).aspect(.center)
+                Path("M 0 10 A 10 10 0 0 1 20 10 Z").fill(Color("#FF0000")).aspect(.center)
                     .frame(width: 20).frame(height: 20).horizontalAlignment(.start)
             }
             host.layOut()
@@ -69,7 +69,7 @@ final class AndroidShapeViewTests: XCTestCase {
     func testAShapeAsksForNoRoom() throws {
         try onMainActor {
             let host = AndroidRenderer.running {
-                VStack { Rectangle().fill(.red).horizontalAlignment(.start) }
+                VStack { Rectangle().fill(Color("#FF0000")).horizontalAlignment(.start) }
             }
             host.layOut()
             let rectangle = try XCTUnwrap(host.views(AndroidShapeView.self).first)

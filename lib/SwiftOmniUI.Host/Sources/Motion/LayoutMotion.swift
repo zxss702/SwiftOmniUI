@@ -33,15 +33,19 @@ extension PlacedView {
     /// Whether business geometry feedback requires the complete frame to arrive.
     public var framesRead: Bool
 
+    /// Measurement refinement may retarget an existing journey without starting a new one.
+    public var refines: Bool
+
     /// An arrangement that animates `lanes` under `law`, fading in a joining child when `fades`.
     public init(
         law: Animation = .none, lanes: AnimationLanes = [],
-        fades: Bool = false, framesRead: Bool = false
+        fades: Bool = false, framesRead: Bool = false, refines: Bool = false
     ) {
         self.law = law
         self.lanes = lanes
         self.fades = fades
         self.framesRead = framesRead
+        self.refines = refines
     }
 }
 
@@ -64,6 +68,11 @@ extension PlacedView {
 
     /// Called when an animation starts, so the frame clock is held while it runs.
     public var onStart: () -> Void = {}
+
+    /// Whether this mounted row still has a presentation journey to finish.
+    public func isTravelling(mount: UInt64) -> Bool {
+        animator.animation(for: .placed(mount)) != nil
+    }
 
     /// Layout animation whose animations `animator` advances, on `now`'s time.
     public init(animator: Animator, now: @escaping () -> Double, reducesMotion: @escaping () -> Bool) {
@@ -158,11 +167,11 @@ extension PlacedView {
         // A scroll anchor changes the viewport origin, not the row's layout destination.
         // Compensate the sampled presentation and bend toward the newly computed place.
         // A measurement-only pass keeps the running law and sampled velocity.
-        let correctingAnchor = anchorOffset != .zero && running != nil
+        let refining = (anchorOffset != .zero || arrangement.refines) && running != nil
             && !arrangement.framesRead && !reducesMotion()
         var lanes = arrangement.lanes
         var law = arrangement.law
-        if correctingAnchor, lanes.isEmpty, let running {
+        if refining, lanes.isEmpty, let running {
             law = running.animation
             for (index, lane) in Self.order.enumerated()
                 where running.from[index] != running.destination[index] || running.velocity[index] != 0 {

@@ -18,8 +18,8 @@ final class AndroidBrushTests: XCTestCase {
 
     /// Red out to 0.6 of the reach from the middle, blue past it: the edge between says how far the gradient reaches.
     static let circle = Brush.radialGradient([
-        GradientStop(Color(red: 255, green: 0, blue: 0), 0), GradientStop(Color(red: 255, green: 0, blue: 0), 0.6),
-        GradientStop(Color(red: 0, green: 0, blue: 255), 0.6), GradientStop(Color(red: 0, green: 0, blue: 255), 1),
+        GradientStop(Color("#FF0000"), 0), GradientStop(Color("#FF0000"), 0.6),
+        GradientStop(Color("#0000FF"), 0.6), GradientStop(Color("#0000FF"), 1),
     ])
 
     /// A radial gradient is a circle whatever it paints: on a box 200 by 100 it reaches 100 down as across, so 40

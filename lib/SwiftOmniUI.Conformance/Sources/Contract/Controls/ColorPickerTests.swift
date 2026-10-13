@@ -24,11 +24,11 @@
                     .horizontalAlignment(.start)
                 }
                 let box = try s.element("box")
-                try s.settle { try s.color(of: box, at: Point(20, 20)) == .red }
+                try s.settle { try s.shows(.red, on: box, at: Point(20, 20)) }
                 s.expect(try s.color(of: box, at: Point(1, 1)), .red, "to its corner")
 
                 try s.perform(.activate, on: s.element("change"))
-                try s.settle { try s.color(of: box, at: Point(20, 20)) == .blue }
+                try s.settle { try s.shows(.blue, on: box, at: Point(20, 20)) }
                 s.expect(try s.color(of: box, at: Point(20, 20)), .blue, "the colour the tree changed it to")
             },
             ConformanceCase("aBoxsRoundedCornersAreLeftEmpty", proves: [
@@ -44,11 +44,11 @@
                     .horizontalAlignment(.start)
                 }
                 let box = try s.element("box")
-                try s.settle { try s.color(of: box, at: Point(40, 40)) == .red }
+                try s.settle { try s.shows(.red, on: box, at: Point(40, 40)) }
                 s.expect(try s.color(of: box, at: Point(1, 1)), nil, "the rounded corner empty")
 
                 try s.perform(.activate, on: s.element("change"))
-                try s.settle { try s.color(of: box, at: Point(1, 1)) == .red }
+                try s.settle { try s.shows(.red, on: box, at: Point(1, 1)) }
                 s.expect(try s.color(of: box, at: Point(1, 1)), .red, "square once the tree says so")
             },
         ]

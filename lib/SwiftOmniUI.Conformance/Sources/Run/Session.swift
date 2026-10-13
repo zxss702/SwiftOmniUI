@@ -251,6 +251,14 @@
              file: file, line: line)
     }
 
+    /// A native color is already resolved; compare it with the expected palette's current appearance.
+    public func expect(
+        _ actual: Color?, _ expected: Color?, _ message: String = "", file: StaticString = #filePath, line: UInt = #line
+    ) {
+        expect(actual?.propValue.resolvingColorScheme(), expected?.propValue.resolvingColorScheme(),
+               message, file: file, line: line)
+    }
+
     /// Expects `actual` within `tolerance` of `expected`.
     public func expect(
         _ actual: Double?, _ expected: Double, within tolerance: Double, _ message: String = "",
@@ -275,8 +283,8 @@
     /// a colour drawn whole.
     /// Design: docs/design/host/conformance.md#a-colour-drawn
     static func shows(_ actual: Color?, _ expected: Color) -> Bool {
-        guard case .color(let red, let green, let blue, let alpha)? = actual?.propValue,
-              case .color(let shownRed, let shownGreen, let shownBlue, let shownAlpha) = expected.propValue
+        guard case .color(let red, let green, let blue, let alpha)? = actual?.propValue.resolvingColorScheme(),
+              case .color(let shownRed, let shownGreen, let shownBlue, let shownAlpha) = expected.propValue.resolvingColorScheme()
         else { return false }
         return zip([red, green, blue, alpha], [shownRed, shownGreen, shownBlue, shownAlpha])
             .allSatisfy { abs(Int($0) - Int($1)) <= 4 }

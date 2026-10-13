@@ -13,13 +13,13 @@ final class TextRulesTests: XCTestCase {
     func testAnElementsWordsAndLookAreReadWhereTheyChanged() throws {
         let held: [Prop: HostValue] = [
             .text: .string("Save"), .textCase: TextCase.uppercase.propValue, .fontSize: .number(17),
-            .foregroundStyle: Color(red: 255, green: 0, blue: 0).propValue,
+            .foregroundStyle: Color("#FF0000").propValue,
         ]
         let changed = ElementValues<TextContract>(changed: [.text, .fontSize], reading: { held[$0] })
         XCTAssertEqual(TextMembers.words(changed), "SAVE")
         let look = try XCTUnwrap(TextMembers.look(changed))
         XCTAssertEqual(look.size, 17)
-        XCTAssertEqual(look.color, Color(red: 255, green: 0, blue: 0).propValue)
+        XCTAssertEqual(look.color, Color("#FF0000").propValue)
 
         let still = ElementValues<TextContract>(changed: [.padding], reading: { held[$0] })
         XCTAssertNil(TextMembers.words(still))

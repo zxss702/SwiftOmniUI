@@ -15,7 +15,7 @@ final class WinUIScrollViewTests: XCTestCase {
                 let axes: Axis.Set = axis == .vertical ? .vertical : axis == .horizontal ? .horizontal
                     : axis == .both ? [.vertical, .horizontal] : []
                 let host = WinUIRenderer.running {
-                    ScrollView(axes) { Color.red.frame(width: 1_000, height: 1_000) }
+                    ScrollView(axes) { Color("#FF0000").frame(width: 1_000, height: 1_000) }
                         .frame(width: 240, height: 240)
                 }
                 let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
@@ -39,7 +39,7 @@ final class WinUIScrollViewTests: XCTestCase {
         try onUIThread {
             let host = WinUIRenderer.running {
                 VStack {
-                    ScrollView { Rectangle().fill(.red).frame(height: 2000) }.frame(height: 100)
+                    ScrollView { Rectangle().fill(Color("#FF0000")).frame(height: 2000) }.frame(height: 100)
                 }
                 .frame(height: 300, alignment: .top)
                 .verticalAlignment(.start)
@@ -55,7 +55,7 @@ final class WinUIScrollViewTests: XCTestCase {
         try onUIThread {
             let host = WinUIRenderer.running {
                 ScrollView {
-                    Rectangle().fill(.red).frame(height: 400)
+                    Rectangle().fill(Color("#FF0000")).frame(height: 400)
                 }
                 .contentPadding(10)
                 .shape(.roundedRectangle(20))

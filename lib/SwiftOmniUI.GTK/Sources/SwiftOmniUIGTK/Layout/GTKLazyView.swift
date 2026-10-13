@@ -40,6 +40,13 @@ class GTKLazyView: GTKTravellingLayout {
     /// A window change under way asks the run again once, not per notice.
     private var retellQueued = false
 
+    var travellingIdentities: Set<String> {
+        if cells.animatesChanges { return Set(mounted.keys) }
+        return Set(mounted.compactMap { identity, item in
+            places.layoutMotion?.isTravelling(mount: item.mount) == true ? identity : nil
+        })
+    }
+
     init(axis: StackArithmetic.Axis, cells: LazyCells) {
         self.axis = axis
         self.cells = cells
@@ -270,7 +277,7 @@ final class GTKLazyStackView: GTKLazyView {
         if let origin = cells.correctedOrigin() { anchorTarget = origin }
         places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                         axis == .vertical ? cells.anchorShift : 0))
+                                         axis == .vertical ? cells.anchorShift : 0), refining: true)
         cells.animatesChanges = false
         cells.anchorShift = 0
         if cells.extents.revision != revision {
@@ -322,7 +329,7 @@ final class GTKLazyStackView: GTKLazyView {
     }
 
     override func tellWindow(_ span: Range<Double>) {
-        cells.show(span)
+        cells.show(span, keeping: travellingIdentities)
     }
 }
 
@@ -429,7 +436,7 @@ final class GTKLazyGridView: GTKLazyView {
         if let origin = cells.correctedOrigin(perRun: perRun, grid: true) { anchorTarget = origin }
         places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                         axis == .vertical ? cells.anchorShift : 0))
+                                         axis == .vertical ? cells.anchorShift : 0), refining: true)
         cells.animatesChanges = false
         cells.anchorShift = 0
         if cells.runs.revision != revision {
@@ -493,7 +500,7 @@ final class GTKLazyGridView: GTKLazyView {
     }
 
     override func tellWindow(_ span: Range<Double>) {
-        cells.show(span, perRun: perRun, grid: true)
+        cells.show(span, perRun: perRun, grid: true, keeping: travellingIdentities)
     }
 }
 

@@ -36,6 +36,8 @@
     public var inserting: Set<String> = []
     /// The source positions mounted, including the fixed neighbour window.
     public private(set) var built: Range<Int> = 0..<0
+    /// Existing rows retained while their presentation is still moving.
+    public private(set) var retained: Set<String> = []
 
     /// The last viewport and geometry asked for. Identical layout notices do
     /// not perform another range lookup or send another render.
@@ -107,6 +109,7 @@
         if now.isEmpty {
             anchor = nil
             anchorShift = 0
+            retained = []
         }
         return true
     }
@@ -159,11 +162,12 @@
     /// are mounted while `span`'s own arithmetic - shown places, the anchor -
     /// keeps reading the true viewport.
     public func show(_ span: Range<Double>, perRun: Int = 1, grid: Bool = false, realize: Range<Double>? = nil,
-                     measureBeforeExpanding: Bool = false) {
+                     measureBeforeExpanding: Bool = false, keeping: Set<String> = []) {
         let revision = grid ? runs.revision : extents.revision
         let realize = realize ?? span
+        let keeping = keeping.filter { positions[$0] != nil }
         guard window?.span != span || window?.revision != revision || window?.perRun != perRun
-            || window?.realize != realize || needsMeasurement else { return }
+            || window?.realize != realize || needsMeasurement || retained != keeping else { return }
         let moved = window?.revision == revision && window?.span != span
         window = (span, revision, perRun, realize)
         searches += 1
@@ -217,12 +221,17 @@
         }
         let within = !wanted.isEmpty && lower < upper ? lower..<upper : 0..<0
         if !needsMeasurement { inserting.formIntersection(identities[within]) }
-        guard within != built else { return }
+        guard within != built || retained != keeping else { return }
         if !inserting.isDisjoint(with: identities[within]) { animatesChanges = true }
         built = within
+        retained = keeping
         requests += 1
         Self.realizing = true
-        element.send(.realizedChanged, [.strings(Array(identities[within]))], in: runtime)
+        // Retain actual moving rows, not all unbuilt rows between their old
+        // and new positions. This keeps the window lazy during a large insertion.
+        let extra = keeping.compactMap { positions[$0] }.filter { !within.contains($0) }
+        let requested = (Array(within) + extra).sorted().map { identities[$0] }
+        element.send(.realizedChanged, [.strings(requested)], in: runtime)
     }
 
     /// The corrected viewport origin after measurements or data move its anchor.
@@ -252,6 +261,7 @@
         guard let element, let runtime, built != 0..<identities.count else { return }
         if !inserting.isEmpty { animatesChanges = true }
         built = 0..<identities.count
+        retained = []
         needsMeasurement = false
         requests += 1
         element.send(.realizedChanged, [.strings(identities)], in: runtime)

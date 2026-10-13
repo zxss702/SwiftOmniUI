@@ -130,6 +130,12 @@ The corrected origin is clamped to the new scroll reach before deriving this
 offset, so removing an anchor cannot compensate a move the native scroller
 would refuse to make.
 
+Lazy measurement refinement is distinct from a resize or a new authored motion.
+At an unchanged cross-axis size, replacing estimated extents can retarget a
+running placement using its current velocity and law even without another
+business patch. It does not start a journey for a stationary row. Resizes,
+business geometry reads and reduced motion retain their immediate-arrival rules.
+
 ## Words at their destination
 
 A child whose place travels is told where it is bound as it sets out

@@ -131,8 +131,8 @@ final class GTKPagesTests: XCTestCase {
                 return color
             }
             XCTAssertEqual(colors.count, 2)
-            XCTAssertGreaterThan(colors[0].red - max(colors[0].green, colors[0].blue), 0.3, "Clear's words are red")
-            XCTAssertLessThan(abs(colors[1].red - colors[1].green), 0.1, "Later's words are the menu's own")
+            XCTAssertGreaterThan(colors[0]Color("#FF0000") - max(colors[0]Color("#008000"), colors[0]Color("#0000FF")), 0.3, "Clear's words are red")
+            XCTAssertLessThan(abs(colors[1]Color("#FF0000") - colors[1]Color("#008000")), 0.1, "Later's words are the menu's own")
         }
     }
 

@@ -48,11 +48,11 @@
                 s.turn()
                 return s.expect(try s.color(of: shape, at: inside), nil, "a line encloses nothing to fill")
             }
-            try s.settle { try s.color(of: shape, at: inside) == .red }
+            try s.settle { try s.shows(.red, on: shape, at: inside) }
             s.expect(try s.color(of: shape, at: inside), .red)
 
             try s.perform(.activate, on: s.element("change"))
-            try s.settle { try s.color(of: shape, at: inside) == .blue }
+            try s.settle { try s.shows(.blue, on: shape, at: inside) }
             s.expect(try s.color(of: shape, at: inside), .blue, "the colour the tree changed it to")
         }
     }
@@ -70,7 +70,7 @@
             }
             let shape = try s.specimen(element)
             let edge = Self.onOutline(element)
-            try s.settle { try s.color(of: shape, at: edge) == .red }
+            try s.settle { try s.shows(.red, on: shape, at: edge) }
             s.expect(try s.color(of: shape, at: edge), .red, "on its outline")
         }
     }
@@ -127,7 +127,7 @@
             }
             let shape = try s.specimen(element)
             let before = line ? Point(20, 20) : Point(8, 20)
-            try s.settle { try s.color(of: shape, at: before) == .red }
+            try s.settle { try s.shows(.red, on: shape, at: before) }
 
             try s.perform(.activate, on: s.element("change"))
             try s.settle { try s.color(of: shape, at: before) == nil }

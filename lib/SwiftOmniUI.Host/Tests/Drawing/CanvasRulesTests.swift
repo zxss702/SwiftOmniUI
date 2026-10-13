@@ -13,7 +13,7 @@ final class CanvasRulesTests: XCTestCase {
     func testAnInstructionReadsAsDrawWroteIt() throws {
         let broken = try XCTUnwrap(DrawCommand(propValue: .values([.enumeration(6), .number(1)])))
         let drawing = [
-            Draw.fillColor(.red), Draw.strokeWidth(3),
+            Draw.fillColor(Color("#FF0000")), Draw.strokeWidth(3),
             Draw.fillRoundedRectangle(x: 1, y: 2, width: 30, height: 40, cornerRadius: 5),
             Draw.drawText("Go", x: 0, y: 0, width: 90, height: 30, horizontalAlignment: .center),
             Draw.drawArc(x: 0, y: 0, width: 10, height: 10, startAngle: 0, endAngle: 90, clockwise: true, closed: false),
@@ -21,7 +21,7 @@ final class CanvasRulesTests: XCTestCase {
         ]
 
         XCTAssertEqual(CanvasInstruction.instructions(drawing), [
-            .fillColor(Color.red.propValue), .strokeWidth(3),
+            .fillColor(Color("#FF0000").propValue), .strokeWidth(3),
             .fillRoundedRectangle(Rect(x: 1, y: 2, width: 30, height: 40), radius: 5),
             .drawText("Go", in: Rect(x: 0, y: 0, width: 90, height: 30), horizontal: .center, vertical: .start),
             .drawArc(Rect(x: 0, y: 0, width: 10, height: 10), start: 0, end: 90, clockwise: true, closed: false),
@@ -62,15 +62,15 @@ final class CanvasRulesTests: XCTestCase {
     /// A setting holds until the next of its kind; a saved state is put back whole.
     func testASettingHoldsTillChangedAndASavedStateComesBack() {
         var pen = CanvasPen()
-        XCTAssertTrue(pen.take(.fillColor(Color.red.propValue)))
+        XCTAssertTrue(pen.take(.fillColor(Color("#FF0000").propValue)))
         XCTAssertTrue(pen.take(.strokeWidth(-2)))
         XCTAssertEqual(pen.strokeWidth, 0, "never below nothing")
         XCTAssertTrue(pen.take(.saveState))
         XCTAssertTrue(pen.take(.alpha(2)))
-        XCTAssertTrue(pen.take(.fillColor(Color.blue.propValue)))
+        XCTAssertTrue(pen.take(.fillColor(Color("#0000FF").propValue)))
         XCTAssertEqual(pen.alpha, 1, "never past whole")
         XCTAssertTrue(pen.take(.restoreState))
-        XCTAssertEqual(pen.fill, Color.red.propValue)
+        XCTAssertEqual(pen.fill, Color("#FF0000").propValue)
         XCTAssertEqual(pen.savedDepth, 0)
         XCTAssertFalse(pen.take(.drawEllipse(Rect(x: 0, y: 0, width: 1, height: 1))), "a drawing is no setting")
     }

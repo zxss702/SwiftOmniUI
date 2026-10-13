@@ -190,7 +190,7 @@ final class GTKLabelViewTests: XCTestCase {
     }
 }
 
-private extension GTKLabelView {
+extension GTKLabelView {
     /// Each of the label's Pango attributes over the bytes it covers, as "start-end kind value", in order.
     var ranged: [String] {
         guard let list = gtk_label_get_attributes(widget.opaque) else { return [] }

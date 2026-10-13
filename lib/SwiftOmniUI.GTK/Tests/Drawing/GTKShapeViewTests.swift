@@ -13,7 +13,7 @@ final class GTKShapeViewTests: XCTestCase {
     func testASpacerDoesNotPaintOverItsBackgroundWhenItInheritsAForeground() throws {
         try onUIThread {
             let host = GTKRenderer.running {
-                Spacer().frame(width: 100, height: 20).background { Color.blue }.foregroundStyle(.red)
+                Spacer().frame(width: 100, height: 20).background { Color("#0000FF") }.foregroundStyle(Color("#FF0000"))
             }
             let stack = try XCTUnwrap(host.views(GTKZStackView.self).first)
             let points: [(Double, Double)] = [(1, 1), (50, 10), (99, 19)]
@@ -37,7 +37,7 @@ final class GTKShapeViewTests: XCTestCase {
                 Capsule(style: .continuous).frame(width: 100, height: 20)
             }
             .frame(width: 100, height: 20)
-            .foregroundStyle(LinearGradient(colors: [.red, .blue], startPoint: .leading, endPoint: .trailing))
+            .foregroundStyle(LinearGradient(colors: [Color("#FF0000"), Color("#0000FF")], startPoint: .leading, endPoint: .trailing))
         }
         XCTAssertGreaterThan(colours[0] >> 16 & 0xFF, 0xE0)
         XCTAssertGreaterThan(colours[1] & 0xFF, 0xE0)

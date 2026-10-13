@@ -174,7 +174,7 @@ private struct LengtheningPage: View {
 
     var body: some View {
         VStack {
-            Text(long ? "Text & typing" : "Text").background(.red).horizontalAlignment(.start)
+            Text(long ? "Text & typing" : "Text").background(Color("#FF0000")).horizontalAlignment(.start)
             Button("Longer").onClicked { long = true }
         }
         .animation(.eased(200, .linear))

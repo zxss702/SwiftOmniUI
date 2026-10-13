@@ -168,7 +168,7 @@ final class AndroidScrollViewTests: XCTestCase {
         try onMainActor {
             let host = AndroidRenderer.running {
                 ScrollView {
-                    ColorPicker(.red).frame(height: 400)
+                    ColorPicker(Color("#FF0000")).frame(height: 400)
                 }
                 .contentPadding(10)
                 .shape(.roundedRectangle(20))

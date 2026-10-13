@@ -45,7 +45,7 @@
                 .verticalAlignment(.start)
             }
             let room = try s.element("room")
-            try s.settle { try s.color(of: room, at: Point(45, 45)) == .red }
+            try s.settle { try s.shows(.red, on: room, at: Point(45, 45)) }
             s.expect(try s.color(of: room, at: Point(45, 45)), .red, "past its edge, shown")
 
             try s.perform(.activate, on: s.element("change"))

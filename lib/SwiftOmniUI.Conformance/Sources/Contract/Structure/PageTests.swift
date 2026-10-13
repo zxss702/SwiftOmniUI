@@ -116,12 +116,14 @@
                 }
             }
             let pushed = try pushedPage(s)
-            try s.settle { try s.held(member, on: pushedPage(s)) == first }
-            s.expect(try s.held(member, on: pushed), first, "what its session wrote")
+            let firstShown = Value(propValue: first.propValue.resolvingColorScheme()) ?? first
+            try s.settle { try s.held(member, on: pushedPage(s)) == firstShown }
+            s.expect(try s.held(member, on: pushed), firstShown, "what its session wrote")
 
             try s.perform(.activate, on: s.element("change"))
-            try s.settle { try s.held(member, on: pushedPage(s)) == second }
-            s.expect(try s.held(member, on: pushedPage(s)), second, "what the tree changed it to")
+            let secondShown = Value(propValue: second.propValue.resolvingColorScheme()) ?? second
+            try s.settle { try s.held(member, on: pushedPage(s)) == secondShown }
+            s.expect(try s.held(member, on: pushedPage(s)), secondShown, "what the tree changed it to")
         }
     }
 

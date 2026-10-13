@@ -186,6 +186,16 @@ extern "C" void swiftomniui_winui_title_bar_set(
     }
 }
 
+extern "C" void swiftomniui_winui_title_bar_set_subtitle(SwiftOmniUIObjectRef handle, char const *subtitle) {
+    try {
+        auto bar = borrow<controls::TitleBar>(handle);
+        auto value = text(subtitle);
+        if (bar.Subtitle() != value) bar.Subtitle(value);
+    } catch (...) {
+        report("setting a title bar subtitle");
+    }
+}
+
 extern "C" void swiftomniui_winui_title_bar_caption_room(SwiftOmniUIObjectRef handle, double *kept, double *room) {
     try {
         auto found = captionRoom(borrow<controls::TitleBar>(handle));

@@ -68,7 +68,7 @@ private struct ForegroundCapsule: View {
         let spacer = try XCTUnwrap(patch.child(.manual("spacer")))
         XCTAssertEqual(spacer.props[.fill], Brush.solidColor(.clear).propValue)
         XCTAssertEqual(spacer.props[.flex], 12.0.propValue)
-        XCTAssertEqual(patch.child(.manual("shape"))?.props[.fill], gradient.brush.propValue)
+        XCTAssertEqual(patch.child(.manual("shape"))?.props[.fill], gradient.brush.propValue.resolvingColorScheme())
     }
 
     func testASpacerKeepsAnExplicitBackgroundVisibleThroughItsClearFill() throws {
@@ -78,7 +78,7 @@ private struct ForegroundCapsule: View {
         XCTAssertEqual(patch.subtree.first { $0.id == .manual("spacer") }?.props[.fill],
                        Brush.solidColor(.clear).propValue)
         XCTAssertEqual(patch.subtree.first { $0.id == .manual("background") }?.props[.fill],
-                       Brush.solidColor(.blue).propValue)
+                       Brush.solidColor(.blue).propValue.resolvingColorScheme())
     }
 
     func testAContainerPassesItsForegroundToShapesAndText() throws {
@@ -89,9 +89,9 @@ private struct ForegroundCapsule: View {
             Text("own").foregroundStyle(.blue).id("own-text")
         }.foregroundStyle(.black.opacity(0.03)).node)
         XCTAssertEqual(patch.child(.manual("composed"))?.props[.fill], Brush.solidColor(.black.opacity(0.03)).propValue)
-        XCTAssertEqual(patch.child(.manual("nearer"))?.props[.fill], Brush.solidColor(.red).propValue)
+        XCTAssertEqual(patch.child(.manual("nearer"))?.props[.fill], Brush.solidColor(.red).propValue.resolvingColorScheme())
         XCTAssertEqual(patch.child(.manual("text"))?.props[.foregroundStyle], Color.black.opacity(0.03).propValue)
-        XCTAssertEqual(patch.child(.manual("own-text"))?.props[.foregroundStyle], Color.blue.propValue)
+        XCTAssertEqual(patch.child(.manual("own-text"))?.props[.foregroundStyle], Color.blue.propValue.resolvingColorScheme())
     }
 
     func testAModifiedContainerAndAFragmentKeepForegroundInheritance() throws {
@@ -102,16 +102,16 @@ private struct ForegroundCapsule: View {
             }.foregroundStyle(.blue)
             Rectangle().id("rectangle")
         }.padding(4).foregroundStyle(.red).node)
-        XCTAssertEqual(patch.subtree.first { $0.id == .manual("capsule") }?.props[.fill], Brush.solidColor(.blue).propValue)
-        XCTAssertEqual(patch.subtree.first { $0.id == .manual("circle") }?.props[.fill], Brush.solidColor(.blue).propValue)
-        XCTAssertEqual(patch.subtree.first { $0.id == .manual("rectangle") }?.props[.fill], Brush.solidColor(.red).propValue)
+        XCTAssertEqual(patch.subtree.first { $0.id == .manual("capsule") }?.props[.fill], Brush.solidColor(.blue).propValue.resolvingColorScheme())
+        XCTAssertEqual(patch.subtree.first { $0.id == .manual("circle") }?.props[.fill], Brush.solidColor(.blue).propValue.resolvingColorScheme())
+        XCTAssertEqual(patch.subtree.first { $0.id == .manual("rectangle") }?.props[.fill], Brush.solidColor(.red).propValue.resolvingColorScheme())
     }
 
     func testACompleteGradientSurvivesAFrameAndAComposedView() throws {
         let gradient = LinearGradient(colors: [.red, .blue], startPoint: .leading, endPoint: .trailing)
         let patch = Renders().render(ForegroundCapsule().frame(width: 100, height: 20).foregroundStyle(gradient).node)
         let shape = try XCTUnwrap(patch.subtree.first { $0.type == .rectangle })
-        XCTAssertEqual(shape.props[.fill], gradient.brush.propValue)
+        XCTAssertEqual(shape.props[.fill], gradient.brush.propValue.resolvingColorScheme())
     }
 
     func testAMaterialForegroundIsNotDroppedForHavingNoFirstColour() throws {
@@ -122,14 +122,14 @@ private struct ForegroundCapsule: View {
 
     func testExplicitFillWinsOnTheShapeAndThroughContainersAndStyles() {
         XCTAssertEqual(Renders().render(Capsule().fill(.blue).foregroundStyle(.red).node).props[.fill],
-                       Brush.solidColor(.blue).propValue)
+                       Brush.solidColor(.blue).propValue.resolvingColorScheme())
         let container = Renders().render(VStack {
             Capsule().fill(.blue).id("filled")
         }.foregroundStyle(.red).node)
-        XCTAssertEqual(container.child(.manual("filled"))?.props[.fill], Brush.solidColor(.blue).propValue)
+        XCTAssertEqual(container.child(.manual("filled"))?.props[.fill], Brush.solidColor(.blue).propValue.resolvingColorScheme())
         let sheet = StyleSheet { Style<Rectangle>().fill(.blue) }
         XCTAssertEqual(Renders().render(Rectangle().foregroundStyle(.red).node, styles: sheet).props[.fill],
-                       Brush.solidColor(.blue).propValue)
+                       Brush.solidColor(.blue).propValue.resolvingColorScheme())
     }
 
     func testForegroundDoesNotFillAStrokeOnlyShape() {
@@ -152,7 +152,7 @@ private struct ForegroundCapsule: View {
         let changed = renders.render(Capsule().foregroundStyle(.blue).id("capsule").node)
         XCTAssertEqual(changed.id, first.id)
         XCTAssertFalse(changed.replace)
-        XCTAssertEqual(changed.props[.fill], Brush.solidColor(.blue).propValue)
+        XCTAssertEqual(changed.props[.fill], Brush.solidColor(.blue).propValue.resolvingColorScheme())
 
         let removed = renders.render(Capsule().id("capsule").node)
         XCTAssertFalse(removed.replace)
@@ -169,13 +169,13 @@ private struct ForegroundCapsule: View {
             Capsule().foregroundStyle(Color(light: .red, dark: .blue)).id("themed")
             Circle().id("default")
         }.node)
-        XCTAssertEqual(first.child(.manual("themed"))?.props[.fill], Brush.solidColor(.red).propValue)
+        XCTAssertEqual(first.child(.manual("themed"))?.props[.fill], Brush.solidColor(.red).propValue.resolvingColorScheme())
         XCTAssertEqual(first.child(.manual("default"))?.props[.fill], Brush.solidColor(.primary).propValue.resolvingColorScheme())
 
         Renderer.shared.clearInvalidation()
         info.colorScheme = .dark
         let changed = renders.revisit(changed: Renderer.shared.pendingChanges)
-        XCTAssertEqual(changed.child(.manual("themed"))?.props[.fill], Brush.solidColor(.blue).propValue)
+        XCTAssertEqual(changed.child(.manual("themed"))?.props[.fill], Brush.solidColor(.blue).propValue.resolvingColorScheme())
         XCTAssertEqual(changed.child(.manual("default"))?.props[.fill], Brush.solidColor(.primary).propValue.resolvingColorScheme())
         XCTAssertFalse(changed.subtree.contains(where: \.replace))
     }

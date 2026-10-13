@@ -37,7 +37,7 @@
     /// Starts an arrangement `width` wide, deciding once for every child how it is placed: what a patch said
     /// travels, what a new width gave arrives - as does everything while a frame under it is read.
     /// `anchorOffset` compensates a changed viewport origin without moving any layout destination.
-    public func begin(width: Double, animating: Bool = true, anchorOffset: Point = .zero) {
+    public func begin(width: Double, animating: Bool = true, anchorOffset: Point = .zero, refining: Bool = false) {
         let said = patched && arrangedWidth != nil
         let resized = arrangedWidth.map { abs($0 - width) > 0.5 } ?? false
         patched = false
@@ -46,6 +46,7 @@
 
         arrangement = layoutMotion?.arrangement(
             said: said && animating, resized: resized, animation: animation, framesRead: framesRead) ?? Arrangement()
+        arrangement.refines = refining && !(said && animating) && !resized && !framesRead
     }
 
     /// Stands `view`, the mounted element `mount`'s, at `place`, or on its way there; its `values` say which sides
