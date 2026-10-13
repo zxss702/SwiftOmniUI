@@ -216,7 +216,7 @@ public final class WindowSession {
     /// What hangs off the window between its page and its overlay: the chrome
     /// and the modal stack, each as the node the host knows it by - built as
     /// the window is, so the modal stack reads its array there.
-    var slots: [Node] {
+    @MainActor var slots: [Node] {
         var slots: [Node] = []
 
         if let bar = titleBar { slots.append(bar.node) }

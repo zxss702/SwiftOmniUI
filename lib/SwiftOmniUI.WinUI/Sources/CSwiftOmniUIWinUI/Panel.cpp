@@ -58,7 +58,19 @@ namespace {
     /// A native redirection boundary, not another layout engine. Swift still
     /// measures and arranges the original children in the parent's coordinates.
     struct MaskSourcePanel : controls::PanelT<MaskSourcePanel> {
-        explicit MaskSourcePanel(bool mask) : mask(mask) { if (mask) IsHitTestVisible(false); }
+        explicit MaskSourcePanel(bool mask) : mask(mask) {
+            HorizontalAlignment(xaml::HorizontalAlignment::Stretch);
+            VerticalAlignment(xaml::VerticalAlignment::Stretch);
+            if (mask) {
+                IsHitTestVisible(false);
+                gettingFocus = GettingFocus(winrt::auto_revoke,
+                    [](xaml::UIElement const &, xaml::Input::GettingFocusEventArgs const &args) {
+                        // A mask supplies drawing, never an input target. A
+                        // routed focus request from any descendant ends here.
+                        (void)args.TryCancel();
+                    });
+            }
+        }
         Size MeasureOverride(Size) { return Size(0, 0); }
         Size ArrangeOverride(Size final) { return final; }
         peers::AutomationPeer OnCreateAutomationPeer() {
@@ -66,6 +78,7 @@ namespace {
             return winrt::make<MaskSourcePeer>(self.as<xaml::FrameworkElement>(), mask);
         }
         bool mask;
+        xaml::UIElement::GettingFocus_revoker gettingFocus;
     };
 
     /// The same live visual-surface redirection as WinUI Gallery's OpacityMaskView.

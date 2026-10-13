@@ -116,24 +116,35 @@ outline's width and SwiftOmniUI against the whole, so it is doubled.
 
 ## A mask
 
-`mask` writes two children into one room: the content first, the mask last. The
-mask is held and laid out like any child - it takes the same room the content
-stands in - and is never drawn: opaque nothing, and no click, so the user's hand
-passes through it to the content under it. What the panel shows is then cut to
-the mask's silhouette: the first shape standing in the mask, in the panel's own
-coordinates, is a geometric clip on the panel's visual, as an element's own
-outline is cut - a rectangle, its one corner radius where all four corners agree,
-or an ellipse. The cut follows the pass that arranged the mask, since that is
-the pass that gives the shape its room; a mask holding no shape WinUI cuts a
-silhouette from - one drawn from a geometry of its own - cuts to the mask's own
-box.
+`mask` holds two stable groups: the content, then the alpha source. A builder
+with several children remains inside its own group, so every layer in the mask
+contributes to its alpha. Only the content determines the container's intrinsic
+size; both groups are placed in its allocated room.
 
-A silhouette is a geometry, so a mask that draws a shape cuts to that shape's
-outline. A mask whose own drawing is soft or only partly opaque - a gradient, a
-picture, words - has no outline to cut to: WinUI would need the mask redirected
-into a surface of its own and composited through a mask brush, which the host
-does not build yet, so such a mask cuts to the box of the mask instead. GTK,
-which composites through `gtk_snapshot_push_mask`, masks by alpha throughout.
+WinUI redirects each complete visual subtree through a native
+`CompositionVisualSurface`. Two `CompositionSurfaceBrush` objects supply a
+`CompositionMaskBrush`, drawn by a `SpriteVisual` attached to the container with
+`ElementCompositionPreview.SetElementChildVisual`. This is the native pipeline
+used by [WinUI Gallery's OpacityMaskView](https://github.com/microsoft/WinUI-Gallery/blob/main/WinUIGallery/Controls/OpacityMaskView.xaml.cs).
+The mask's alpha multiplies the content's alpha: curves, holes, gradients,
+pictures, words, Canvas drawing and nested masks all use their actual drawing.
+An empty alpha source hides all content. There is no rectangle fallback or
+shape approximation, and `.mask` does not write a geometric clip.
+
+Each source is held below a separate, unstyled XAML panel whose root
+Composition opacity is zero. A visual surface omits its source root's own
+opacity, as in Gallery's redirection, so only the originals are hidden from the
+presented tree. Authored children retain their opacity, transforms and clips
+inside the captured subtree. They remain attached as live native controls for
+measurement and input; child updates keep intersecting controls attached. The
+alpha host suppresses pointer input, cancels descendant focus requests and
+omits mask descendants from its automation peer.
+
+The surfaces and brushes are reused. Native arrangement updates both surfaces'
+`SourceSize` and the sprite's size in the same local coordinate system; live
+Composition changes update the drawing without bitmap snapshots or a redraw
+timer. Detaching clears the child visual and the surfaces' source references.
+GTK continues to composite alpha with `gtk_snapshot_push_mask`.
 
 ## A canvas
 

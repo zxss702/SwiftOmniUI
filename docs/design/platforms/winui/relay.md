@@ -49,3 +49,12 @@ colour as #AARRGGBB, a number, 0 or 1, sides and corners as four numbers - or
 reads the dialog showing over a window and `swiftomniui_winui_announced` what the
 relay told the screen reader, which WinUI keeps nowhere a test can ask. A test
 reads the control; it never asks the host what it wrote.
+
+`swiftomniui_winui_pixels` reads a XAML `RenderTargetBitmap`. Composition child
+visuals, including the opacity-mask sprite, need the presented desktop instead:
+`swiftomniui_winui_presented_pixels` samples RGB at local DIP coordinates through
+the window's client origin and rasterization scale. It rejects points covered
+by another window. These regression checks require a visible, unobscured native
+window and compare over a known opaque background; desktop pixels do not expose
+the intermediate alpha. The `alphaMasked` reader also checks the native mask
+brush's source and mask, while `clipped` reads geometric clipping separately.

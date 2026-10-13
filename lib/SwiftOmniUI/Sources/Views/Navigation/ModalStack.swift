@@ -21,9 +21,11 @@
 public struct ModalStack {
     /// The presented pages under a wrapper node, built as the window builds.
     /// Design: docs/design/views/pages.md#the-modal-stack-is-a-value
-    var node: Node { build() }
+    @MainActor var node: Node { build() }
 
-    private let build: () -> Node
+    // Destinations are UI values; deferred construction runs with the window's
+    // main-actor node build, even though the stack itself is only a stored value.
+    private let build: @MainActor () -> Node
 
     /// Runs on the window's node when a modal has gone, with how many remain.
     let popped: EventHandler
