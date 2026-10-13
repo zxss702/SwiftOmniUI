@@ -52,29 +52,50 @@ import XCTest
     /// Equality is the COLOUR, not its spelling - which is what stops two ways
     /// of writing one from reading as a change and being sent again.
     func testTwoSpellingsOfOneColourAreOneValue() {
-        XCTAssertEqual(Color("#ff0000"), Color.red)
-        XCTAssertEqual(Color(red: 255, green: 0, blue: 0), Color.red)
-        XCTAssertEqual(Color(red: 255, green: 0, blue: 0, alpha: 255), Color.red)
-        XCTAssertNotEqual(Color(red: 255, green: 0, blue: 0, alpha: 128), Color.red)
+        let (r, g, b) = (255, 0, 0)
+        XCTAssertEqual(Color("#ff0000"), Color("#FF0000"))
+        XCTAssertEqual(Color(red: r, green: g, blue: b), Color("#FF0000"))
+        XCTAssertEqual(Color(red: r, green: g, blue: b, alpha: 255), Color("#FF0000"))
+        XCTAssertNotEqual(Color(red: r, green: g, blue: b, alpha: 128), Color("#FF0000"))
+        XCTAssertNotEqual(Color("#FF0000"), Color.red, "the UI palette is not a constant CSS primary")
     }
 
     /// A channel outside 0-255 is held to it rather than wrapping - which is
     /// what an Int argument makes possible in the first place.
     func testAChannelOutsideItsRangeIsHeldToIt() {
-        XCTAssertEqual(Color(red: -20, green: 300, blue: 0), Color("#00FF00"))
+        let (r, g, b) = (-20, 300, 0)
+        XCTAssertEqual(Color(red: r, green: g, blue: b), Color("#00FF00"))
     }
 
     /// A fractional channel is the one SwiftUI writes: 0-1, held to it, and a
     /// value that is no number reads as no channel.
     func testAFractionalChannelScalesToAByte() {
         XCTAssertEqual(Color(red: 1, green: 0.5, blue: 0),
-                       Color(red: 255, green: 128, blue: 0))
+                       Color("#FF8000"))
         XCTAssertEqual(Color(red: 0.61, green: 0.74, blue: 0.65),
-                       Color(red: 156, green: 189, blue: 166))
-        XCTAssertEqual(Color(red: 2.0, green: -1, blue: 0), Color(red: 255, green: 0, blue: 0))
-        XCTAssertEqual(Color(red: .nan, green: 0, blue: 0), Color(red: 0, green: 0, blue: 0))
+                       Color("#9CBDA6"))
+        XCTAssertEqual(Color(red: 2.0, green: -1, blue: 0), Color("#FF0000"))
+        XCTAssertEqual(Color(red: .nan, green: 0, blue: 0), Color.black)
         XCTAssertEqual(Color(red: 1, green: 1, blue: 1, alpha: 0.5),
-                       Color(red: 255, green: 255, blue: 255, alpha: 128))
+                       Color("#80FFFFFF"))
+    }
+
+    /// Untyped literals follow SwiftUI's component initializer, rather than the older byte overload.
+    func testIntegerRGBLiteralsAreFullIntensityComponents() {
+        XCTAssertEqual(Color(red: 1, green: 0, blue: 0), Color("#FF0000"))
+        XCTAssertEqual(Color(red: 0, green: 1, blue: 1), Color("#00FFFF"))
+        XCTAssertEqual(Color(red: 1, green: 1, blue: 1), Color.white)
+        XCTAssertEqual(Color(red: 0, green: 1, blue: 1, opacity: 0.5), Color("#8000FFFF"))
+        XCTAssertEqual(Color(red: 0.0, green: 1.0, blue: 1.0), Color(red: 0, green: 1, blue: 1))
+    }
+
+    func testExplicitColorSpacesEncodeOnceBeforeReachingTheHost() {
+        XCTAssertEqual(Color(.sRGB, red: 0.25, green: 0.5, blue: 0.75, opacity: 0.4), Color("#664080BF"))
+        XCTAssertEqual(Color(.sRGBLinear, white: 0.5), Color("#BCBCBC"))
+        XCTAssertEqual(Color(white: 0.5), Color("#808080"))
+        XCTAssertEqual(Color(.displayP3, red: 1, green: 1, blue: 1), Color.white)
+        XCTAssertEqual(Color(.displayP3, red: 1, green: 0, blue: 0), Color("#FF0000"),
+                       "the existing 8-bit boundary clips out-of-gamut components to sRGB")
     }
 
     // MARK: - What crosses

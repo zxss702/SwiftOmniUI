@@ -67,7 +67,7 @@ public struct Color: Hashable, Sendable, HostRepresentable {
     /// Design: docs/design/types/colour-and-color-scheme.md#a-pair-for-each-color-scheme
     public init(light: Color, dark: Color) {
         self.light = light.light
-        self.dark = dark.light
+        self.dark = dark.dark ?? dark.light
     }
 
     /// The channels themselves, and the ones for dark mode when there are any.
@@ -79,13 +79,14 @@ public struct Color: Hashable, Sendable, HostRepresentable {
     /// A colour from its channels: red, green and blue, each 0-255, and an
     /// alpha from 0, invisible, to 255, opaque - the default.
     ///
-    ///     Color(red: 81, green: 43, blue: 212)
-    ///     Color(red: 81, green: 43, blue: 212, alpha: 128)
+    ///     let (r, g, b) = (81, 43, 212)
+    ///     Color(red: r, green: g, blue: b, alpha: 128)
     ///
     /// Whole numbers, as a channel holds them, so a fraction is refused where
     /// it is written. A value outside 0-255 is held to the range rather than
-    /// refused.
-    public init(red: Int, green: Int, blue: Int, alpha: Int = 255) {
+    /// refused. This compatibility overload takes typed Int bytes; untyped RGB literals use the
+    /// SwiftUI initializer's 0-1 components instead. Hex is also available for constant byte values.
+    @_disfavoredOverload public init(red: Int, green: Int, blue: Int, alpha: Int = 255) {
         self.init(Rgba(
             red: Color.channel(red),
             green: Color.channel(green),
@@ -93,25 +94,21 @@ public struct Color: Hashable, Sendable, HostRepresentable {
             alpha: Color.channel(alpha)))
     }
 
-    /// A colour from its channels as fractions of full, SwiftUI's spelling:
+    /// A colour from its channels as fractions of full, the legacy `alpha:` spelling:
     /// red, green and blue each from 0 to 1, and an alpha from 0, invisible,
-    /// to 1, opaque - the default.
+    /// to 1, opaque. Use `opacity:` for the SwiftUI initializer.
     ///
-    ///     Color(red: 0.61, green: 0.74, blue: 0.65)
+    ///     Color(red: 0.61, green: 0.74, blue: 0.65, alpha: 1.0)
     ///
     /// A value outside 0-1 is held to the range, rounded to the channel it
     /// lands nearest.
-    public init(red: Double, green: Double, blue: Double, alpha: Double = 1) {
-        self.init(Rgba(
-            red: Color.channel(red),
-            green: Color.channel(green),
-            blue: Color.channel(blue),
-            alpha: Color.channel(alpha)))
+    @_disfavoredOverload public init(red: Double, green: Double, blue: Double, alpha: Double) {
+        self.init(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
 
     /// A grey, the SwiftUI spelling - `Color(white: 0.5)` is a medium grey.
     public init(white: Double, opacity: Double = 1) {
-        self.init(red: white, green: white, blue: white, alpha: opacity)
+        self.init(.sRGB, white: white, opacity: opacity)
     }
 
     /// A colour from channels in `colorSpace`, SwiftUI's spelling: red, green and blue each from 0 to 1, and an
@@ -120,7 +117,8 @@ public struct Color: Hashable, Sendable, HostRepresentable {
     ///     Color(.displayP3, red: 0.2314, green: 0.5251, blue: 0.9678)
     public init(_ colorSpace: RGBColorSpace = .sRGB, red: Double, green: Double, blue: Double, opacity: Double = 1) {
         let (r, g, b) = colorSpace.channels(red, green, blue)
-        self.init(red: r, green: g, blue: b, alpha: opacity)
+        self.init(Rgba(
+            red: Color.channel(r), green: Color.channel(g), blue: Color.channel(b), alpha: Color.channel(opacity)))
     }
 
     /// A grey in `colorSpace`, SwiftUI's spelling.
@@ -289,7 +287,9 @@ extension Color {
 }
 
 // MARK: - Named colors
-// The common ones, with their CSS names and values.
+// SwiftUI's standard UI palette uses light/dark pairs, not CSS primaries.
+// Reference sRGB components: https://developer.apple.com/design/human-interface-guidelines/color
+// Additional CSS-only names below keep their constant values.
 
 extension Color {
     /// Nothing at all, #00FFFFFF.
@@ -304,8 +304,8 @@ extension Color {
     /// White, #FFFFFF.
     public static let white = Color("#FFFFFF")
 
-    /// Gray, #808080.
-    public static let gray = Color("#808080")
+    /// The system grey, with a lighter variant in dark appearances.
+    public static let gray = Color(light: Color("#8E8E93"), dark: Color("#98989D"))
 
     /// Light gray, #D3D3D3.
     public static let lightGray = Color("#D3D3D3")
@@ -322,8 +322,8 @@ extension Color {
     /// White smoke, #F5F5F5.
     public static let whiteSmoke = Color("#F5F5F5")
 
-    /// Red, #FF0000.
-    public static let red = Color("#FF0000")
+    /// The standard UI red, resolved for the current color scheme.
+    public static let red = Color(light: Color("#FF383C"), dark: Color("#FF4245"))
 
     /// Firebrick, #B22222.
     public static let firebrick = Color("#B22222")
@@ -331,17 +331,17 @@ extension Color {
     /// Tomato, #FF6347.
     public static let tomato = Color("#FF6347")
 
-    /// Orange, #FFA500.
-    public static let orange = Color("#FFA500")
+    /// The standard UI orange, resolved for the current color scheme.
+    public static let orange = Color(light: Color("#FF8D28"), dark: Color("#FF9230"))
 
     /// Gold, #FFD700.
     public static let gold = Color("#FFD700")
 
-    /// Yellow, #FFFF00.
-    public static let yellow = Color("#FFFF00")
+    /// The standard UI yellow, resolved for the current color scheme.
+    public static let yellow = Color(light: Color("#FFCC00"), dark: Color("#FFD600"))
 
-    /// Green, the dark one: #008000 - `.lime` is #00FF00.
-    public static let green = Color("#008000")
+    /// The standard UI green, resolved for the current color scheme. `.lime` remains constant #00FF00.
+    public static let green = Color(light: Color("#34C759"), dark: Color("#30D158"))
 
     /// Lime, #00FF00.
     public static let lime = Color("#00FF00")
@@ -349,14 +349,14 @@ extension Color {
     /// Forest green, #228B22.
     public static let forestGreen = Color("#228B22")
 
-    /// Teal, #008080.
-    public static let teal = Color("#008080")
+    /// The standard UI teal, resolved for the current color scheme.
+    public static let teal = Color(light: Color("#00C3D0"), dark: Color("#00D2E0"))
 
-    /// Cyan, #00FFFF.
-    public static let cyan = Color("#00FFFF")
+    /// The standard UI cyan, resolved for the current color scheme.
+    public static let cyan = Color(light: Color("#00C0E8"), dark: Color("#3CD3FE"))
 
-    /// Blue, #0000FF.
-    public static let blue = Color("#0000FF")
+    /// The standard UI blue, resolved for the current color scheme.
+    public static let blue = Color(light: Color("#0088FF"), dark: Color("#0091FF"))
 
     /// Navy, #000080.
     public static let navy = Color("#000080")
@@ -373,11 +373,11 @@ extension Color {
     /// Light blue, #ADD8E6.
     public static let lightBlue = Color("#ADD8E6")
 
-    /// Purple, #800080.
-    public static let purple = Color("#800080")
+    /// The standard UI purple, resolved for the current color scheme.
+    public static let purple = Color(light: Color("#CB30E0"), dark: Color("#DB34F2"))
 
-    /// Indigo, #4B0082.
-    public static let indigo = Color("#4B0082")
+    /// The standard UI indigo, resolved for the current color scheme.
+    public static let indigo = Color(light: Color("#6155F5"), dark: Color("#6D7CFF"))
 
     /// Violet, #EE82EE.
     public static let violet = Color("#EE82EE")
@@ -385,11 +385,11 @@ extension Color {
     /// Magenta, #FF00FF.
     public static let magenta = Color("#FF00FF")
 
-    /// Pink, #FFC0CB.
-    public static let pink = Color("#FFC0CB")
+    /// The standard UI pink, resolved for the current color scheme.
+    public static let pink = Color(light: Color("#FF2D55"), dark: Color("#FF375F"))
 
-    /// Brown, #A52A2A.
-    public static let brown = Color("#A52A2A")
+    /// The standard UI brown, resolved for the current color scheme.
+    public static let brown = Color(light: Color("#AC7F5E"), dark: Color("#B78A66"))
 
     /// Maroon, #800000.
     public static let maroon = Color("#800000")
@@ -397,8 +397,8 @@ extension Color {
     /// Olive, #808000.
     public static let olive = Color("#808000")
 
-    /// Mint, #00C7BE.
-    public static let mint = Color("#00C7BE")
+    /// The standard UI mint, resolved for the current color scheme.
+    public static let mint = Color(light: Color("#00C8B3"), dark: Color("#00DAC3"))
 }
 
 extension Color {
