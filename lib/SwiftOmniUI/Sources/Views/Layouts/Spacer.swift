@@ -28,8 +28,9 @@ public struct Spacer: View {
         self.minLength = minLength
     }
 
-    /// A `Rectangle` drawn with nothing, marked flexible.
+    /// An explicitly clear `Rectangle`, marked flexible. Its layout room
+    /// must not pick up a shape's default or inherited foreground fill.
     public var body: some View {
-        Rectangle().flex(minLength)
+        Rectangle().fill(.clear).flex(minLength)
     }
 }

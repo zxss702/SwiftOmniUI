@@ -44,6 +44,43 @@ private struct ForegroundCapsule: View {
         }
     }
 
+    func testASpacerStaysClearWithoutForegroundAndWithItsOwnForeground() throws {
+        let views: [any View] = [
+            Spacer(),
+            Spacer().foregroundStyle(.red),
+            Spacer(minLength: 12).frame(width: 100, height: 20).foregroundStyle(.blue),
+        ]
+        for (index, view) in views.enumerated() {
+            let patch = Renders().render(view.node)
+            let spacer = try XCTUnwrap(patch.subtree.first { $0.type == .rectangle })
+            XCTAssertEqual(spacer.props[.fill], Brush.solidColor(.clear).propValue)
+            let layout = try XCTUnwrap(patch.subtree.first { $0.props[.flex] != nil })
+            XCTAssertEqual(layout.props[.flex], (index == 2 ? 12.0 : 0.0).propValue)
+        }
+    }
+
+    func testAContainerForegroundFillsShapesButLeavesItsSpacerClear() throws {
+        let gradient = LinearGradient(colors: [.red, .blue], startPoint: .leading, endPoint: .trailing)
+        let patch = Renders().render(HStack {
+            Capsule().id("shape")
+            Spacer(minLength: 12).id("spacer")
+        }.foregroundStyle(gradient).node)
+        let spacer = try XCTUnwrap(patch.child(.manual("spacer")))
+        XCTAssertEqual(spacer.props[.fill], Brush.solidColor(.clear).propValue)
+        XCTAssertEqual(spacer.props[.flex], 12.0.propValue)
+        XCTAssertEqual(patch.child(.manual("shape"))?.props[.fill], gradient.brush.propValue)
+    }
+
+    func testASpacerKeepsAnExplicitBackgroundVisibleThroughItsClearFill() throws {
+        let patch = Renders().render(Spacer().id("spacer").background {
+            Rectangle().fill(.blue).id("background")
+        }.foregroundStyle(.red).node)
+        XCTAssertEqual(patch.subtree.first { $0.id == .manual("spacer") }?.props[.fill],
+                       Brush.solidColor(.clear).propValue)
+        XCTAssertEqual(patch.subtree.first { $0.id == .manual("background") }?.props[.fill],
+                       Brush.solidColor(.blue).propValue)
+    }
+
     func testAContainerPassesItsForegroundToShapesAndText() throws {
         let patch = Renders().render(VStack {
             ForegroundCapsule().id("composed")

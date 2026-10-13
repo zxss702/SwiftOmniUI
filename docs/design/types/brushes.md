@@ -64,3 +64,8 @@ nearest foreground brush, or `Color.primary` when no foreground was supplied.
 The differ resolves themed stops afterward, so a color scheme change updates
 the fill through the usual invalidation path. Frames, composed views, fragments
 and lazy row sources retain the inherited brush without building extra rows.
+
+`Spacer` uses a rectangle only to participate in stack layout. It explicitly
+fills that placeholder with `Color.clear`, so neither the default shape fill
+nor an inherited foreground paints the space. Its `flex` minimum and any
+background the caller supplies retain their usual behaviour.

@@ -10,6 +10,18 @@ final class WinUIPathViewTests: XCTestCase {
     private static let red: UInt32 = 0xFFFF_0000
     private static let blue: UInt32 = 0xFF00_00FF
 
+    func testASpacerDoesNotPaintOverItsBackgroundWhenItInheritsAForeground() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                Spacer().frame(width: 100, height: 20).background { Color.blue }.foregroundStyle(.red)
+            }
+            let stack = try XCTUnwrap(host.views(WinUIZStackView.self).first)
+            let points: [(Double, Double)] = [(1, 1), (50, 10), (99, 19)]
+            host.settle { stack.pixels(at: points) == [Self.blue, Self.blue, Self.blue] }
+            XCTAssertEqual(stack.pixels(at: points), [Self.blue, Self.blue, Self.blue])
+        }
+    }
+
     func testACapsuleForegroundDrawsItsLowOpacityFill() throws {
         let colours = try drawn(width: 100, height: 20, at: [(50, 10), (1, 1)]) {
             Capsule(style: .continuous).foregroundStyle(.black.opacity(0.03)).frame(width: 100, height: 20)
