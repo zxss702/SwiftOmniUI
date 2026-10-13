@@ -47,6 +47,7 @@ struct SceneElement: Element {
         }
 
         record.declared = declared
+        record.declaresMainWindow = windows.main != nil
         record.mainWindowType = (windows.main as? WindowSceneAsks)?.windowID.map(WindowType.init)
 
         var children: [Node] = []

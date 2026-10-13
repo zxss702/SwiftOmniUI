@@ -107,9 +107,9 @@ class WinUILazyView: WinUITravellingLayout {
         return nil
     }
 
-    /// Only the compositor's effective viewport selects the realized window.
+    /// Scroll notices name the actual position before layout's viewport event catches up.
     private var viewport: Rect? {
-        effectiveViewport
+        announcedRect ?? effectiveViewport
     }
 
     /// Native viewport changes realize the required rows before XAML measures and arranges the new window.
@@ -126,12 +126,12 @@ class WinUILazyView: WinUITravellingLayout {
         watchClip()
         if effective {
             effectiveViewport = rect
-            // EffectiveViewport can arrive after a newer ViewChanged notice.
-            // Acknowledge that window when layout catches up, or replace its
-            // dimensions on resize; never let an old offset evict the new rows.
-            if announcedRect == nil || announcedRect?.width != rect.width || announcedRect?.height != rect.height
-                || announcedRect.flatMap({ windowSpan(in: $0) }) == windowSpan(in: rect) {
-                announcedRect = rect
+            if announcedRect != nil, let scroll = watching {
+                // A late notice must not restore an old offset. Read the native
+                // position now, also picking up a descendant moved by layout.
+                var raw = [Double](repeating: 0, count: 6)
+                swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
+                announcedRect = Rect(raw[0], raw[1], rect.width, rect.height)
             }
         }
         // A notice a mount or a place of this one's own raises answers nothing
@@ -151,27 +151,20 @@ class WinUILazyView: WinUITravellingLayout {
         guard let target = override ?? announcedRect ?? viewport else { return }
         let grid = self is WinUILazyGridView
         let revision = grid ? cells.runs.revision : cells.extents.revision
-        // Follow the actual view or an explicitly announced program jump.
-        // Retaining the whole path until Idle turns a moving window into an
-        // ever-growing document, especially with an animation's far endpoint.
+        // Anchor geometry follows the actual native window. Only an explicit
+        // program jump selects a different window before that position changes.
         let incoming = windowSpan(in: target)
         let span = self.span ?? incoming
         var realize = incoming
-        // Layout and compositor notifications can name adjacent windows in
-        // one frame. Keep both while moving, without accumulating scroll history.
-        if watching?.held == true, let visible = self.span {
-            realize = realize.map {
-                min($0.lowerBound, visible.lowerBound)..<max($0.upperBound, visible.upperBound)
-            } ?? visible
-        }
-        // Retain the existing viewport-sized look-ahead, but release rows
-        // behind it as the view moves rather than waiting for scroll rest.
         if let realized = realize {
             // The look-ahead must stand on the same sixty-fourth grid the
             // window's own bounds snap to, or a float's worth of room lands a
             // boundary row on one side of the window and not the other.
             let raw = axis == .vertical ? rect.height : rect.width
             let room = (raw * 64).rounded() / 64
+            // Keep the existing viewport of look-ahead, releasing old rows as
+            // the position moves. Predicted endpoints and scroll history are
+            // not visible windows and must not grow this range.
             realize = max(0, realized.lowerBound - room)..<(realized.upperBound + room)
         }
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)
@@ -322,8 +315,6 @@ class WinUILazyView: WinUITravellingLayout {
         swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
         var rect = Rect(x: raw[0], y: raw[1], width: raw[2], height: raw[3])
         let standing = scroll.scroller.standing.offset
-        // Native animation endpoints describe a curve, not the next visible
-        // window. ViewChanged supplies the actual offset for realization.
         let next = scroll.scroller.nextOffset ?? standing
         // The announced window: the scroller's own read says where the view
         // stands now; the effective viewport lends its size, whose fractions
@@ -332,7 +323,7 @@ class WinUILazyView: WinUITravellingLayout {
         rect.height = effectiveViewport?.height ?? raw[3]
         if axis == .vertical { rect.y += next.y - standing.y } else { rect.x += next.x - standing.x }
         announcedRect = rect
-        viewportChanged(rect, effective: effectiveViewport == nil, target: rect)
+        viewportChanged(rect, effective: false, target: rect)
     }
 
     /// A jump the program makes: realize the window it lands in before the
@@ -344,22 +335,20 @@ class WinUILazyView: WinUITravellingLayout {
         swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
         var rect = Rect(x: raw[0], y: raw[1], width: effectiveViewport?.width ?? raw[2],
                         height: effectiveViewport?.height ?? raw[3])
-        if axis == .vertical { rect.y = target.y } else { rect.x = target.x }
-        announcedRect = rect
+        let standing = scroll.scroller.standing.offset
+        if axis == .vertical { rect.y += target.y - standing.y }
+        else { rect.x += target.x - standing.x }
         viewportChanged(rect, effective: false, target: rect)
     }
 
     /// Every pass re-asks the window: a place in the air lands in the one it
     /// asks for, and a move of the scroller's brings one.
     override func arrange(in bounds: Rect) {
-        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges)
+        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
+                     anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
+                                         axis == .vertical ? cells.anchorShift : 0))
         cells.animatesChanges = false
-        if cells.anchorShift != 0 {
-            places.layoutMotion?.shift(mounts: mounted.values.map(\.mount),
-                                       by: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                                 axis == .vertical ? cells.anchorShift : 0))
-            cells.anchorShift = 0
-        }
+        cells.anchorShift = 0
         retell()
     }
 

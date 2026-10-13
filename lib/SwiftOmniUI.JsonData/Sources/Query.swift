@@ -50,11 +50,12 @@ final class QueryResult<Element: PersistentModel> {
     let animation: Animation?
 
     /// The context the query follows, once the environment answers.
-    private(set) weak var context: ModelContext?
+    @ObservationIgnored private(set) weak var context: ModelContext?
 
     /// The store's observation - a GRDB cancellable under JsonDataCore,
     /// released with the object.
-    private var observation: Any?
+    @ObservationIgnored private var observation: Any?
+    @ObservationIgnored private var instances: [ObjectIdentifier] = []
 
     nonisolated init(descriptor: FetchDescriptor<Element>, animation: Animation? = nil) {
         self.descriptor = descriptor
@@ -70,14 +71,24 @@ final class QueryResult<Element: PersistentModel> {
         observation = context.startObservation(
             descriptor,
             onChange: { [weak self] newItems in
-                self?.items = newItems
+                self?.accept(newItems)
             })
     }
 
     /// Fetches again and reports the rows.
     private func refetch() {
         guard let context else { return }
-        items = (try? context.fetch(descriptor)) ?? []
+        accept((try? context.fetch(descriptor)) ?? [])
+    }
+
+    /// The observation's initial delivery often repeats the synchronous fetch.
+    /// Model properties have their own Observation dependencies; publish here
+    /// only when membership, order or the actual model instances change.
+    private func accept(_ newItems: [Element]) {
+        let identities = newItems.map(ObjectIdentifier.init)
+        guard instances != identities else { return }
+        instances = identities
+        items = newItems
     }
 }
 

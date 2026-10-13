@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include <winrt/Windows.UI.Xaml.Interop.h>
 
@@ -36,9 +38,12 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_picker_make(int64_t view) {
 
 extern "C" void swiftomniui_winui_picker_set_options(SwiftOmniUIObjectRef handle, char const *const *options, int32_t count) {
     try {
-        auto items = borrow<controls::ComboBox>(handle).Items();
-        items.Clear();
-        for (int32_t index = 0; index < count; ++index) items.Append(winrt::box_value(text(options[index])));
+        // Build off-control, then publish one collection. Appending each model
+        // to the live ItemCollection makes every picker process N native changes.
+        std::vector<IInspectable> items;
+        items.reserve(static_cast<size_t>(std::max(0, count)));
+        for (int32_t index = 0; index < count; ++index) items.push_back(winrt::box_value(text(options[index])));
+        borrow<controls::ComboBox>(handle).ItemsSource(winrt::single_threaded_vector<IInspectable>(std::move(items)));
     } catch (...) {
         report("giving a picker its choices");
     }

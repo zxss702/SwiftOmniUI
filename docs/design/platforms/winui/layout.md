@@ -35,7 +35,7 @@ card of the home page's run turned.
 Arithmetic queries and native preparation have separate scopes. A
 `naturalSize` query can measure native leaves to answer a new proposal, but
 does not recursively prepare panels or replace lazy row geometry. Stacks,
-single-child containers and layers also calculate their child places in a
+grids, single-child containers and layers also calculate their child places in a
 query scope, then prepare only the selected places during native measurement.
 Repeated leaf probes read width-keyed answers without selecting another
 native proposal. A new leaf probe marks its placing ancestors' native
@@ -54,6 +54,10 @@ the subtree's native proposals. This avoids the former alternating
 ideal/allocated-width queries clearing and rebuilding nested caches.
 Only a completed native measure records the prepared subtree's width;
 an arithmetic cache miss cannot overwrite that record.
+GeometryReader retains its independent ideal size, but still prepares its
+native children at the proposals selected by its placement arithmetic. Its
+children cannot remain unmeasured merely because they do not determine the
+reader's own natural size.
 
 Nothing is measured while WinUI arranges: `Measure` written on an element
 inside an arrangement marks it, the marked element is measured and arranged
@@ -96,11 +100,14 @@ scroll's final endpoint. It releases rows behind its look-ahead while a
 scroll is still active; it does not keep the continuous path from the first
 viewport to the eventual endpoint mounted until Idle. Program jumps still
 announce and realize their destination before moving the native scroller.
-An older EffectiveViewport notice cannot replace a newer ViewChanged position
-until it reports that same window (or changes the viewport dimensions). While
-moving, realization covers both the layout viewport and the latest announced
-viewport, with the existing look-ahead; it retains no accumulated path.
-Anchor corrections shift both viewport records together.
+ViewChanged supplies the current position for both realization and anchor
+selection. EffectiveViewport supplies the clipped dimensions; once scroll
+notices have begun, an effective-viewport event reads the current native offset
+instead of restoring an old reported position. This also picks up a descendant
+moved by layout. Anchor corrections shift both viewport records together.
+Program-jump preparation translates the target scroll offset into descendant
+coordinates; it does not publish that future position as an already visible
+anchor before the native move.
 
 GeometryReader accepts a safe allocation while retaining the remaining
 environment. Native window chrome that already sits outside the content row
@@ -163,6 +170,13 @@ changed - whose natural size has changed tells the layout placing it, which
 measures again, and so on up; a layout measured inside its parent's own
 measure is read there and tells nothing. A picture read after its layouts
 were measured tells the layout holding it through the relay.
+
+Content, child membership or layout-property changes also invalidate native
+arrangement along the affected placing chain. A panel's zero DesiredSize can
+remain unchanged while its children's places change; remeasurement alone is
+not a reliable request for new child arrangements. Child attachment likewise
+requests arrangement after committing the new native child list. No synchronous
+`UpdateLayout` or window-wide redraw is needed for this handoff.
 
 ## Where a view stands
 

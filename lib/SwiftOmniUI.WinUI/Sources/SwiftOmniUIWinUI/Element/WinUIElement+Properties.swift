@@ -141,7 +141,10 @@ extension WinUIElement {
         var invalidated: Set<ObjectIdentifier> = []
         func invalidate(_ view: WinUIView?) {
             guard let view, invalidated.insert(ObjectIdentifier(view)).inserted else { return }
-            (view as? WinUILayoutView)?.forgetMeasurements()
+            if let layout = view as? WinUILayoutView {
+                layout.forgetMeasurements()
+                layout.invalidateArrange()
+            }
             view.invalidateMeasure()
         }
         var element: WinUIElement? = self

@@ -94,6 +94,14 @@ of a state it never mentions.
 
 ## Model state
 
+The JsonData adapter's `QueryResult` observes its published model array, not
+its context attachment or observation token. Attaching a context during a view
+build must not make that build depend on bookkeeping written by the attachment.
+The store's initial observation may repeat the synchronous fetch; an identical
+ordered list of live model instances is not published again. Membership,
+ordering and replacement instances do publish, while each observable model's
+own property dependencies continue to update the views that read them.
+
 A `@State` declared inside a class is reached through the wrapper's
 enclosing-instance subscript: Swift routes the property through the wrapper's
 type with the instance in hand. The value is the storage's, read and written as

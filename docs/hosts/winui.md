@@ -57,9 +57,16 @@ application and hands the thread to the host:
 import NotesUI
 import SwiftOmniUIWinUI
 
-swiftomniui_app_register()
-SwiftOmniUIWinUI.run()
+SwiftOmniUIWinUI.run(applicationID: "com.example.notes") {
+    swiftomniui_app_register()
+}
 ```
+
+Windows' `AppInstance` selects one running process for this ID. Repeated plain
+launches activate or reopen the first declared main window, preserving other
+windows. The initialization closure runs only in the primary process; if no
+ID is supplied, the executable's full path is the instance key. Closing the
+last window exits the process.
 
 `SWIFTOMNIUI_HOST=winui` is what makes a build a WinUI one: the application's
 manifest reads it, declares the `Platforms/WinUI` target, the executable it
@@ -75,8 +82,9 @@ head, as HelloWorld does.
 
 ## Controls, acts, and events registered in Swift
 
-An application extends the host from its WinUI head. Registrations run before
-`SwiftOmniUIWinUI.run`, on the main thread. Registering a contract or an act again
+An application extends the host from its WinUI head. Registrations run in
+`run`'s initialization closure on the UI thread, before the first render;
+registering before `run` remains supported. Registering a contract or an act again
 replaces the earlier registration. Every registration is written against the
 application's own contracts, so they are `public`: the host lives in a module
 of its own and must see them. The Gallery's WinUI halves are in

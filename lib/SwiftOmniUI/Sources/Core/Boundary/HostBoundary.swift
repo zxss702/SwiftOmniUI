@@ -91,6 +91,11 @@
         Scenes.shared.connected(restoring: values)
     }
 
+    /// Reopens the first declared main window in an existing scene; its scene key identifies the native target.
+    public static func reopenInitialWindow() -> String? {
+        Scenes.shared.reopenInitialWindow()
+    }
+
     /// Updates the process-wide application session from native lifecycle.
     public static func setApplicationPhase(_ phase: ApplicationPhase) {
         update(StandardEnvironment.app, \.phase, phase)

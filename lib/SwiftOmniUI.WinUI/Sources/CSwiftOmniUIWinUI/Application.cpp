@@ -12,7 +12,12 @@
 #pragma comment(linker, "/STACK:8388608")
 
 #include <chrono>
+#include <deque>
+#include <exception>
 #include <io.h>
+#include <memory>
+#include <mutex>
+#include <objbase.h>
 
 #include <winrt/Windows.UI.Xaml.Interop.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -36,6 +41,21 @@ namespace swiftomniui {
         namespace lifecycle = winrt::Microsoft::Windows::AppLifecycle;
         namespace activation = winrt::Windows::ApplicationModel::Activation;
 
+        lifecycle::AppInstance instance{nullptr};
+        winrt::event_token activationListener{};
+        std::mutex activationLock;
+        std::deque<winrt::agile_ref<lifecycle::AppActivationArguments>> pendingActivations;
+        bool activationReady = false;
+        bool shuttingDown = false;
+        bool windowsAlive = false;
+        bool exitQueued = false;
+        bool registeredPrimary = false;
+
+        winrt::Microsoft::UI::Dispatching::DispatcherQueue dispatcherQueue() {
+            std::lock_guard lock(activationLock);
+            return queue;
+        }
+
         /// A storage item's path as the `file:` URL `onOpenURL` hands on - forward slashes past `file:///`.
         std::string fileURL(winrt::hstring const &path) {
             std::wstring text{path.begin(), path.end()};
@@ -45,9 +65,10 @@ namespace swiftomniui {
 
         /// Reports each URL an activation carries - the files it names, the link it followed.
         void reportActivation(lifecycle::AppActivationArguments const &args) {
-            if (!callbacks.urlOpened) return;
             try {
-                if (args.Kind() == lifecycle::ExtendedActivationKind::File) {
+                if (args.Kind() == lifecycle::ExtendedActivationKind::Launch) {
+                    if (callbacks.activated) callbacks.activated();
+                } else if (args.Kind() == lifecycle::ExtendedActivationKind::File && callbacks.urlOpened) {
                     if (auto files = args.Data().try_as<activation::IFileActivatedEventArgs>()) {
                         for (auto const &item : files.Files()) {
                             if (auto storage = item.try_as<winrt::Windows::Storage::IStorageItem>()) {
@@ -56,13 +77,133 @@ namespace swiftomniui {
                             }
                         }
                     }
-                } else if (args.Kind() == lifecycle::ExtendedActivationKind::Protocol) {
+                } else if (args.Kind() == lifecycle::ExtendedActivationKind::Protocol && callbacks.urlOpened) {
                     if (auto link = args.Data().try_as<activation::IProtocolActivatedEventArgs>()) {
                         callbacks.urlOpened(winrt::to_string(link.Uri().RawUri().c_str()).c_str());
                     }
                 }
             } catch (...) {
                 report("reporting an activation");
+            }
+        }
+
+        /// Activation can arrive on an AppLifecycle worker before XAML or the Swift application is ready.
+        /// Drain its agile arguments only on the dispatcher, after the primary application's first render.
+        void drainActivations() {
+            std::deque<winrt::agile_ref<lifecycle::AppActivationArguments>> waiting;
+            {
+                std::lock_guard lock(activationLock);
+                if (!activationReady || shuttingDown) return;
+                waiting.swap(pendingActivations);
+            }
+            for (auto const &args : waiting) reportActivation(args.get());
+            swiftomniui_winui_keep_scene_alive(windowsAlive);
+        }
+
+        void receiveActivation(lifecycle::AppActivationArguments const &args) {
+            winrt::Microsoft::UI::Dispatching::DispatcherQueue dispatcher{nullptr};
+            {
+                std::lock_guard lock(activationLock);
+                if (shuttingDown) return;
+                pendingActivations.emplace_back(args);
+                if (activationReady) dispatcher = queue;
+            }
+            if (dispatcher) dispatcher.TryEnqueue(guarded("handling application activation", [] { drainActivations(); }));
+        }
+
+        struct RedirectionWait {
+            winrt::handle complete{CreateEventW(nullptr, TRUE, FALSE, nullptr)};
+            std::mutex lock;
+            std::exception_ptr failure;
+        };
+
+        /// AppLifecycle redirects asynchronously. Dispatch COM messages while waiting, and also observe the
+        /// destination process: it may exit after we found its key but before it acknowledges the request.
+        bool redirectActivation(lifecycle::AppInstance const &target, lifecycle::AppActivationArguments const &args) {
+            winrt::handle process{OpenProcess(SYNCHRONIZE, FALSE, target.ProcessId())};
+            if (!process) {
+                if (GetLastError() == ERROR_INVALID_PARAMETER) return false;
+                winrt::throw_last_error();
+            }
+            if (WaitForSingleObject(process.get(), 0) == WAIT_OBJECT_0) return false;
+            auto waiting = std::make_shared<RedirectionWait>();
+            if (!waiting->complete) winrt::throw_last_error();
+            auto sent = target.RedirectActivationToAsync(args);
+            sent.Completed([waiting](winrt::Windows::Foundation::IAsyncAction const &action,
+                                     winrt::Windows::Foundation::AsyncStatus) {
+                try { action.GetResults(); }
+                catch (...) {
+                    std::lock_guard lock(waiting->lock);
+                    waiting->failure = std::current_exception();
+                }
+                SetEvent(waiting->complete.get());
+            });
+            HANDLE events[]{waiting->complete.get(), process.get()};
+            DWORD index = 0;
+            auto result = CoWaitForMultipleHandles(COWAIT_DISPATCH_CALLS | COWAIT_DISPATCH_WINDOW_MESSAGES,
+                                                   INFINITE, 2, events, &index);
+            winrt::check_hresult(result);
+            if (index == 1) {
+                sent.Cancel();
+                return false;
+            }
+            std::lock_guard lock(waiting->lock);
+            if (waiting->failure) std::rethrow_exception(waiting->failure);
+            return true;
+        }
+
+        winrt::hstring instanceKey(char const *applicationID) {
+            if (applicationID && *applicationID) return winrt::to_hstring(applicationID);
+            std::wstring path(256, L'\0');
+            for (;;) {
+                auto length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+                if (!length) winrt::throw_last_error();
+                if (length < path.size()) { path.resize(length); return winrt::hstring(path); }
+                path.resize(path.size() * 2);
+            }
+        }
+
+        /// Only the key's owner initializes XAML and the Swift application. Recheck after forwarding so an
+        /// instance that unregistered while closing its last window does not swallow the new launch.
+        bool selectPrimary(winrt::hstring const &key, lifecycle::AppActivationArguments const &args) {
+            for (int attempt = 0; attempt < 3; ++attempt) {
+                auto target = lifecycle::AppInstance::FindOrRegisterForKey(key);
+                if (!target) continue; // The key can disappear between the SDK's registration and lookup.
+                if (target.IsCurrent()) return true;
+                AllowSetForegroundWindow(target.ProcessId());
+                try {
+                    if (!redirectActivation(target, args)) continue;
+                } catch (...) {
+                    auto replacement = lifecycle::AppInstance::FindOrRegisterForKey(key);
+                    if (!replacement) continue;
+                    if (replacement.IsCurrent()) return true;
+                    if (replacement.ProcessId() == target.ProcessId()) throw;
+                    continue;
+                }
+                auto current = lifecycle::AppInstance::FindOrRegisterForKey(key);
+                if (!current) continue;
+                if (current.IsCurrent()) return true;
+                if (current.ProcessId() == target.ProcessId()) return false;
+            }
+            winrt::throw_hresult(HRESULT_FROM_WIN32(ERROR_RETRY));
+        }
+
+        void releaseInstance() {
+            {
+                std::lock_guard lock(activationLock);
+                shuttingDown = true;
+                activationReady = false;
+                pendingActivations.clear();
+                queue = nullptr;
+            }
+            if (instance) {
+                if (registeredPrimary) {
+                    instance.UnregisterKey();
+                    registeredPrimary = false;
+                }
+                if (activationListener.value) instance.Activated(activationListener);
+                activationListener = {};
+                instance = nullptr;
             }
         }
 
@@ -84,17 +225,18 @@ namespace swiftomniui {
                 if (embedded) return;
                 ownsMessageLoop = true;
                 Resources().MergedDictionaries().Append(controls::XamlControlsResources());
-                queue = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
-                callbacks.launched();
-                auto instance = lifecycle::AppInstance::GetCurrent();
-                if (instance) {
-                    if (auto args = instance.GetActivatedEventArgs()) reportActivation(args);
-                    activationListener = instance.Activated(
-                        guarded("handling Activated",
-                            [](IInspectable const &, lifecycle::AppActivationArguments const &args) {
-                            reportActivation(args);
-                        }));
+                {
+                    std::lock_guard lock(activationLock);
+                    queue = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
                 }
+                // The first render may temporarily have no windows. Shutdown becomes eligible only after launch.
+                DispatcherShutdownMode(xaml::DispatcherShutdownMode::OnExplicitShutdown);
+                callbacks.launched();
+                {
+                    std::lock_guard lock(activationLock);
+                    activationReady = true;
+                }
+                drainActivations();
             }
 
             xaml::Markup::IXamlType GetXamlType(winrt::Windows::UI::Xaml::Interop::TypeName const &type) {
@@ -116,8 +258,6 @@ namespace swiftomniui {
             }
 
             bool embedded;
-            /// Kept so a second activation - a file opened while the application runs - keeps reaching it.
-            winrt::event_token activationListener{};
             xaml::XamlTypeInfo::XamlControlsXamlMetaDataProvider types{nullptr};
         };
 
@@ -154,7 +294,9 @@ namespace swiftomniui {
 namespace swiftomniui {
     void post(void (*work)()) {
         try {
-            if (queue) queue.TryEnqueue(guarded("handling TryEnqueue", [work] { work(); }));
+            if (auto dispatcher = dispatcherQueue()) {
+                dispatcher.TryEnqueue(guarded("handling TryEnqueue", [work] { work(); }));
+            }
         } catch (...) {
             report("posting work to the UI thread");
         }
@@ -162,7 +304,9 @@ namespace swiftomniui {
 
     void runOnUIThread(std::function<void()> work) {
         try {
-            if (queue) queue.TryEnqueue(guarded("handling TryEnqueue", [work = std::move(work)] { work(); }));
+            if (auto dispatcher = dispatcherQueue()) {
+                dispatcher.TryEnqueue(guarded("handling TryEnqueue", [work = std::move(work)] { work(); }));
+            }
         } catch (...) {
             report("handing work to the UI thread");
         }
@@ -172,15 +316,46 @@ namespace swiftomniui {
 using namespace swiftomniui;
 
 extern "C" int32_t swiftomniui_winui_run(SwiftOmniUIWinUICallbacks const *given) {
+    return swiftomniui_winui_run_single_instance(given, nullptr);
+}
+
+extern "C" int32_t swiftomniui_winui_run_single_instance(
+    SwiftOmniUIWinUICallbacks const *given, char const *applicationID
+) {
     callbacks = *given;
     writeToTheStartingConsole();
     try {
         loadRuntime();
         winrt::init_apartment(winrt::apartment_type::single_threaded);
+        {
+            std::lock_guard lock(activationLock);
+            shuttingDown = false;
+            activationReady = false;
+            pendingActivations.clear();
+        }
+        windowsAlive = false;
+        exitQueued = false;
+        registeredPrimary = false;
+        instance = lifecycle::AppInstance::GetCurrent();
+        auto args = instance.GetActivatedEventArgs();
+        // Subscribe before publishing the key: another launch can redirect as soon as registration succeeds.
+        activationListener = instance.Activated(guarded("receiving application activation",
+            [](IInspectable const &, lifecycle::AppActivationArguments const &args) { receiveActivation(args); }));
+        if (!selectPrimary(instanceKey(applicationID), args)) {
+            releaseInstance();
+            return 0;
+        }
+        registeredPrimary = true;
+        receiveActivation(args);
         xaml::Application::Start([](auto &&) { winrt::make<SwiftOmniUIApplication>(false); });
+        releaseInstance();
+        ownsMessageLoop = false;
         return 0;
     } catch (...) {
-        return report("starting WinUI");
+        auto failure = report("starting WinUI");
+        try { releaseInstance(); } catch (...) { report("releasing the application instance"); }
+        ownsMessageLoop = false;
+        return failure;
     }
 }
 
@@ -198,7 +373,10 @@ extern "C" int32_t swiftomniui_winui_embed(SwiftOmniUIWinUICallbacks const *give
         static auto application = winrt::make<SwiftOmniUIApplication>(true);
         static auto manager = xaml::Hosting::WindowsXamlManager::InitializeForCurrentThread();
         application.Resources().MergedDictionaries().Append(controls::XamlControlsResources());
-        queue = controller.DispatcherQueue();
+        {
+            std::lock_guard lock(activationLock);
+            queue = controller.DispatcherQueue();
+        }
         embedded = true;
         return 0;
     } catch (...) {
@@ -224,7 +402,9 @@ extern "C" void swiftomniui_winui_pump(double seconds) {
 
 extern "C" void swiftomniui_winui_post_turn(void) {
     try {
-        if (queue) queue.TryEnqueue(guarded("handling TryEnqueue", [] { callbacks.turn(); }));
+        if (auto dispatcher = dispatcherQueue()) {
+            dispatcher.TryEnqueue(guarded("handling TryEnqueue", [] { callbacks.turn(); }));
+        }
     } catch (...) {
         report("posting a turn");
     }
@@ -233,11 +413,39 @@ extern "C" void swiftomniui_winui_post_turn(void) {
 extern "C" void swiftomniui_winui_keep_scene_alive(bool alive) {
     if (!ownsMessageLoop) return;
     try {
+        windowsAlive = alive;
         auto application = xaml::Application::Current();
-        if (alive) application.DispatcherShutdownMode(xaml::DispatcherShutdownMode::OnExplicitShutdown);
-        else application.Exit();
+        application.DispatcherShutdownMode(xaml::DispatcherShutdownMode::OnExplicitShutdown);
+        {
+            std::lock_guard lock(activationLock);
+            if (alive || !activationReady || shuttingDown || exitQueued) return;
+        }
+        exitQueued = true;
+        auto dispatcher = dispatcherQueue();
+        auto accepted = dispatcher && dispatcher.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
+            guarded("ending the application after its last window", [] {
+                exitQueued = false;
+                {
+                    std::lock_guard lock(activationLock);
+                    if (windowsAlive || !pendingActivations.empty() || shuttingDown) return;
+                    // An activation rejected as shutting down must observe the key already released.
+                    // Otherwise its sender could still find this process and lose the new launch.
+                    if (instance && registeredPrimary) {
+                        try {
+                            instance.UnregisterKey();
+                            registeredPrimary = false;
+                        } catch (...) {
+                            // Still exit when releasing the key fails; process termination also releases it.
+                            report("releasing the application instance key");
+                        }
+                    }
+                    shuttingDown = true;
+                }
+                xaml::Application::Current().Exit();
+            }));
+        if (!accepted) exitQueued = false;
     } catch (...) {
-        report("updating the application's scene lifetime");
+        report("updating the application's window lifetime");
     }
 }
 

@@ -76,7 +76,10 @@ final class WinUIRenderer {
         _ = core.needsRender
         _ = core.runJobs()
 
-        MainActor.assumeIsolated { _ = start() }
+        MainActor.assumeIsolated {
+            SwiftOmniUIWinUI.initializeApplication()
+            _ = start()
+        }
     }
 
     /// Starts the host: the application rendered whole, then the doorbell for everything after.
@@ -136,6 +139,12 @@ final class WinUIRenderer {
         runtime.pump.turn()
     }
 
+    /// A plain launch targets the first declared window, restoring one minimized by the user.
+    func activateInitialWindow() {
+        guard let element = runtime.initialWindowForActivation(), let controller = roster.controller(of: element) else { return }
+        swiftomniui_winui_window_activate(controller.window.handle)
+    }
+
     /// Renders the application whole: the scenes kept for this start come back, else one new scene.
     /// Design: docs/design/host/runtime.md#kept-scenes
     func show() {
@@ -148,11 +157,11 @@ final class WinUIRenderer {
     /// holds closes - and tells each, once, in its turn, that it was made.
     /// Design: docs/design/platforms/winui/runtime.md#the-window
     private func showWindows(keepingSizing: Bool = false) {
-        let hasScenes = runtime.tree.root?.children.isEmpty == false
-        if hasScenes { swiftomniui_winui_keep_scene_alive(true) }
+        let hasWindows = runtime.tree.root?.windows.isEmpty == false
+        if hasWindows { swiftomniui_winui_keep_scene_alive(true) }
         let first = roster.update(
             root: runtime.tree.root, make: { WinUIWindowController($0) }, close: { $0.window.close() })
-        if !hasScenes { swiftomniui_winui_keep_scene_alive(false) }
+        if !hasWindows { swiftomniui_winui_keep_scene_alive(false) }
         if first, let window {
             // The screen is known once there is a window; what reads it renders in the turn after this one.
             WinUIEnvironment.reportDisplay(to: runtime.core, window: window)

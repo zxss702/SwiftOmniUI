@@ -43,40 +43,53 @@ final class WinUIGridView: WinUITravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
+        let size = Self.querySize { queriedSize(width: width) }
+        if WinUIView.arranging == 0, Self.queryingSize == 0 {
+            let bounds = Rect(0, 0, width ?? size.width, size.height)
+            let places = Self.querySize { childPlaces(in: bounds) }
+            for (item, place) in zip(items, places) {
+                if let place { item.view.prepareMeasure(width: place.width) }
+            }
+            return Self.querySize { queriedSize(width: width) }
+        }
+        return size
+    }
+
+    private func queriedSize(width: Double?) -> LayoutSize {
         if sourceElement?.isGeometryReader == true { return GeometryReaderArithmetic.size(width: width) }
-        return GridArithmetic.size(
-            of: items, rows: rows, columns: columns,
-            rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, width: width,
-            flow: flowColumns)
+        return GridArithmetic.size(of: items, rows: rows, columns: columns,
+                                   rowSpacing: rowSpacing, columnSpacing: columnSpacing,
+                                   padding: padding, width: width, flow: flowColumns)
     }
 
     override func arrange(in bounds: Rect) {
         beginArrangement(width: bounds.width)
+        let places = childPlaces(in: bounds)
+        for (item, place) in zip(items, places) {
+            if let place { self.place(item, at: place) }
+        }
+    }
+
+    /// Preparation and arrangement must select the same native child proposals,
+    /// including children of a reader whose size is independent of its content.
+    private func childPlaces(in bounds: Rect) -> [Rect?] {
         let context = layoutSafeArea(in: bounds)
         if let element = sourceElement, element.isSafeAreaBoundary, let item = items.first(where: { !$0.departing }) {
             let next = context.padding(SafeAreaArithmetic.physicalInsets(element.safeAreaPadding ?? EdgeInsets(0), direction: direction))
             let place = SafeAreaArithmetic.base(of: item, boundary: item.element?.preservesSafeAreaProposal == true,
                                                ignores: item.element?.ignoresSafeArea,
                                                in: next, direction: direction)
-            self.place(item, at: place)
-            return
+            return items.map { $0.view === item.view ? place : nil }
         }
         if sourceElement?.isGeometryReader == true {
-            let places = GeometryReaderArithmetic.places(of: items, in: bounds, direction: direction, safeArea: context) {
+            return GeometryReaderArithmetic.places(of: items, in: bounds, direction: direction, safeArea: context) {
                 $0.element?.preservesSafeAreaProposal == true
             }
-            for (item, place) in zip(items, places) {
-                if let place { self.place(item, at: place) }
-            }
-            return
         }
-        let places = GridArithmetic.places(
+        return GridArithmetic.places(
             of: items, rows: rows, columns: columns,
             rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, in: bounds,
             direction: direction, flow: flowColumns)
-        for (item, place) in zip(items, places) {
-            if let place { self.place(item, at: place) }
-        }
     }
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
         let context = layoutSafeArea(in: allocatedBounds)

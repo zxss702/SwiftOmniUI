@@ -97,8 +97,8 @@ final class WinUIImageView: WinUIView {
     }
 
     override func layout(_ place: Rect) {
-        super.layout(place)
         draw(in: place)
+        super.layout(place)
     }
 
     /// Places the picture and synchronously supplies any additional SVG pixels

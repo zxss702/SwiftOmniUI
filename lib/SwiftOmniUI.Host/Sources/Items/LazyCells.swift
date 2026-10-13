@@ -60,7 +60,7 @@
     /// Native child measurements performed.
     public var measurements = 0
 
-    /// Document-coordinate correction not yet applied to the mounted presentation frames.
+    /// Viewport-origin correction not yet compensated by the mounted presentation frames.
     public var anchorShift = 0.0
 
     private var anchor: (identity: String, place: Int, inset: Double, origin: Double, viewport: Double, trailing: Bool)?
@@ -237,7 +237,11 @@
         let total = grid
             ? runs.total(count: (identities.count + perRun - 1) / perRun)
             : extents.total(in: identities)
-        let origin = max(0, held.trailing ? total - held.viewport : start + held.inset)
+        // Deleting the anchor or shortening the document can put the requested
+        // origin beyond the native scroll reach. Compensate only the offset
+        // the scroller can actually apply, not an unreachable presentation shift.
+        let reach = max(0, total - held.viewport)
+        let origin = min(reach, max(0, held.trailing ? reach : start + held.inset))
         anchorShift += origin - held.origin
         anchor = (identities[place], place, held.inset, origin, held.viewport, held.trailing)
         return abs(origin - held.origin) > 0.0001 ? origin : nil

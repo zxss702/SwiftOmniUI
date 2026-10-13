@@ -54,6 +54,19 @@ final class Scenes: @unchecked Sendable {
         }
     }
 
+    /// A plain application activation reuses the earliest scene's declared main window.
+    /// If the last scene just closed, a launch received before native shutdown starts a fresh scene.
+    func reopenInitialWindow() -> String? {
+        let standing = _list.storage.value
+        if standing.isEmpty {
+            connected(restoring: [:])
+            return _list.storage.value.first?.id
+        }
+        guard let record = standing.first(where: { $0.declaresMainWindow }) else { return nil }
+        if !record.mainIsOpen { record.mainIsOpen = true }
+        return record.id
+    }
+
     /// Opens another scene, for the host to open a platform window for.
     func openScene() throws {
         guard Scenes.opensWindows else { throw WindowError.unsupported }

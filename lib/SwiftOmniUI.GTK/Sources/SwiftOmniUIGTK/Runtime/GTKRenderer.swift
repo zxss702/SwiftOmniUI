@@ -63,7 +63,6 @@ final class GTKRenderer {
 
     /// Whether the screen the first window stands on has been told.
     private var reportedDisplay = false
-    private var holdsWithoutWindows = false
 
     /// A runtime whose windows belong to `application`, on GLib's monotonic clock or on `clock`, with the animation
     /// `reducesMotion` allows.
@@ -90,20 +89,32 @@ final class GTKRenderer {
         nonisolated(unsafe) let application = application
 
         MainActor.assumeIsolated {
-            if let window = shared?.window {
-                window.present()
-            } else {
+            if shared == nil {
+                SwiftOmniUIGTK.initializeApplication()
                 start(application: application)
             }
+            shared?.activateInitialWindow()
         }
+    }
+
+    /// Bring the declared first window forward, reopening it alongside any existing secondary windows.
+    func activateInitialWindow() {
+        guard let element = runtime.initialWindowForActivation(), let controller = roster.controller(of: element) else { return }
+        controller.window.present()
     }
 
     /// The platform handed the application files to open - a launch under `HANDLES_OPEN` emits `open` instead of
     /// `activate`, so the host starts here where it never did; then every `onOpenURL` listener hears each URL.
     nonisolated static func opened(_ application: UnsafeMutablePointer<GtkApplication>, urls: [String]) {
+        let core = CoreLink()
+        _ = core.needsRender
+        _ = core.runJobs()
         nonisolated(unsafe) let application = application
         MainActor.assumeIsolated {
-            if shared == nil { start(application: application) }
+            if shared == nil {
+                SwiftOmniUIGTK.initializeApplication()
+                start(application: application)
+            }
             guard let runtime = shared?.runtime else { return }
             for url in urls {
                 runtime.core.raise(AppContract.urlOpened, url)
@@ -144,12 +155,6 @@ final class GTKRenderer {
     /// holds closes - and tells each, once, in its turn, that it was made.
     /// Design: docs/design/platforms/gtk/runtime.md#the-window
     private func showWindows() {
-        let needsHold = runtime.tree.root?.windows.isEmpty == true
-            && runtime.tree.root?.children.isEmpty == false
-        if needsHold, !holdsWithoutWindows {
-            g_application_hold(application.of(GApplication.self))
-            holdsWithoutWindows = true
-        }
         roster.update(
             root: runtime.tree.root,
             make: { element in
@@ -165,10 +170,6 @@ final class GTKRenderer {
                 return controller
             },
             close: { $0.close() })
-        if !needsHold, holdsWithoutWindows {
-            g_application_release(application.of(GApplication.self))
-            holdsWithoutWindows = false
-        }
         // Frames tick only in a window GTK shows: a window closed or hidden stops ticking, and every animation
         // would wait for the next event - the clock moves to a window still shown.
         let widgets = roster.controllers.map(\.window.widget)

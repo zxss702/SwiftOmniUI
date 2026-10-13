@@ -13,20 +13,36 @@ import CSwiftOmniUIGTK
 ///     import HelloWorldUI
 ///     import SwiftOmniUIGTK
 ///
-///     swiftomniui_app_register()
-///     SwiftOmniUIGTK.run(applicationID: "com.swiftomniui.helloworld")
+///     SwiftOmniUIGTK.run(applicationID: "com.swiftomniui.helloworld") {
+///         swiftomniui_app_register()
+///     }
 ///
 /// `.scripts/GTK/run-app.sh` builds the head and starts it. A control this
 /// host does not present yet shows its name in red where it belongs.
 public enum SwiftOmniUIGTK {
+    nonisolated(unsafe) private static var initialization: (@MainActor @Sendable () -> Void)?
+
+    /// Runs only in the primary instance, after GTK has dispatched its first activation on the UI thread.
+    @MainActor static func initializeApplication() {
+        let initialize = initialization
+        initialization = nil
+        initialize?()
+    }
+
     /// Starts GTK on this thread and runs the application until its last window closes.
     ///
-    /// - Parameter applicationID: the application's reverse-DNS name, which the desktop knows it by - its entry and
-    ///   its icon are named by it; a second launch under the same name brings the running application's window
-    ///   forward instead.
+    /// - Parameters:
+    ///   - applicationID: the application's reverse-DNS name, which the desktop knows it by - its entry and
+    ///     its icon are named by it. A repeated plain launch activates or reopens the first declared main window.
+    ///   - initialize: registers the application and its controls on the UI thread, once in the primary process.
+    ///     A secondary process forwards its activation and returns without invoking this closure.
     /// - Returns: the process's exit code.
     @discardableResult
-    public static func run(applicationID: String) -> Int32 {
+    public static func run(
+        applicationID: String, initializing initialize: @escaping @MainActor @Sendable () -> Void = {}
+    ) -> Int32 {
+        initialization = initialize
+        defer { initialization = nil }
         PicturePixels.read = { name in MainActor.assumeIsolated { GTKPictures.pixels(of: name) } }
         Fonts.add = { path in MainActor.assumeIsolated { GTKFonts.register(path) } }
         for path in Fonts.pending { _ = Fonts.add?(path) }

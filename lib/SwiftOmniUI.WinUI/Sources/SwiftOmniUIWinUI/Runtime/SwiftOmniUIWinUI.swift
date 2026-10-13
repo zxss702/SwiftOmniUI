@@ -13,18 +13,37 @@ import CSwiftOmniUIWinUI
 ///     import HelloWorldUI
 ///     import SwiftOmniUIWinUI
 ///
-///     swiftomniui_app_register()
-///     SwiftOmniUIWinUI.run()
+///     SwiftOmniUIWinUI.run(applicationID: "com.swiftomniui.helloworld") {
+///         swiftomniui_app_register()
+///     }
 ///
 /// `.scripts/WinUI/run-app.ps1` builds the head and lays the Windows App SDK
 /// beside it. A control this host does not present yet shows its name in red
 /// where it belongs.
 public enum SwiftOmniUIWinUI {
+    nonisolated(unsafe) private static var initialization: (@MainActor @Sendable () -> Void)?
+
+    /// Runs after the native entry has selected this process as the primary instance.
+    @MainActor static func initializeApplication() {
+        let initialize = initialization
+        initialization = nil
+        initialize?()
+    }
+
     /// Starts WinUI on this thread and runs the application until its last window closes.
     ///
+    /// - Parameters:
+    ///   - applicationID: the single-instance key; nil uses the executable's full path.
+    ///     A repeated plain launch activates or reopens the first declared main window.
+    ///   - initialize: registers the application and its controls on the UI thread, once in the primary process.
+    ///     A secondary process forwards its activation and returns without invoking this closure.
     /// - Returns: the process's exit code - 0, or the failure WinUI started with.
     @discardableResult
-    public static func run() -> Int32 {
+    public static func run(
+        applicationID: String? = nil, initializing initialize: @escaping @MainActor @Sendable () -> Void = {}
+    ) -> Int32 {
+        initialization = initialize
+        defer { initialization = nil }
         PicturePixels.read = { name in
             let files = PictureArithmetic.files(for: name)
             var size = [Int32](repeating: 0, count: 2)
@@ -45,7 +64,10 @@ public enum SwiftOmniUIWinUI {
         for path in Fonts.pending { _ = Fonts.add?(path) }
         Fonts.pending.removeAll()
         var callbacks = WinUICallbacks.table
-        return swiftomniui_winui_run(&callbacks)
+        if let applicationID {
+            return applicationID.withCString { swiftomniui_winui_run_single_instance(&callbacks, $0) }
+        }
+        return swiftomniui_winui_run_single_instance(&callbacks, nil)
     }
 }
 
@@ -213,6 +235,9 @@ enum WinUICallbacks {
             urlOpened: { utf8 in
                 guard let url = utf8.map({ String(cString: $0) }) else { return }
                 MainActor.assumeIsolated { WinUIRenderer.shared?.urlOpened(url) }
+            },
+            activated: {
+                MainActor.assumeIsolated { WinUIRenderer.shared?.activateInitialWindow() }
             })
     }
 }

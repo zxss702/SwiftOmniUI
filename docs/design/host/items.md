@@ -142,9 +142,11 @@ visible grid's tracks or measurements.
 WinUI follows actual scroll offsets and releases rows behind its look-ahead
 while scrolling; an animation endpoint does not widen the window to include
 the whole path. Program jumps realize the destination before the native move.
-While layout and compositor notifications catch up with one another, it
-covers both current viewport records instead of letting an older layout
-notice evict newly visible rows. Anchor corrections update both records.
+Scroll notices supply the actual window for anchor selection as well as row
+realization. A later layout notification reads that current native position
+and updates the clipped dimensions, rather than restoring an older offset.
+Anchor corrections update both records; program-jump preparation keeps its
+future target separate from the actual anchor until the native move.
 An empty fragment is a zero-size row once its requested render has committed.
 Zero-size rows leave unseen rows' 44-point estimates intact, so an empty
 header cannot hide all the cards behind it.

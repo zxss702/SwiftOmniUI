@@ -231,8 +231,6 @@ final class GTKLazyStackView: GTKLazyView {
     /// Every mounted child measures, is stood at its offset, and the window
     /// re-asks what the tree builds.
     override func arrange(in bounds: Rect) {
-        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges)
-        cells.animatesChanges = false
         let across = max(0, axis == .vertical
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom)
@@ -270,12 +268,11 @@ final class GTKLazyStackView: GTKLazyView {
             invalidateMeasurements()
         }
         if let origin = cells.correctedOrigin() { anchorTarget = origin }
-        if cells.anchorShift != 0 {
-            places.layoutMotion?.shift(mounts: mounted.values.map(\.mount),
-                                       by: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                                 axis == .vertical ? cells.anchorShift : 0))
-            cells.anchorShift = 0
-        }
+        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
+                     anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
+                                         axis == .vertical ? cells.anchorShift : 0))
+        cells.animatesChanges = false
+        cells.anchorShift = 0
         if cells.extents.revision != revision {
             measurements.invalidate()
             geometryChanged = true
@@ -396,8 +393,6 @@ final class GTKLazyGridView: GTKLazyView {
     }
 
     override func arrange(in bounds: Rect) {
-        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges)
-        cells.animatesChanges = false
         acrossRoom = axis == .vertical
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom
@@ -432,12 +427,11 @@ final class GTKLazyGridView: GTKLazyView {
         }
         for (run, extent) in runExtents { cells.runs.measure(run, extent: extent) }
         if let origin = cells.correctedOrigin(perRun: perRun, grid: true) { anchorTarget = origin }
-        if cells.anchorShift != 0 {
-            places.layoutMotion?.shift(mounts: mounted.values.map(\.mount),
-                                       by: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                                 axis == .vertical ? cells.anchorShift : 0))
-            cells.anchorShift = 0
-        }
+        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
+                     anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
+                                         axis == .vertical ? cells.anchorShift : 0))
+        cells.animatesChanges = false
+        cells.anchorShift = 0
         if cells.runs.revision != revision {
             measurements.invalidate()
             geometryChanged = true

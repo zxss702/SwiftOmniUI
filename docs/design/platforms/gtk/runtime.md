@@ -23,14 +23,23 @@ its panel and drops the reference it held.
 
 ## Starting
 
-The head's `main` names the application and hands the thread to
-`SwiftOmniUIGTK.run(applicationID:)`, which makes an `AdwApplication` under that
-name and runs GLib's main loop on the thread until the last window closes.
+The head's `main` hands the thread to
+`SwiftOmniUIGTK.run(applicationID:initializing:)`, which makes an `AdwApplication`
+under that name and runs GLib's main loop until the last window closes.
 The application's first activation calls the host, whose first act is to drain
 SwiftOmniUI's UI executor on that thread: the drain is what makes the thread
 `MainActor`'s. The name is the one the desktop knows the application by, and
-GTK keeps one instance of it: a second launch activates the first, which
-brings its window forward.
+GTK keeps one instance of it through `GApplication`'s session D-Bus registration.
+Only the primary invokes the head's initialization closure, after making the
+thread `MainActor`'s and before registering and rendering the application.
+Existing heads that register before `run` remain supported.
+
+A second plain launch activates the earliest scene's declared main window,
+reopening it alongside existing secondary windows if it was closed. It does
+not choose whichever editor happens to be active or replace the renderer.
+File launches retain the `open` signal's URL delivery. GTK's registered windows
+provide the application's use count: no explicit hold keeps an empty scene
+alive, so closing the last window returns from the main loop.
 
 A test process runs no main loop: it starts libadwaita, registers an
 application of its own so windows have one to belong to, and turns GLib's

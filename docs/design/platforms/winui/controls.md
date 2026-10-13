@@ -118,6 +118,11 @@ with. `isOpen` opens and closes the list; the user's opening and closing are
 reported and the program's are not, so the user closing a list the program
 opened is reported. The chosen choice's mark in the list is the picker's tint.
 
+Choices are collected in an unattached WinRT vector, then assigned once through
+`ItemsSource`. Updating several model pickers therefore sends one collection
+replacement per picker, rather than clearing and appending every model to each
+live control. Selection is restored by the same program-write path.
+
 ## A day and a time
 
 A DatePicker is WinUI's `CalendarDatePicker`: its day written short or long -
@@ -279,6 +284,13 @@ it declares - its width and height, or its viewBox - and a bitmap its pixels.
 The host reads that intrinsic size itself, and the image asks WinUI for no room
 ([no room asked](layout.md#no-room-asked)): it is drawn in the place its
 layout gives it, with no later decode changing its ancestors' first size.
+
+The native image and symbol Viewbox stand in a private Panel whose desired size
+is zero. The panel measures its contents and centres their declared drawing size
+inside the Swift allocation. A nonresizable glyph can draw beyond a smaller
+frame, unless an ancestor explicitly clips it; a native Grid must not enlarge
+that frame and supply an implicit layout clip. Drawing dimensions are assigned
+before arranging the image, including its first placement.
 
 SVG documents are parsed once per full path and aspect mode. Ready rasters
 are shared by path, aspect mode and physical pixel size, with a 64 MiB cache

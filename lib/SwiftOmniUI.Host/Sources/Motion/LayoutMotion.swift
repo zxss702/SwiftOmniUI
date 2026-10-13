@@ -98,12 +98,16 @@ extension PlacedView {
         stated: AnimationLanes,
         fadeIn: ((Animation, Rect) -> Void)?,
         arrivedFrom: Rect? = nil,
+        anchorOffset: Point = .zero,
         in arrangement: Arrangement
     ) {
         guard mount != 0 else {
             view.placedFrame = target
             return
         }
+        // Joining rows (including a matched-geometry arrival) have no old
+        // presentation in this viewport to compensate.
+        let anchorOffset = seats[mount] == nil ? Point.zero : anchorOffset
 
         // A child with no seat yet is already where it belongs - unless a
         // `matchedGeometry` match left it a frame to fly from; one joining a
@@ -125,14 +129,14 @@ extension PlacedView {
         let running = animator.animation(for: key)
 
         // The same place asked for again keeps its animation rather than starting it over.
-        if let running, running.destination == destination, !arrangement.framesRead {
+        if let running, running.destination == destination, !arrangement.framesRead, anchorOffset == .zero {
             if let standing = seat.standing { view.placedFrame = standing }
             return
         }
 
         // A correction to a stationary side does not finish another side's journey.
         // Keep its original timing while the corrected sides arrive immediately.
-        if let running, arrangement.lanes.isEmpty, !arrangement.framesRead,
+        if let running, arrangement.lanes.isEmpty, !arrangement.framesRead, anchorOffset == .zero,
            destination.indices.allSatisfy({ running.destination[$0] == destination[$0]
                || (running.from[$0] == running.destination[$0] && running.velocity[$0] == 0) }) {
             var from = running.from
@@ -151,7 +155,23 @@ extension PlacedView {
         }
 
         let from = seat.standing ?? view.placedFrame
-        let lanes = arrangement.lanes.subtracting(stated)
+        // A scroll anchor changes the viewport origin, not the row's layout destination.
+        // Compensate the sampled presentation and bend toward the newly computed place.
+        // A measurement-only pass keeps the running law and sampled velocity.
+        let correctingAnchor = anchorOffset != .zero && running != nil
+            && !arrangement.framesRead && !reducesMotion()
+        var lanes = arrangement.lanes
+        var law = arrangement.law
+        if correctingAnchor, lanes.isEmpty, let running {
+            law = running.animation
+            for (index, lane) in Self.order.enumerated()
+                where running.from[index] != running.destination[index] || running.velocity[index] != 0 {
+                lanes.insert(lane)
+            }
+            if anchorOffset.x != 0 { lanes.insert(.x) }
+            if anchorOffset.y != 0 { lanes.insert(.y) }
+        }
+        lanes.subtract(stated)
 
         guard !lanes.isEmpty, Self.isReal(from), Self.isReal(target) else {
             arrive(view, at: target, mount: mount)
@@ -162,13 +182,15 @@ extension PlacedView {
         let position = running?.position(at: now())
         var start = position?.value ?? Self.lanes(from)
         var velocity = position?.velocity ?? [0, 0, 0, 0]
+        start[0] += anchorOffset.x
+        start[1] += anchorOffset.y
 
         for (index, lane) in Self.order.enumerated() where !lanes.contains(lane) {
             start[index] = destination[index]
             velocity[index] = 0
         }
 
-        let animation = RunningAnimation(from: start, destination: destination, velocity: velocity, animation: arrangement.law, began: now())
+        let animation = RunningAnimation(from: start, destination: destination, velocity: velocity, animation: law, began: now())
 
         guard !animation.arrives else {
             arrive(view, at: target, mount: mount)
@@ -195,8 +217,8 @@ extension PlacedView {
         }
     }
 
-    /// Moves the document coordinate system with a corrected scroll anchor. Existing animation
-    /// starts and destinations move together, preserving both screen position and elapsed time.
+    /// Translates the coordinate system itself. Existing animation starts and destinations
+    /// move together, preserving elapsed time. Scroll anchors instead use `place`'s offset.
     public func shift(mounts: [UInt64], by offset: Point) {
         guard offset != .zero else { return }
         for mount in mounts {

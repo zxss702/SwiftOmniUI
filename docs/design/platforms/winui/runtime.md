@@ -27,13 +27,34 @@ executor's queue, which rings the doorbell. The WinUI element goes with it.
 
 ## Starting
 
-The head's `main` names the application and hands the thread to
-`SwiftOmniUIWinUI.run()`, which loads the Windows App SDK the application carries
-and starts WinUI's `App` there; WinUI's loop runs that thread until
-the last window closes. Its `OnLaunched` calls the host, whose first act is to
-drain SwiftOmniUI's UI executor on that thread: the drain is what makes the thread
-`MainActor`'s, and every native call after it asserts that isolation rather
-than assuming a thread.
+The head hands the thread to `SwiftOmniUIWinUI.run(applicationID:initializing:)`.
+The relay loads the Windows App SDK, then uses `AppInstance.FindOrRegisterForKey`
+to select one process for the application ID, or the executable's full path
+when no ID is supplied. A secondary process redirects its activation and
+returns without starting XAML or invoking the initialization closure. It
+grants the primary process foreground permission before forwarding. The native
+asynchronous redirection reports completion while the startup STA dispatches
+COM messages. The wait also observes the destination's process handle, so a
+process that exits before acknowledging the request cannot strand the launcher.
+
+Only the primary starts WinUI's `App`. Its `OnLaunched` calls the host, whose
+first act is to drain SwiftOmniUI's UI executor on that thread: the drain is
+what makes the thread `MainActor`'s. The head's initialization closure registers
+the application and its controls there before the first render. Existing heads
+that register before `run()` remain supported.
+
+Activation arguments are held as agile references until the first render and
+drained on the UI dispatcher, including redirected requests received during
+startup. A plain launch reuses the earliest scene's declared main window,
+reopening it if only secondary windows remain; it restores a minimized window
+before activation. File and protocol activations retain their URL delivery.
+
+The process is held only while the tree declares windows, rather than while
+it retains scenes. When no windows remain, a low-priority dispatcher task
+exits XAML after checking for accepted activations. It releases the instance
+key before rejecting later requests as shutting down. A sender rechecks the
+key after forwarding, allowing a launch concurrent with shutdown to become
+the next primary. There is no background application hold.
 
 The relay's startup object requests an 8 MiB executable stack with
 `/STACK:8388608`. Windows otherwise reserves only 1 MiB: debug tree
@@ -67,6 +88,10 @@ A test process runs no loop of WinUI's: it makes the application first and
 then `WindowsXamlManager.InitializeForCurrentThread()`, which calls that
 application's `OnLaunched` - where nothing starts - and a control takes its
 template only in a window of that thread once the thread's messages ran.
+Embedding does not claim an instance key or exit the test process when its
+windows close. `.scripts/WinUI/test-window-lifecycle.ps1` separately exercises
+real processes and normal window close requests against an already-built
+application that starts one window, without building it.
 
 ## The doorbell
 

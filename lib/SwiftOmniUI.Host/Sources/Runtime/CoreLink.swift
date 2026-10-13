@@ -188,6 +188,9 @@
         HostBoundary.connectScene(restoring: values)
     }
 
+    /// Reopens the first declared main window, retaining any other windows in its scene.
+    public func reopenInitialWindow() -> String? { HostBoundary.reopenInitialWindow() }
+
     /// The keys read from the platform's settings store before the first render.
     public var persistentKeys: [PersistentKey] { HostBoundary.persistentKeys }
 

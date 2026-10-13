@@ -24,6 +24,7 @@
     private var arrangedWidth: Double?
 
     private var arrangement = Arrangement()
+    private var anchorOffset = Point.zero
 
     /// A layout not arranged yet.
     public init() {}
@@ -35,11 +36,13 @@
 
     /// Starts an arrangement `width` wide, deciding once for every child how it is placed: what a patch said
     /// travels, what a new width gave arrives - as does everything while a frame under it is read.
-    public func begin(width: Double, animating: Bool = true) {
+    /// `anchorOffset` compensates a changed viewport origin without moving any layout destination.
+    public func begin(width: Double, animating: Bool = true, anchorOffset: Point = .zero) {
         let said = patched && arrangedWidth != nil
         let resized = arrangedWidth.map { abs($0 - width) > 0.5 } ?? false
         patched = false
         arrangedWidth = width
+        self.anchorOffset = resized || framesRead ? .zero : anchorOffset
 
         arrangement = layoutMotion?.arrangement(
             said: said && animating, resized: resized, animation: animation, framesRead: framesRead) ?? Arrangement()
@@ -61,6 +64,7 @@
         if values.width != nil { stated.insert(.width) }
         if values.height != nil { stated.insert(.height) }
         layoutMotion.place(view, mount: mount, at: place, stated: stated,
-                           fadeIn: fadeIn, arrivedFrom: arrivedFrom, in: arrangement)
+                           fadeIn: fadeIn, arrivedFrom: arrivedFrom,
+                           anchorOffset: anchorOffset, in: arrangement)
     }
 }

@@ -349,7 +349,13 @@ extern "C" void swiftomniui_winui_window_set_chrome(
 
 extern "C" void swiftomniui_winui_window_activate(SwiftOmniUIObjectRef handle) {
     try {
-        borrow<xaml::Window>(handle).Activate();
+        auto window = borrow<xaml::Window>(handle);
+        auto app = window.AppWindow();
+        if (auto presenter = app.Presenter().try_as<windowing::OverlappedPresenter>(); presenter && minimized(app)) {
+            presenter.Restore();
+        }
+        app.Show();
+        window.Activate();
     } catch (...) {
         report("showing a window");
     }

@@ -212,6 +212,9 @@ typedef struct {
     /// The platform activated the application with a URL to open - a file's association, a protocol's link - the
     /// URL in UTF-8.
     void (*urlOpened)(char const *utf8);
+
+    /// A plain launch or reactivation: show the first declared window, reusing it where it is open.
+    void (*activated)(void);
 } SwiftOmniUIWinUICallbacks;
 
 /// What the environment is, in groups, each read at once.
@@ -225,8 +228,11 @@ typedef enum {
     SwiftOmniUIFactsDisplay,
 } SwiftOmniUIFacts;
 
-/// Starts the Windows App SDK and WinUI on this thread and runs its loop until the last scene ends.
+/// Starts the single-instance application and runs its loop until the last window closes.
 int32_t swiftomniui_winui_run(SwiftOmniUIWinUICallbacks const *callbacks);
+
+/// As above, with an explicit instance key; null uses the executable's path.
+int32_t swiftomniui_winui_run_single_instance(SwiftOmniUIWinUICallbacks const *callbacks, char const *applicationID);
 
 /// Makes this thread hold WinUI elements with no loop of WinUI's running - a test process's thread.
 int32_t swiftomniui_winui_embed(SwiftOmniUIWinUICallbacks const *callbacks);
@@ -237,7 +243,7 @@ void swiftomniui_winui_pump(double seconds);
 /// Posts one turn to the UI thread's queue; any thread.
 void swiftomniui_winui_post_turn(void);
 
-/// Keeps the application's loop alive while a scene exists, including one temporarily without windows.
+/// Keeps the loop alive while windows exist; false schedules shutdown after queued activations.
 void swiftomniui_winui_keep_scene_alive(bool alive);
 
 /// Subscribes to CompositionTarget.Rendering, or lets go of it.

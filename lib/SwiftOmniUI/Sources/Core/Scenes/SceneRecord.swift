@@ -13,6 +13,7 @@ final class SceneRecord: @unchecked Sendable {
     /// A named primary Window can close independently and reopen by its ID.
     @State var mainIsOpen = true
     var mainWindowType: WindowType?
+    var declaresMainWindow = false
 
     /// Its session - what a view in the scene resolves as `SceneSession`.
     let session: SceneSession

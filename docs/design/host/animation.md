@@ -119,6 +119,17 @@ again keeps its running animation, and a new place bends a running one from
 where it has reached, at its speed. A layout's children hold no strong
 reference: a view the tree dropped is not kept alive for its place.
 
+A lazy scroll-anchor correction changes the viewport origin, not the rows'
+logical destinations. Its offset compensates the current presentation before
+placement bends toward the newly calculated row frame. An already travelling
+row keeps its sampled velocity and animation law through that correction;
+newly mounted rows still start at their actual places. Translating both an
+animation's start and destination is reserved for a coordinate-system change,
+not a scroll offset, or the animation can land beyond the row's layout frame.
+The corrected origin is clamped to the new scroll reach before deriving this
+offset, so removing an anchor cannot compensate a move the native scroller
+would refuse to make.
+
 ## Words at their destination
 
 A child whose place travels is told where it is bound as it sets out

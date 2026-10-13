@@ -209,6 +209,15 @@
         pump.turn()
     }
 
+    /// A plain launch targets the declared main window, even when only secondary windows currently exist.
+    public func initialWindowForActivation() -> MountedElement? {
+        guard let scene = core.reopenInitialWindow() else { return nil }
+        pump.turn()
+        return tree.root?.windows.first {
+            $0.id == .manual("main") && $0.enclosing(type: .scene)?.id == .manual(scene)
+        }
+    }
+
     /// What the user closing `window` tells, in order: the window that it is going, then its scene - that it is
     /// going too where the window is its main one, else that one of its windows closed, by the window's key.
     /// Design: docs/design/host/runtime.md#a-window-the-user-closes

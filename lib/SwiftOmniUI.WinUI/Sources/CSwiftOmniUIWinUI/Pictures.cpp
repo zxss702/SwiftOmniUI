@@ -408,36 +408,55 @@ namespace {
     /// The source's immutable file metadata belongs to the Image, including the
     /// full path; changing the application's picture folder cannot redirect an
     /// already visible image's next size or DPI adjustment.
-    struct PictureGrid : controls::GridT<PictureGrid> {
+    struct PicturePanel : controls::PanelT<PicturePanel> {
         std::wstring path;
         bool svg = false;
         int32_t aspect = -1;
         winrt::Windows::Foundation::Size size{};
+
+        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size) {
+            // Swift owns the image's intrinsic size and its frame. A native
+            // desired size would enlarge or clip an unresizable image whose
+            // frame is smaller than its glyph (for example a disclosure arrow).
+            for (auto const &child : Children()) child.Measure({INFINITY, INFINITY});
+            return {0, 0};
+        }
+
+        winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) {
+            for (auto const &child : Children()) {
+                auto element = child.as<xaml::FrameworkElement>();
+                auto desired = child.DesiredSize();
+                auto width = std::isfinite(element.Width()) ? static_cast<float>(element.Width()) : desired.Width;
+                auto height = std::isfinite(element.Height()) ? static_cast<float>(element.Height()) : desired.Height;
+                child.Arrange({(final.Width - width) / 2, (final.Height - height) / 2, width, height});
+            }
+            return final;
+        }
     };
 
-    /// The element `handle` made by `swiftomniui_winui_image_make` holds: a grid
+    /// The element `handle` made by `swiftomniui_winui_image_make` holds: a panel
     /// with the picture at [0] and a Viewbox with a FontIcon at [1], one
     /// visible at a time.
-    controls::Grid imageGrid(SwiftOmniUIObjectRef handle) {
-        return borrow<controls::Grid>(handle);
+    controls::Panel imageGrid(SwiftOmniUIObjectRef handle) {
+        return borrow<controls::Panel>(handle);
     }
 
-    PictureGrid *imageState(controls::Grid const &grid) {
-        return winrt::get_self<PictureGrid>(grid.as<xaml::IFrameworkElementOverrides>());
+    PicturePanel *imageState(controls::Panel const &grid) {
+        return winrt::get_self<PicturePanel>(grid.as<xaml::IFrameworkElementOverrides>());
     }
 
-    controls::Image imageChild(controls::Grid const &grid) {
+    controls::Image imageChild(controls::Panel const &grid) {
         return grid.Children().GetAt(0).as<controls::Image>();
     }
 
-    controls::Viewbox symbolBox(controls::Grid const &grid) {
+    controls::Viewbox symbolBox(controls::Panel const &grid) {
         return grid.Children().GetAt(1).as<controls::Viewbox>();
     }
 }
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_image_make(void) {
     try {
-        auto grid = winrt::make<PictureGrid>().as<controls::Grid>();
+        auto grid = winrt::make<PicturePanel>().as<controls::Panel>();
         grid.Children().Append(controls::Image());
         controls::Viewbox box;
         controls::FontIcon icon;

@@ -148,6 +148,7 @@ class WinUILayoutView: WinUIView {
         holdNativeChildren(handles)
         held = views
         heldBox = boxView
+        invalidateArrange()
     }
 
     /// Commits a native child list after the normal identity and pass checks.
@@ -211,6 +212,9 @@ class WinUILayoutView: WinUIView {
     func invalidateMeasurements() {
         forgetMeasurements()
         invalidateMeasure()
+        // These panels report zero DesiredSize to their placing parents.
+        // New content still needs new places when the native size stays zero.
+        invalidateArrange()
         ((self as? WinUIScrollDocument)?.scrollView ?? placingLayout)?.invalidateMeasurements()
     }
 

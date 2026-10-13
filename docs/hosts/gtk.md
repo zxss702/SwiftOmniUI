@@ -49,13 +49,16 @@ and hands the thread to the host, under the application's reverse-DNS name:
 import NotesUI
 import SwiftOmniUIGTK
 
-swiftomniui_app_register()
-SwiftOmniUIGTK.run(applicationID: "com.example.notes")
+SwiftOmniUIGTK.run(applicationID: "com.example.notes") {
+    swiftomniui_app_register()
+}
 ```
 
 The name is the one the desktop knows the application by. GTK keeps one
-instance of it: launched again, the running application brings its window
-forward.
+instance of it: launched again, the running application activates or reopens
+its first declared main window, preserving other windows. Only the primary
+process invokes the initialization closure. Closing the last window exits
+the process.
 
 `SWIFTOMNIUI_HOST=gtk` is what makes a build a GTK one: the application's manifest
 reads it, declares the `Platforms/GTK` target, the executable it makes and the
@@ -68,8 +71,9 @@ as HelloWorld does.
 
 ## Controls, acts, and events registered in Swift
 
-An application extends the host from its GTK head. Registrations run before
-`SwiftOmniUIGTK.run`, on the main thread. Registering a contract or an act again
+An application extends the host from its GTK head. Registrations run in
+`run`'s initialization closure on the UI thread, before the first render;
+registering before `run` remains supported. Registering a contract or an act again
 replaces the earlier registration. Every registration is written against the
 application's own contracts, so they are `public`: the host lives in a module
 of its own and must see them. The Gallery's GTK halves are in
