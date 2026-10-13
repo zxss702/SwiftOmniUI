@@ -30,6 +30,21 @@ class WinUIView {
     weak var nativeSafeBarOwner: AnyObject?
     private(set) var safeBarDrawing: HostMatrix?
 
+    /// Only promoted bars depend on an ancestor's drawing. Ordinary content
+    /// must not be walked on every opacity or offset animation frame.
+    private struct SafeBarDrawingDependency {
+        weak var bar: WinUIView?
+    }
+    private var safeBarDrawingDependencies: [Int64: SafeBarDrawingDependency] = [:]
+
+    func addSafeBarDrawingDependency(_ bar: WinUIView) {
+        safeBarDrawingDependencies[bar.number] = SafeBarDrawingDependency(bar: bar)
+    }
+
+    func removeSafeBarDrawingDependency(_ bar: WinUIView) {
+        safeBarDrawingDependencies.removeValue(forKey: bar.number)
+    }
+
     func recordSafeBarPlace(_ place: Rect, context: SafeAreaContext) {
         placed = place
         safeAreaContext = context
@@ -45,6 +60,7 @@ class WinUIView {
 
     func updateSafeBarDrawing() {
         guard nativeSafeBarOwner != nil else { return }
+        (nativeSafeBarOwner as? WinUISafeAreaBarHost)?.synchronizeDrawingAncestors()
         (nativeSafeBarOwner as? WinUIView)?.setIgnoresInput(sourceElement?.safeBarAllowsInput == false)
         var matrix = HostMatrix.identity
         var opacity = 1.0
@@ -77,16 +93,17 @@ class WinUIView {
     /// An ancestor opacity/offset animation need not cause layout. Mirror it
     /// to promoted descendants when drawing changes as well as when arranging.
     func refreshNativeSafeBarDrawing() {
-        func visit(_ element: MountedElement) {
-            for child in element.children {
-                if let view = (child.native as? WinUIElement)?.view, view.nativeSafeBarOwner != nil {
-                    view.updateSafeBarDrawing()
-                } else {
-                    visit(child)
-                }
+        guard !safeBarDrawingDependencies.isEmpty else { return }
+        // Ancestors are made before descendants. Updating an outer bar first
+        // also gives an inner bar the current inherited opacity.
+        for number in safeBarDrawingDependencies.keys.sorted() {
+            guard let bar = safeBarDrawingDependencies[number]?.bar,
+                  !bar.isDetached, bar.nativeSafeBarOwner != nil else {
+                safeBarDrawingDependencies.removeValue(forKey: number)
+                continue
             }
+            bar.updateSafeBarDrawing()
         }
-        if let sourceElement { visit(sourceElement) }
     }
 
     func layoutSafeArea(in bounds: Rect) -> SafeAreaContext {
@@ -107,6 +124,17 @@ class WinUIView {
 
     /// Where the view was last placed, in DIPs of its parent; nil before its first place.
     private(set) var placed: Rect?
+
+    /// The last native allocation is separate from the current animated
+    /// place. A position-only journey lays the subtree out at its destination
+    /// once and moves that allocation through its presentation transform.
+    private var nativeAllocation: Rect?
+    private var travellingDestination: Rect?
+    private var placementTranslation = Point.zero
+
+    /// Lazy realization uses the final allocated capacity, including any
+    /// explicit frame. Geometry reports keep using the current placed frame.
+    var committedLayoutFrame: Rect { travellingDestination ?? placed ?? laidOutFrame }
 
     /// How opaque the view's own property draws it, and whether it shows, as the host last wrote them.
     private(set) var opacity = 1.0
@@ -234,6 +262,7 @@ class WinUIView {
 
     /// Moves, turns and scales the view where its layout put it, in DIPs and degrees.
     func setTransform(_ transform: HostDrawingTransform) {
+        guard transform != self.transform else { return }
         self.transform = transform
         writeTransform()
         refreshNativeSafeBarDrawing()
@@ -251,14 +280,20 @@ class WinUIView {
     private func writeTransform() {
         let drawn = drawing
         let size = placed ?? Rect(x: 0, y: 0, width: 0, height: 0)
-        swiftomniui_winui_set_transform(
-            handle, drawn.translationX, drawn.translationY, drawn.rotation,
-            drawn.scaleX, drawn.scaleY, drawn.pivotX * size.width, drawn.pivotY * size.height)
         let ownTip = drawn.tip(width: size.width, height: size.height)
         let tip = safeBarDrawing.map { (ownTip ?? .identity) * $0 } ?? ownTip
-        guard tip != writtenTip else { return }
-        writtenTip = tip
-        guard let tip else { return swiftomniui_winui_set_projection(handle, nil) }
+        // Placement is a translation in the parent's plane, after the
+        // authored drawing (including perspective). A flat view can put it
+        // straight into CompositeTransform; a tipped one appends it to its
+        // projection so it is not rotated or projected a second time.
+        let flatTranslation = tip == nil ? placementTranslation : .zero
+        swiftomniui_winui_set_transform(
+            handle, drawn.translationX + flatTranslation.x, drawn.translationY + flatTranslation.y, drawn.rotation,
+            drawn.scaleX, drawn.scaleY, drawn.pivotX * size.width, drawn.pivotY * size.height)
+        let projected = tip.map { $0 * HostMatrix.translation(placementTranslation.x, placementTranslation.y) }
+        guard projected != writtenTip else { return }
+        writtenTip = projected
+        guard let tip = projected else { return swiftomniui_winui_set_projection(handle, nil) }
         let numbers = [
             tip.m11, tip.m12, tip.m13, tip.m14, tip.m21, tip.m22, tip.m23, tip.m24,
             tip.m31, tip.m32, tip.m33, tip.m34, tip.m41, tip.m42, tip.m43, tip.m44,
@@ -412,6 +447,11 @@ class WinUIView {
         }
         let resized = placed.map { $0.width != place.width || $0.height != place.height } ?? true
         if nativeSafeBarOwner == nil { placed = place }
+        let room = wordsRoom ?? place
+        let positionJourney = nativeSafeBarOwner == nil && travellingDestination.map {
+            $0.width == place.width && $0.height == place.height
+        } == true
+        let previousTranslation = placementTranslation
         if Self.arranging > 0 {
             // A layout of SwiftOmniUI's is measured at the width it stands at; a new width is measured once the
             // pass ends - measuring an element while WinUI arranges marks it for another pass, for ever.
@@ -423,12 +463,36 @@ class WinUIView {
                 }
                 layout.standsAt = place.width
             }
-            let room = wordsRoom ?? place
-            swiftomniui_winui_arrange(handle, place.x, place.y, room.width, room.height)
+            let corner = positionJourney ? travellingDestination! : place
+            let allocation = Rect(corner.x, corner.y, room.width, room.height)
+            nativeAllocation = allocation
+            placementTranslation = positionJourney
+                ? Point(place.x - corner.x, place.y - corner.y) : .zero
+            swiftomniui_winui_arrange(handle, allocation.x, allocation.y, allocation.width, allocation.height)
+        } else if nativeSafeBarOwner == nil, let nativeAllocation,
+                  nativeAllocation.width == room.width, nativeAllocation.height == room.height,
+                  positionJourney || (travellingDestination == nil && placementTranslation != .zero) {
+            // No size or child allocation changed. Advancing this row must
+            // not invalidate and re-arrange every other mounted lazy row.
+            placementTranslation = Point(place.x - nativeAllocation.x, place.y - nativeAllocation.y)
+            if travellingDestination == nil,
+               nativeAllocation.x != place.x || nativeAllocation.y != place.y {
+                // A retarget can land before its new native allocation was
+                // committed. Keep its final presentation until that pass;
+                // clearing it now would flash the previous destination.
+                placingLayout?.invalidateArrange()
+            }
         } else {
+            // Keep an existing presentation move until the new allocation
+            // actually lands, even when this next placement changes size.
+            if nativeSafeBarOwner == nil, let nativeAllocation, placementTranslation != .zero {
+                placementTranslation = Point(place.x - nativeAllocation.x, place.y - nativeAllocation.y)
+            }
             placingLayout?.invalidateArrange()
         }
-        if resized, transform != .identity || placedDrawing != nil { writeTransform() }
+        if previousTranslation != placementTranslation
+            || (resized && (transform != .identity || placedDrawing != nil)) { writeTransform() }
+        if previousTranslation != placementTranslation { refreshNativeSafeBarDrawing() }
         if resized {
             for what in paintsBySize.keys.sorted() { paintsBySize[what]?(LayoutSize(width: place.width, height: place.height)) }
         }
@@ -443,8 +507,12 @@ class WinUIView {
         paint(LayoutSize(width: frame.width, height: frame.height))
     }
 
-    /// Nothing of the view's own follows where its place travels.
-    func travels(to destination: Rect?) {}
+    /// Keep the final allocation while a same-size place travels. Do not
+    /// clear its presentation offset here: the animator calls this before
+    /// writing the final frame, which clears the offset without a flash.
+    func travels(to destination: Rect?) {
+        travellingDestination = destination
+    }
 
     /// The size the view's words are laid out at while its place travels; nil for its place's.
     var wordsRoom: Rect? { nil }
@@ -610,6 +678,10 @@ class WinUIView {
     /// overrides this lets go of what every view holds first, then of its own.
     func detach() {
         isDetached = true
+        nativeAllocation = nil
+        travellingDestination = nil
+        placementTranslation = .zero
+        safeBarDrawingDependencies.removeAll()
         hear([]) { _ in }
         setFocusChanged(nil)
         menuActions = []

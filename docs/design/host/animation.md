@@ -40,6 +40,16 @@ the value drawn on the current frame, keyed by element and property. A new
 animation of a property starts from where the running one stands, with its
 speed.
 
+A combined removal waits for every component, whose spring lanes can reach
+rest on different frames. A component that finishes first retains its target
+in `DescribedMotion` until the whole element leaves. It cannot fall back to
+the authored value while another component still removes the view: opacity
+zero must stay zero, rather than briefly making the old branch visible again.
+Reviving or retargeting the component starts from its retained presentation
+and releases that target; leaving clears all retained targets for the mount.
+These settled targets hold no frame clock and do not affect ordinary property
+animations.
+
 A value moves as numeric lanes and only within one shape: a number, a list of
 numbers of one length, a colour, or a structure whose kind and parts stay the
 same - a gradient moves its geometry, stops and colours, never its kind or
@@ -57,6 +67,15 @@ a shape's fill and stroke; a window's place. A backend answers
 the backend each frame's. Every other pair arrives at once, rather than
 keeping a animation alive that nothing shows: a host that answers no pair
 animates nothing, however the tree asks.
+
+Insertion and removal phases use this same native capability check. An
+actual native view supports opacity and drawing transforms independently of
+its type: pages, lazy containers and custom controls retain these transitions,
+while type tables still limit their text, layout and control properties.
+A scale's pivot is part of its supported drawing transform. An unsupported blur still
+has the transition's supported opacity crossing, but creates no invisible
+blur animation and no extra wait before removal. Blur belongs to drawing,
+not measurement, regardless of whether a backend implements its effect.
 
 What a moved value asks of the elements around it is the host layer's too
 ([one frame](runtime.md#one-frame)): a window's frame, a title bar's

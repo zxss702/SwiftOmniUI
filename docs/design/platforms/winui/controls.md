@@ -54,7 +54,11 @@ text block's, and a span's own is not realized. A run's background is a
 per run - keeping the run's colour on them. The runs stand in place of the
 label's own words; a label whose spans are taken away shows its own words
 again. A span that changes has its label apply again, so the runs are laid
-down whole each time.
+down whole each time. A highlighter without an explicit span colour shares
+the label's foreground brush. When the label's foreground changes, the native
+setter moves those shared highlighters to the new brush; explicit span brushes
+remain their own, even when they have the same colour. Changing the label's
+colour therefore needs no inline rebuild or measurement.
 
 ## Nothing the program writes is heard
 

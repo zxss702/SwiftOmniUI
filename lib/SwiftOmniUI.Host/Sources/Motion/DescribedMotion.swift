@@ -39,6 +39,9 @@
 @_spi(Host) @MainActor public final class DescribedMotion {
     private let animator: Animator
     private var transitions: [DescribedKey: DescribedTransition] = [:]
+    /// A removal's components can finish on different frames. A finished
+    /// component keeps its target until the whole element leaves or revives.
+    private var retainedTargets: [DescribedKey: HostValue] = [:]
     private var outputs: [DescribedOutput] = []
 
     /// Described animation whose animations `animator` advances.
@@ -49,13 +52,16 @@
     /// Whether any transition is under way.
     public var isActive: Bool { !transitions.isEmpty }
 
-    /// The value a transition under way draws for `key`.
+    /// The value a transition draws, including a finished removal component
+    /// held while the rest of that element's transition still runs.
     public func presentedValue(for key: DescribedKey) -> HostValue? {
-        transitions[key]?.presented
+        transitions[key]?.presented ?? retainedTargets[key]
     }
 
     /// Starts, retargets or cuts short a property's animation; a nil `animation` snaps.
     /// `landed` runs when it ends or is cut short; returns whether one started.
+    /// `retainingTarget` holds a removal component after it lands, until its
+    /// mount is removed or this property receives a new destination.
     @discardableResult
     public func receive(
         key: DescribedKey,
@@ -63,12 +69,20 @@
         target: HostValue?,
         animation: Animation?,
         landed: (() -> Void)? = nil,
+        retainingTarget: Bool = false,
         now: Double,
         reducesMotion: Bool
     ) -> Bool {
-        var source = standing
+        let retained = retainedTargets.removeValue(forKey: key)
+        var source = standing ?? retained
         var carriedLanes: [Double] = []
         var carriedVelocity: [Double] = []
+        func arrive() -> Bool {
+            // A component already at its target, or snapped there, must also
+            // stay there while the other removal components finish.
+            if retainingTarget, let target { retainedTargets[key] = target }
+            return false
+        }
 
         if let running = transitions.removeValue(forKey: key) {
             if let animation = animator.animation(for: .described(key)) {
@@ -94,7 +108,7 @@
                 destination: target,
                 exactSource: carriedLanes,
                 property: key.property)
-        else { return false }
+        else { return arrive() }
 
         let running = RunningAnimation(
             from: plan.from,
@@ -105,9 +119,9 @@
             animation: animation,
             began: now)
 
-        guard !running.arrives else { return false }
+        guard !running.arrives else { return arrive() }
         transitions[key] = DescribedTransition(
-            plan: plan, velocity: running.velocity, landed: landed)
+            plan: plan, velocity: running.velocity, landed: landed, retainingTarget: retainingTarget)
         animator.start(running, for: .described(key))
         return true
     }
@@ -123,6 +137,7 @@
             outputs.append(DescribedOutput(key: key, value: presented.value))
 
             if presented.rested {
+                if transition.retainingTarget { retainedTargets[key] = presented.value }
                 transitions[key] = nil
                 animator.halt(.described(key))
                 transition.landed?()
@@ -133,6 +148,7 @@
     /// Drops every animation of an element that leaves.
     public func remove(mount: UInt64) {
         transitions = transitions.filter { $0.key.mount != mount }
+        retainedTargets = retainedTargets.filter { $0.key.mount != mount }
         outputs.removeAll { $0.key.mount == mount }
         animator.retain { target in
             guard case .described(let key) = target else { return true }
@@ -156,12 +172,14 @@ private final class DescribedTransition {
 
     /// What follows the transition's end.
     let landed: (() -> Void)?
+    let retainingTarget: Bool
 
-    init(plan: MotionValuePlan, velocity: [Double], landed: (() -> Void)?) {
+    init(plan: MotionValuePlan, velocity: [Double], landed: (() -> Void)?, retainingTarget: Bool) {
         self.plan = plan
         lanes = plan.from
         self.velocity = velocity
         self.landed = landed
+        self.retainingTarget = retainingTarget
     }
 
     var presented: HostValue { plan.value(at: lanes) }

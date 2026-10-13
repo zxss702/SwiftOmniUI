@@ -207,34 +207,3 @@ extern "C" void swiftomniui_winui_path_draw(
         report("drawing a shape");
     }
 }
-
-extern "C" void swiftomniui_winui_clip_to_shape(
-    SwiftOmniUIObjectRef element, int32_t kind, double radius, double x, double y, double width, double height
-) {
-    try {
-        auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(as<xaml::UIElement>(element));
-        // No mask, or no room for one to stand in, leaves the panel whole.
-        if (kind < 0 || width <= 0 || height <= 0) {
-            visual.Clip(nullptr);
-            return;
-        }
-        auto compositor = visual.Compositor();
-        auto w = static_cast<float>(width), h = static_cast<float>(height);
-        auto at = winrt::Windows::Foundation::Numerics::float2{static_cast<float>(x), static_cast<float>(y)};
-        if (kind == 2) {
-            auto ellipse = compositor.CreateEllipseGeometry();
-            ellipse.Center({at.x + w / 2, at.y + h / 2});
-            ellipse.Radius({w / 2, h / 2});
-            visual.Clip(compositor.CreateGeometricClip(ellipse));
-        } else {
-            auto rectangle = compositor.CreateRoundedRectangleGeometry();
-            auto r = kind == 1 ? std::min(static_cast<float>(radius), std::min(w, h) / 2) : 0.0f;
-            rectangle.Size({w, h});
-            rectangle.CornerRadius({r, r});
-            rectangle.Offset(at);
-            visual.Clip(compositor.CreateGeometricClip(rectangle));
-        }
-    } catch (...) {
-        report("cutting a panel to its mask");
-    }
-}

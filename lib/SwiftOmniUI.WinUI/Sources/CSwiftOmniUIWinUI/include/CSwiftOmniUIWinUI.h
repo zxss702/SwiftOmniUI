@@ -345,14 +345,6 @@ SwiftOmniUIObjectRef swiftomniui_winui_path_clip_make(SwiftOmniUIObjectRef eleme
 void swiftomniui_winui_path_clip_update(SwiftOmniUIObjectRef clip, double const *commands, int32_t count, bool evenOdd);
 void swiftomniui_winui_path_clip_attach(SwiftOmniUIObjectRef element, SwiftOmniUIObjectRef clip);
 
-/// Cuts what `element` shows to a silhouette standing `x` by `y` DIPs from its corner and `width` by `height`:
-/// `kind` 0 a rectangle, 1 a rectangle of `radius` at each corner, 2 an ellipse, and any other kind - no mask -
-/// shows the element whole. Lines of a geometry of a shape's own are no silhouette WinUI draws a clip from: a
-/// panel cut to such a mask is cut to its box.
-void swiftomniui_winui_clip_to_shape(
-    SwiftOmniUIObjectRef element, int32_t kind, double radius, double x, double y, double width, double height
-);
-
 /// Whether the element takes clicks and touches; one that does not lets them through to what is behind it.
 void swiftomniui_winui_set_hit_testable(SwiftOmniUIObjectRef element, bool testable);
 
@@ -404,6 +396,15 @@ int32_t swiftomniui_winui_text(SwiftOmniUIObjectRef element, char *utf8, int32_t
 
 SwiftOmniUIObjectRef swiftomniui_winui_panel_make(int64_t view);
 void swiftomniui_winui_panel_set_children(SwiftOmniUIObjectRef panel, SwiftOmniUIObjectRef const *children, int32_t count);
+
+/// A panel that redirects its live XAML source and mask through CompositionMaskBrush.
+SwiftOmniUIObjectRef swiftomniui_winui_masked_panel_make(int64_t view);
+/// Commits the children and their alpha-source role together, keeping intersecting controls attached.
+void swiftomniui_winui_masked_panel_set_children(
+    SwiftOmniUIObjectRef panel, SwiftOmniUIObjectRef const *children, int32_t count, SwiftOmniUIObjectRef mask
+);
+/// Disconnects the composition surfaces when the panel leaves or is disposed.
+void swiftomniui_winui_masked_panel_clear(SwiftOmniUIObjectRef panel);
 
 /// How words look on a text block or any control showing them: the font - a size of 0 or less and an empty
 /// family are the platform's - the colour as 0xAARRGGBB, `has` false putting back the platform's, and the room
@@ -783,6 +784,11 @@ void swiftomniui_winui_color_box_set(SwiftOmniUIObjectRef box, uint32_t argb, do
 /// Renders the element and reads the colour, as ARGB, at each of `count` points given as x and y in DIPs of it -
 /// what a test reads of the screen; whether it rendered.
 bool swiftomniui_winui_pixels(SwiftOmniUIObjectRef element, double const *points, int32_t count, uint32_t *argb);
+
+/// Samples actual presented RGB pixels, including Composition visuals; for visible, unobscured test windows.
+bool swiftomniui_winui_presented_pixels(
+    SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element, double const *points, int32_t count, uint32_t *argb
+);
 
 /// A ScrollView's scroller: a ScrollViewer around `content`, scrolling down (0), across (1), both ways (2) or not at
 /// all (3); each bar shown as WinUI decides (0), always (1) or never (2).

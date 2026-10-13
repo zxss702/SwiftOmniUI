@@ -185,6 +185,19 @@ placeholders for its children, and those go through the full `element` path.
 A clean walk moves nothing: a child's place among its siblings is its
 parent's business.
 
+Each rendered node indexes the reads in its whole branch. A tracked clean
+walk stops at a branch whose index is disjoint from the changed states, so
+realizing another lazy row does not revisit every control in the rows already
+held. Changed branches still carry the scopes on the path to their readers
+and refold preference answers from the settled children. Full builds and
+explicit empty-change refolds keep visiting their carries, including dynamic
+preferences fed by host layout reports.
+
+Preference transforms record their own state and observable-model reads when
+they fold. Those reads also reach the branch index, so a changed transform
+cannot be hidden behind an unchanged body. Refolding replaces its dependency
+scope; rebuilding the body and updating a folded answer remain separate work.
+
 An element keeps what the clean walk needs to build it without its parent:
 a composed view keeps its placeholder, a container keeps its node with the
 content still to run, the environment it provided, the scene it is in, and

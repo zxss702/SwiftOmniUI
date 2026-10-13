@@ -62,6 +62,25 @@ layer's `HostDrawingTransform.tip`, about the pivot the translation moved, so
 the flat drawing, then the projection, is the host layer's whole matrix, as
 every host draws it. A view that tips nothing has no projection.
 
+A same-size layout journey has its own presentation translation over the
+authored drawing. Flat drawing adds this move after its scale and rotation;
+tipped drawing appends it to the projection matrix, so the layout's move stays
+in the parent's plane. It never replaces an authored offset or transform. The
+native origin includes this presentation move, while the logical placed frame
+already holds the current animation position; geometry reports do not add the
+move a second time.
+WinUI's [render transforms](https://learn.microsoft.com/en-us/windows/apps/develop/platform/xaml/transforms)
+also move hit testing with the drawing; its
+[effective viewport](https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.frameworkelement.effectiveviewportchanged)
+accounts for ancestor render transforms.
+
+Promoted safe bars register weak drawing dependencies on their logical native
+ancestors. Changes to an ancestor's transform or opacity notify just those
+bars instead of searching its entire content subtree on every frame. Hosting
+and release add and remove the dependencies, and committing the bar's logical
+place refreshes the ancestor chain. The drawing matrix still comes from that
+logical chain, preserving animation and opacity across native toolbar hosting.
+
 ## The shapes
 
 Each of the six shapes is one WinUI `Path` in a figure of the relay's (see

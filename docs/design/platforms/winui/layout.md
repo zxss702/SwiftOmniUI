@@ -105,10 +105,29 @@ Native Image/Viewbox content is prepared at its intrinsic size rather than 0x0.
 A child's `Arrange` written outside its parent's arrangement does nothing, so
 a view keeps the place it was last given and writes it according to when it
 comes. Inside a pass - the host counts the arrangements under way - the place
-is arranged at once. Between passes, as a display frame moves a travelling
-child, the view asks the layout that placed it to arrange again
-(`InvalidateArrange`); WinUI runs that arrangement before it draws the frame,
-and the layout's arrangement gives the child the place it keeps.
+is arranged at once. A position-only layout animation allocates the child's
+native subtree at its destination once. Its current animated place remains
+the reported place, and a presentation translation moves that allocation to
+the current position. Each display frame changes that translation without
+invalidating the parent lazy panel or arranging every surviving row again.
+The final frame clears the translation after landing; clearing it before the
+final frame would briefly show the destination between animation steps.
+
+A journey that changes the child's size still asks the placing layout to
+arrange again (`InvalidateArrange`), because its descendants really have new
+room to lay out. Ordinary placements between passes also follow this path.
+WinUI runs that arrangement before it draws the frame. Business frame reads
+already make layout motion arrive immediately, so they keep the actual
+allocation rather than receiving an intermediate animation proposal.
+
+A lazy window clamps against the final allocated document capacity during a
+size animation, rather than the current presentation height while row offsets
+already describe the final geometry. This avoids repeatedly dropping and
+realizing boundary rows as that height travels. An explicit fixed frame is
+still the allocation's bound; geometry reports retain the current frame.
+If a journey is retargeted before its new native allocation lands, its final
+presentation translation stays until the committing arrangement, rather than
+briefly returning to the previous target when the animator finishes.
 
 A label whose place travels is arranged at its place's corner but at the size
 the place is bound for ([words at their

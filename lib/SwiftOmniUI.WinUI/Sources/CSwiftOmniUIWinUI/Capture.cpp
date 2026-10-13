@@ -7,9 +7,11 @@
 #include "Relay.h"
 
 #include <chrono>
+#include <cmath>
 
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
+#include <winrt/Microsoft.UI.Windowing.h>
 
 using namespace swiftomniui;
 using winrt::Windows::Foundation::AsyncStatus;
@@ -46,6 +48,45 @@ namespace {
             if (panel) panel.Background(nullptr);
         }
     };
+}
+
+/// Test-only sampling of the presented desktop image. RenderTargetBitmap omits
+/// Composition child visuals, so it cannot verify an opacity-mask result.
+/// The test window must be visible and unobscured at every requested point.
+extern "C" bool swiftomniui_winui_presented_pixels(
+    SwiftOmniUIObjectRef windowHandle, SwiftOmniUIObjectRef elementHandle,
+    double const *points, int32_t count, uint32_t *argb
+) {
+    try {
+        if (count < 0 || (count > 0 && (!points || !argb))) return false;
+        auto window = as<xaml::Window>(windowHandle);
+        auto element = as<xaml::FrameworkElement>(elementHandle);
+        auto hwnd = reinterpret_cast<HWND>(window.AppWindow().Id().Value);
+        POINT origin{};
+        if (!IsWindowVisible(hwnd) || !ClientToScreen(hwnd, &origin)) return false;
+        auto transform = element.TransformToVisual(window.Content());
+        auto scale = element.XamlRoot().RasterizationScale();
+        struct DesktopDC {
+            HDC handle = GetDC(nullptr);
+            ~DesktopDC() { if (handle) ReleaseDC(nullptr, handle); }
+        } desktop;
+        if (!desktop.handle) return false;
+        for (int32_t index = 0; index < count; ++index) {
+            auto at = transform.TransformPoint({static_cast<float>(points[2 * index]),
+                                                static_cast<float>(points[2 * index + 1])});
+            POINT pixel{origin.x + static_cast<LONG>(std::floor(at.X * scale)),
+                        origin.y + static_cast<LONG>(std::floor(at.Y * scale))};
+            if (GetAncestor(WindowFromPoint(pixel), GA_ROOT) != hwnd) return false;
+            auto colour = GetPixel(desktop.handle, pixel.x, pixel.y);
+            if (colour == CLR_INVALID) return false;
+            argb[index] = 0xFF000000u | static_cast<uint32_t>(GetRValue(colour)) << 16
+                | static_cast<uint32_t>(GetGValue(colour)) << 8 | GetBValue(colour);
+        }
+        return true;
+    } catch (...) {
+        report("reading presented pixels");
+        return false;
+    }
 }
 
 extern "C" bool swiftomniui_winui_pixels(SwiftOmniUIObjectRef handle, double const *points, int32_t count, uint32_t *argb) {

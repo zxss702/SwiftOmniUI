@@ -7,6 +7,14 @@
 /// Every other pair arrives at once, rather than keeping a animation alive that nothing shows.
 /// Design: docs/design/host/animation.md#what-travels
 @_spi(Host) public enum TransitionSurface {
+    /// Drawing shared by every actual native view, including a page, a lazy
+    /// container or an application-registered control. The caller checks
+    /// that this instance presents a view; type tables still govern its
+    /// layout, text and control-specific properties.
+    public static func presentsDrawing(_ property: Prop) -> Bool {
+        drawingProperties.contains(property)
+    }
+
     /// Whether a host moves `property` of an element of `type` frame by frame; `atRest` names, element type by
     /// element type, what the host's toolkit paints only at rest, which arrives at once there.
     public static func presents(_ property: Prop, on type: NodeType, atRest: [NodeType: Set<Prop>] = [:]) -> Bool {
@@ -117,7 +125,13 @@
         .minimumWidth, .minimumHeight,
         .maximumWidth, .maximumHeight,
         .rotation, .scale, .scaleX, .scaleY, .translationX, .translationY,
+        .pivotX, .pivotY,
         .padding,
+    ]
+
+    private static let drawingProperties: Set<Prop> = [
+        .opacity, .translationX, .translationY, .rotation, .rotationX, .rotationY,
+        .scale, .scaleX, .scaleY, .pivotX, .pivotY,
     ]
 
     private static let contentPageProperties: Set<Prop> = [

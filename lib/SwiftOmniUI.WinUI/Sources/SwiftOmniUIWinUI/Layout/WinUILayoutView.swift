@@ -87,6 +87,10 @@ class WinUILayoutView: WinUIView {
         super.init { number in swiftomniui_winui_panel_make(number) }
     }
 
+    init(_ make: (_ number: Int64) -> SwiftOmniUIObjectRef?) {
+        super.init(make)
+    }
+
     /// Puts `items` in the panel, in order, where they differ from the children it holds; whether they did.
     @discardableResult
     func setItems(_ items: [WinUILayoutItem]) -> Bool {
@@ -137,9 +141,15 @@ class WinUILayoutView: WinUIView {
         }
         pendingChildren = nil
         let handles: [SwiftOmniUIObjectRef?] = (boxView.map { [$0.handle] } ?? []) + views.map(\.handle)
-        swiftomniui_winui_panel_set_children(handle, handles, Int32(handles.count))
+        holdNativeChildren(handles)
         held = views
         heldBox = boxView
+    }
+
+    /// Commits a native child list after the normal identity and pass checks.
+    /// Specialized compositing containers retain the same layout bookkeeping.
+    func holdNativeChildren(_ handles: [SwiftOmniUIObjectRef?]) {
+        swiftomniui_winui_panel_set_children(handle, handles, Int32(handles.count))
     }
 
     /// What fills the box: a colour or a brush; nil for nothing.

@@ -130,7 +130,7 @@ extension MountedElement {
             let started = tree.receiveProperty(
                 mount: mount, property: property,
                 standing: value(property) ?? resting(of: property),
-                target: target, animation: law) { [weak self] in
+                target: target, animation: law, retainingTarget: true) { [weak self] in
                     pending -= 1
                     // A departure a patch turned around - or another since -
                     // lands its components anyway; only this one's last lets
@@ -197,7 +197,10 @@ extension MountedElement {
             values.append((.pivotY, .number(pivot.y)))
         }
         if let blur = phase.blur, driven[.blur] == nil { values.append((.blur, .number(blur))) }
-        return values
+        // A transition only waits for components the native half presents.
+        // Unsupported effects must not run an invisible animation or keep a
+        // departed branch alive after its visible components finished.
+        return values.filter { native.animates($0.0) }
     }
 
     /// The value a transition property rests at where the element says none.

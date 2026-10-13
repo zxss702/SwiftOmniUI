@@ -109,8 +109,16 @@ extern "C" void swiftomniui_winui_set_foreground(SwiftOmniUIObjectRef handle, bo
         auto brush = has ? media::SolidColorBrush(color(argb)) : media::SolidColorBrush{nullptr};
         either(handle,
             [&](controls::TextBlock const &block) {
+                auto previous = block.Foreground();
                 if (has) block.Foreground(brush);
                 else block.ClearValue(controls::TextBlock::ForegroundProperty());
+                // A background run without its own colour shares the label's
+                // brush. Keep that inheritance when the label changes colour;
+                // an explicit run owns a different brush, even for the same ARGB.
+                auto foreground = block.Foreground();
+                for (auto const &highlighter : block.TextHighlighters()) {
+                    if (highlighter.Foreground() == previous) highlighter.Foreground(foreground);
+                }
             },
             [&](controls::Control const &control) {
                 if (has) control.Foreground(brush);

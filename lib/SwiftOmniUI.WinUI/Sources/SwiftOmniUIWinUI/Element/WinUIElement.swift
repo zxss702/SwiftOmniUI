@@ -50,7 +50,8 @@ final class WinUIElement: NativeElement {
     }
 
     func animates(_ property: Prop) -> Bool {
-        TransitionSurface.presents(property, on: type)
+        (presentsView && TransitionSurface.presentsDrawing(property))
+            || TransitionSurface.presents(property, on: type)
     }
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {

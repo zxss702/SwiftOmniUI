@@ -219,7 +219,15 @@ extension View {
         var wrapper = Node(contract: MaskedContract.self)
         let content = node
         let maskNode = mask().node
-        wrapper.producer = { content.asChildren + maskNode.asChildren }
+        // Keep the two roles distinct even when a builder or composed body
+        // expands to several siblings. All mask layers contribute their alpha.
+        var source = Node(contract: ZStackContract.self)
+        source.key = "content"
+        source.producer = { content.asChildren }
+        var alpha = Node(contract: ZStackContract.self)
+        alpha.key = "mask"
+        alpha.producer = { maskNode.asChildren }
+        wrapper.producer = { [source, alpha] }
         return ModifiedContent(node: wrapper)
     }
 }

@@ -180,6 +180,15 @@ extension WinUIView {
         return argb
     }
 
+    /// The desktop's composited RGB result, including Composition child visuals.
+    /// These checks need a visible, unobscured test window; they are not bitmap captures.
+    func presentedPixels(at points: [(Double, Double)], in window: WinUIWindow) -> [UInt32] {
+        let flat = points.flatMap { [$0.0, $0.1] }
+        var argb = [UInt32](repeating: 0, count: points.count)
+        guard swiftomniui_winui_presented_pixels(window.handle, handle, flat, Int32(points.count), &argb) else { return [] }
+        return argb
+    }
+
     /// The opacity WinUI draws the element at.
     var drawnOpacity: Double {
         swiftomniui_winui_opacity(handle)

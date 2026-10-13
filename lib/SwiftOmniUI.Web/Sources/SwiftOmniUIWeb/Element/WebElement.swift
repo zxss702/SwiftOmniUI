@@ -54,7 +54,8 @@ final class WebElement: NativeElement {
     }
 
     func animates(_ property: Prop) -> Bool {
-        WebTransitionSurface.presents(property, on: type)
+        (presentsView && TransitionSurface.presentsDrawing(property))
+            || WebTransitionSurface.presents(property, on: type)
     }
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {

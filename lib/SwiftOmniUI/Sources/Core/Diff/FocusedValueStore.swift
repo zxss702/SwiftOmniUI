@@ -75,12 +75,16 @@ final class FocusedValueStore: NamedState {
     /// focused element gone - rebuilds the readers. Compared rather than
     /// told, so a walk that changed nothing asks for nothing.
     func stale() {
+        // With no live reader there is no answer to compare or notify.
+        // The first later read refreshes against the latest rendered tree.
+        dirty = true
+        guard Renderer.shared.isRead(self) else { return }
+
         let chain = resolvedChain
         let scene = resolvedScene
         let fallback = defaultScene
         let bags = sceneBags
 
-        dirty = true
         refresh()
 
         var moved = !chain.same(as: resolvedChain)

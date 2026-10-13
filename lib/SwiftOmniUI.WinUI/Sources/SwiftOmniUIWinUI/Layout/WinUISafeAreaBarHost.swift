@@ -12,6 +12,10 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     private var contribution: [Double] = []
     private var measurePending = false
     private var released = false
+    private struct DrawingAncestor {
+        weak var view: WinUIView?
+    }
+    private var drawingAncestors: [DrawingAncestor] = []
     var spacing: Double {
         max(0, bar.sourceElement?.parent?.number(.spacing) ?? 0)
     }
@@ -21,8 +25,27 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
         super.init()
         allowsNativeSafeBars = true
         bar.nativeSafeBarOwner = self
+        synchronizeDrawingAncestors()
         bar.placingLayout?.holdChildren()
         setChildren([bar])
+    }
+
+    /// A promoted bar remains in the logical tree. Index its drawing
+    /// dependencies when hosted and refresh the index as its logical place
+    /// is committed, rather than searching ordinary content every frame.
+    func synchronizeDrawingAncestors() {
+        guard !released else { return }
+        var ancestors: [WinUIView] = []
+        var next = bar.sourceElement?.parent
+        while let element = next {
+            if let view = (element.native as? WinUIElement)?.view { ancestors.append(view) }
+            next = element.parent
+        }
+        guard ancestors.count != drawingAncestors.count
+            || !zip(ancestors, drawingAncestors).allSatisfy({ $0 === $1.view }) else { return }
+        for ancestor in drawingAncestors { ancestor.view?.removeSafeBarDrawingDependency(bar) }
+        drawingAncestors = ancestors.map { DrawingAncestor(view: $0) }
+        for ancestor in ancestors { ancestor.addSafeBarDrawingDependency(bar) }
     }
 
     /// Logical contribution changes are committed outside native layout.
@@ -67,6 +90,8 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     /// logical panel. Never insert one control into two native parents.
     func releaseBar() {
         released = true
+        for ancestor in drawingAncestors { ancestor.view?.removeSafeBarDrawingDependency(bar) }
+        drawingAncestors.removeAll()
         setChildren([])
         bar.nativeSafeBarOwner = nil
         bar.clearSafeBarDrawing()

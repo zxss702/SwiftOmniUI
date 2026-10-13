@@ -106,8 +106,8 @@ extension WinUIRegistrations {
             layout.property(VisualElementContract.ignoresInput) { view, ignores in view.setIgnoresInput(ignores ?? false) }
         }
 
-        // The mask the `.mask` modifier writes last is laid out in the same room and never drawn; the content is
-        // cut to its silhouette.
+        // Windows composites the complete mask subtree's alpha with the source;
+        // both keep their native controls and the content's allocated room.
         // Design: docs/design/platforms/winui/drawing.md#a-mask
         registry.add(MaskedContract.self, create: { _ in WinUIMaskedView() }) { layout in
             layout.property(PaddingElementContract.contentPadding) { view, padding in view.padding = padding ?? EdgeInsets(0) }

@@ -377,6 +377,13 @@ namespace {
                 auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(element);
                 return flag(static_cast<bool>(element.Clip()) || static_cast<bool>(visual.Clip()));
             }
+            if (what == "alphaMasked") {
+                auto output = xaml::Hosting::ElementCompositionPreview::GetElementChildVisual(element)
+                    .try_as<winrt::Microsoft::UI::Composition::SpriteVisual>();
+                auto mask = output && output.Brush()
+                    ? output.Brush().try_as<winrt::Microsoft::UI::Composition::CompositionMaskBrush>() : nullptr;
+                return flag(mask && mask.Source() && mask.Mask());
+            }
         }
         return std::nullopt;
     }

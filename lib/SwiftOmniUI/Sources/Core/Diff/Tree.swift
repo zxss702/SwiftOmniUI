@@ -80,6 +80,34 @@ final class RenderedNode {
         }
     }
 
+    /// Reads performed by a preference transform while the settled child
+    /// answers fold. They can change that answer without rebuilding the
+    /// body's description, and each refold replaces their observation scope.
+    var preferenceReads: Set<ObjectIdentifier> = [] {
+        didSet {
+            let added = preferenceReads.subtracting(oldValue)
+            let removed = oldValue.subtracting(preferenceReads)
+            if !added.isEmpty { Renderer.shared.reading(added) }
+            if !removed.isEmpty { Renderer.shared.unreading(removed) }
+        }
+    }
+
+    /// Every live reader in this branch, so a tracked clean walk can stop
+    /// before entering a branch none of its changed states reach. Rebuilt
+    /// nodes take their children's settled index; a kept node refreshes it
+    /// once after visiting its changed descendants.
+    private(set) var subtreeReads: Set<ObjectIdentifier>
+
+    /// Refreshes the branch index after a lazy window or a descendant
+    /// rebuild changed the readers it holds. It is not a live subscription:
+    /// only each element's own build and preference reads count in the renderer.
+    func refreshSubtreeReads() {
+        var found = reads
+        found.formUnion(preferenceReads)
+        for child in children { found.formUnion(child.subtreeReads) }
+        subtreeReads = found
+    }
+
     /// A lazy container's identities and row closures, before materialization.
     /// A data or environment rebuild replaces this with a fresh description.
     var lazySource: Node?
@@ -193,6 +221,7 @@ final class RenderedNode {
         placeholder: Node? = nil,
         view: String? = nil,
         reads: Set<ObjectIdentifier> = [],
+        preferenceReads: Set<ObjectIdentifier> = [],
         builds: Int = 1,
         provided: [(key: ObjectIdentifier, object: AnyObject)] = [],
         seen: [ObjectIdentifier: ObjectIdentifier] = [:],
@@ -209,6 +238,7 @@ final class RenderedNode {
         self.placeholder = placeholder
         self.view = view
         self.reads = reads
+        self.preferenceReads = preferenceReads
         self.builds = builds
         self.provided = provided
         self.seen = seen
@@ -222,11 +252,18 @@ final class RenderedNode {
         self.events = events
         self.key = key
         self.children = children
+        var found = reads
+        found.formUnion(preferenceReads)
+        for child in children { found.formUnion(child.subtreeReads) }
+        subtreeReads = found
 
         // A reader of what it read for as long as it lives; an element that read
         // nothing skips the lock.
         if !reads.isEmpty {
             Renderer.shared.reading(reads)
+        }
+        if !preferenceReads.isEmpty {
+            Renderer.shared.reading(preferenceReads)
         }
 
         // And one of the living, for the tally's `alive`.
@@ -236,6 +273,9 @@ final class RenderedNode {
     deinit {
         if !reads.isEmpty {
             Renderer.shared.unreading(reads)
+        }
+        if !preferenceReads.isEmpty {
+            Renderer.shared.unreading(preferenceReads)
         }
 
         Renderer.shared.nodeGone()

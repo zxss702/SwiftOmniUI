@@ -48,7 +48,8 @@ final class GTKElement: NativeElement {
     }
 
     func animates(_ property: Prop) -> Bool {
-        GTKTransitionSurface.presents(property, on: type)
+        (presentsView && TransitionSurface.presentsDrawing(property))
+            || GTKTransitionSurface.presents(property, on: type)
     }
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {

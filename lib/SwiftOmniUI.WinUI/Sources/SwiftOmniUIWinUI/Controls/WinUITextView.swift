@@ -115,6 +115,7 @@ class WinUITextView: WinUIView {
     /// The words stand at the size the place is bound for, whole, while the place travels.
     /// Design: docs/design/host/animation.md#words-at-their-destination
     override func travels(to destination: Rect?) {
+        super.travels(to: destination)
         bound = destination
     }
 

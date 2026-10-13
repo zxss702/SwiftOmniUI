@@ -250,8 +250,12 @@ class WinUILazyView: WinUITravellingLayout {
         guard !cells.identities.isEmpty else { return nil }
         let start = axis == .vertical ? rect.y : rect.x
         let room = axis == .vertical ? rect.height : rect.width
-        let own = axis == .vertical
-            ? (placed?.height ?? laidOutFrame.height) : (placed?.width ?? laidOutFrame.width)
+        // Row offsets already describe the final document. Clamping their
+        // window to an intermediate height animation repeatedly drops and
+        // rebuilds boundary rows. Keep the final allocation here; an explicit
+        // fixed frame still bounds it, and geometry reports remain current.
+        let allocation = committedLayoutFrame
+        let own = axis == .vertical ? allocation.height : allocation.width
         // A move announced past either end lands where the scroller clamps it:
         // the far end's window, not no window - or every mounted row falls away
         // until the effective viewport reports the clamp.
