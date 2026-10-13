@@ -25,7 +25,8 @@ final class WinUIPickerView: WinUIView {
     private var closedSizes: [(width: Double?, height: Double?, size: LayoutSize)] = []
 
     override func measure(width: Double?, height: Double?) -> LayoutSize {
-        let width = width.map { Double(Float($0)) }, height = height.map { Double(Float($0)) }
+        let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
+        let height = height.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         if isOpen, let measured = closedSizes.last(where: { $0.width == width && $0.height == height }) {
             return measured.size
         }
@@ -36,6 +37,11 @@ final class WinUIPickerView: WinUIView {
             closedSizes.append((width, height, size))
         }
         return size
+    }
+
+    override func prepareNativeMeasure(width: Double?, height: Double?) {
+        guard !isOpen else { return }
+        super.prepareNativeMeasure(width: width, height: height)
     }
 
     init() {

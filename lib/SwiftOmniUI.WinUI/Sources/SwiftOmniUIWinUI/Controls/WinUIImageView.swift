@@ -10,6 +10,7 @@ import CSwiftOmniUIWinUI
 /// Design: docs/design/platforms/winui/controls.md#pictures
 @MainActor
 final class WinUIImageView: WinUIView {
+    override var reusesNativeMeasurements: Bool { true }
     /// The picture shown, by file name, and whether it was found.
     private(set) var file = ""
     private(set) var found = false
@@ -72,6 +73,7 @@ final class WinUIImageView: WinUIView {
         }
         declared = size[0] > 0 && size[1] > 0 ? LayoutSize(width: size[0], height: size[1]) : nil
         picturePlace = nil
+        invalidateMeasure()
         if let placed { draw(in: placed) }
         placingLayout?.invalidateMeasurements()
     }
@@ -81,6 +83,20 @@ final class WinUIImageView: WinUIView {
     /// gives it.
     /// Design: docs/design/platforms/winui/controls.md#pictures
     override func measure(width: Double?, height: Double?) -> LayoutSize {
+        let intrinsic = intrinsicSize
+        // Preparing a Viewbox/FontIcon at zero clips its native content even
+        // though Swift's intrinsic result is nonzero. Prepare the same box
+        // the arithmetic reports, before its first native arrangement.
+        _ = super.measure(width: intrinsic.width, height: intrinsic.height)
+        return intrinsic
+    }
+
+    override func prepareNativeMeasure(width: Double?, height: Double?) {
+        let intrinsic = intrinsicSize
+        super.prepareNativeMeasure(width: intrinsic.width, height: intrinsic.height)
+    }
+
+    private var intrinsicSize: LayoutSize {
         let intrinsic: LayoutSize
         if let declared { intrinsic = declared }
         else if symbol { intrinsic = LayoutSize(width: 16, height: 16) }
@@ -89,10 +105,6 @@ final class WinUIImageView: WinUIView {
             swiftomniui_winui_image_size(handle, &size)
             intrinsic = LayoutSize(width: size[0], height: size[1])
         }
-        // Preparing a Viewbox/FontIcon at zero clips its native content even
-        // though Swift's intrinsic result is nonzero. Prepare the same box
-        // the arithmetic reports, before its first native arrangement.
-        _ = super.measure(width: intrinsic.width, height: intrinsic.height)
         return intrinsic
     }
 

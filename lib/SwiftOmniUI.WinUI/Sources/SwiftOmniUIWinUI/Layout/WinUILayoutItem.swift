@@ -37,13 +37,6 @@ struct WinUILayoutItem: LayoutChild {
         let measured: LayoutSize
         if let layout = view as? WinUILayoutView {
             measured = layout.naturalSize(width: offer)
-            if WinUIView.arranging == 0 {
-                let expands = values.flex != nil || values.expandingAxes == .horizontal || values.expandingAxes == .both
-                let allocated = Extent.of(option: expands ? 3 : values.horizontal, stated: values.width,
-                                          natural: measured.width, available: width ?? measured.width,
-                                          minimum: values.minimumWidth, maximum: values.maximumWidth)
-                layout.prepareMeasure(width: allocated)
-            }
         } else {
             measured = view.measure(width: offer, height: nil)
         }

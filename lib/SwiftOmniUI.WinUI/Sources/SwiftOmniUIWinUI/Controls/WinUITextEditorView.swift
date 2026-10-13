@@ -28,4 +28,8 @@ final class WinUITextEditorView: WinUIInputView {
     override func measure(width: Double?, height: Double?) -> LayoutSize {
         super.measure(width: width, height: growsWithText ? height : 0)
     }
+
+    override func prepareNativeMeasure(width: Double?, height: Double?) {
+        super.prepareNativeMeasure(width: width, height: growsWithText ? height : 0)
+    }
 }

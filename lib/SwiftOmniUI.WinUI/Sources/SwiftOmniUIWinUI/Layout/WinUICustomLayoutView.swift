@@ -27,7 +27,7 @@ final class WinUICustomLayoutView: WinUITravellingLayout {
     /// The items as the layout sees them: measured through `size(offered:)`,
     /// placed through this view's arrangement, their `.layoutValue` tags and
     /// guides read back over the boundary.
-    private func subviews() -> LayoutSubviews {
+    private func subviews(preparing: Bool = false) -> LayoutSubviews {
         // A child riding its removal transition is no subview: it stands where it last stood.
         LayoutSubviews(items.filter { !$0.departing }.map { item in
             LayoutSubview(
@@ -56,10 +56,12 @@ final class WinUICustomLayoutView: WinUITravellingLayout {
                 placeView: { [weak self] position, anchor, proposal in
                     guard let self else { return }
                     let measured = item.size(offered: proposal.width)
-                    self.place(item, at: Rect(
+                    let frame = Rect(
                         x: position.x - anchor.x * measured.width,
                         y: position.y - anchor.y * measured.height,
-                        width: measured.width, height: measured.height))
+                        width: measured.width, height: measured.height)
+                    if preparing { self.prepareChild(item, at: frame) }
+                    else { self.place(item, at: frame) }
                 })
         }, direction: direction)
     }
@@ -72,6 +74,16 @@ final class WinUICustomLayoutView: WinUITravellingLayout {
         return LayoutSize(
             width: measured.width + padding.left + padding.right,
             height: measured.height + padding.top + padding.bottom)
+    }
+
+    override func prepareChildren(width: Double) {
+        guard let arrangement else { return }
+        let size = naturalSize(width: width.isFinite ? width : nil)
+        let room = Rect(padding.left, padding.top,
+                        max(0, (width.isFinite ? width : size.width) - padding.left - padding.right),
+                        max(0, size.height - padding.top - padding.bottom))
+        arrangement.place(in: room, proposal: ProposedViewSize(width: room.width, height: room.height),
+                          subviews: subviews(preparing: true))
     }
 
     override func arrange(in bounds: Rect) {

@@ -111,6 +111,10 @@ final class WinUIPathView: WinUIView {
         return LayoutSize(width: 0, height: 0)
     }
 
+    override func prepareNativeMeasure(width: Double?, height: Double?) {
+        super.prepareNativeMeasure(width: 0, height: 0)
+    }
+
     override func layout(_ place: Rect) {
         draw(in: place)
         super.layout(place)

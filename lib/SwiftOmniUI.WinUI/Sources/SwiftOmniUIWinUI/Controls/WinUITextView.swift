@@ -10,6 +10,7 @@ import CSwiftOmniUIWinUI
 @MainActor
 class WinUITextView: WinUIView {
     override var takesDirection: Bool { true }
+    override var reusesNativeMeasurements: Bool { true }
 
     /// The font's size, the space between the letters and the height of a line - what the spacing is measured
     /// against, and what it is.
@@ -44,7 +45,7 @@ class WinUITextView: WinUIView {
         WinUIDoorbell.afterPass { [weak self] in
             guard let self else { return }
             self.loadedMeasurePending = false
-            guard self.sourceElement?.isDeparting != true else { return }
+            guard !self.isDetached, self.sourceElement?.isDeparting != true else { return }
             self.invalidateMeasure()
             self.placingLayout?.commitMeasurementChange()
         }

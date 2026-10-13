@@ -47,6 +47,14 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
         return LayoutSize(width: size.width, height: size.height + spacing)
     }
 
+    override func prepareChildren(width: Double) {
+        let item = WinUILayoutItem(view: bar, values: bar.sourceElement?.layoutValues ?? LayoutValues())
+        let size = naturalSize(width: width.isFinite ? width : nil)
+        let room = Rect(0, 0, width.isFinite ? width : size.width, max(0, size.height - spacing))
+        prepareChild(item, at: SingleChildArithmetic.place(of: item, in: room,
+                                                          padding: EdgeInsets(0), direction: direction))
+    }
+
     override func arrange(in bounds: Rect) {
         bar.updateSafeBarDrawing()
         let item = WinUILayoutItem(view: bar, values: bar.sourceElement?.layoutValues ?? LayoutValues())

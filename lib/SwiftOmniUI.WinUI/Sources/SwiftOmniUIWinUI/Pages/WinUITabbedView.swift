@@ -72,6 +72,17 @@ final class WinUITabbedView: WinUILayoutView {
             row: rowHeight(width: width))
     }
 
+    override func prepareChildren(width: Double) {
+        let offered = width.isFinite ? width : nil
+        let size = naturalSize(width: offered)
+        let bounds = Rect(0, 0, offered ?? size.width, size.height)
+        let (_, room) = RowEdge.top.split(bounds, row: rowHeight(width: offered))
+        if !tabsShownByWindow { row.prepareNativeMeasure(width: offered, height: nil) }
+        guard let page = selectedItem else { return }
+        prepareChild(page, at: SingleChildArithmetic.place(of: page, in: room,
+                                                          padding: EdgeInsets(0), direction: direction))
+    }
+
     override func arrange(in bounds: Rect) {
         let (rowRoom, room) = RowEdge.top.split(
             Rect(x: 0, y: 0, width: bounds.width, height: bounds.height), row: rowHeight(width: bounds.width))

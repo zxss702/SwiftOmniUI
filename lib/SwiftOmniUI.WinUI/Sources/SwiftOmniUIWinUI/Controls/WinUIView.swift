@@ -134,8 +134,15 @@ class WinUIView {
     /// Native sizes by proposal. DesiredSize alone belongs only to the last Measure call: a grid can ask for
     /// both an unconstrained size and a wrapped size before arranging either one.
     private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize)] = []
+    /// The constraint actually prepared in XAML, separate from the several
+    /// proposals the arithmetic can query without changing that constraint.
+    private var nativeProposal: (width: Double?, height: Double?)?
     private var pendingMeasures: [(width: Double?, height: Double?)] = []
     private var nativeMeasurePending = false
+    /// Only views whose size changes are explicitly reported by the host can
+    /// keep native answers between passes. Controls with native content or
+    /// user edits let XAML's own dirty flags decide whether to measure again.
+    var reusesNativeMeasurements: Bool { false }
     /// Any arithmetic that encountered an unprepared native proposal is
     /// provisional; ancestors must not retain it as a completed measurement.
     static var provisionalMeasureRevision = 0
@@ -263,6 +270,7 @@ class WinUIView {
     func invalidateMeasure() {
         measurementRevision &+= 1
         measuredSizes.removeAll(keepingCapacity: true)
+        nativeProposal = nil
         guard Self.arranging == 0, Self.measuring == 0 else {
             guard !nativeMeasurePending else { return }
             nativeMeasurePending = true
@@ -291,13 +299,13 @@ class WinUIView {
         // XAML aborts the eighth such pass with a layout cycle.
         // WinUI receives single-precision proposals. Use that same value for the cache key so a width
         // travelling through Measure and Arrange does not become two different proposals.
-        let width = width.map { Double(Float($0)) }
-        let height = height.map { Double(Float($0)) }
+        let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
+        let height = height.flatMap { $0.isFinite ? Double(Float($0)) : nil }
+        if reusesNativeMeasurements || Self.arranging > 0,
+           let measured = measuredSizes.first(where: { $0.width == width && $0.height == height }) {
+            return measured.size
+        }
         if Self.arranging > 0 {
-            if let measured = measuredSizes.first(where: { $0.width == width && $0.height == height }) {
-                return measured.size
-            }
-
             // Pixel rounding can narrow a text's arranged proposal slightly. A wider measurement whose
             // complete lines still fit has exactly the same wrapping; it needs no deferred repair.
             if self is WinUILabelView, let width,
@@ -316,7 +324,7 @@ class WinUIView {
                 pendingMeasures.append((width, height))
                 if !scheduled {
                     WinUIDoorbell.afterPass { [weak self] in
-                        guard let self else { return }
+                        guard let self, !self.isDetached else { return }
                         let proposals = self.pendingMeasures
                         self.pendingMeasures.removeAll(keepingCapacity: true)
                         for proposal in proposals {
@@ -328,13 +336,40 @@ class WinUIView {
             }
             return desiredSize
         }
+        return measureNative(width: width, height: height)
+    }
+
+    /// Prepare the final proposal even if its arithmetic answer is cached.
+    /// Querying an ideal size must not repeatedly switch the native subtree
+    /// away from its allocated width, or discard other width-keyed answers.
+    func prepareNativeMeasure(width: Double?, height: Double?) {
+        let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
+        let height = height.flatMap { $0.isFinite ? Double(Float($0)) : nil }
+        guard Self.arranging == 0 else {
+            _ = measure(width: width, height: height)
+            return
+        }
+        if reusesNativeMeasurements, let nativeProposal,
+           nativeProposal.width == width, nativeProposal.height == height { return }
+        _ = measureNative(width: width, height: height)
+    }
+
+    private func measureNative(width: Double?, height: Double?) -> LayoutSize {
+        // This explicit preparation consumes the invalidation left by the
+        // preceding pass; its queued invalidation must not discard it again.
+        if nativeMeasurePending {
+            nativeMeasurePending = false
+            invalidateNativeMeasure()
+        }
         let startedAt = Self.provisionalMeasureRevision
+        let contentRevision = measurementRevision
         var size = [0.0, 0.0]
         Self.measuring += 1
         defer { Self.measuring -= 1 }
         swiftomniui_winui_measure(handle, width ?? .infinity, height ?? .infinity, &size)
         let measured = LayoutSize(width: size[0], height: size[1])
-        guard startedAt == Self.provisionalMeasureRevision else { return measured }
+        guard startedAt == Self.provisionalMeasureRevision, contentRevision == measurementRevision else { return measured }
+        nativeProposal = (width, height)
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.
         if measuredSizes.count == 8 { measuredSizes.removeFirst() }
@@ -366,10 +401,7 @@ class WinUIView {
             if let layout = self as? WinUILayoutView, placingLayout != nil {
                 if layout.standsAt != place.width,
                    !measuredSizes.contains(where: { $0.width == Double(Float(place.width)) && $0.height == nil }) {
-                    WinUIDoorbell.afterPass { [weak self] in
-                        guard let self, let layout = self as? WinUILayoutView, layout.standsAt != nil else { return }
-                        layout.commitMeasurementChange()
-                    }
+                    layout.prepareAfterPass()
                 }
                 layout.standsAt = place.width
             }
