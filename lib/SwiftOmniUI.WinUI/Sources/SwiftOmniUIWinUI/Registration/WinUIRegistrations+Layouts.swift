@@ -140,7 +140,8 @@ extension WinUIRegistrations {
                 BorderElementContract.shape, BorderElementContract.stroke, BorderElementContract.strokeWidth,
             ]) { view, values in
                 // A scroller always cuts what it shows to its bounds; a shape cuts it to the shape.
-                view.setBackground(values[VisualElementContract.background]?.propValue)
+                view.setPathClip(values[LayoutContract.clipPath], evenOdd: (values[LayoutContract.clipFillRule] ?? .nonzero) == .evenOdd)
+        view.setBackground(values[VisualElementContract.background]?.propValue)
                 view.setOutline(
                     stroke: values[BorderElementContract.stroke]?.propValue,
                     width: values[BorderElementContract.strokeWidth],
@@ -157,10 +158,11 @@ extension WinUIRegistrations {
     private static let boxMembers: [any ContractMember] = [
         VisualElementContract.background,
         BorderElementContract.stroke, BorderElementContract.strokeWidth, BorderElementContract.shape,
-        LayoutContract.clipsContent,
+        LayoutContract.clipsContent, LayoutContract.clipPath, LayoutContract.clipFillRule,
     ]
 
     private static func applyBox<Realized: ElementContract>(_ view: WinUILayoutView, _ values: ElementValues<Realized>) {
+        view.setPathClip(values[LayoutContract.clipPath], evenOdd: (values[LayoutContract.clipFillRule] ?? .nonzero) == .evenOdd)
         view.setBackground(values[VisualElementContract.background]?.propValue)
         view.setOutline(
             stroke: values[BorderElementContract.stroke]?.propValue,

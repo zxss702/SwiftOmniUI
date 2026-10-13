@@ -114,6 +114,13 @@ with. `isOpen` opens and closes the list; the user's opening and closing are
 reported and the program's are not, so the user closing a list the program
 opened is reported. The chosen choice's mark in the list is the picker's tint.
 
+Choices are boxed into a complete collection before it is attached, then the
+relay replaces `ItemsSource` once. Initializing a large model picker therefore
+does not notify the closed ComboBox separately for every option. WinUI still
+owns its item containers and dropdown. The following host write chooses the
+authored index when the choices change; `Items` remains the native collection
+used to inspect choices and validate that index.
+
 ## A day and a time
 
 A DatePicker is WinUI's `CalendarDatePicker`: its day written short or long -

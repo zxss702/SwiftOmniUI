@@ -48,7 +48,7 @@ extension GraphicsContext {
         commands += [
             Draw.fillColor(color),
             Draw.fillStyle(eoFill: style.isEOFilled),
-            Draw.fillPath(path.svg),
+            Draw.fillGeometry(path),
         ]
     }
 
@@ -62,8 +62,8 @@ extension GraphicsContext {
         guard let color = shading.color else { return }
         commands += [
             Draw.strokeColor(color),
-            Draw.strokeStyle(width: style.lineWidth, cap: style.lineCap, join: style.lineJoin),
-            Draw.drawPath(path.svg),
+            Draw.completeStrokeStyle(style),
+            Draw.drawGeometry(path),
         ]
     }
 

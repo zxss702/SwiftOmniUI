@@ -16,10 +16,12 @@ final class GTKShapeView: GTKPanelView {
     enum Geometry: Equatable {
         case rectangle([Double])
         case ellipse
-        case authored([Double], evenOdd: Bool, aspect: ContentMode, transform: [Double]?)
+        case authored([Double], evenOdd: Bool, aspect: ContentMode?, transform: [Double]?)
     }
 
     private var geometry = Geometry.rectangle([0, 0, 0, 0])
+    private var cached: (geometry: Geometry, width: Double, height: Double, inset: Double, path: OpaquePointer, evenOdd: Bool)?
+    isolated deinit { if let cached { gsk_path_unref(cached.path) } }
     private var fill = GTKBrush.none
     private var stroke = GTKBrush.none
     private var strokeWidth = 1.0
@@ -59,7 +61,8 @@ final class GTKShapeView: GTKPanelView {
 
         if fill != .none {
             gtk_snapshot_push_fill(snapshot, path, evenOdd ? GSK_FILL_RULE_EVEN_ODD : GSK_FILL_RULE_WINDING)
-            fill.paint(snapshot, Self.rect(-strokeWidth, -strokeWidth, width + strokeWidth * 2, height + strokeWidth * 2))
+            var bounds = graphene_rect_t()
+            if gsk_path_get_bounds(path, &bounds) != 0 { fill.paint(snapshot, bounds) }
             gtk_snapshot_pop(snapshot)
         }
         guard outlined else { return }
@@ -75,15 +78,26 @@ final class GTKShapeView: GTKPanelView {
             gsk_stroke_set_dash_offset(outline, Float(dashOffset * strokeWidth))
         }
         gtk_snapshot_push_stroke(snapshot, path, outline)
-        stroke.paint(snapshot, Self.rect(-strokeWidth, -strokeWidth, width + strokeWidth * 2, height + strokeWidth * 2))
+        var bounds = graphene_rect_t()
+        if gsk_path_get_stroke_bounds(path, outline, &bounds) != 0 { stroke.paint(snapshot, bounds) }
         gtk_snapshot_pop(snapshot)
     }
 
     /// The path for a room `width` by `height`: a rectangle and an ellipse fill it, half their outline in from its
     /// edges; a geometry of the shape's own is placed in it. Whether it fills by the even-odd rule.
     private func path(width: Double, height: Double, outlined: Bool) -> (OpaquePointer, Bool)? {
-        let builder = gsk_path_builder_new()!
         let inset = outlined ? strokeWidth / 2 : 0
+        if let cached, cached.geometry == geometry, cached.width == width, cached.height == height, cached.inset == inset {
+            return (gsk_path_ref(cached.path)!, cached.evenOdd)
+        }
+        let result = makePath(width: width, height: height, inset: inset)
+        if let cached { gsk_path_unref(cached.path) }
+        cached = result.map { (geometry, width, height, inset, gsk_path_ref($0.0)!, $0.1) }
+        return result
+    }
+
+    private func makePath(width: Double, height: Double, inset: Double) -> (OpaquePointer, Bool)? {
+        let builder = gsk_path_builder_new()!
         let room = Self.rect(inset, inset, max(0, width - inset * 2), max(0, height - inset * 2))
         switch geometry {
         case .rectangle(let radii):
@@ -102,22 +116,23 @@ final class GTKShapeView: GTKPanelView {
             return (gsk_path_builder_free_to_path(builder), false)
         case .authored(let commands, let evenOdd, let aspect, let transform):
             gsk_path_builder_unref(builder)
+            if aspect == nil { return (Self.build(commands, moved: transform ?? [1, 0, 0, 1, 0, 0]), evenOdd) }
             let own = Self.build(commands, moved: [1, 0, 0, 1, 0, 0])
             var bounds = graphene_rect_t()
             let known = gsk_path_get_bounds(own, &bounds) != 0
             gsk_path_unref(own)
             guard known else { return nil }
-            let placement = ShapeArithmetic.placement(
+            let placement = aspect.map { aspect in ShapeArithmetic.placement(
                 of: Rect(
                     x: Double(bounds.origin.x), y: Double(bounds.origin.y),
                     width: Double(bounds.size.width), height: Double(bounds.size.height)),
-                in: LayoutSize(width: width, height: height), aspect: aspect, transform: transform)
+                in: LayoutSize(width: width, height: height), aspect: aspect, transform: transform) } ?? transform ?? [1, 0, 0, 1, 0, 0]
             return (Self.build(commands, moved: placement), evenOdd)
         }
     }
 
     /// The path the flat commands draw, every point moved by the affine `moved`.
-    private static func build(_ commands: [Double], moved: [Double]) -> OpaquePointer {
+    static func build(_ commands: [Double], moved: [Double]) -> OpaquePointer {
         let builder = gsk_path_builder_new()!
         func point(_ x: Double, _ y: Double) -> (Float, Float) {
             (Float(moved[0] * x + moved[2] * y + moved[4]), Float(moved[1] * x + moved[3] * y + moved[5]))

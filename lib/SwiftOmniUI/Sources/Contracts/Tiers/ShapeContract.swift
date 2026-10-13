@@ -16,6 +16,13 @@ public enum ShapeContract: Contract {
     /// What the inside of the shape is painted with.
     public static let fill = ElementProperty<Self, Brush>("fill", layer: .stateUI)
 
+    public static let fillRule = ElementProperty<Self, FillRule>("fillRule", layer: .stateUI)
+
+    /// Public StrokeStyle uses path units; the older SPI setters use widths.
+    public static let strokeDashInPathUnits = ElementProperty<Self, Bool>("strokeDashInPathUnits", layer: .stateUI)
+
+    public static let strokePhaseInPathUnits = ElementProperty<Self, Bool>("strokePhaseInPathUnits", layer: .stateUI)
+
     /// A transform of the shape's drawing, which moves nothing around it.
     public static let renderTransform = ElementProperty<Self, ViewTransform>("renderTransform", layer: .native)
 
@@ -49,6 +56,6 @@ public enum ShapeContract: Contract {
     /// The tier's own members.
     public static let members: [any ContractMember] = [
         aspect, fill, renderTransform, stroke, strokeBorder, strokeDashOffset, strokeDashPattern,
-        strokeLineCap, strokeLineJoin, strokeMiterLimit, strokeWidth,
+        strokeLineCap, strokeLineJoin, strokeMiterLimit, strokeWidth, fillRule, strokeDashInPathUnits, strokePhaseInPathUnits,
     ]
 }

@@ -31,6 +31,10 @@
     /// How the corners where segments meet are drawn: mitered until set.
     public var strokeJoin: LineJoin = .miter
 
+    public var strokeMiter = 10.0
+    public var strokeDash: [Double] = []
+    public var strokePhase = 0.0
+
     /// Which points a fill counts as inside: the winding rule until set -
     /// `true` asks for the even-odd one.
     public var fillEvenOdd = false
@@ -54,6 +58,13 @@
             strokeCap = cap
             strokeJoin = join
         case .fillStyle(let evenOdd): fillEvenOdd = evenOdd
+        case .completeStrokeStyle(let style):
+            strokeWidth = max(0, style.lineWidth)
+            strokeCap = style.lineCap
+            strokeJoin = style.lineJoin
+            strokeMiter = max(1, style.miterLimit)
+            strokeDash = style.dash.map { max(0, $0) }
+            strokePhase = style.dashPhase
         case .saveState: saved.append(self)
         case .restoreState:
             guard let last = saved.popLast() else { return true }

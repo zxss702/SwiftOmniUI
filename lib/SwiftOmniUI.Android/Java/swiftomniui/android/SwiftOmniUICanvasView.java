@@ -27,7 +27,7 @@ final class SwiftOmniUICanvasView extends View {
             ALPHA = 5, DRAW_LINE = 6, DRAW_RECTANGLE = 7, DRAW_ROUNDED_RECTANGLE = 8, DRAW_ELLIPSE = 9,
             DRAW_PATH = 11, FILL_RECTANGLE = 12, FILL_ROUNDED_RECTANGLE = 13, FILL_ELLIPSE = 14,
             FILL_PATH = 16, DRAW_TEXT = 17, TRANSLATE = 18, ROTATE = 19, SCALE = 20, SAVE = 21,
-            RESTORE = 22;
+            RESTORE = 22, STROKE_STYLE = 23, FILL_STYLE = 24, COMPLETE_STROKE_STYLE = 27;
 
     /** A path command's kinds, as the Swift host numbers them, each followed by its points. */
     private static final int MOVE = 0, LINE = 1, CUBIC = 2, QUADRATIC = 3;
@@ -46,12 +46,17 @@ final class SwiftOmniUICanvasView extends View {
     /** What an instruction may change, kept and put back by `saveState` and `restoreState`. */
     private static final class State {
         int fill = 0xFF000000, stroke = 0xFF000000, text = 0xFF000000;
-        float strokeWidth = 1, fontSize = 14, alpha = 1;
+        float strokeWidth = 1, fontSize = 14, alpha = 1, miter = 10, phase = 0;
+        int cap = 0, join = 0;
+        boolean evenOdd = false;
+        float[] dashes = new float[0];
 
         State copy() {
             State copy = new State();
             copy.fill = fill; copy.stroke = stroke; copy.text = text;
             copy.strokeWidth = strokeWidth; copy.fontSize = fontSize; copy.alpha = alpha;
+            copy.cap = cap; copy.join = join; copy.evenOdd = evenOdd;
+            copy.miter = miter; copy.phase = phase; copy.dashes = dashes;
             return copy;
         }
     }
@@ -150,6 +155,18 @@ final class SwiftOmniUICanvasView extends View {
                         canvas.restore();
                     }
                     break;
+                case STROKE_STYLE:
+                    state.cap = ints[at++]; state.join = ints[at++];
+                    state.strokeWidth = Math.max(0, numbers[number++]); break;
+                case FILL_STYLE: state.evenOdd = ints[at++] == 1; break;
+                case COMPLETE_STROKE_STYLE: {
+                    state.cap = ints[at++]; state.join = ints[at++]; int count = ints[at++];
+                    state.strokeWidth = Math.max(0, numbers[number++]);
+                    state.miter = Math.max(1, numbers[number++]); state.phase = numbers[number++];
+                    state.dashes = new float[count];
+                    for (int i = 0; i < count; i++) state.dashes[i] = Math.max(0, numbers[number++]);
+                    break;
+                }
                 default: return;
             }
         }
@@ -161,6 +178,8 @@ final class SwiftOmniUICanvasView extends View {
     }
 
     private boolean filling(State state) {
+        path.setFillType(state.evenOdd ? Path.FillType.EVEN_ODD : Path.FillType.WINDING);
+        paint.setPathEffect(null);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(state.fill);
         paint.setAlpha(Math.round(((state.fill >>> 24) & 0xFF) * state.alpha));
@@ -171,6 +190,18 @@ final class SwiftOmniUICanvasView extends View {
         if (state.strokeWidth <= 0) return false;
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(state.strokeWidth);
+        paint.setStrokeCap(state.cap == 1 ? Paint.Cap.ROUND : state.cap == 2 ? Paint.Cap.SQUARE : Paint.Cap.BUTT);
+        paint.setStrokeJoin(state.join == 1 ? Paint.Join.BEVEL : state.join == 2 ? Paint.Join.ROUND : Paint.Join.MITER);
+        paint.setStrokeMiter(state.miter);
+        boolean dashed = false;
+        for (float dash : state.dashes) if (dash > 0) dashed = true;
+        float[] lengths = state.dashes;
+        if ((lengths.length & 1) != 0) {
+            lengths = new float[state.dashes.length * 2];
+            System.arraycopy(state.dashes, 0, lengths, 0, state.dashes.length);
+            System.arraycopy(state.dashes, 0, lengths, state.dashes.length, state.dashes.length);
+        }
+        paint.setPathEffect(dashed ? new android.graphics.DashPathEffect(lengths, state.phase) : null);
         paint.setColor(state.stroke);
         paint.setAlpha(Math.round(((state.stroke >>> 24) & 0xFF) * state.alpha));
         return true;

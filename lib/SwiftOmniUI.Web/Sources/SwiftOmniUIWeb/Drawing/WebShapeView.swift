@@ -14,7 +14,7 @@ final class WebShapeView: WebDOMView {
     enum Geometry {
         case rectangle([Double], transform: [Double]?)
         case ellipse(transform: [Double]?)
-        case authored([Double], evenOdd: Bool, aspect: ContentMode, transform: [Double]?)
+        case authored([Double], evenOdd: Bool, aspect: ContentMode?, transform: [Double]?)
     }
 
     private let surface = WebDOMView(vector: "svg")
@@ -79,9 +79,9 @@ final class WebShapeView: WebDOMView {
         case .authored(let commands, let evenOdd, let aspect, let transform):
             path.attribute("d", WebVector.path(commands))
             path.attribute("fill-rule", evenOdd ? "evenodd" : "nonzero")
-            let placement = ShapeArithmetic.placement(
+            let placement = aspect.map { aspect in ShapeArithmetic.placement(
                 of: WebRelay.shapeBounds(of: path.node), in: LayoutSize(width: width, height: height),
-                aspect: aspect, transform: transform)
+                aspect: aspect, transform: transform) } ?? transform ?? [1, 0, 0, 1, 0, 0]
             path.attribute("transform", WebVector.matrix(placement))
         }
         let painted = Rect(x: -lineWidth, y: -lineWidth, width: width + lineWidth * 2, height: height + lineWidth * 2)

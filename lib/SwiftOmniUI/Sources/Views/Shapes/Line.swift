@@ -14,7 +14,7 @@
 ///
 /// Each coordinate left unsaid is zero, so `.x2(240)` on its own runs from the
 /// top left corner across.
-public struct Line: Shape, LineProperties {
+public struct Line: Shape, VisualElement, ShapeProperties, LineProperties {
     /// The node this control describes.
     public var node: Node
 

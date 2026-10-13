@@ -36,6 +36,7 @@ namespace {
         FillColor, StrokeColor, TextColor, StrokeWidth, FontSize, Alpha, DrawLine, DrawRectangle, DrawRoundedRectangle,
         DrawEllipse, DrawArc, DrawPath, FillRectangle, FillRoundedRectangle, FillEllipse, FillArc, FillPath, DrawText,
         Translate, Rotate, Scale, SaveState, RestoreState, StrokeStyle, FillStyle,
+        CompleteStrokeStyle = 27,
     };
 
     /// What every canvas draws with: Direct2D's device, made at the first drawing and again after Windows takes it
@@ -125,6 +126,8 @@ namespace {
         D2D1_CAP_STYLE cap = D2D1_CAP_STYLE_FLAT;
         D2D1_LINE_JOIN join = D2D1_LINE_JOIN_MITER;
         bool evenOdd = false;
+        float miter = 10, phase = 0;
+        std::vector<float> dashes;
         winrt::com_ptr<ID2D1StrokeStyle> style;
         D2D1_CAP_STYLE madeCap = D2D1_CAP_STYLE_FLAT;
         D2D1_LINE_JOIN madeJoin = D2D1_LINE_JOIN_MITER;
@@ -135,8 +138,14 @@ namespace {
             if (!style || madeCap != cap || madeJoin != join) {
                 madeCap = cap;
                 madeJoin = join;
-                winrt::check_hresult(devices.factory->CreateStrokeStyle(
-                    D2D1::StrokeStyleProperties(cap, cap, cap, join), nullptr, 0, style.put()));
+                style = nullptr;
+                std::vector<float> relative;
+                for (auto dash : dashes) relative.push_back(dash / std::max(width, 0.000001f));
+                auto dashed = std::any_of(relative.begin(), relative.end(), [](float length) { return length > 0; });
+                auto properties = D2D1::StrokeStyleProperties(cap, cap, cap, join, miter * 2,
+                    dashed ? D2D1_DASH_STYLE_CUSTOM : D2D1_DASH_STYLE_SOLID, phase / std::max(width, 0.000001f));
+                winrt::check_hresult(devices.factory->CreateStrokeStyle(properties,
+                    dashed ? relative.data() : nullptr, dashed ? static_cast<uint32_t>(relative.size()) : 0, style.put()));
             }
             return style.get();
         }
@@ -267,6 +276,7 @@ namespace {
             case TextColor: pen.text = colour(reader.integer()); break;
             case StrokeWidth:
                 if ((at = reader.numbers(1))) pen.width = static_cast<float>(std::max(0.0, *at));
+                pen.style = nullptr;
                 break;
             case FontSize:
                 if ((at = reader.numbers(1))) pen.size = static_cast<float>(std::max(0.0, *at));
@@ -342,6 +352,7 @@ namespace {
                 auto cap = reader.integer(), join = reader.integer();
                 if (!(at = reader.numbers(1))) break;
                 pen.width = static_cast<float>(std::max(0.0, *at));
+                pen.style = nullptr;
                 // The vocabulary: flat, round, square; miter, bevel, round.
                 pen.cap = cap == 1   ? D2D1_CAP_STYLE_ROUND
                           : cap == 2 ? D2D1_CAP_STYLE_SQUARE
@@ -349,6 +360,22 @@ namespace {
                 pen.join = join == 1   ? D2D1_LINE_JOIN_BEVEL
                            : join == 2 ? D2D1_LINE_JOIN_ROUND
                                        : D2D1_LINE_JOIN_MITER;
+                break;
+            }
+            case CompleteStrokeStyle: {
+                auto cap = reader.integer(), join = reader.integer(), count = reader.integer();
+                if (count < 0 || !(at = reader.numbers(3))) break;
+                pen.width = static_cast<float>(std::max(0.0, at[0]));
+                pen.miter = static_cast<float>(std::max(1.0, at[1]));
+                pen.phase = static_cast<float>(at[2]);
+                pen.cap = cap == 1 ? D2D1_CAP_STYLE_ROUND : cap == 2 ? D2D1_CAP_STYLE_SQUARE : D2D1_CAP_STYLE_FLAT;
+                pen.join = join == 1 ? D2D1_LINE_JOIN_BEVEL : join == 2 ? D2D1_LINE_JOIN_ROUND : D2D1_LINE_JOIN_MITER;
+                pen.dashes.clear();
+                if (count > 0) {
+                    if (!(at = reader.numbers(static_cast<size_t>(count)))) break;
+                    for (int32_t index = 0; index < count; ++index) pen.dashes.push_back(static_cast<float>(std::max(0.0, at[index])));
+                }
+                pen.style = nullptr;
                 break;
             }
             case FillStyle:

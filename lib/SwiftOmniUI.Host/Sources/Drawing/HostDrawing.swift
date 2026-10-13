@@ -73,6 +73,9 @@
             numbers.append(width)
         case .fillStyle(let evenOdd):
             ints += [Kind.fillStyle, evenOdd ? 1 : 0]
+        case .completeStrokeStyle(let style):
+            ints += [27, style.lineCap.rawValue, style.lineJoin.rawValue, Int32(style.dash.count)]
+            numbers += [style.lineWidth, style.miterLimit, style.dashPhase] + style.dash
         }
     }
 

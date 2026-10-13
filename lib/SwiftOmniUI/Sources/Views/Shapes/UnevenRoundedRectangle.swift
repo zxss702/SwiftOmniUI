@@ -6,7 +6,7 @@
 ///     UnevenRoundedRectangle(bottomLeadingRadius: 20, bottomTrailingRadius: 20)
 ///         .fill(.cornflowerBlue)
 ///     Rectangle().background(UnevenRoundedRectangle(topLeadingRadius: 12).fill(.gray))
-public struct UnevenRoundedRectangle: Shape {
+public struct UnevenRoundedRectangle: Shape, VisualElement, ShapeProperties {
     /// The node this control describes.
     public var node: Node
 

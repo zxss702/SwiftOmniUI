@@ -32,6 +32,22 @@ class GTKLayoutView: GTKPanelView {
 
     /// The box as the element says it.
     private(set) var box = Box()
+    private var clipCommands: [Double]?
+    private var clipPath: OpaquePointer?
+    private var clipEvenOdd = false
+
+    isolated deinit { if let clipPath { gsk_path_unref(clipPath) } }
+
+    func setPathClip(_ commands: [Double]?, evenOdd: Bool) {
+        guard commands != clipCommands || evenOdd != clipEvenOdd else { return }
+        if commands != clipCommands {
+            if let clipPath { gsk_path_unref(clipPath) }
+            clipPath = commands.map { GTKShapeView.build($0, moved: [1, 0, 0, 1, 0, 0]) }
+            clipCommands = commands
+        }
+        clipEvenOdd = evenOdd
+        gtk_widget_queue_draw(widget)
+    }
 
     /// The views the panel holds, in the order it draws them, back to front.
     private var held: [GTKView] = []
@@ -76,6 +92,10 @@ class GTKLayoutView: GTKPanelView {
     /// the outline where the box clips.
     /// Design: docs/design/platforms/gtk/drawing.md#a-layouts-box
     override func draw(_ snapshot: OpaquePointer, width: Double, height: Double) {
+        if let clipPath {
+            gtk_snapshot_push_fill(snapshot, clipPath, clipEvenOdd ? GSK_FILL_RULE_EVEN_ODD : GSK_FILL_RULE_WINDING)
+        }
+        defer { if clipPath != nil { gtk_snapshot_pop(snapshot) } }
         let room = backgroundBounds(in: Rect(0, 0, width, height))
         let bounds = graphene_rect_t(
             origin: graphene_point_t(x: Float(room.x), y: Float(room.y)),

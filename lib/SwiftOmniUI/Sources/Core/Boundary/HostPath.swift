@@ -29,6 +29,9 @@
 @_spi(Host) public struct HostPath: Equatable, Sendable {
     public let commands: [HostPathCommand]
 
+    /// Already normalized geometry, without a trip through SVG text.
+    public init(commands: [HostPathCommand]) { self.commands = commands }
+
     /// Parses SVG path data without locale or platform converters. Invalid and
     /// non-finite data is rejected as a whole rather than partially drawn.
     public init?(svg: String) {

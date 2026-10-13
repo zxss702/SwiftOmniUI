@@ -211,6 +211,7 @@ class WinUILazyView: WinUITravellingLayout {
             }
         }
         invalidateMeasure()
+        var needsArrangement = false
         while true {
             let built = cells.built
             let before = grid ? cells.runs.revision : cells.extents.revision
@@ -226,13 +227,21 @@ class WinUILazyView: WinUITravellingLayout {
             }
             if cells.built != built || measuredRevision != measurementRevision || cells.anchorShift != 0 {
                 prepareMeasure(width: placed.width)
-                arrange(width: placed.width, height: placed.height)
+                needsArrangement = true
             }
             let after = grid ? cells.runs.revision : cells.extents.revision
             guard cells.needsMeasurement || cells.window?.revision != after else { break }
             // A handler deferred by a patch cannot mount this run yet. Its
             // next layout resumes; never spin on rows that are not available.
             guard cells.built != built || after != before else { break }
+        }
+        // Every unknown run needs its true extent before the next one is
+        // requested. Placement can wait for the completed window: arranging
+        // all surviving rows after each mount repeats their entire native
+        // subtrees and restarts placement while that window is still growing.
+        // Apply the accumulated anchor shift and insertion motion once.
+        if needsArrangement, let placed, WinUIView.arranging == 0, WinUIView.measuring == 0 {
+            arrange(width: placed.width, height: placed.height)
         }
     }
 

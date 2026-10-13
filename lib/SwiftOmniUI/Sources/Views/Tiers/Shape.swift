@@ -5,7 +5,54 @@
 public protocol ShapeProperties: ViewProperties {}
 
 /// A drawn outline.
-public protocol Shape: VisualElement, ShapeProperties {}
+@preconcurrency @MainActor public protocol Shape: View {
+    /// The outline in the view's allocated local rectangle.
+    func path(in rect: Rect) -> Path
+}
+
+extension Shape {
+    public var node: Node {
+        Node.composed(self, type: String(reflecting: Self.self)) { SizedShape(shape: self).node }
+    }
+
+    @_disfavoredOverload public func fill(_ value: Brush) -> ModifiedContent { setting(ShapeContract.fill, value) }
+    @_disfavoredOverload public func fill(_ value: Color) -> ModifiedContent { fill(value.brush) }
+    @_disfavoredOverload public func fill(_ style: some ShapeStyle) -> ModifiedContent { fill(style.brush) }
+    @_disfavoredOverload public func fill(_ style: some ShapeStyle, style fillStyle: FillStyle) -> ModifiedContent {
+        fill(style.brush).setting(ShapeContract.fillRule, fillStyle.isEOFilled ? .evenOdd : .nonzero)
+    }
+    @_disfavoredOverload @_spi(Host) public func aspect(_ value: ContentMode) -> ModifiedContent {
+        setting(ShapeContract.aspect, value)
+    }
+    @_disfavoredOverload public func stroke(_ value: Brush) -> ModifiedContent { setting(ShapeContract.stroke, value) }
+    @_disfavoredOverload public func stroke(_ value: Color) -> ModifiedContent { stroke(value.brush) }
+    @_disfavoredOverload public func stroke(_ style: some ShapeStyle) -> ModifiedContent { stroke(style.brush) }
+    @_disfavoredOverload public func stroke(_ style: some ShapeStyle, lineWidth: Double) -> ModifiedContent {
+        stroke(style.brush).strokeWidth(lineWidth)
+    }
+    @_disfavoredOverload public func stroke(_ style: some ShapeStyle, style strokeStyle: StrokeStyle) -> ModifiedContent {
+        stroke(style.brush).stroke(style, style: strokeStyle)
+    }
+}
+
+/// An empty native Path already occupies the final identity. Geometry feedback
+/// only changes its drawing, never the shape's measurement or its control.
+private struct SizedShape<S: Shape>: View {
+    let shape: S
+    @State private var size: Size? = nil
+
+    var body: some View {
+        let path = size.map { shape.path(in: Rect(0, 0, $0.width, $0.height)) } ?? Path()
+        path.hearing(ViewContract.frameChanged) { numbers in
+            guard let report = FrameReport(numbers) else { return }
+            let next = Size(report.frame.width, report.frame.height)
+            guard next != self.size else { return }
+            var transaction = Transaction()
+            transaction.isGeometryFeedback = true
+            withTransaction(transaction) { self.size = next }
+        }
+    }
+}
 
 extension ShapeProperties {
     /// A transform applied to the shape's geometry before it is drawn, in the
@@ -35,6 +82,13 @@ extension ShapeProperties {
     ///     shape.fill(.ultraThinMaterial)
     public func fill(_ style: some ShapeStyle) -> Modified { fill(style.brush) }
 
+    public func fill(_ style: some ShapeStyle, style fillStyle: FillStyle) -> Modified {
+        modified {
+            $0.write(ShapeContract.fill, style.brush)
+            $0.write(ShapeContract.fillRule, fillStyle.isEOFilled ? .evenOdd : .nonzero)
+        }
+    }
+
     /// What the outline is painted with.
     public func stroke(_ value: Brush) -> Modified { setValue(ShapeContract.stroke, value) }
 
@@ -48,7 +102,7 @@ extension ShapeProperties {
     /// `stroke(_:)` with its thickness said alongside.
     public func stroke(_ style: some ShapeStyle, lineWidth: Double) -> Modified {
         modified {
-            $0.props[ShapeContract.stroke.token] = style.brush.propValue
+            $0.write(ShapeContract.stroke, style.brush)
             $0.write(ShapeContract.strokeWidth, lineWidth)
         }
     }
@@ -57,17 +111,15 @@ extension ShapeProperties {
     /// width, cap, join, miter and dashes together.
     public func stroke(_ style: some ShapeStyle, style strokeStyle: StrokeStyle) -> Modified {
         modified {
-            $0.props[ShapeContract.stroke.token] = style.brush.propValue
+            $0.write(ShapeContract.stroke, style.brush)
             $0.write(ShapeContract.strokeWidth, strokeStyle.lineWidth)
             $0.write(ShapeContract.strokeLineCap, strokeStyle.lineCap)
             $0.write(ShapeContract.strokeLineJoin, strokeStyle.lineJoin)
             $0.write(ShapeContract.strokeMiterLimit, strokeStyle.miterLimit)
-            if !strokeStyle.dash.isEmpty {
-                $0.write(ShapeContract.strokeDashPattern, strokeStyle.dash)
-            }
-            if strokeStyle.dashPhase != 0 {
-                $0.write(ShapeContract.strokeDashOffset, strokeStyle.dashPhase)
-            }
+            $0.write(ShapeContract.strokeDashPattern, strokeStyle.dash)
+            $0.write(ShapeContract.strokeDashOffset, strokeStyle.dashPhase)
+            $0.write(ShapeContract.strokeDashInPathUnits, true)
+            $0.write(ShapeContract.strokePhaseInPathUnits, true)
         }
     }
 
@@ -85,12 +137,12 @@ extension ShapeProperties {
     ///         .strokeWidth(2)
     ///         .strokeDashPattern([4, 2])   // 8 units of dash, 4 of gap
     @_spi(Host) public func strokeDashPattern(_ value: [Double]) -> Modified {
-        setValue(ShapeContract.strokeDashPattern, value)
+        modified { $0.write(ShapeContract.strokeDashPattern, value); $0.write(ShapeContract.strokeDashInPathUnits, false) }
     }
 
     /// How far into the dash pattern the line starts.
     @_spi(Host) public func strokeDashOffset(_ value: Double) -> Modified {
-        setValue(ShapeContract.strokeDashOffset, value)
+        modified { $0.write(ShapeContract.strokeDashOffset, value); $0.write(ShapeContract.strokePhaseInPathUnits, false) }
     }
 
     /// How the ends of an open line are drawn.
@@ -111,11 +163,12 @@ extension ShapeProperties {
 
     /// What the shape does with the room it is given - the `ContentMode` an Image
     /// takes too. `.fit`, the default, scales the drawing to fit and keeps its
-    /// proportions; `.center` keeps the size its own numbers say.
+    /// proportions; `.center` keeps the size its own numbers say. A Path retains
+    /// local coordinates until an aspect is explicitly set.
     @_spi(Host) public func aspect(_ value: ContentMode) -> Modified { setValue(ShapeContract.aspect, value) }
 }
 
-extension Shape {
+extension Shape where Self: VisualElement {
     /// `aspect` from a state, `$x`: the host sets each new value as it stands,
     /// and no view is rebuilt for it.
     @_spi(Host) public func aspect(_ state: Binding<ContentMode>) -> Modified {
@@ -125,7 +178,10 @@ extension Shape {
     /// `strokeDashOffset` from a state, `$x`: the host animates the property to
     /// each new value, and no view is rebuilt for it.
     @_spi(Host) public func strokeDashOffset(_ state: Binding<Double>) -> Modified {
-        journey(ShapeContract.strokeDashOffset, by: state)
+        modifyingContent(ShapeContract.self) {
+            $0.journey(ShapeContract.strokeDashOffset, by: state)
+                .setValue(ShapeContract.strokePhaseInPathUnits, false)
+        }
     }
 
     /// `strokeLineCap` from a state, `$x`: the host sets each new value as it
@@ -161,8 +217,8 @@ extension ShapeProperties {
     ///         .strokeBorder(.accent, lineWidth: 2)
     public func strokeBorder(_ value: Brush, lineWidth: Double = 1) -> Modified {
         modified {
-            $0.props[ShapeContract.strokeBorder.token] = value.propValue
-            $0.props[ShapeContract.strokeWidth.token] = lineWidth.propValue
+            $0.write(ShapeContract.strokeBorder, value)
+            $0.write(ShapeContract.strokeWidth, lineWidth)
         }
     }
 

@@ -127,6 +127,13 @@ The existing scroll look-ahead and neighbour policy still bounds the final
 window, and existing native seats within that window remain attached during
 an incremental fill.
 
+The tree's prepared lazy source also retains each current window row's authored
+description. Extending an incremental window runs builders only for incoming
+identities; the differ still revisits retained rendered rows for their own state
+changes. A source rebuild starts a fresh description cache with the new captures,
+and leaving the window drops that row's cached description, so re-entry builds
+its subtree and starts its lifetime again.
+
 Incremental fills resume even when an actual extent equals its estimate and
 does not change the geometry revision. WinUI completes the fill in the
 viewport callback when measurement is allowed; a callback within another

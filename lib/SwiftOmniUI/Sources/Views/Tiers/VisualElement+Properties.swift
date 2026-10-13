@@ -558,6 +558,16 @@ extension View {
         background { OutlinedFill(outline: shape.outline, brush: style.brush) }
     }
 
+    public func background<S: Shape>(_ style: some ShapeStyle, in shape: S) -> some View {
+        background {
+            if let fixed = shape as? any ClipShape {
+                OutlinedFill(outline: fixed.outline, brush: style.brush)
+            } else {
+                shape.fill(style.brush)
+            }
+        }
+    }
+
     /// The size the view asks for, in device units. A request: the layout has
     /// the last word.
     @_disfavoredOverload

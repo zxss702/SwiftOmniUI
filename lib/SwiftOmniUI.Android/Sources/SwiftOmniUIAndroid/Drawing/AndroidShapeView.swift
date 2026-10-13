@@ -19,7 +19,7 @@ final class AndroidShapeView: AndroidView {
         /// Authored geometry in points, closed where it is a polygon's.
         case line(Point, Point)
         case points([Point], closed: Bool, evenOdd: Bool)
-        case path(String)
+        case path([Double], evenOdd: Bool)
     }
 
     init() {
@@ -28,7 +28,7 @@ final class AndroidShapeView: AndroidView {
 
     /// Whether the shape draws geometry of its own, which its aspect places.
     private var drawsGeometry = false
-    private var aspect = ContentMode.fit
+    private var aspect: ContentMode? = .fit
     private var transform: [Double]?
 
     /// Where the drawn geometry stands before it is placed, in points, as Android measures it.
@@ -49,7 +49,7 @@ final class AndroidShapeView: AndroidView {
     /// Everything the shape draws, from what the tree says.
     func draw(
         _ geometry: Geometry, fill: HostValue?, stroke: HostValue?, strokeWidth: Double, dashes: [Double],
-        dashOffset: Double, cap: Int32, join: Int32, miterLimit: Double, aspect: Int32, transform: [Double]?
+        dashOffset: Double, cap: Int32, join: Int32, miterLimit: Double, aspect: Int32?, transform: [Double]?
     ) {
         let (kind, commands, evenOdd) = Self.flattened(geometry, density: density)
         if case .rectangle(let radius) = geometry { corners = BoxArithmetic.clockwise(radius) } else { corners = [] }
@@ -72,7 +72,7 @@ final class AndroidShapeView: AndroidView {
         }
         fitCorners()
         drawsGeometry = kind == 2
-        self.aspect = ContentMode(rawValue: aspect) ?? .fit
+        self.aspect = aspect.flatMap(ContentMode.init(rawValue:))
         self.transform = transform
         if drawsGeometry { geometryBounds = readGeometryBounds() }
         place()
@@ -117,9 +117,11 @@ final class AndroidShapeView: AndroidView {
     private func place() {
         guard let size = placedSize else { return }
         let room = LayoutSize(width: Double(size.width) / density, height: Double(size.height) / density)
-        let numbers = drawsGeometry
-            ? ShapeArithmetic.placement(of: geometryBounds, in: room, aspect: aspect, transform: transform)
-            : transform
+        let numbers: [Double]?
+        if drawsGeometry {
+            numbers = aspect.map { ShapeArithmetic.placement(of: geometryBounds, in: room, aspect: $0, transform: transform) }
+                ?? transform ?? [1, 0, 0, 1, 0, 0]
+        } else { numbers = transform }
         let affine = numbers.map { values in
             [values[0], values[1], values[2], values[3], values[4] * density, values[5] * density].map(Float.init)
         } ?? []
@@ -149,8 +151,8 @@ final class AndroidShapeView: AndroidView {
         case .line(let from, let to): (2, pixels([0, from.x, from.y, 1, to.x, to.y], density), false)
         case .points(let points, let closed, let evenOdd):
             (2, pixels(ShapeArithmetic.curves(through: points, closed: closed).flatMap(\.numbers), density), evenOdd)
-        case .path(let data):
-            (2, pixels((HostPath(svg: data)?.arcsAsCubics ?? []).flatMap(\.numbers), density), false)
+        case .path(let commands, let evenOdd):
+            (2, pixels(commands, density), evenOdd)
         }
     }
 

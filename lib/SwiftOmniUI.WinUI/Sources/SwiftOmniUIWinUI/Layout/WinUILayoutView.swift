@@ -15,6 +15,10 @@ class WinUILayoutView: WinUIView {
     /// XAML keeps only its last native proposal. Reuse preparation while the arithmetic
     /// and its children's native measures still stand at that same width and revision.
     private var preparedMeasure: (width: Double, revision: Int)?
+    /// A speculative native size query can change a descendant's last XAML
+    /// proposal without changing any arithmetic answer. Restore that branch
+    /// on its next preparation; stable branches need no recursive walk.
+    private var preparedChildrenDirty = false
     private var preparingMeasure = false
     private var measurementsAreDirty = false
     private var measurementInvalidationSent = false
@@ -39,6 +43,30 @@ class WinUILayoutView: WinUIView {
 
     /// The box as the element says it.
     private(set) var box = Box()
+    private var clipCommands: [Double]?
+    private var clipEvenOdd = false
+    private var pathClip: SwiftOmniUIObjectRef?
+
+    isolated deinit { if let pathClip { swiftomniui_winui_release(pathClip) } }
+
+    func setPathClip(_ commands: [Double]?, evenOdd: Bool) {
+        guard commands != clipCommands || evenOdd != clipEvenOdd else { return }
+        clipCommands = commands
+        clipEvenOdd = evenOdd
+        if let commands {
+            if pathClip == nil { pathClip = swiftomniui_winui_path_clip_make(handle) }
+            if let pathClip {
+                swiftomniui_winui_path_clip_update(pathClip, commands, Int32(commands.count), evenOdd)
+                swiftomniui_winui_path_clip_attach(handle, pathClip)
+            }
+        } else {
+            swiftomniui_winui_path_clip_attach(handle, nil)
+            if let pathClip { swiftomniui_winui_release(pathClip) }
+            pathClip = nil
+            cut = nil
+            if let placed { writeCut(width: placed.width, height: placed.height) }
+        }
+    }
 
     /// The shape drawn behind the children; nil while the box paints nothing.
     private(set) var boxView: WinUIShapeView?
@@ -213,15 +241,22 @@ class WinUILayoutView: WinUIView {
         measurements.invalidate()
     }
 
+    /// Native proposal changes need preparation, not another arithmetic
+    /// invalidation or posted layout turn. Stop at the first marked ancestor.
+    func invalidatePreparedChildren() {
+        guard !preparedChildrenDirty else { return }
+        preparedChildrenDirty = true
+        ((self as? WinUIScrollDocument)?.scrollView ?? placingLayout)?.invalidatePreparedChildren()
+        (nativeSafeBarOwner as? WinUILayoutView)?.invalidatePreparedChildren()
+    }
+
     /// Marks this panel measured at its allocated width without discarding the natural
     /// sizes the arithmetic just computed. An independent XAML measure still refreshes them.
     func prepareMeasure(width: Double) {
         guard WinUIView.arranging == 0 else { return }
         let width = Double(Float(width))
-        if preparedMeasure?.width == width, preparedMeasure?.revision == measurementRevision {
-            // A size query may have asked a leaf for another proposal. Restore
-            // actual native child proposals without forgetting arithmetic.
-            prepareChildren(width: width)
+        if preparedMeasure?.width == width, preparedMeasure?.revision == measurementRevision,
+           !preparedChildrenDirty {
             return
         }
         let wasPreparing = preparingMeasure
@@ -230,6 +265,7 @@ class WinUILayoutView: WinUIView {
         prepareChildren(width: width)
         prepareNativeMeasure(width: width, height: nil)
         preparedMeasure = (width, measurementRevision)
+        preparedChildrenDirty = false
     }
 
     /// A width first discovered by Arrange is completed once, using the
@@ -387,6 +423,7 @@ class WinUILayoutView: WinUIView {
 
     /// Cuts what the layout shows to its outline at its size, written only where it differs.
     private func writeCut(width: Double, height: Double) {
+        guard clipCommands == nil else { return }
         let outline = BoxArithmetic.outline(box.shape)
         let wanted = box.clips ? (outline, width, height) : nil
         guard wanted?.0 != cut?.outline || wanted?.1 != cut?.width || wanted?.2 != cut?.height else { return }

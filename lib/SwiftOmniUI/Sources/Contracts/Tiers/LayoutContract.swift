@@ -20,6 +20,10 @@ public enum LayoutContract: Contract {
     /// Whether children are cut off at the layout's edges.
     public static let clipsContent = ElementProperty<Self, Bool>("clipsContent", layer: .native)
 
+    /// An independent local-coordinate path clip. An empty value clips all.
+    public static let clipPath = ElementProperty<Self, [Double]>("clipPath", layer: .native, travels: false)
+    public static let clipFillRule = ElementProperty<Self, FillRule>("clipFillRule", layer: .native)
+
     /// Whether input on the layout's own empty space passes to what is under
     /// it.
     public static let letsInputThrough = ElementProperty<Self, Bool>("letsInputThrough", layer: .native)
@@ -33,6 +37,6 @@ public enum LayoutContract: Contract {
 
     /// The tier's own members.
     public static let members: [any ContractMember] = [
-        ignoresSafeArea, clipsContent, letsInputThrough, hitShape, scrollTargetLayout,
+        ignoresSafeArea, clipsContent, letsInputThrough, hitShape, scrollTargetLayout, clipPath, clipFillRule,
     ]
 }

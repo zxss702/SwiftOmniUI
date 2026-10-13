@@ -180,6 +180,12 @@ final class GTKCanvasView: GTKPanelView {
             pen.strokeJoin == .round ? GSK_LINE_JOIN_ROUND
                 : pen.strokeJoin == .bevel ? GSK_LINE_JOIN_BEVEL : GSK_LINE_JOIN_MITER)
 
+        gsk_stroke_set_miter_limit(outline, Float(pen.strokeMiter))
+        let dashes = pen.strokeDash.map(Float.init)
+        if dashes.contains(where: { $0 > 0 }) {
+            gsk_stroke_set_dash(outline, dashes, gsize(dashes.count))
+            gsk_stroke_set_dash_offset(outline, Float(pen.strokePhase))
+        }
         var bounds = graphene_rect_t()
         guard gsk_path_get_stroke_bounds(path, outline, &bounds) != 0 else { return }
         gtk_snapshot_push_stroke(snapshot, path, outline)

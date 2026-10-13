@@ -59,6 +59,8 @@
     /// Which points a fill counts as inside from here: even-odd, or winding.
     case fillStyle(evenOdd: Bool)
 
+    case completeStrokeStyle(StrokeStyle)
+
     /// The instructions of `drawing`, in order.
     public static func instructions(_ drawing: [DrawCommand]?) -> [CanvasInstruction] {
         (drawing ?? []).compactMap { CanvasInstruction($0.propValue) }
@@ -122,6 +124,17 @@
         case 24:
             guard let evenOdd = flag(0) else { return nil }
             self = .fillStyle(evenOdd: evenOdd)
+        case 25, 26:
+            guard let data = values.first?.numbers, let path = HostPath(numbers: data) else { return nil }
+            self = kind == 25 ? .drawPath(path.arcsAsCubics) : .fillPath(path.arcsAsCubics)
+        case 27:
+            guard values.count == 6, let width = values[0].number,
+                  let cap = values[1].enumeration, let join = values[2].enumeration,
+                  let miter = values[3].number, let dash = values[4].numbers, let phase = values[5].number,
+                  ([width, miter, phase] + dash).allSatisfy(\.isFinite) else { return nil }
+            self = .completeStrokeStyle(StrokeStyle(lineWidth: width,
+                lineCap: LineCap(rawValue: cap) ?? .flat, lineJoin: LineJoin(rawValue: join) ?? .miter,
+                miterLimit: miter, dash: dash, dashPhase: phase))
         default: return nil
         }
     }

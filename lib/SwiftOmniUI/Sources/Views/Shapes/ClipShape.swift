@@ -65,7 +65,7 @@ public enum RoundedCornerStyle: Sendable {
 ///
 ///     RoundedRectangle(cornerRadius: 8).fill(.cornflowerBlue)
 ///     Text("…").clipShape(RoundedRectangle(cornerRadius: 8))
-public struct RoundedRectangle: Shape, ClipShape {
+public struct RoundedRectangle: Shape, VisualElement, ShapeProperties, ClipShape {
     /// The node this control describes.
     public var node: Node
 
@@ -94,7 +94,7 @@ public struct RoundedRectangle: Shape, ClipShape {
 ///
 ///     Capsule().fill(.tomato).frame(width: 80, height: 32)
 ///     Text("…").clipShape(Capsule())
-public struct Capsule: Shape, ClipShape {
+public struct Capsule: Shape, VisualElement, ShapeProperties, ClipShape {
     /// The node this control describes.
     public var node: Node
 
@@ -119,7 +119,7 @@ public struct Capsule: Shape, ClipShape {
 ///
 ///     Circle().fill(.teal).frame(width: 24, height: 24)
 ///     Image("avatar.png").clipShape(Circle())
-public struct Circle: Shape, ClipShape {
+public struct Circle: Shape, VisualElement, ShapeProperties, ClipShape {
     /// The node this control describes.
     public var node: Node
 
@@ -141,13 +141,26 @@ extension View {
     ///
     /// The clip is the container the view is wrapped in's, so it cuts what the
     /// view draws of its own too.
-    public func clipShape(_ shape: some ClipShape) -> ModifiedContent {
+    @_disfavoredOverload public func clipShape(_ shape: some ClipShape) -> ModifiedContent {
         var wrapper = Node(contract: ZStackContract.self)
         let content = node
         wrapper.producer = { content.asChildren }
         wrapper.props[BorderElementContract.shape.token] = shape.outline.propValue
         wrapper.props[LayoutContract.clipsContent.token] = .bool(true)
         return ModifiedContent(node: wrapper)
+    }
+
+    /// Cuts by any Shape, evaluated in this view's allocated local bounds.
+    public func clipShape<S: Shape>(_ shape: S, style: FillStyle = FillStyle()) -> ModifiedContent {
+        if let fixed = shape as? any ClipShape {
+            var wrapper = Node(contract: ZStackContract.self)
+            let content = node
+            wrapper.producer = { content.asChildren }
+            wrapper.write(BorderElementContract.shape, fixed.outline)
+            wrapper.write(LayoutContract.clipsContent, true)
+            return ModifiedContent(node: wrapper)
+        }
+        return ModifiedContent(node: SizedPathClip(content: self, shape: shape, style: style).node)
     }
 
     /// Cuts the view to its own bounds - a `.clipShape` by the bounds'

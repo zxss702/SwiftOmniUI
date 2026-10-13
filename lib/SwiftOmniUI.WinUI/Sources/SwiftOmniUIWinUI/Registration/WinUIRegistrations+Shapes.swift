@@ -31,14 +31,17 @@ extension WinUIRegistrations {
             }
         }
         registry.add(PathContract.self, create: { _ in WinUIPathView() }) { shape in
-            shape.applies(shapeMembers + [PathContract.data]) { view, values in
+            shape.applies(shapeMembers + [PathContract.data, PathContract.commands]) { view, values in
                 paint(view, values)
-                let curves = HostPath(svg: values[PathContract.data] ?? "")?.arcsAsCubics ?? []
-                view.draw(authored(curves.flatMap(\.numbers), evenOdd: false, values))
+                let geometry: HostPath?
+                if let data = values[PathContract.data] { geometry = HostPath(svg: data) }
+                else { geometry = values[PathContract.commands].flatMap { HostPath(numbers: $0) } }
+                let curves = geometry?.arcsAsCubics ?? []
+                view.draw(authored(curves.flatMap(\.numbers), evenOdd: (values[ShapeContract.fillRule] ?? .nonzero) == .evenOdd, values, local: true))
             }
         }
         registry.add(PolygonContract.self, create: { _ in WinUIPathView() }) { shape in
-            shape.applies(shapeMembers + [PolygonContract.points, PolygonContract.fillRule]) { view, values in
+            shape.applies(shapeMembers + [PolygonContract.points]) { view, values in
                 paint(view, values)
                 view.draw(authored(
                     ShapeArithmetic.curves(through: values[PolygonContract.points] ?? [], closed: true).flatMap(\.numbers),
@@ -46,7 +49,7 @@ extension WinUIRegistrations {
             }
         }
         registry.add(PolylineContract.self, create: { _ in WinUIPathView() }) { shape in
-            shape.applies(shapeMembers + [PolylineContract.points, PolylineContract.fillRule]) { view, values in
+            shape.applies(shapeMembers + [PolylineContract.points]) { view, values in
                 paint(view, values)
                 view.draw(authored(
                     ShapeArithmetic.curves(through: values[PolylineContract.points] ?? [], closed: false).flatMap(\.numbers),
@@ -60,7 +63,7 @@ extension WinUIRegistrations {
         ShapeContract.fill, ShapeContract.stroke, ShapeContract.strokeWidth,
         ShapeContract.strokeDashPattern, ShapeContract.strokeDashOffset,
         ShapeContract.strokeLineCap, ShapeContract.strokeLineJoin, ShapeContract.strokeMiterLimit,
-        ShapeContract.aspect, ShapeContract.renderTransform,
+        ShapeContract.aspect, ShapeContract.renderTransform, ShapeContract.fillRule, ShapeContract.strokeDashInPathUnits, ShapeContract.strokePhaseInPathUnits,
     ]
 
     private static func paint<Realized: ElementContract>(_ view: WinUIPathView, _ values: ElementValues<Realized>) {
@@ -70,8 +73,11 @@ extension WinUIRegistrations {
             width: values[ShapeContract.strokeWidth] ?? 1,
             outline: BoxArithmetic.outlineWidth(
                 stroke: values[ShapeContract.stroke]?.propValue, width: values[ShapeContract.strokeWidth]),
-            dashes: values[ShapeContract.strokeDashPattern] ?? [],
-            dashOffset: values[ShapeContract.strokeDashOffset] ?? 0,
+            dashes: (values[ShapeContract.strokeDashPattern] ?? []).map {
+                values[ShapeContract.strokeDashInPathUnits] == true ? $0 / max(0.000001, values[ShapeContract.strokeWidth] ?? 1) : $0
+            },
+            dashOffset: (values[ShapeContract.strokeDashOffset] ?? 0)
+                / (values[ShapeContract.strokePhaseInPathUnits] == true ? max(0.000001, values[ShapeContract.strokeWidth] ?? 1) : 1),
             cap: values[ShapeContract.strokeLineCap] ?? .flat,
             join: values[ShapeContract.strokeLineJoin] ?? .miter,
             miter: values[ShapeContract.strokeMiterLimit] ?? 10)
@@ -79,9 +85,9 @@ extension WinUIRegistrations {
 
     /// A geometry of the shape's own, placed by its aspect and moved by its transform.
     private static func authored<Realized: ElementContract>(
-        _ commands: [Double], evenOdd: Bool, _ values: ElementValues<Realized>
+        _ commands: [Double], evenOdd: Bool, _ values: ElementValues<Realized>, local: Bool = false
     ) -> WinUIPathView.Geometry {
-        .authored(commands, evenOdd: evenOdd, aspect: values[ShapeContract.aspect] ?? .fit, transform: moved(values))
+        .authored(commands, evenOdd: evenOdd, aspect: values[ShapeContract.aspect] ?? (local ? nil : .fit), transform: moved(values))
     }
 
     /// The shape's transform, as the six numbers of its matrix; nil for none.

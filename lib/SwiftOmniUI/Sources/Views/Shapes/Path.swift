@@ -19,24 +19,53 @@ import CRT
 /// `M` moves, `L` draws a line, `C` a curve, `A` an arc and `Z` closes the
 /// figure. The numbers are device units in the path's OWN space, and `.aspect`
 /// says what happens to that space in the room the layout gives it - a path
-/// drawn 40 wide fills a 200-wide cell under `.fit` and stays 40 under
-/// `.center`.
+/// drawn 40 wide keeps its coordinates by default. Explicit `.fit` fills a
+/// 200-wide cell; `.center` keeps its size and centers its bounds.
 ///
 /// Every platform accepts the same grammar: the host parses the path itself
 /// before drawing it.
-public struct Path: Shape, PathProperties {
-    /// The node this control describes.
-    public var node: Node
+public struct Path: Shape, VisualElement, ShapeProperties, PathProperties {
+    // Geometry is independent of the node and any frame wrappers.
+    private var properties: Node
+    private var commands: [HostPathCommand] = []
+    private var cursor: Point?
+    private var subpathStart: Point?
+
+    /// The native description, encoded once when the view is requested.
+    public var node: Node {
+        get {
+            var result = properties
+            result.write(PathContract.commands, geometry.numbers)
+            return result
+        }
+        set {
+            let content = newValue.controlContent
+            if let data = content.props[PathContract.data.token]?.string {
+                replaceGeometry(HostPath(svg: data)?.commands ?? [])
+            } else if let values = content.props[PathContract.commands.token]?.numbers,
+                      values != geometry.numbers {
+                replaceGeometry(HostPath(numbers: values)?.commands ?? [])
+            }
+            properties = newValue
+            properties.modifyControl {
+                $0.props.removeValue(forKey: PathContract.data.token)
+                $0.props.removeValue(forKey: PathContract.commands.token)
+            }
+        }
+    }
+
+    var geometry: HostPath { HostPath(commands: commands) }
+    public func path(in rect: Rect) -> Path { self }
 
     /// A path with no outline yet - what a `Style<Path>` is written against.
     public init() {
-        node = Node(shape: PathContract.self)
+        properties = Node(shape: PathContract.self)
     }
 
     /// The outline, in SVG path syntax.
     public init(_ data: String) {
-        node = Node(shape: PathContract.self)
-        node.write(PathContract.data, data)
+        properties = Node(shape: PathContract.self)
+        replaceGeometry(HostPath(svg: data)?.commands ?? [])
     }
 
     /// An outline written by the closure, the way SwiftUI builds one:
@@ -106,12 +135,12 @@ public struct Path: Shape, PathProperties {
     /// The outline as it stands, in the syntax the initializer takes - what a
     /// `GraphicsContext` call draws.
     nonisolated var svg: String {
-        node.props[PathContract.data.token]?.string ?? ""
+        HostPath(commands: commands).svg
     }
 
     /// Whether the outline says nothing yet - an empty path draws nothing.
     public var isEmpty: Bool {
-        HostPath(svg: svg)?.commands.isEmpty ?? false
+        commands.isEmpty
     }
 
     /// Where the outline stands: the point the next segment starts from, nil
@@ -122,12 +151,12 @@ public struct Path: Shape, PathProperties {
     public mutating func move(
         to point: Point
     ) {
-        append("M \(point.x),\(point.y)")
+        append(.move(point))
     }
 
     /// Adds a straight segment from where the path stands to `point`.
     public mutating func addLine(to point: Point) {
-        append("L \(point.x),\(point.y)")
+        append(.line(point))
     }
 
     /// Adds a straight segment to each of the points, in order.
@@ -139,13 +168,13 @@ public struct Path: Shape, PathProperties {
 
     /// Adds a cubic Bézier segment to `point`, bent by the two control points.
     public mutating func addCurve(to point: Point, control1: Point, control2: Point) {
-        append("C \(control1.x),\(control1.y) \(control2.x),\(control2.y) \(point.x),\(point.y)")
+        append(.cubic(control1: control1, control2: control2, end: point))
     }
 
     /// Adds a quadratic Bézier segment to `point`, bent by the one control
     /// point.
     public mutating func addQuadCurve(to point: Point, control: Point) {
-        append("Q \(control.x),\(control.y) \(point.x),\(point.y)")
+        append(.quadratic(control: control, end: point))
     }
 
     /// Adds an arc of the circle `radius` about `center`, running from
@@ -282,10 +311,11 @@ public struct Path: Shape, PathProperties {
 
     /// Adds `rect`'s outline as a subpath: a move, three lines and a close.
     public mutating func addRect(_ rect: Rect) {
-        append("M \(rect.x),\(rect.y)"
-            + " L \(rect.x + rect.width),\(rect.y)"
-            + " L \(rect.x + rect.width),\(rect.y + rect.height)"
-            + " L \(rect.x),\(rect.y + rect.height) Z")
+        move(to: Point(rect.x, rect.y))
+        addLine(to: Point(rect.x + rect.width, rect.y))
+        addLine(to: Point(rect.x + rect.width, rect.y + rect.height))
+        addLine(to: Point(rect.x, rect.y + rect.height))
+        closeSubpath()
     }
 
     /// Adds each rectangle's outline as a subpath, in order.
@@ -301,9 +331,10 @@ public struct Path: Shape, PathProperties {
         let radiusY = rect.height / 2
         let centerX = rect.x + radiusX
         let centerY = rect.y + radiusY
-        append("M \(centerX),\(centerY - radiusY)"
-            + " A \(radiusX),\(radiusY) 0 1 1 \(centerX),\(centerY + radiusY)"
-            + " A \(radiusX),\(radiusY) 0 1 1 \(centerX),\(centerY - radiusY) Z")
+        move(to: Point(centerX, centerY - radiusY))
+        arc(to: Point(centerX, centerY + radiusY), radiusX: radiusX, radiusY: radiusY, largeArc: true, sweep: true)
+        arc(to: Point(centerX, centerY - radiusY), radiusX: radiusX, radiusY: radiusY, largeArc: true, sweep: true)
+        closeSubpath()
     }
 
     /// Adds `rect` with every corner rounded by `cornerSize` - how far across
@@ -312,10 +343,10 @@ public struct Path: Shape, PathProperties {
     public mutating func addRoundedRect(
         in rect: Rect, cornerSize: Size, style: RoundedCornerStyle = .continuous
     ) {
-        append(Self.roundedRectData(
+        appendRoundedRect(
             rect,
             topLeading: cornerSize, topTrailing: cornerSize,
-            bottomTrailing: cornerSize, bottomLeading: cornerSize))
+            bottomTrailing: cornerSize, bottomLeading: cornerSize)
     }
 
     /// Adds `rect` with each corner rounded by its own radius, as its own
@@ -324,12 +355,12 @@ public struct Path: Shape, PathProperties {
     public mutating func addRoundedRect(
         in rect: Rect, cornerRadii: RectangleCornerRadii, style: RoundedCornerStyle = .continuous
     ) {
-        append(Self.roundedRectData(
+        appendRoundedRect(
             rect,
             topLeading: Size(cornerRadii.topLeading, cornerRadii.topLeading),
             topTrailing: Size(cornerRadii.topTrailing, cornerRadii.topTrailing),
             bottomTrailing: Size(cornerRadii.bottomTrailing, cornerRadii.bottomTrailing),
-            bottomLeading: Size(cornerRadii.bottomLeading, cornerRadii.bottomLeading)))
+            bottomLeading: Size(cornerRadii.bottomLeading, cornerRadii.bottomLeading))
     }
 
     /// Adds `rect` with every corner rounded by `cornerRadius`, as its own
@@ -341,14 +372,13 @@ public struct Path: Shape, PathProperties {
     /// Appends `path`'s outline to this one's - its subpaths keeping their
     /// own starts, the numbers taken as they are.
     public mutating func addPath(_ path: Path) {
-        guard !path.svg.isEmpty else { return }
-        append(path.svg)
+        for command in path.commands { append(command) }
     }
 
     /// Closes the current subpath with a straight segment back to where it
     /// began.
     public mutating func closeSubpath() {
-        append("Z")
+        if subpathStart != nil { append(.close) }
     }
 
     /// The same outline with `transform` applied to every point - a new
@@ -361,7 +391,7 @@ public struct Path: Shape, PathProperties {
     /// - Parameter transform: how the outline is moved, turned and sized.
     /// - Returns: the path, transformed.
     public func applying(_ transform: ViewTransform) -> Path {
-        guard let parsed = HostPath(svg: svg) else { return self }
+        let parsed = geometry
 
         func mapped(_ point: Point) -> Point {
             Point(
@@ -373,7 +403,7 @@ public struct Path: Shape, PathProperties {
         let conformal = transform.a == transform.d && transform.c == -transform.b
 
         var copy = self
-        copy.node.props[PathContract.data.token] = .string("")
+        copy.replaceGeometry([])
         var current = Point.zero
         var start = Point.zero
 
@@ -393,8 +423,8 @@ public struct Path: Shape, PathProperties {
                 copy.addQuadCurve(to: mapped(end), control: mapped(control))
                 current = end
             case .arc(let radiusX, let radiusY, let rotation, let largeArc, let sweep, let end):
-                if diagonal {
-                    // A square-to-the-axes sizing; a mirror in one turns the
+                if diagonal && (rotation.truncatingRemainder(dividingBy: 180) == 0 || abs(transform.a) == abs(transform.d)) {
+                    // An axis-aligned ellipse or equal scaling of both axes; a mirror in one turns the
                     // arc the other way round.
                     let mirrored = transform.a * transform.d < 0
                     copy.arc(
@@ -449,8 +479,27 @@ public struct Path: Shape, PathProperties {
     }
 
     /// One more statement of the outline, past what it already says.
-    private mutating func append(_ piece: String) {
-        node.props[PathContract.data.token] = .string(svg.isEmpty ? piece : svg + " " + piece)
+    private mutating func append(_ command: HostPathCommand) {
+        // A segment with no start begins at its endpoint, matching native paths.
+        if cursor == nil {
+            switch command {
+            case .move: break
+            case .line(let p), .cubic(_, _, let p), .quadratic(_, let p), .arc(_, _, _, _, _, let p):
+                append(.move(p)); return
+            case .close: return
+            }
+        }
+        commands.append(command)
+        switch command {
+        case .move(let p): cursor = p; subpathStart = p
+        case .line(let p), .cubic(_, _, let p), .quadratic(_, let p), .arc(_, _, _, _, _, let p): cursor = p
+        case .close: cursor = subpathStart
+        }
+    }
+
+    private mutating func replaceGeometry(_ value: [HostPathCommand]) {
+        commands = []; cursor = nil; subpathStart = nil
+        for command in value { append(command) }
     }
 
     /// An arc command from where the outline stands to `end`, the way an `A`
@@ -460,7 +509,7 @@ public struct Path: Shape, PathProperties {
         to end: Point, radiusX: Double, radiusY: Double,
         rotation: Double = 0, largeArc: Bool, sweep: Bool
     ) {
-        append("A \(radiusX),\(radiusY) \(rotation) \(largeArc ? 1 : 0) \(sweep ? 1 : 0) \(end.x),\(end.y)")
+        append(.arc(radiusX: radiusX, radiusY: radiusY, rotation: rotation, largeArc: largeArc, sweep: sweep, end: end))
     }
 
     /// A whole circle about `center`, two half turns meeting back at
@@ -485,29 +534,7 @@ public struct Path: Shape, PathProperties {
 
     /// Where the outline stands - nil until a move or a segment lands it,
     /// nil when the data does not parse.
-    private var tail: Point? {
-        guard let parsed = HostPath(svg: svg) else { return nil }
-        var current: Point?
-        var start = Point.zero
-        for command in parsed.commands {
-            switch command {
-            case .move(let point):
-                current = point
-                start = point
-            case .line(let point):
-                current = point
-            case .cubic(_, _, let end):
-                current = end
-            case .quadratic(_, let end):
-                current = end
-            case .arc(_, _, _, _, _, let end):
-                current = end
-            case .close:
-                current = start
-            }
-        }
-        return current
-    }
+    private var tail: Point? { cursor }
 
     /// The rim point `degrees` round on the circle `radius` about `center` -
     /// 0 to the right, 90 straight down.
@@ -520,14 +547,13 @@ public struct Path: Shape, PathProperties {
     /// bottom trailing, bottom leading - each corner's size how far across
     /// and down its bend reaches, a corner zero on either axis staying
     /// square.
-    private static func roundedRectData(
+    private mutating func appendRoundedRect(
         _ rect: Rect, topLeading: Size, topTrailing: Size,
         bottomTrailing: Size, bottomLeading: Size
-    ) -> String {
+    ) {
         func corner(_ size: Size) -> Size {
-            Size(
-                min(max(0, size.width), rect.width / 2),
-                min(max(0, size.height), rect.height / 2))
+            guard size.width > 0, size.height > 0 else { return .zero }
+            return Size(min(size.width, max(0, rect.width / 2)), min(size.height, max(0, rect.height / 2)))
         }
         let topLeft = corner(topLeading)
         let topRight = corner(topTrailing)
@@ -539,24 +565,24 @@ public struct Path: Shape, PathProperties {
         let right = rect.x + rect.width
         let bottom = rect.y + rect.height
 
-        var data = "M \(left + topLeft.width),\(top)"
-        data += topRight.width > 0 && topRight.height > 0
-            ? " L \(right - topRight.width),\(top)"
-                + " A \(topRight.width),\(topRight.height) 0 0 1 \(right),\(top + topRight.height)"
-            : " L \(right),\(top)"
-        data += bottomRight.width > 0 && bottomRight.height > 0
-            ? " L \(right),\(bottom - bottomRight.height)"
-                + " A \(bottomRight.width),\(bottomRight.height) 0 0 1 \(right - bottomRight.width),\(bottom)"
-            : " L \(right),\(bottom)"
-        data += bottomLeft.width > 0 && bottomLeft.height > 0
-            ? " L \(left + bottomLeft.width),\(bottom)"
-                + " A \(bottomLeft.width),\(bottomLeft.height) 0 0 1 \(left),\(bottom - bottomLeft.height)"
-            : " L \(left),\(bottom)"
-        data += topLeft.width > 0 && topLeft.height > 0
-            ? " L \(left),\(top + topLeft.height)"
-                + " A \(topLeft.width),\(topLeft.height) 0 0 1 \(left + topLeft.width),\(top)"
-            : " L \(left),\(top)"
-        return data + " Z"
+        move(to: Point(left + topLeft.width, top))
+        addLine(to: Point(right - topRight.width, top))
+        if topRight.width > 0 && topRight.height > 0 {
+            arc(to: Point(right, top + topRight.height), radiusX: topRight.width, radiusY: topRight.height, largeArc: false, sweep: true)
+        }
+        addLine(to: Point(right, bottom - bottomRight.height))
+        if bottomRight.width > 0 && bottomRight.height > 0 {
+            arc(to: Point(right - bottomRight.width, bottom), radiusX: bottomRight.width, radiusY: bottomRight.height, largeArc: false, sweep: true)
+        }
+        addLine(to: Point(left + bottomLeft.width, bottom))
+        if bottomLeft.width > 0 && bottomLeft.height > 0 {
+            arc(to: Point(left, bottom - bottomLeft.height), radiusX: bottomLeft.width, radiusY: bottomLeft.height, largeArc: false, sweep: true)
+        }
+        addLine(to: Point(left, top + topLeft.height))
+        if topLeft.width > 0 && topLeft.height > 0 {
+            arc(to: Point(left + topLeft.width, top), radiusX: topLeft.width, radiusY: topLeft.height, largeArc: false, sweep: true)
+        }
+        closeSubpath()
     }
 }
 
@@ -574,5 +600,12 @@ extension PathProperties {
     /// The same value the initializer takes; write it here to give a
     /// `Style<Path>` an outline, or to swap one on a path that already has
     /// modifiers on it.
-    public func data(_ value: String) -> Modified { setValue(PathContract.data, value) }
+    public func data(_ value: String) -> Modified {
+        modified {
+            $0.modifyControl {
+                $0.props.removeValue(forKey: PathContract.commands.token)
+                $0.write(PathContract.data, value)
+            }
+        }
+    }
 }

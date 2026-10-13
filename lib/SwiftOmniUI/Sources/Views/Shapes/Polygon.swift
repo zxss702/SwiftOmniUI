@@ -33,7 +33,7 @@ extension PolygonProperties {
 ///
 /// The last point is joined back to the first,
 /// which is the whole difference between this and a `Polyline`.
-public struct Polygon: Shape, PolygonProperties {
+public struct Polygon: Shape, VisualElement, ShapeProperties, PolygonProperties {
     /// The node this control describes.
     public var node: Node
 

@@ -14,7 +14,7 @@
 ///
 /// It has no size of its own: give it a `height`, a `width` or a
 /// layout that stretches it, or it draws nothing.
-public struct Rectangle: Shape, RectangleProperties {
+public struct Rectangle: Shape, VisualElement, ShapeProperties, RectangleProperties {
     /// The node this control describes.
     public var node: Node
 

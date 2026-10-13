@@ -340,6 +340,11 @@ void swiftomniui_winui_set_enabled(SwiftOmniUIObjectRef control, bool enabled);
 void swiftomniui_winui_set_clip(SwiftOmniUIObjectRef element, bool cuts, SwiftOmniUIOutline outline, double radius,
                             double width, double height);
 
+/// Retained Composition clip, updated in place from local curve commands.
+SwiftOmniUIObjectRef swiftomniui_winui_path_clip_make(SwiftOmniUIObjectRef element);
+void swiftomniui_winui_path_clip_update(SwiftOmniUIObjectRef clip, double const *commands, int32_t count, bool evenOdd);
+void swiftomniui_winui_path_clip_attach(SwiftOmniUIObjectRef element, SwiftOmniUIObjectRef clip);
+
 /// Cuts what `element` shows to a silhouette standing `x` by `y` DIPs from its corner and `width` by `height`:
 /// `kind` 0 a rectangle, 1 a rectangle of `radius` at each corner, 2 an ellipse, and any other kind - no mask -
 /// shows the element whole. Lines of a geometry of a shape's own are no silhouette WinUI draws a clip from: a

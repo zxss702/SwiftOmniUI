@@ -15,7 +15,7 @@ final class WinUIPathView: WinUIView {
     enum Geometry: Equatable {
         case rectangle([Double], transform: [Double]?)
         case ellipse(transform: [Double]?)
-        case authored([Double], evenOdd: Bool, aspect: ContentMode, transform: [Double]?)
+        case authored([Double], evenOdd: Bool, aspect: ContentMode?, transform: [Double]?)
     }
 
     private var geometry = Geometry.rectangle([0, 0, 0, 0], transform: nil)
@@ -147,9 +147,9 @@ final class WinUIPathView: WinUIView {
             }
             standFigure(filled)
         case .authored(let commands, let evenOdd, let aspect, let transform):
-            let placement = ShapeArithmetic.placement(
+            let placement = aspect.map { aspect in ShapeArithmetic.placement(
                 of: bounds, in: LayoutSize(width: room.width, height: room.height), aspect: aspect,
-                transform: transform)
+                transform: transform) } ?? transform ?? [1, 0, 0, 1, 0, 0]
             swiftomniui_winui_path_draw(
                 handle, 2, nil, commands, Int32(commands.count), evenOdd, placement, room.width, room.height, inset)
             standFigure(LayoutSize(

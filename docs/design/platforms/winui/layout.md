@@ -30,8 +30,13 @@ will give them. Stacks, grids and single-child layouts resolve those places
 separately from their size queries. Preparation preserves the arithmetic
 cache; a panel's own `MeasureOverride` does not repeat its child preparation
 when answering that explicit preparation. A preparation already current at
-the same width and revision still restores its children's native proposals,
-using kept results. This matters because XAML retains only its last native
+the same width and revision skips its stable subtree. A native query that
+changes a descendant's proposal, or invalidates its measure, marks just the
+related placing ancestors as needing preparation. This hint does not discard
+arithmetic or post another layout task. The next preparation restores those
+branches before becoming current again. Scroll documents carry the hint to
+their scroller, and promoted safe bars carry it to both their logical layout
+and native bar host. This matters because XAML retains only its last native
 proposal, while the host's arithmetic can retain several widths.
 If preparing a child replaces an estimate or changes its revision, the
 parent discards its own cached arithmetic before finishing that measure.
@@ -77,6 +82,14 @@ coordinates have not changed. Once row geometry and the realized window
 agree, another notice sends no realization. The current ArrangeOverride
 bounds propagate safe contexts instead of reading the previous ActualSize
 during the callback.
+
+An incremental viewport fill measures each unknown run before requesting the
+next, retaining the strict window bound for tall rows. It places the final
+mounted window once after the synchronous fill, rather than arranging every
+surviving native subtree after every incoming run. Accumulated anchor shifts
+and insertion animations are consumed by that final placement. A fill that
+awaits a deferred render places the measurements completed so far and resumes
+after the pass.
 
 GeometryReader accepts a safe allocation while retaining the remaining
 environment. Native window chrome that already sits outside the content row

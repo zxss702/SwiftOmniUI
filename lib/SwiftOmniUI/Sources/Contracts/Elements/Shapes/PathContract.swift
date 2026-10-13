@@ -16,6 +16,9 @@ public enum PathContract: ElementContract {
     /// The outline, in SVG path syntax.
     public static let data = ElementProperty<Self, String>("data", layer: .stateUI)
 
+    /// Structured geometry; SVG remains supported for authored node data.
+    public static let commands = ElementProperty<Self, [Double]>("pathCommands", layer: .stateUI, travels: false)
+
     /// The element's own members.
-    public static let members: [any ContractMember] = [data]
+    public static let members: [any ContractMember] = [data, commands]
 }

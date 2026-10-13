@@ -88,7 +88,7 @@ final class GTKShapeViewTests: XCTestCase {
     /// room.
     func testAPathIsPlacedByItsAspect() throws {
         let fitted = try drawn(width: 40, height: 40, at: [(35, 5), (5, 35)]) {
-            Path("M 0 0 L 10 0 L 10 10 Z").fill(Color("#FF0000")).frame(width: 40).frame(height: 40)
+            Path("M 0 0 L 10 0 L 10 10 Z").fill(Color("#FF0000")).aspect(.fit).frame(width: 40).frame(height: 40)
         }
         XCTAssertEqual(fitted, [Self.red, 0])
 

@@ -47,6 +47,12 @@ public struct DrawCommand: Equatable, Sendable {
         // How an outline and a fill are finished.
         case strokeStyle = 23
         case fillStyle = 24
+
+        // Structured geometry and the complete public StrokeStyle. Existing
+        // records keep their numbers and their interpretation.
+        case drawGeometry = 25
+        case fillGeometry = 26
+        case completeStrokeStyle = 27
     }
 
     /// Which canvas call this instruction is.

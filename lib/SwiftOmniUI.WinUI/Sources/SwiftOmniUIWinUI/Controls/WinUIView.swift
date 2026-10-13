@@ -271,6 +271,7 @@ class WinUIView {
         measurementRevision &+= 1
         measuredSizes.removeAll(keepingCapacity: true)
         nativeProposal = nil
+        invalidateAncestorPreparation()
         guard Self.arranging == 0, Self.measuring == 0 else {
             guard !nativeMeasurePending else { return }
             nativeMeasurePending = true
@@ -355,6 +356,15 @@ class WinUIView {
     }
 
     private func measureNative(width: Double?, height: Double?) -> LayoutSize {
+        let changedProposal: Bool
+        if let nativeProposal {
+            changedProposal = nativeProposal.width != width || nativeProposal.height != height
+        } else {
+            changedProposal = true
+        }
+        if changedProposal {
+            invalidateAncestorPreparation()
+        }
         // This explicit preparation consumes the invalidation left by the
         // preceding pass; its queued invalidation must not discard it again.
         if nativeMeasurePending {
@@ -375,6 +385,14 @@ class WinUIView {
         if measuredSizes.count == 8 { measuredSizes.removeFirst() }
         measuredSizes.append((width, height, measured))
         return measured
+    }
+
+    /// Arithmetic queries can switch the native proposal even when their
+    /// answers remain cached. Mark just the ancestors whose next preparation
+    /// must restore the allocated proposal, including the native bar host.
+    private func invalidateAncestorPreparation() {
+        ((self as? WinUIScrollDocument)?.scrollView ?? placingLayout)?.invalidatePreparedChildren()
+        (nativeSafeBarOwner as? WinUILayoutView)?.invalidatePreparedChildren()
     }
 
     /// What the element last measured at, read from WinUI without marking it.

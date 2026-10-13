@@ -61,13 +61,15 @@ struct WebCanvasStroke {
     private mutating func stroke(_ curves: [HostCurveCommand], _ pen: CanvasPen) {
         guard pen.strokeWidth > 0, let color = Self.color(pen.stroke, pen) else { return }
         path(curves)
+        numbers += [14, Double(pen.strokeCap.rawValue), Double(pen.strokeJoin.rawValue), pen.strokeMiter,
+                    pen.strokePhase, Double(pen.strokeDash.count)] + pen.strokeDash
         numbers += [12] + color + [pen.strokeWidth]
     }
 
     private mutating func fill(_ curves: [HostCurveCommand], _ pen: CanvasPen) {
         guard let color = Self.color(pen.fill, pen) else { return }
         path(curves)
-        numbers += [11] + color
+        numbers += [15, pen.fillEvenOdd ? 1 : 0] + color
     }
 
     private mutating func path(_ curves: [HostCurveCommand]) {

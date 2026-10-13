@@ -16,7 +16,8 @@ import XCTest
         path.closeSubpath()
 
         XCTAssertEqual(path.svg, "M 1.0,2.0 L 3.0,4.0 C 1.0,1.0 4.0,4.0 5.0,6.0 Z")
-        XCTAssertEqual(path.node.props["data"], .string(path.svg))
+        XCTAssertEqual(path.node.props[PathContract.commands.token], .numbers(path.geometry.numbers))
+        XCTAssertNil(path.node.props[PathContract.data.token])
     }
 
     /// The closure form writes on an empty path, the way SwiftUI's does.
@@ -63,12 +64,12 @@ import XCTest
         context.stroke(Path("M 2,2 L 3,3"), with: .color(.blue), lineWidth: 1)
 
         XCTAssertEqual(context.commands, [
-            Draw.fillColor(.red), Draw.fillStyle(eoFill: false), Draw.fillPath("M 0,0 L 4,4"),
-            Draw.fillColor(.red), Draw.fillStyle(eoFill: true), Draw.fillPath("M 0,0 Z"),
-            Draw.strokeColor(.blue), Draw.strokeStyle(width: 2, cap: .round, join: .round),
-            Draw.drawPath("M 0,0 L 1,1"),
-            Draw.strokeColor(.blue), Draw.strokeStyle(width: 1, cap: .flat, join: .miter),
-            Draw.drawPath("M 2,2 L 3,3"),
+            Draw.fillColor(.red), Draw.fillStyle(eoFill: false), Draw.fillGeometry(Path("M 0,0 L 4,4")),
+            Draw.fillColor(.red), Draw.fillStyle(eoFill: true), Draw.fillGeometry(Path("M 0,0 Z")),
+            Draw.strokeColor(.blue), Draw.completeStrokeStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)),
+            Draw.drawGeometry(Path("M 0,0 L 1,1")),
+            Draw.strokeColor(.blue), Draw.completeStrokeStyle(StrokeStyle(lineWidth: 1)),
+            Draw.drawGeometry(Path("M 2,2 L 3,3")),
         ])
     }
 
@@ -110,18 +111,18 @@ import XCTest
                 with: .color(.cornflowerBlue))
         }
 
-        // Before the first report the canvas's room reads zero; it is rebuilt
-        // when the frame lands. The drawing is there whichever it says.
-        let built = canvas.node.built
-        let leaf = try XCTUnwrap(built.children.first)
-        XCTAssertEqual(leaf.type, CanvasContract.nodeType)
-
+        let renders = Renders()
+        let first = renders.render(canvas.node)
+        XCTAssertFalse(first.subtree.contains { $0.type == CanvasContract.nodeType }, "no invented zero-size drawing")
+        let frame = try XCTUnwrap(first.events?[ViewContract.frameChanged.token])
+        renders.fire(frame, with: [.numbers([0, 0, 120, 80, 0, 0, 0, 0, 120, 80])])
+        let second = renders.render(canvas.node, changed: Renderer.shared.pendingChanges)
+        let leaf = try XCTUnwrap(second.subtree.first { $0.type == CanvasContract.nodeType })
         let commands = try XCTUnwrap(leaf.props["drawable"]?.values?.compactMap(DrawCommand.init(propValue:)))
         XCTAssertEqual(commands, [
-            Draw.fillColor(.cornflowerBlue),
-            Draw.fillStyle(eoFill: false),
-            Draw.fillPath(Path(roundedRect: Rect(0, 0, 0, 40), cornerRadius: 8).svg),
+            Draw.fillColor(.cornflowerBlue), Draw.fillStyle(eoFill: false),
+            Draw.fillGeometry(Path(roundedRect: Rect(0, 0, 120, 40), cornerRadius: 8)),
         ])
-        XCTAssertNotNil(built.events[.frameChanged], "a frame is reported so the closure runs again")
+        Renderer.shared.clearInvalidation()
     }
 }

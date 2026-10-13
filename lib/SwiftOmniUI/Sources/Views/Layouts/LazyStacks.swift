@@ -296,10 +296,19 @@ struct LazyHStackElement: StackBase {
         let rowStack: PropValue? = node.type == .lazyVStack || node.type == .lazyHStack
             ? .numbers([node.type == .lazyHStack ? 1 : 0, node.props[.spacing]?.number ?? 0]) : nil
         node.lazyWindow = realized.lender.map(ObjectIdentifier.init)
+        // One prepared source may fill its window in several turns. Retained
+        // rows already have descriptions; only incoming identities need their
+        // builders again. A new take owns new captures and a new cache.
+        var retained: [String: Node] = [:]
         node.producer = {
-            realized.wrappedValue.filter { positions[$0] != nil }
+            let selected = realized.wrappedValue.filter { positions[$0] != nil }
                 .sorted { positions[$0]! < positions[$1]! }
-                .compactMap { identity in
+            let window = Set(selected)
+            for identity in retained.keys.filter({ !window.contains($0) }) {
+                retained.removeValue(forKey: identity)
+            }
+            return selected.compactMap { identity in
+                if let child = retained[identity] { return child }
                 guard let owner = owned[identity] else { return nil }
                 var child: Node
                 switch segments[owner.segment] {
@@ -332,6 +341,7 @@ struct LazyHStackElement: StackBase {
                         variant += 1
                     }
                 }
+                retained[identity] = child
                 return child
             }
         }
