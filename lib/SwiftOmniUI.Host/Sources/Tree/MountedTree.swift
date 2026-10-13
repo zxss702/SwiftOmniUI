@@ -134,15 +134,6 @@
     private(set) var languageDirection: LayoutDirection?
     private var patchReducesMotion: Bool?
 
-    private struct LiveElement {
-        weak var value: MountedElement?
-    }
-
-    /// Frame values address mounted instances and state wearers directly.
-    /// Departing instances remain indexed until their native view leaves.
-    private var elements: [UInt64: LiveElement] = [:]
-    private var frameWearers: [Int32: Set<UInt64>] = [:]
-
     /// Whether a render since the windows last composed their chrome touched anything outside lazy runs' rows: a
     /// window composes its chrome again only then. The host clears it once its windows have.
     public var chromeMayChange = true
@@ -216,48 +207,10 @@
     /// Design: docs/design/host/patches.md#program-write
     @discardableResult
     public func present(states: [Int32: HostStateValue], properties: [UInt64: Set<Prop>]) -> FrameImpact {
-        var visiting: Set<UInt64> = []
-        func include(_ mount: UInt64) {
-            var element = elements[mount]?.value
-            while let each = element, visiting.insert(each.mount).inserted {
-                element = each.parent
-            }
-        }
-        for mount in properties.keys { include(mount) }
-        for state in states.keys {
-            for mount in frameWearers[state] ?? [] { include(mount) }
-        }
-        let impact = ProgramWrite.perform {
-            root?.applyFrame(states: states, properties: properties, visiting: visiting) ?? .none
-        }
+        let impact = ProgramWrite.perform { root?.applyFrame(states: states, properties: properties) ?? .none }
         guard arrangementChanged else { return impact }
         arrangementChanged = false
         return impact.union(FrameImpact(arrangement: true, windowChrome: true))
-    }
-
-    func register(_ element: MountedElement) {
-        elements[element.mount] = LiveElement(value: element)
-    }
-
-    func replaceFrameBindings(
-        of element: MountedElement,
-        from previous: [Prop: HostStateBinding],
-        to next: [Prop: HostStateBinding]
-    ) {
-        let oldStates = Set(previous.values.filter { $0.mode != .in }.map(\.state))
-        let newStates = Set(next.values.filter { $0.mode != .in }.map(\.state))
-        for state in oldStates.subtracting(newStates) {
-            frameWearers[state]?.remove(element.mount)
-            if frameWearers[state]?.isEmpty == true { frameWearers[state] = nil }
-        }
-        for state in newStates.subtracting(oldStates) {
-            frameWearers[state, default: []].insert(element.mount)
-        }
-    }
-
-    func unregister(_ element: MountedElement) {
-        replaceFrameBindings(of: element, from: element.driven, to: [:])
-        elements[element.mount] = nil
     }
 
     /// Starts, retargets or cuts short the animation of `property` on the element `mount`.

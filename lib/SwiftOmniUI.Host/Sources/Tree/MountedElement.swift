@@ -108,7 +108,6 @@ import CRT
         properties = patch.properties
         native = nil
         native = tree.makeNative(self)
-        tree.register(self)
         tree.tally?.made += 1
         apply(patch)
     }
@@ -164,7 +163,6 @@ import CRT
         }
 
         if case .replace(let driven) = patch.driven {
-            tree.replaceFrameBindings(of: self, from: self.driven, to: driven)
             self.driven = driven
             drivenValues = drivenValues.filter { driven[$0.key] != nil }
         }
@@ -367,7 +365,6 @@ import CRT
     /// Design: docs/design/host/tree.md#leaving
     public func leave() {
         if let tree {
-            tree.unregister(self)
             for state in wornStates { tree.stateChannels.detach(state) }
             tree.removeMotions(mount: mount)
         }
@@ -465,18 +462,6 @@ import CRT
         states valuesByState: [Int32: HostStateValue],
         properties propertiesByMount: [UInt64: Set<Prop>]
     ) -> FrameImpact {
-        applyFrame(states: valuesByState, properties: propertiesByMount, visiting: nil)
-    }
-
-    /// A frame walks only its addressed instances and their ancestors. The
-    /// public subtree entry point keeps the complete walk for direct callers.
-    @discardableResult
-    func applyFrame(
-        states valuesByState: [Int32: HostStateValue],
-        properties propertiesByMount: [UInt64: Set<Prop>],
-        visiting: Set<UInt64>?
-    ) -> FrameImpact {
-        if let visiting, !visiting.contains(mount) { return .none }
         var changed = propertiesByMount[mount] ?? []
 
         for (property, binding) in driven where binding.mode != .in {
@@ -489,17 +474,12 @@ import CRT
         var descendants = FrameImpact.none
 
         for child in children {
-            descendants = descendants.union(child.applyFrame(
-                states: valuesByState, properties: propertiesByMount, visiting: visiting))
+            descendants = descendants.union(child.applyFrame(states: valuesByState, properties: propertiesByMount))
         }
 
         // A child's place is its parent's business; an element with no view passes it up.
         let restacked = restack()
-        // Drawing a new opacity or transform does not change the children
-        // this view holds. Rebinding them on every drawing frame defeats lazy
-        // layout and can restart native content work during a transition.
-        let ownArrangement = own.content && !changed.isSubset(of: Self.unmeasuredProperties)
-        if ownArrangement || descendants.arrangement || restacked { native.arrangeChildren() }
+        if own.content || descendants.arrangement || restacked { native.arrangeChildren() }
         guard native.presentsView else { return own.union(descendants) }
         descendants.arrangement = false
         return own.union(descendants)

@@ -138,15 +138,6 @@ final class WinUIScrollView: WinUILayoutView {
         return document.contentSize(width: width)
     }
 
-    override func prepareChildren(width: Double) {
-        // Prepare the document at its real cross-axis constraint. The native
-        // ScrollViewer's viewport proposal is completed separately after
-        // arrangement; an ideal query must not select a new lazy row width.
-        if width.isFinite {
-            prepareChild(WinUILayoutItem(view: document), at: Rect(0, 0, width, 0))
-        }
-    }
-
     override func backgroundBounds(in bounds: Rect) -> Rect {
         box.clips ? bounds : layoutSafeArea(in: bounds).viewport(in: bounds, axes: orientation)
     }

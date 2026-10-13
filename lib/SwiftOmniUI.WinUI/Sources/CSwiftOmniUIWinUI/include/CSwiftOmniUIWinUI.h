@@ -237,9 +237,6 @@ void swiftomniui_winui_pump(double seconds);
 /// Posts one turn to the UI thread's queue; any thread.
 void swiftomniui_winui_post_turn(void);
 
-/// Posts optional layout-cache work below normal UI work; false when the queue is unavailable or shutting down.
-bool swiftomniui_winui_post_layout_cache(void (*work)(void));
-
 /// Keeps the application's loop alive while a scene exists, including one temporarily without windows.
 void swiftomniui_winui_keep_scene_alive(bool alive);
 

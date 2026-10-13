@@ -12,9 +12,8 @@ walk needs two facts recorded as they happen.
             reads is recorded against THAT element (ReadScope, Core/Invalidation)
   changes   every write names the state it wrote (Renderer.stateChanged)
 
-  tracked render: branch.subtreeReads ∩ changed = ∅ -> keep the whole branch
-                  element.reads ∩ changed ≠ ∅       -> build that element again
-                  otherwise                         -> walk toward changed readers
+  next render:  element.reads ∩ changed  ≠ ∅   ->  build that element again
+                otherwise                        ->  carry it, walk its children
 ```
 
 The identity in both is the storage, not the box. A `@State` box is rebuilt
@@ -22,20 +21,6 @@ with its view on every render and adopts its predecessor's storage, so the
 storage is the one object that means "this piece of state" across renders. A
 `@State` in a class has a storage of its own the same way, and a `Ticker` is
 its own.
-
-Each rendered element keeps the union of its build reads, its preference
-transform reads and its children's settled branch indexes. A fresh node
-builds that index once; a kept node refreshes it once after visiting its
-changed descendants or realizing a lazy window. An unchanged row's controls
-and preference folds are therefore not
-walked again each time its lazy parent adds one more row. The union only
-guides the walk; it does not add subscriptions to the renderer's live-reader
-counts.
-
-This pruning belongs to the tracked clean walk only. A full build, including
-the subtrees it carries, still refolds preferences, because a host-pushed text
-layout report can change an answer without writing a state. An explicitly
-requested clean walk with no changed states keeps the same folding behavior.
 
 ## The reader is the closure that read
 
@@ -78,21 +63,9 @@ element. A write to a state no live element reads cannot change the screen, so
 it asks for nothing - no dirty tree, no wake - and is counted in the tally's
 `refused` column.
 
-A regular build that read something else makes a new element. A kept lazy
-source can add dependencies as its window builds new rows; changing its own
-`reads` adjusts the live counts by the added and removed identities. The
-branch index is refreshed after that window's reconciliation settles.
-
-Preference transforms execute after the children have settled, in a separate
-observed read scope. Their dependencies participate in the same branch index
-and live-reader counts, but do not cause an unchanged body to rebuild. A
-refold replaces this scope's reads and observation tokens rather than retaining
-every previous fold. Nodes without transforms create no additional scope.
-
-The focus store likewise refolds and compares its chain only while a live
-`@FocusedValue` or `@FocusedSceneValue` reader can hear it. With no reader it
-marks its cached answers dirty and defers the fold until the first later
-read, which sees the latest rendered tree.
+An element's reads are fixed for its life, because the count must be taken
+back exactly as it was given. A build that read something else makes a new
+element.
 
 A state's own `readAtBuild` flag spares even the call to the renderer: a state
 no build ever read has no reader to find. The flag is sticky - a state read

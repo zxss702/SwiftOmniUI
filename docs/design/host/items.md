@@ -119,42 +119,21 @@ road of its own for it.
 `LazyCells` keeps scroll geometry for a lazy stack or grid. Each unmeasured
 row stays at an extent of 44; a native measurement replaces only that row's
 estimate and updates the document extent. Measured rows never change the
-estimates of unseen rows. WinUI first probes an unknown row (a complete run
-for a grid), then uses measured run heights at the selected allocation to
-plan batches covering the remaining viewport. This planning estimate changes
-only the requested identities, never the document's offsets or anchor.
-Native measurements replace each batch's provisional extents before the
-window is checked again. A tall initial card therefore corrects the range
-before the rows behind it are requested, while short file rows do not each
-require their own render and preparation. When every measured run has zero
-extent, planning uses 44 rather than a zero-height density.
-Existing native seats within the requested window remain attached during
-a fill. WinUI completes the first visible window before deferred work fills
-its neighbouring scroll cache, following the native arrangement lifecycle.
-The ready cache remains attached while idle so asynchronous scrolling can
-reveal content that is already prepared. Realization follows the latest
-native window rather than spanning from a stale effective viewport to it.
+estimates of unseen rows. GTK and WinUI request a bounded viewport window
+together, then replace its estimates with the mounted rows' measurements.
+WinUI rechecks coverage after that render: newly measured tall rows may
+reduce the requested range, and shorter rows may extend it. It does not run
+a growing render and native arrangement for each unknown row. Look-ahead
+and neighbour policy still bound realization; nothing requests the entire
+source merely because its rows have no measurements yet.
 
-The tree's prepared lazy source also retains each current window row's authored
-description. Extending an incremental window runs builders only for incoming
-identities; the differ still revisits retained rendered rows for their own state
-changes. A source rebuild starts a fresh description cache with the new captures,
-and leaving the window drops that row's cached description, so re-entry builds
-its subtree and starts its lifetime again.
-
-Incremental fills resume even when an actual extent equals its estimate and
-does not change the geometry revision. WinUI completes the fill in the
-viewport callback when measurement is allowed; a callback within another
-layout or patch resumes after that pass. Source changes keep surviving rows'
+WinUI completes the fill in the viewport callback when measurement is
+allowed; a callback within another layout or patch resumes after that pass.
+It waits for requested fragments to commit before interpreting missing
+native children as empty content, then arranges the resulting window once.
+Source changes keep surviving rows'
 measurement caches. Their native revisions, placement values and cross-axis
 proposals decide which rows need fresh measurement.
-On WinUI, only preparation at the selected native allocation commits those
-row measurements and track widths. An intrinsic or alternative-width size
-query reads document estimates without resetting the realized rows, changing
-their anchors or posting a new realization. A resized allocation still takes
-the new finite width immediately; the previous allocation is used only when
-that selected proposal is unspecified. Cached rows restore their native
-child proposals without forgetting their measured extents.
 An empty fragment is a zero-size row once its requested render has committed.
 Zero-size rows leave unseen rows' 44-point estimates intact, so an empty
 header cannot hide all the cards behind it.

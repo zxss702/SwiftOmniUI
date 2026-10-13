@@ -50,44 +50,33 @@ final class WinUIGridView: WinUITravellingLayout {
             flow: flowColumns)
     }
 
-    override func prepareChildren(width: Double) {
-        let size = naturalSize(width: width.isFinite ? width : nil)
-        let room = Rect(0, 0, width.isFinite ? width : size.width, size.height)
-        for (item, place) in zip(items, childPlaces(in: room)) {
-            if let place { prepareChild(item, at: place) }
-        }
-    }
-
     override func arrange(in bounds: Rect) {
         beginArrangement(width: bounds.width)
-        for (item, place) in zip(items, childPlaces(in: bounds)) {
-            if let place { self.place(item, at: place) }
-        }
-    }
-
-    /// Preparation and arrangement select the same child proposals. This
-    /// calculation does not publish contexts or place native controls.
-    private func childPlaces(in bounds: Rect) -> [Rect?] {
         let context = layoutSafeArea(in: bounds)
-        if let element = sourceElement, element.isSafeAreaBoundary,
-           let index = items.firstIndex(where: { !$0.departing }) {
-            let item = items[index]
+        if let element = sourceElement, element.isSafeAreaBoundary, let item = items.first(where: { !$0.departing }) {
             let next = context.padding(SafeAreaArithmetic.physicalInsets(element.safeAreaPadding ?? EdgeInsets(0), direction: direction))
-            var places = [Rect?](repeating: nil, count: items.count)
-            places[index] = SafeAreaArithmetic.base(of: item, boundary: item.element?.preservesSafeAreaProposal == true,
-                                                   ignores: item.element?.ignoresSafeArea,
-                                                   in: next, direction: direction)
-            return places
+            let place = SafeAreaArithmetic.base(of: item, boundary: item.element?.preservesSafeAreaProposal == true,
+                                               ignores: item.element?.ignoresSafeArea,
+                                               in: next, direction: direction)
+            self.place(item, at: place)
+            return
         }
         if sourceElement?.isGeometryReader == true {
-            return GeometryReaderArithmetic.places(of: items, in: bounds, direction: direction, safeArea: context) {
+            let places = GeometryReaderArithmetic.places(of: items, in: bounds, direction: direction, safeArea: context) {
                 $0.element?.preservesSafeAreaProposal == true
             }
+            for (item, place) in zip(items, places) {
+                if let place { self.place(item, at: place) }
+            }
+            return
         }
-        return GridArithmetic.places(
+        let places = GridArithmetic.places(
             of: items, rows: rows, columns: columns,
             rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, in: bounds,
             direction: direction, flow: flowColumns)
+        for (item, place) in zip(items, places) {
+            if let place { self.place(item, at: place) }
+        }
     }
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
         let context = layoutSafeArea(in: allocatedBounds)

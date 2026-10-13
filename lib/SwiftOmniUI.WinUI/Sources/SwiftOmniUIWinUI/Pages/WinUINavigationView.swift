@@ -19,14 +19,6 @@ final class WinUINavigationView: WinUILayoutView {
         SingleChildArithmetic.size(of: items.last, padding: EdgeInsets(0), width: width)
     }
 
-    override func prepareChildren(width: Double) {
-        guard let page = items.last else { return }
-        let size = naturalSize(width: width.isFinite ? width : nil)
-        let room = Rect(0, 0, width.isFinite ? width : size.width, size.height)
-        prepareChild(page, at: SingleChildArithmetic.place(of: page, in: room,
-                                                          padding: EdgeInsets(0), direction: direction))
-    }
-
     override func arrange(in bounds: Rect) {
         guard let page = items.last else { return }
         page.view.layout(SingleChildArithmetic.place(of: page, in: bounds, padding: EdgeInsets(0), direction: direction))

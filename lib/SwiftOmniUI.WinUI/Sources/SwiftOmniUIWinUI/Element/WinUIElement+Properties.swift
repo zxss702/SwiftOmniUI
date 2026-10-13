@@ -141,20 +141,17 @@ extension WinUIElement {
         var invalidated: Set<ObjectIdentifier> = []
         func invalidate(_ view: WinUIView?) {
             guard let view, invalidated.insert(ObjectIdentifier(view)).inserted else { return }
-            if let layout = view as? WinUILayoutView {
-                layout.invalidateLocalMeasurements()
-            } else {
-                view.invalidateMeasure()
-            }
+            (view as? WinUILayoutView)?.forgetMeasurements()
+            view.invalidateMeasure()
         }
         var element: WinUIElement? = self
         while let each = element {
-            invalidate(each.view)
             // An entry of an List is measured by its cell; the list's own size never follows its items.
             if let items = each.parent?.view as? WinUIItemsView {
                 items.remeasure(each.element)
                 break
             }
+            invalidate(each.view)
             // A popover's card is its own room: nothing its content asks reaches the layout its anchor stands in.
             if each.type == .popover { break }
             element = each.parent

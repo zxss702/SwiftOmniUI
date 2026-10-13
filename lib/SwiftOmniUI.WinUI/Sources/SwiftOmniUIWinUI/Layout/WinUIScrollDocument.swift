@@ -29,24 +29,13 @@ final class WinUIScrollDocument: WinUILayoutView {
 
     /// The scroller's own measure stands on this document: a change beneath forgets it too, or the presenter
     /// keeps the extent it read last.
-    @discardableResult
-    override func invalidateLocalMeasurements() -> Bool {
-        guard super.invalidateLocalMeasurements() else { return false }
+    override func invalidateMeasurements() {
+        super.invalidateMeasurements()
         scrollView?.scroller.invalidateMeasure()
-        return true
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
         ScrollArithmetic.contentSize(of: items.first, padding: layoutPadding, orientation: orientation, width: width)
-    }
-
-    override func prepareChildren(width: Double) {
-        guard let item = items.first, item.isShown else { return }
-        let size = naturalSize(width: width.isFinite ? width : nil)
-        let arranged = ScrollArithmetic.arrange(item, padding: layoutPadding, orientation: orientation,
-                                               in: LayoutSize(width: width.isFinite ? width : size.width,
-                                                              height: size.height))
-        prepareChild(item, at: arranged.place)
     }
 
     /// The scroller's presenter asks this size as it arranges - inside the pass, where a layout answers only

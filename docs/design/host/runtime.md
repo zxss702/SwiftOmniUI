@@ -94,15 +94,6 @@ parent arranges again where a value that places it moved, or where it shows
 no view of its own and is drawn by its parent's; and the window's chrome is
 composed again where it shows what moved (`WindowChrome.follows`).
 
-The mounted tree indexes live instances by mount and the instances wearing
-each output-capable state. A frame visits those instances and their ancestor
-paths, preserving tree order and arranging each affected parent once. A
-departing branch stays indexed until it leaves; replacing bindings or leaving
-removes its old entries. Unrelated mounted lazy rows need no frame walk.
-An opacity, colour or drawing transform update presents drawing without
-rebinding the view's children; layout properties and a viewless child's
-arrangement still reach the parent that places them.
-
 Finished described animations run their landing callbacks after their final
 values have been presented. A callback can remove a child and clear its motion
 outputs; the cycle then commits those structural changes even with an empty

@@ -40,11 +40,6 @@ final class Differ {
     /// The states written since the tree the host holds was built.
     private(set) var changed: Set<ObjectIdentifier> = []
 
-    /// Only a render whose causes all named their states can skip branches
-    /// by their readers. A full build, including its carries, must still
-    /// fold host-fed preferences that changed without a state write.
-    private var prunesUnchangedReads = false
-
     /// What each changed state is called, for `debugInfo()` (Builds.swift).
     var named: [ObjectIdentifier: String] = [:]
 
@@ -110,7 +105,6 @@ final class Differ {
     ) -> (node: RenderedNode, patch: HostPatch) {
         self.describeAll = describeAll
         self.changed = changed
-        prunesUnchangedReads = false
         stylesMoved = !StyleSheet.same(styles, self.styles)
         self.styles = styles
         walkStamp += 1
@@ -140,9 +134,6 @@ final class Differ {
     ) -> (node: RenderedNode, patch: HostPatch) {
         describeAll = false
         self.changed = changed
-        // An empty clean walk may have been explicitly asked to refold a
-        // host report; keep that path even when no state names its cause.
-        prunesUnchangedReads = !changed.isEmpty
         stylesMoved = false
         walkStamp += 1
         seedScope()
@@ -163,9 +154,6 @@ final class Differ {
         _ rendered: RenderedNode,
         walking: Bool = true
     ) -> (node: RenderedNode, patch: HostPatch) {
-        if prunesUnchangedReads, rendered.subtreeReads.isDisjoint(with: changed) {
-            return (rendered, HostPatch(id: rendered.id, type: rendered.type))
-        }
         let windowOnly = rendered.lazySource?.lazyWindow.map {
             rendered.reads.intersection(changed) == Set([$0])
         } ?? false
@@ -266,12 +254,10 @@ final class Differ {
         // descendant's write may have moved - and any listener hearing a new
         // answer fires.
         // Design: docs/design/core/identity-and-diffing.md#preferences
-        let preferences = observedPreferences(
+        rendered.preferenceValues = foldedPreferences(
             seeds: rendered.preferenceSeeds,
             transforms: rendered.preferenceTransforms,
             children: rendered.children)
-        rendered.preferenceValues = preferences.values
-        rendered.preferenceReads = preferences.reads
 
         for index in rendered.preferenceWatches.indices {
             let watch = rendered.preferenceWatches[index]
@@ -283,8 +269,6 @@ final class Differ {
             rendered.preferenceWatches[index].last = answer
             fire { try await watch.run(heard, answer) }
         }
-
-        rendered.refreshSubtreeReads()
 
         return (rendered, patch)
     }

@@ -110,23 +110,6 @@ struct FoldedPreference {
 }
 
 extension Differ {
-    /// A transform is authored code and may read state or an observable
-    /// model. Keep that dependency separate from the body that declared it.
-    /// Ordinary seeds and settled child answers need no new read scope.
-    func observedPreferences(
-        seeds: [PreferenceSeed],
-        transforms: [PreferenceTransform],
-        children: [RenderedNode]
-    ) -> (values: [ObjectIdentifier: FoldedPreference], reads: Set<ObjectIdentifier>) {
-        guard !transforms.isEmpty else {
-            return (foldedPreferences(seeds: seeds, transforms: transforms, children: children), [])
-        }
-        let found = ReadScope.observed {
-            foldedPreferences(seeds: seeds, transforms: transforms, children: children)
-        }
-        return (found.value, found.reads)
-    }
-
     /// What a node's subtree offers for each key: its writes in written order,
     /// each child's folded answers in the children's order, its transforms last.
     func foldedPreferences(

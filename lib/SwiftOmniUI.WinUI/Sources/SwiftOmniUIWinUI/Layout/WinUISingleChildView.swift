@@ -13,14 +13,13 @@ class WinUISingleChildView: WinUILayoutView {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        SingleChildArithmetic.size(of: items.first, padding: padding, width: width)
-    }
-
-    override func prepareChildren(width: Double) {
-        guard let item = items.first, item.isShown else { return }
-        let size = naturalSize(width: width.isFinite ? width : nil)
-        let room = Rect(0, 0, width.isFinite ? width : size.width, size.height)
-        prepareChild(item, at: SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction))
+        let size = SingleChildArithmetic.size(of: items.first, padding: padding, width: width)
+        if WinUIView.arranging == 0, let item = items.first, item.isShown, let layout = item.view as? WinUILayoutView {
+            let room = Rect(x: 0, y: 0, width: size.width, height: size.height)
+            let place = SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction)
+            layout.prepareMeasure(width: place.width)
+        }
+        return size
     }
 
     override func arrange(in bounds: Rect) {

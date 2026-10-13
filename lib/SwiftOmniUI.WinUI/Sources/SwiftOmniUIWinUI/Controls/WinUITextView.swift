@@ -10,7 +10,6 @@ import CSwiftOmniUIWinUI
 @MainActor
 class WinUITextView: WinUIView {
     override var takesDirection: Bool { true }
-    override var reusesNativeMeasurements: Bool { true }
 
     /// The font's size, the space between the letters and the height of a line - what the spacing is measured
     /// against, and what it is.
@@ -37,21 +36,17 @@ class WinUITextView: WinUIView {
     }
 
     /// The pre-attachment measurement does not establish the final native
-    /// text layout. Loaded validates the used proposals in the real tree,
-    /// including its XamlRoot scale/resources. Only changed sizes invalidate
-    /// the placing layout; attaching every label must not remeasure every row.
+    /// text layout. Loaded commits one fresh measurement in the real tree,
+    /// including its XamlRoot scale/resources, before relying on cached sizes.
     private func nativeTextLoaded() {
         guard !loadedMeasurePending else { return }
         loadedMeasurePending = true
         WinUIDoorbell.afterPass { [weak self] in
             guard let self else { return }
             self.loadedMeasurePending = false
-            guard !self.isDetached, self.isAttached, self.sourceElement?.isDeparting != true else { return }
-            guard let changed = self.refreshNativeMeasurementsAfterAttachment() else {
-                self.nativeTextLoaded()
-                return
-            }
-            if changed { self.placingLayout?.commitMeasurementChange() }
+            guard self.sourceElement?.isDeparting != true else { return }
+            self.invalidateMeasure()
+            self.placingLayout?.commitMeasurementChange()
         }
     }
 
@@ -119,7 +114,6 @@ class WinUITextView: WinUIView {
     /// The words stand at the size the place is bound for, whole, while the place travels.
     /// Design: docs/design/host/animation.md#words-at-their-destination
     override func travels(to destination: Rect?) {
-        super.travels(to: destination)
         bound = destination
     }
 

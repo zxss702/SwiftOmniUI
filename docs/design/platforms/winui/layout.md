@@ -13,129 +13,64 @@ asking: a child is placed only inside its parent's arrangement
 
 ## Measured every pass
 
-Layout size arithmetic and native preparation are separate. A parent's
-`WinUILayoutItem.size(offered:)` query reads `naturalSize(width:)`; it does not
-prepare that child's native panel. The arithmetic keeps answers for multiple
-widths until content invalidation discards them. Text and image leaves whose
-changes the host explicitly invalidates keep measurements by proposal.
-Native containers and input controls use XAML's own measure cache, so native
-content and user edits can invalidate their sizes without a host property
-write. Asking for an ideal width and then an
-allocated width must not repeatedly discard every descendant's sizes or
-switch every nested native panel between those widths.
+WinUI keeps each element's measure itself, and a child left unmeasured in a
+pass that marked it stays marked, which sets the pass going again - a pass
+that does not settle ends the process. So each measure the panel answers
+measures every shown child; WinUI answers a child it measured at the same
+size from what it kept, and measures one it did not.
 
-`prepareMeasure(width:)` selects the native allocation, and
-`prepareChildren(width:)` prepares shown children at the widths the layout
-will give them. Stacks, grids and single-child layouts resolve those places
-separately from their size queries. Preparation preserves the arithmetic
-cache; a panel's own `MeasureOverride` does not repeat its child preparation
-when answering that explicit preparation. A preparation already current at
-the same width and revision skips its stable subtree. A native query that
-changes a descendant's proposal, or invalidates its measure, marks just the
-related placing ancestors as needing preparation. This hint does not discard
-arithmetic or post another layout task. The next preparation restores those
-branches before becoming current again. Scroll documents carry the hint to
-their scroller, and promoted safe bars carry it to both their logical layout
-and native bar host. This matters because XAML retains only its last native
-proposal, while the host's arithmetic can retain several widths.
-If preparing a child replaces an estimate or changes its revision, the
-parent discards its own cached arithmetic before finishing that measure.
-The current preparation carries the fresh result upward without scheduling
-a separate ancestor traversal for every row.
+A native control is measured at each width the arithmetic offers it. A
+layout of SwiftOmniUI's asks for no room, so it is measured at the width of the
+place it stands in: WinUI measures it again only where a change beneath
+marked it. Put in a place of another width, it is measured there first, which
+measures its own children at the widths its arrangement then gives them - a
+control arranged at a width other than the one it was last measured at would
+mark its layout again. Its size at any other width is the arithmetic's, kept
+per width until WinUI measures it again or a change forgets it on the way up.
+Measured at every width asked of it, a layout forgot its sizes each time and
+measured its whole subtree again: some seven hundred sizings for one word six
+grids deep, and 2910 measures - 150 ms of a debug build's frame - for one
+card of the home page's run turned.
 
-One synchronous host measurement shares a short-lived scope across arithmetic,
-native control probes and child preparation. Repeated native proposals can
-reuse their answers within that scope, but preparation still restores XAML's
-last proposal to the actual allocation. A control's content presenter can
-re-enter the host through `MeasureOverride`; that callback shares the scope
-instead of discarding every already-computed width and preparing the same
-subtree again. A new independent XAML measure starts a fresh scope. Content
-invalidation and provisional measurements invalidate the affected scoped
-answers, and no scope survives an asynchronous doorbell or layout boundary.
-Stable explicit child preparations still survive between viewport batches.
-They ask XAML to restore the selected constraint without walking the unchanged
-subtree: a clean panel uses XAML's own cache, while a real dirty callback
-refreshes the host arithmetic. Native content-presenter callbacks also discard
-the old selected-constraint record, so a queried size never falsely proves
-that the allocated proposal is still selected.
+Arithmetic that has just sized a child prepares its native panel separately.
+That preparation keeps the computed natural sizes, and repeated preparations
+while that allocated width and content revision remain current do nothing. Otherwise the
+panel's `MeasureOverride` would discard the result and size the same subtree
+again. Content invalidation clears both caches; an independent measure from
+XAML still refreshes the arithmetic and reports a changed size upward. Returning
+from another measured width prepares the subtree again: XAML retains only its
+last native proposal, even where the natural-size cache holds both widths.
 
-An independent native measure refreshes that layout's arithmetic and reports
-a changed natural size upward. A layout placed by another SwiftOmniUI layout
-still returns zero native DesiredSize: its parent reads the arithmetic size
-and gives it the exact allocated place. Native containers such as a window
-or scroll presenter instead receive the content's measured size.
+Nothing is measured while WinUI arranges: `Measure` written on an element
+inside an arrangement marks it, the marked element is measured and arranged
+again, and eight passes that never settle end the process with a layout
+cycle. An arrangement asking a child's size is answered from what the pass
+already measured, and a marked element WinUI measures again inside its own
+arrangement is answered with what its last real measure said. The place a
+child is newly put in is measured once the pass ends, posted on the
+doorbell: the pass after measures it there, and the one after settles.
 
-Lazy stacks and grids commit mounted row measurements, tracks and anchors
-only during preparation at the selected native allocation. Other width
-queries read document estimates without replacing the realized geometry or
-requesting additional rows. A grid's alternative track count uses a constant
-time estimate of unseen runs. The current finite allocation takes priority
-on initialization and resize; the previous allocation is only a fallback
-for an unspecified selected proposal. Surviving rows keep their measures,
-and restoring a row's native proposal rechecks its revision before retaining
-the old size. Unseen rows keep their estimates and remain unmounted.
+An arithmetic query that needed such an unprepared native proposal is
+provisional and is not cached. Its temporary DesiredSize cannot become a lazy
+row's committed natural extent. Native invalidation and child attachment are
+also deferred when MeasureOverride or ArrangeOverride is active. Deferred
+changes clear affected arithmetic and request native measure/arrange at the
+owning root; they do not measure that root with an invented unbounded height.
+Viewport realization includes the measurement revision, even if the viewport
+coordinates have not changed. The current ArrangeOverride bounds propagate
+safe contexts instead of reading the previous ActualSize during the callback.
+Lazy rows and tracks prefer the current finite width to `standsAt`; the old
+allocation is only a fallback when the parent left the width unspecified.
 
-No new native `Measure` proposal is applied while WinUI arranges. An
-arrangement reads a kept result, or a provisional DesiredSize when that
-proposal has not yet been prepared. Provisional arithmetic is not retained
-as a completed measurement. The missing preparation is coalesced on the
-doorbell after the pass, using the newest allocation, then its placing
-ancestors receive the changed size. A viewport notification inside a native
-measure or arrangement also defers its fill; it cannot prepare and arrange
-the run at the previous `placed.width` during a resize.
-
-Native invalidation and parent-child changes are deferred while a measure or
-arrangement is active. Ancestor measurement invalidation is sent once until
-fresh arithmetic is computed, independently of local cache disposal. Child
-lists are compared before scheduling a commit, so an unchanged list posts no
-work. Background painting uses pending children when present, preserving
-newly realized rows instead of overwriting them with the old native list.
-The native child-list commit uses WinRT object-identity sets for membership.
-Surviving children remain attached, and new children skip the native vector's
-linear search; existing children still use its normal move operation.
-Deferred size feedback invalidates the owning root using the normal XAML
-proposal; it does not prepare that root with an invented unbounded height.
-
-Viewport realization includes the measurement revision even when its
-coordinates have not changed. Once row geometry and the realized window
-agree, another notice sends no realization. The current ArrangeOverride
-bounds propagate safe contexts instead of reading the previous ActualSize
-during the callback.
-
-A viewport fill first measures an unknown run, then plans a batch from the
-measured run heights and the remaining viewport capacity. Planning changes
-the request range, not the document's 44-point unknown extents. Each completed
-batch replaces its own extents with native measurements and recalculates the
-window before requesting more. A grid probes and requests whole runs. This
-avoids a render and growing-prefix preparation for every short row, while a
-tall first row can still correct the initial request before other cards mount.
-The fill places its final mounted window once. Accumulated anchor shifts and
-insertion animations are consumed by that final placement. A fill that awaits
-a deferred render resumes after the pass.
-
-The first viewport fills and arranges its visible rows before building the
-scroll cache. After that arrangement completes, low-priority dispatcher work prepares a
-viewport of neighbouring content on either side and retains this buffer
-while idle. This follows native virtualization's visible-first/cache-after-
-arrangement order: `ViewChanged` and `EffectiveViewportChanged` are too late
-to begin preparing all content the compositor will first reveal.
-Realization follows the latest native viewport and its bounded nearby cache,
-not the union of an old effective viewport and a new native offset. That
-union can span many screens when UI notices lag behind the compositor.
-Geometry and anchors continue to use the actual effective viewport. Source
-and allocation changes revalidate readiness; detached views cannot finish
-queued cache work. Programmatic jumps prepare their target window before
-changing the view.
-Cache work uses a separate dispatcher queue from normal layout completions,
-so it cannot be swept into an already queued normal-priority doorbell. Each
-completion re-reads the current native viewport and requires an actual local
-intersection; a sibling lazy container outside that viewport stays unrealized.
-
-A lazy preparation also follows its requested window and completed render,
-not only native child-list changes. An empty builder adds no native child,
-but its newly requested run must still be confirmed as zero before further
-realization can proceed. This invalidates local preparation without forcing
-another ancestor geometry update.
+Lazy viewport realization requests the estimated window as one batch, as
+GTK does. The former one-unknown-run policy performed a synchronous core
+render for each incoming row; reconciliation revisited the growing mounted
+window, and each iteration arranged that window again. This multiplied
+initialization work and restarted placement decisions before the fill had
+settled. The viewport callback now waits for the requested render, refines
+coverage from measured geometry, and commits one final arrangement. A
+callback during native Measure or Arrange resumes after the pass. Native
+proposal preparation, row revisions and the scroll look-ahead stay intact.
 
 GeometryReader accepts a safe allocation while retaining the remaining
 environment. Native window chrome that already sits outside the content row
@@ -151,29 +86,10 @@ Native Image/Viewbox content is prepared at its intrinsic size rather than 0x0.
 A child's `Arrange` written outside its parent's arrangement does nothing, so
 a view keeps the place it was last given and writes it according to when it
 comes. Inside a pass - the host counts the arrangements under way - the place
-is arranged at once. A position-only layout animation allocates the child's
-native subtree at its destination once. Its current animated place remains
-the reported place, and a presentation translation moves that allocation to
-the current position. Each display frame changes that translation without
-invalidating the parent lazy panel or arranging every surviving row again.
-The final frame clears the translation after landing; clearing it before the
-final frame would briefly show the destination between animation steps.
-
-A journey that changes the child's size still asks the placing layout to
-arrange again (`InvalidateArrange`), because its descendants really have new
-room to lay out. Ordinary placements between passes also follow this path.
-WinUI runs that arrangement before it draws the frame. Business frame reads
-already make layout motion arrive immediately, so they keep the actual
-allocation rather than receiving an intermediate animation proposal.
-
-A lazy window clamps against the final allocated document capacity during a
-size animation, rather than the current presentation height while row offsets
-already describe the final geometry. This avoids repeatedly dropping and
-realizing boundary rows as that height travels. An explicit fixed frame is
-still the allocation's bound; geometry reports retain the current frame.
-If a journey is retargeted before its new native allocation lands, its final
-presentation translation stays until the committing arrangement, rather than
-briefly returning to the previous target when the animator finishes.
+is arranged at once. Between passes, as a display frame moves a travelling
+child, the view asks the layout that placed it to arrange again
+(`InvalidateArrange`); WinUI runs that arrangement before it draws the frame,
+and the layout's arrangement gives the child the place it keeps.
 
 A label whose place travels is arranged at its place's corner but at the size
 the place is bound for ([words at their

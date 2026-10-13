@@ -28,15 +28,6 @@ as its text block was. What assistive technology meets of a label is its text
 block - a border has no automation peer - so its identifier, name, hint and
 heading level are the text block's.
 
-On native attachment, a label remeasures the proposals it already answered
-using its actual `XamlRoot` and inherited resources. It restores the last
-prepared proposal after checking the ideal and wrapped sizes. Matching sizes
-replace the label's cached answers without invalidating the placing layout;
-only a changed size invalidates the host's ancestor arithmetic and requests a
-geometry update. XAML can still schedule its native measure when the label is
-invalidated. The validation runs after the native pass and skips labels that
-have detached or are leaving.
-
 WinUI spaces letters in thousandths of an em and lines in DIPs, where SwiftOmniUI
 gives the first in points and the second as a multiple of the font's own
 line: both are worked out against the font's size, a line of Segoe UI taken as
@@ -126,13 +117,6 @@ tree changed it or the choices changed, so the user's choice is never argued
 with. `isOpen` opens and closes the list; the user's opening and closing are
 reported and the program's are not, so the user closing a list the program
 opened is reported. The chosen choice's mark in the list is the picker's tint.
-
-Choices are boxed into a complete collection before it is attached, then the
-relay replaces `ItemsSource` once. Initializing a large model picker therefore
-does not notify the closed ComboBox separately for every option. WinUI still
-owns its item containers and dropdown. The following host write chooses the
-authored index when the choices change; `Items` remains the native collection
-used to inspect choices and validate that index.
 
 ## A day and a time
 

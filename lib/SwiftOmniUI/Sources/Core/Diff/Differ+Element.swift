@@ -640,11 +640,10 @@ extension Differ {
         // moves - and once on first mount, as `.onPreferenceChange` always
         // tells the value it found.
         // Design: docs/design/core/identity-and-diffing.md#preferences
-        let preferences = observedPreferences(
+        let folded = foldedPreferences(
             seeds: node.preferenceSeeds,
             transforms: node.preferenceTransforms,
             children: children)
-        let folded = preferences.values
 
         let preferenceWatches: [PreferenceWatch] = node.preferenceObservers.enumerated()
             .map { index, observer in
@@ -675,7 +674,6 @@ extension Differ {
             placeholder: placeholder,
             view: within?.view,
             reads: reads,
-            preferenceReads: preferences.reads,
             builds: builds,
             provided: Array(scope.suffix(pushed)),
             seen: seen,

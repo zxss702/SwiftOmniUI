@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <unordered_set>
 #include <vector>
 
 #include <winrt/Microsoft.UI.Composition.h>
@@ -29,32 +28,17 @@ namespace {
 
     void removeUnused(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
                       std::vector<xaml::UIElement> const &held) {
-        auto const count = items.Size();
-        if (count == 0) return;
-        // C++/WinRT's equality and hash both use the object's IUnknown
-        // identity, including different interface pointers to the same child.
-        // Stable lazy rows need one membership lookup rather than a scan of
-        // every retained row each time another row joins the window.
-        std::unordered_set<IInspectable> retained;
-        retained.reserve(held.size());
-        for (auto const &child : held) retained.insert(child);
-        for (uint32_t index = count; index > 0; --index) {
-            if (retained.find(items.GetAt(index - 1)) == retained.end()) items.RemoveAt(index - 1);
+        for (uint32_t index = items.Size(); index > 0; --index) {
+            if (std::find(held.begin(), held.end(), items.GetAt(index - 1)) == held.end()) items.RemoveAt(index - 1);
         }
     }
 
     void insertInOrder(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
                        std::vector<xaml::UIElement> const &held) {
-        std::unordered_set<IInspectable> present;
-        auto const count = items.Size();
-        present.reserve(count + held.size());
-        for (uint32_t index = 0; index < count; ++index) present.insert(items.GetAt(index));
         for (uint32_t index = 0; index < held.size(); ++index) {
             if (index < items.Size() && items.GetAt(index) == held[index]) continue;
             uint32_t previous;
-            // A newly realized child is absent from this native parent. Do
-            // not scan the growing prefix for every new row in a batch.
-            if (!present.insert(held[index]).second && items.IndexOf(held[index], previous)) items.RemoveAt(previous);
+            if (items.IndexOf(held[index], previous)) items.RemoveAt(previous);
             items.InsertAt(index, held[index]);
         }
     }
