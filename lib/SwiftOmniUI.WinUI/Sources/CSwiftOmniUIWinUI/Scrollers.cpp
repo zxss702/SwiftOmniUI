@@ -140,7 +140,7 @@ namespace {
 
     // The landing an animation announced, shared by the move's notices: while
     // one flies the compositor's per-frame word pairs where it stands with
-    // where it lands, and the run's window realizes both ends.
+    // where it lands. Realization follows the actual offset, not that endpoint.
     struct ScrollerFlight {
         double x = std::nan(""), y = std::nan("");
         bool held = false;
@@ -199,15 +199,15 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
                 callbacks.scrolled(view, x, y);
         }));
         // An animation - inertia's or a move the program animated - names its
-        // landing as it starts: realized before the compositor can reach it.
+        // landing as it starts. That endpoint is metadata, not a visible window.
         scroller.ScrollAnimationStarting(guarded("handling ScrollAnimationStarting",
             [view, flight](controls::ScrollView const &scroller,
                 controls::ScrollingScrollAnimationStartingEventArgs const &args) {
             auto end = args.EndPosition();
             flight->x = end.x;
             flight->y = end.y;
-            // The animation runs from the next frame, before StateChanged says so: the scroller is held now, and
-            // the window it leaves stays built with the one it heads for.
+            // The animation runs from the next frame, before StateChanged says so:
+            // the scroller is held now; realization retains a moving look-ahead.
             if (!flight->held) {
                 flight->held = true;
                 callbacks.held(view, true);

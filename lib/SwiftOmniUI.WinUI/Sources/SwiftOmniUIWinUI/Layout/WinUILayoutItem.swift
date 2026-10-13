@@ -34,15 +34,16 @@ struct WinUILayoutItem: LayoutChild {
         let offer = values.offer(width)
         // A layout of SwiftOmniUI's is measured at the width it stands at; its size for any width is the arithmetic's.
         // Design: docs/design/platforms/winui/layout.md#measured-every-pass
-        let measured: LayoutSize
+        var measured: LayoutSize
         if let layout = view as? WinUILayoutView {
             measured = layout.naturalSize(width: offer)
-            if WinUIView.arranging == 0 {
+            if WinUIView.arranging == 0, WinUILayoutView.queryingSize == 0 {
                 let expands = values.flex != nil || values.expandingAxes == .horizontal || values.expandingAxes == .both
                 let allocated = Extent.of(option: expands ? 3 : values.horizontal, stated: values.width,
                                           natural: measured.width, available: width ?? measured.width,
                                           minimum: values.minimumWidth, maximum: values.maximumWidth)
                 layout.prepareMeasure(width: allocated)
+                measured = layout.naturalSize(width: offer)
             }
         } else {
             measured = view.measure(width: offer, height: nil)

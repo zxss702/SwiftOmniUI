@@ -134,6 +134,14 @@ native children as empty content, then arranges the resulting window once.
 Source changes keep surviving rows'
 measurement caches. Their native revisions, placement values and cross-axis
 proposals decide which rows need fresh measurement.
+WinUI's ideal-size and window minimum-size queries read committed row
+geometry. Native preparation at the selected width, or viewport
+reconciliation, measures mounted rows and updates extents and anchors. A
+speculative grid track count uses its own estimates without replacing the
+visible grid's tracks or measurements.
+WinUI follows actual scroll offsets and releases rows behind its look-ahead
+while scrolling; an animation endpoint does not widen the window to include
+the whole path. Program jumps realize the destination before the native move.
 An empty fragment is a zero-size row once its requested render has committed.
 Zero-size rows leave unseen rows' 44-point estimates intact, so an empty
 header cannot hide all the cards behind it.

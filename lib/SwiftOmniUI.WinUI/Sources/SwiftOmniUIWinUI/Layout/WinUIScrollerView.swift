@@ -12,10 +12,10 @@ final class WinUIScrollerView: WinUIView {
     /// Says where the view stands after it changed, in DIPs.
     var onScrolled: ((Point) -> Void)?
 
-    /// The next actual viewport during ViewChanging. It is not the inertia's predicted final offset.
+    /// The actual offset reported by ViewChanged or an animation-start notice.
     var nextOffset: Point?
 
-    /// Where the view finally lands once a move - inertia's own included - is over, per ViewChanging's own word.
+    /// The reported animation endpoint; it does not select the realized viewport.
     var finalOffset: Point?
 
     /// Says the user took hold of the scroller, or let go of it.

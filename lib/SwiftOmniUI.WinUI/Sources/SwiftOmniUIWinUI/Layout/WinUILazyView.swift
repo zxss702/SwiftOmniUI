@@ -44,9 +44,6 @@ class WinUILazyView: WinUITravellingLayout {
     private var effectiveViewport: Rect?
     private var lastTargetViewport: Rect?
 
-    /// The window the scroller's own notice last announced it would show;
-    /// realized work its view still stands to cross is kept until it arrives.
-    private var lastAnnounced: Range<Double>?
     /// The viewport the scroller's own notices last named - newer than the
     /// effective viewport while a move stands between them.
     private var announcedRect: Rect?
@@ -129,13 +126,9 @@ class WinUILazyView: WinUITravellingLayout {
         watchClip()
         if effective {
             effectiveViewport = rect
-            // The screen has reached the announced window: the announced rect's
-            // coarser read gives way to the effective viewport's exact fractions,
-            // or a boundary row flips between their two spellings of one spot.
-            if let announced = announcedRect,
-               abs(announced.x - rect.x) < 1, abs(announced.y - rect.y) < 1 {
-                announcedRect = rect
-            }
+            // Native clipping/layout is authoritative once reported. An old
+            // announcement must not keep selecting a viewport before resize.
+            announcedRect = rect
         }
         // A notice a mount or a place of this one's own raises answers nothing
         // new - but its viewport is news, so it re-asks once this one is over.
@@ -154,40 +147,22 @@ class WinUILazyView: WinUITravellingLayout {
         guard let target = override ?? announcedRect ?? viewport else { return }
         let grid = self is WinUILazyGridView
         let revision = grid ? cells.runs.revision : cells.extents.revision
-        // `span` is the window the screen shows. While the user holds the
-        // scroller its view sweeps under the compositor's own power toward
-        // every window a notice names - the realized window keeps them all
-        // until the screen arrives. A move nobody holds snaps to where it
-        // lands, so only the window it lands in stands built.
-        let span = self.span
-        let held = watching?.held == true
+        // Follow the actual view or an explicitly announced program jump.
+        // Retaining the whole path until Idle turns a moving window into an
+        // ever-growing document, especially with an animation's far endpoint.
         let incoming = windowSpan(in: target)
-        var realize = held ? span : incoming
-        for window in [incoming, held ? lastAnnounced : nil] {
-            guard let window else { continue }
-            realize = realize.map {
-                min($0.lowerBound, window.lowerBound)..<max($0.upperBound, window.upperBound)
-            } ?? window
-        }
-        // The compositor moves ahead of these notices, held or not: keep a viewport
-        // of run past either end mounted, so a move that starts before the next
-        // notice - a resumed wheel, a drag's first frames - sweeps into rows already
-        // painted. While the scroller is held the window only widens, built a stretch
-        // at a time; at rest it follows the viewport, a look-ahead either way.
+        let span = incoming
+        var realize = incoming
+        // Retain the existing viewport-sized look-ahead, but release rows
+        // behind it as the view moves rather than waiting for scroll rest.
         if let realized = realize {
             // The look-ahead must stand on the same sixty-fourth grid the
             // window's own bounds snap to, or a float's worth of room lands a
             // boundary row on one side of the window and not the other.
             let raw = axis == .vertical ? rect.height : rect.width
             let room = (raw * 64).rounded() / 64
-            if held, let kept = cells.window?.realize, kept.lowerBound <= max(0, realized.lowerBound - room / 2),
-               kept.upperBound >= realized.upperBound + room / 2 {
-                realize = kept
-            } else {
-                realize = max(0, realized.lowerBound - room)..<(realized.upperBound + room)
-            }
+            realize = max(0, realized.lowerBound - room)..<(realized.upperBound + room)
         }
-        if override != nil { lastAnnounced = incoming }
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)
             || cells.window?.realize != (realize ?? 0..<0)
             || cells.window?.revision != revision || cells.needsMeasurement
@@ -313,7 +288,6 @@ class WinUILazyView: WinUITravellingLayout {
         watching = scroll
         effectiveViewport = nil
         lastTargetViewport = nil
-        lastAnnounced = nil
         announcedRect = nil
         scrollEar = nil
         if let scroll {
@@ -332,10 +306,9 @@ class WinUILazyView: WinUITravellingLayout {
         swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
         var rect = Rect(x: raw[0], y: raw[1], width: raw[2], height: raw[3])
         let standing = scroll.scroller.standing.offset
-        // The announced target is the change's landing - inertia's predicted final
-        // offset when one is named, else the next step: where the view will be,
-        // ahead of where it stands, is what an incoming window realizes for.
-        let next = scroll.scroller.finalOffset ?? scroll.scroller.nextOffset ?? standing
+        // Native animation endpoints describe a curve, not the next visible
+        // window. ViewChanged supplies the actual offset for realization.
+        let next = scroll.scroller.nextOffset ?? standing
         // The announced window: the scroller's own read says where the view
         // stands now; the effective viewport lends its size, whose fractions
         // the direct read rounds away, and the notice's next offset moves it.
@@ -386,7 +359,6 @@ class WinUILazyView: WinUITravellingLayout {
         swiftomniui_winui_panel_watch_viewport(handle, false)
         effectiveViewport = nil
         lastTargetViewport = nil
-        lastAnnounced = nil
         announcedRect = nil
         watching = nil
         scrollEar = nil
@@ -418,7 +390,7 @@ final class WinUILazyStackView: WinUILazyView {
         let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         let across = axis == .vertical
             ? (width ?? standsAt).map { max(0, $0 - padding.left - padding.right) } : nil
-        if WinUIView.arranging == 0 {
+        if WinUIView.arranging == 0, WinUILayoutView.queryingSize == 0 {
             let revision = cells.extents.revision
             if measuredAcross != across {
                 cells.extents.reset()
@@ -592,7 +564,7 @@ final class WinUILazyGridView: WinUILazyView {
             : acrossRoom)
         let proposed = LazyGridTracks.resolve(tracks, width: room, spacing: trackSpacing)
         let widths = LazyGridTracks.extents(proposed, width: room, spacing: trackSpacing)
-        if WinUIView.arranging == 0 {
+        if WinUIView.arranging == 0, WinUILayoutView.queryingSize == 0 {
             let revision = cells.runs.revision
             if widths != columns {
                 columns = widths
@@ -637,7 +609,9 @@ final class WinUILazyGridView: WinUILazyView {
             measuredRevision = measurementRevision
         }
         let count = (cells.identities.count + max(1, proposed.count) - 1) / max(1, proposed.count)
-        let total = cells.runs.total(count: count)
+        let total = widths == columns ? cells.runs.total(count: count)
+            : cells.runs.padding.head + cells.runs.padding.tail + Double(count) * cells.runs.estimate
+                + Double(max(0, count - 1)) * runSpacing
         return axis == .vertical
             ? LayoutSize(width: width ?? 0, height: total)
             : LayoutSize(width: total, height: widths.reduce(0, +)

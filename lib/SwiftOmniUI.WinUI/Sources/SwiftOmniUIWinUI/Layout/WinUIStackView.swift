@@ -26,15 +26,22 @@ final class WinUIStackView: WinUITravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        let size = StackArithmetic.size(of: items, axis: axis, spacing: spacing, padding: padding, width: width)
-        if WinUIView.arranging == 0 {
-            let room = Rect(x: 0, y: 0, width: size.width, height: size.height)
-            let places = StackArithmetic.places(of: items, axis: axis, spacing: spacing, padding: padding,
-                                                in: room, direction: direction)
+        let size = Self.querySize {
+            StackArithmetic.size(of: items, axis: axis, spacing: spacing, padding: padding, width: width)
+        }
+        if WinUIView.arranging == 0, Self.queryingSize == 0 {
+            let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
+            let places = Self.querySize {
+                StackArithmetic.places(of: items, axis: axis, spacing: spacing, padding: padding,
+                                       in: room, direction: direction)
+            }
             for (item, place) in zip(items, places) {
                 if let place, let layout = item.view as? WinUILayoutView {
                     layout.prepareMeasure(width: place.width)
                 }
+            }
+            return Self.querySize {
+                StackArithmetic.size(of: items, axis: axis, spacing: spacing, padding: padding, width: width)
             }
         }
         return size

@@ -32,14 +32,22 @@ measured its whole subtree again: some seven hundred sizings for one word six
 grids deep, and 2910 measures - 150 ms of a debug build's frame - for one
 card of the home page's run turned.
 
-Arithmetic that has just sized a child prepares its native panel separately.
-That preparation keeps the computed natural sizes, and repeated preparations
-while that allocated width and content revision remain current do nothing. Otherwise the
-panel's `MeasureOverride` would discard the result and size the same subtree
-again. Content invalidation clears both caches; an independent measure from
-XAML still refreshes the arithmetic and reports a changed size upward. Returning
-from another measured width prepares the subtree again: XAML retains only its
-last native proposal, even where the natural-size cache holds both widths.
+Arithmetic queries and native preparation have separate scopes. A
+`naturalSize` query can measure native leaves to answer a new proposal, but
+does not recursively prepare panels or replace lazy row geometry. Stacks,
+single-child containers and layers also calculate their child places in a
+query scope, then prepare only the selected places during native measurement.
+They read the resulting sizes again before answering, so an initially
+estimated lazy extent is not retained as the parent's completed size.
+
+Preparation restores native child proposals even when their arithmetic
+answers are cached. Changing the native proposal preserves the other
+width-keyed answers; only changed content, a changed answer or provisional
+measurement discards them. An independent measure from XAML still refreshes
+the arithmetic and reports a changed size upward. Repeating a preparation
+at the same width and revision does nothing unless a fresh query has changed
+the subtree's native proposals. This avoids the former alternating
+ideal/allocated-width queries clearing and rebuilding nested caches.
 
 Nothing is measured while WinUI arranges: `Measure` written on an element
 inside an arrangement marks it, the marked element is measured and arranged
@@ -61,6 +69,12 @@ coordinates have not changed. The current ArrangeOverride bounds propagate
 safe contexts instead of reading the previous ActualSize during the callback.
 Lazy rows and tracks prefer the current finite width to `standsAt`; the old
 allocation is only a fallback when the parent left the width unspecified.
+Only preparation or viewport reconciliation commits row measurements,
+tracks and anchor corrections. Window minimum-size and ideal-size queries
+read the committed geometry; a query for different grid tracks uses estimates
+for those tracks without resetting the visible grid.
+Writing an unchanged child place between passes does not invalidate its
+parent again. ArrangeOverride still arranges every native child it holds.
 
 Lazy viewport realization requests the estimated window as one batch, as
 GTK does. The former one-unknown-run policy performed a synchronous core
@@ -71,6 +85,11 @@ settled. The viewport callback now waits for the requested render, refines
 coverage from measured geometry, and commits one final arrangement. A
 callback during native Measure or Arrange resumes after the pass. Native
 proposal preparation, row revisions and the scroll look-ahead stay intact.
+The realized window follows the actual ViewChanged offset, not an animated
+scroll's final endpoint. It releases rows behind its look-ahead while a
+scroll is still active; it does not keep the continuous path from the first
+viewport to the eventual endpoint mounted until Idle. Program jumps still
+announce and realize their destination before moving the native scroller.
 
 GeometryReader accepts a safe allocation while retaining the remaining
 environment. Native window chrome that already sits outside the content row

@@ -20,6 +20,15 @@ class WinUILayoutView: WinUIView {
     private var preparingMeasure = false
     private var sizeFeedbackPending = false
 
+    /// Arithmetic probes do not select the native subtree's layout proposal.
+    static var queryingSize = 0
+
+    static func querySize<Result>(_ query: @MainActor () -> Result) -> Result {
+        queryingSize += 1
+        defer { queryingSize -= 1 }
+        return query()
+    }
+
     /// The children, in order.
     private(set) var items: [WinUILayoutItem] = []
 
@@ -235,7 +244,7 @@ class WinUILayoutView: WinUIView {
     /// Marks this panel measured at its allocated width without discarding the natural
     /// sizes the arithmetic just computed. An independent XAML measure still refreshes them.
     func prepareMeasure(width: Double) {
-        guard WinUIView.arranging == 0 else { return }
+        guard WinUIView.arranging == 0, Self.queryingSize == 0 else { return }
         let width = Double(Float(width))
         let currentSizing = hasSizing && lastSizingWidth == (width.isFinite ? width : nil)
         guard preparedMeasure?.width != width || preparedMeasure?.revision != measurementRevision || !currentSizing
@@ -268,9 +277,19 @@ class WinUILayoutView: WinUIView {
         }
 
         let offered = width.isFinite ? width : nil
-        if !preparingMeasure || !hasSizing || lastSizingWidth != offered { forgetMeasurements() }
+        if !preparingMeasure { forgetMeasurements() }
         _ = boxView?.measure(width: width, height: height)
-        let size = naturalSize(width: offered)
+        let queried = naturalSize(width: offered)
+        // Restore native child proposals without throwing away the answers to
+        // other widths. A cache hit alone cannot prepare XAML's last proposal.
+        let querying = Self.queryingSize
+        Self.queryingSize = 0
+        defer { Self.queryingSize = querying }
+        let startedAt = WinUIView.provisionalMeasureRevision
+        let size = contentSize(width: offered)
+        lastSizingWidth = offered
+        hasSizing = startedAt == WinUIView.provisionalMeasureRevision
+        if size != queried || !hasSizing { measurements.invalidate() }
         reportChange(of: size, offered: offered)
         guard placingLayout == nil else { return .zero }
         // Native content presenters do not have a LayoutItem to apply the
@@ -313,6 +332,8 @@ class WinUILayoutView: WinUIView {
         let width = width.map { Double(Float($0)) }
         return measurements.size(offering: width) {
             Self.sizings += 1
+            Self.queryingSize += 1
+            defer { Self.queryingSize -= 1 }
             let startedAt = WinUIView.provisionalMeasureRevision
             let size = contentSize(width: width)
             lastSizingWidth = width

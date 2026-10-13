@@ -353,6 +353,7 @@ class WinUIView {
     /// the layout for one. Its size is its words' room while its place travels.
     /// Design: docs/design/platforms/winui/layout.md#a-place-between-passes
     func layout(_ place: Rect) {
+        let moved = placed != place
         if nativeSafeBarOwner == nil, let placingLayout {
             safeAreaContext = placingLayout.context(for: self, at: place)
                 .ignoring(sourceElement?.ignoresSafeArea)
@@ -375,7 +376,7 @@ class WinUIView {
             }
             let room = wordsRoom ?? place
             swiftomniui_winui_arrange(handle, place.x, place.y, room.width, room.height)
-        } else {
+        } else if moved {
             placingLayout?.invalidateArrange()
         }
         if resized, transform != .identity || placedDrawing != nil { writeTransform() }

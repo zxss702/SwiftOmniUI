@@ -67,7 +67,9 @@ final class WinUIWindowController {
             sizing = WindowContentSizing(of: element, content: presentation.arrangement) { node, width in
                 guard let item = node.winUI.layoutItem else { return nil }
                 if let known = asked[width]?[ObjectIdentifier(node)] { return known }
-                let size = SingleChildArithmetic.size(of: item, padding: EdgeInsets(0), width: width)
+                let size = WinUILayoutView.querySize {
+                    SingleChildArithmetic.size(of: item, padding: EdgeInsets(0), width: width)
+                }
                 asked[width, default: [:]][ObjectIdentifier(node)] = size
                 return size
             }
