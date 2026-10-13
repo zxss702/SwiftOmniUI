@@ -71,6 +71,9 @@ final class GTKSplitView: GTKLayoutView {
     /// Whether a content column stands between the sidebar and the detail.
     var hasContentColumn: Bool { panes.count > 2 }
     var showsDetailColumn: Bool { hasContentColumn && detailWidthBounds?.last != 0 }
+    var showsContentColumn: Bool {
+        showsDetailColumn && adw_overlay_split_view_get_show_sidebar(middle.widget.opaque) != 0
+    }
 
     /// The sidebar and the pages beside it, each framed where it is a page -
     /// a third pane stands in the middle split as its sidebar.

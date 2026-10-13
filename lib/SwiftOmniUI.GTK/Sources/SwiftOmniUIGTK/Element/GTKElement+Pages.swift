@@ -57,11 +57,6 @@ extension GTKElement {
                 chrome.barBackground = Color.clear.propValue
             }
         }
-        // The scene's commands stand once in a window, on the bar at its leading edge - a split view's sidebar
-        // while it shows, else the page the user sees - not on every bar an arrangement shows.
-        let arrangement = element.enclosing(type: .windowScene)?.children.first { NodeType.pageTypes.contains($0.type) }
-        chrome.appMenu = arrangement?.leadingPage === page ? Self.appMenuEntries(of: page) : []
-
         let actions = page.chromeActions
         chrome.leadingActions = actions.leading.map(Self.action)
         chrome.actions = actions.primary.map(Self.action)
@@ -74,7 +69,7 @@ extension GTKElement {
     /// The scene's menus as the app menu's entries - a command group's entries
     /// spliced where they stand, a `CommandMenu` a submenu.
     static func appMenuEntries(of element: MountedElement) -> [MenuEntry] {
-        guard let menus = element.enclosing(type: .windowScene)?.children.first(where: { $0.type == .menuBar })
+        guard let menus = element.enclosing(type: .windowScene)?.currentChildren.first(where: { $0.type == .menuBar })
         else { return [] }
         return MenuEntry.flattened(MenuEntry.menus(of: menus))
     }
@@ -97,22 +92,53 @@ extension GTKElement {
         return action
     }
 
-    /// Writes each framed element's chrome on its header bar, through this arrangement and every one it holds;
-    /// `sidebar` shows a split view's sidebar from the header bar of the page the user sees in its detail.
-    func composeChrome(showingSidebar sidebar: (shows: Bool, toggle: () -> Void)? = nil) {
+    /// The first visible native header this arrangement carries. A wrapper page is not necessarily framed;
+    /// stacks and split panes carry the actual frames, and tabs use the frame supplied by their parent.
+    var leadingHeaderFrame: GTKPageFrame? {
+        func header(_ frame: GTKPageFrame?, of page: GTKElement?) -> GTKPageFrame? {
+            if let frame, page?.chrome.showsBar == true { return frame }
+            return page?.leadingHeaderFrame
+        }
         switch type {
         case .page:
-            element.contentArrangement?.gtk.composeChrome(showingSidebar: sidebar)
+            return element.contentArrangement?.gtk.leadingHeaderFrame
+        case .navigationStack:
+            return header((view as? GTKNavigationView)?.frames.last, of: element.stackedChildren.last?.gtk)
+        case .navigationSplitView:
+            guard let split = view as? GTKSplitView else { return nil }
+            if element.sidebarIsVisible, let frame = header(split.sidebarFrame, of: children.first) { return frame }
+            if split.showsDetailColumn {
+                if split.showsContentColumn,
+                   let frame = header(split.contentFrame, of: children.dropFirst().first) { return frame }
+                return header(split.detailFrame, of: children.last)
+            }
+            return header(split.detailFrame, of: children.dropFirst().first)
+        case .tabView:
+            return element.selectedTab?.gtk.leadingHeaderFrame
+        default:
+            return nil
+        }
+    }
+
+    /// Writes each framed element's chrome on its header bar, through this arrangement and every one it holds;
+    /// `sidebar` shows a split view's sidebar from the header bar of the page the user sees in its detail.
+    func composeChrome(
+        showingSidebar sidebar: (shows: Bool, toggle: () -> Void)? = nil,
+        show: (GTKPageFrame, GTKPageChrome) -> Void = { frame, chrome in frame.show(chrome) }
+    ) {
+        switch type {
+        case .page:
+            element.contentArrangement?.gtk.composeChrome(showingSidebar: sidebar, show: show)
         case .navigationStack:
             guard let navigation = view as? GTKNavigationView else { return }
             let pages = element.stackedChildren.map(\.gtk)
             for (index, (page, frame)) in zip(pages, navigation.frames).enumerated() {
                 var chrome = page.chrome
                 if index == pages.count - 1 { chrome.sidebar = sidebar }
-                frame.show(chrome)
+                show(frame, chrome)
                 navigation.describe(
                     frame, title: page.element.visiblePage?.pageValue(.title)?.string ?? "", canPop: chrome.offersBack)
-                page.composeChrome()
+                page.composeChrome(show: show)
             }
         case .navigationSplitView:
             guard let split = view as? GTKSplitView else { return }
@@ -121,26 +147,26 @@ extension GTKElement {
                 self?.changeSidebarVisibility(to: !shows)
             })
             if let sidebar = children.first {
-                split.sidebarFrame?.show(sidebar.chrome)
-                sidebar.composeChrome()
+                if let frame = split.sidebarFrame { show(frame, sidebar.chrome) }
+                sidebar.composeChrome(show: show)
             }
             if split.showsDetailColumn, let content = children.dropFirst().first {
-                split.contentFrame?.show(content.chrome)
-                content.composeChrome()
+                if let frame = split.contentFrame { show(frame, content.chrome) }
+                content.composeChrome(show: show)
             }
             let detail = split.showsDetailColumn ? children.last : children.dropFirst().first
             if let detail {
                 if let frame = split.detailFrame {
                     var chrome = detail.chrome
                     chrome.sidebar = showing
-                    frame.show(chrome)
-                    detail.composeChrome()
+                    show(frame, chrome)
+                    detail.composeChrome(show: show)
                 } else {
-                    detail.composeChrome(showingSidebar: showing)
+                    detail.composeChrome(showingSidebar: showing, show: show)
                 }
             }
         case .tabView:
-            element.selectedTab?.gtk.composeChrome()
+            element.selectedTab?.gtk.composeChrome(show: show)
         default:
             break
         }

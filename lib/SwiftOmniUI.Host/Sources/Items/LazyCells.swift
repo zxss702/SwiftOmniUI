@@ -41,7 +41,12 @@
     /// not perform another range lookup or send another render.
     public var window: (span: Range<Double>, revision: Int, perRun: Int, realize: Range<Double>)?
 
-    /// An incremental host stopped at an unmeasured run. Measure it before
+    /// A host's realization-density version, independent of the document's
+    /// measured extents. Learning an actual 44-point row changes the plan
+    /// even though its document coordinates stay exactly as estimated.
+    public private(set) var windowPlanningRevision = 0
+
+    /// An incremental host has requested unmeasured runs. Measure them before
     /// expanding the same window; an unchanged 44-point estimate still resumes.
     public private(set) var needsMeasurement = false
 
@@ -158,14 +163,21 @@
     /// under its own power can show before the next notice: the cells it covers
     /// are mounted while `span`'s own arithmetic - shown places, the anchor -
     /// keeps reading the true viewport.
+    /// `estimatedUnknownRunExtent` plans how many unknown runs fit after the
+    /// host measured its first complete run. It never changes the 44-point
+    /// document estimates, offsets or anchor; hosts omitting it keep their
+    /// existing window policy.
     public func show(_ span: Range<Double>, perRun: Int = 1, grid: Bool = false, realize: Range<Double>? = nil,
-                     measureBeforeExpanding: Bool = false) {
+                     measureBeforeExpanding: Bool = false, estimatedUnknownRunExtent: Double? = nil,
+                     planningRevision: Int = 0) {
         let revision = grid ? runs.revision : extents.revision
         let realize = realize ?? span
         guard window?.span != span || window?.revision != revision || window?.perRun != perRun
-            || window?.realize != realize || needsMeasurement else { return }
+            || window?.realize != realize || windowPlanningRevision != planningRevision
+            || needsMeasurement else { return }
         let moved = window?.revision == revision && window?.span != span
         window = (span, revision, perRun, realize)
+        windowPlanningRevision = planningRevision
         searches += 1
         let runCount = (identities.count + perRun - 1) / perRun
         let wanted = grid
@@ -191,17 +203,37 @@
         let requestedUpper = upper
         needsMeasurement = false
         if measureBeforeExpanding, !wanted.isEmpty {
-            // The estimate describes scroll room, not permission to build an
-            // entire set of potentially tall cards. Include one unknown run,
-            // let its native measurement correct the range, then continue.
-            for run in (lower / perRun)..<((upper + perRun - 1) / perRun) {
-                let known = grid ? runs.hasMeasurement(for: run)
-                    : extents.hasMeasurement(for: identities[run])
-                if !known {
-                    let end = min(identities.count, (run + 1) * perRun)
-                    needsMeasurement = end < upper
-                    upper = end
-                    break
+            let first = lower / perRun
+            let estimate = estimatedUnknownRunExtent.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+            if let estimate {
+                // Select a batch by its predicted physical coverage, rather
+                // than rendering every unknown row in a separate tree turn.
+                // Only this request uses the host's sampled density. All
+                // document coordinates continue to use their own arithmetic.
+                let gap = grid ? runs.spacing : extents.spacing ?? StackArithmetic.automaticSpacing
+                var origin = grid ? runs.offset(of: first, count: runCount)
+                    : extents.offset(of: first, in: identities)
+                var end = first
+                while end < runCount, origin < realize.upperBound {
+                    let known = grid ? runs.hasMeasurement(for: end)
+                        : extents.hasMeasurement(for: identities[end])
+                    let extent = known ? (grid ? runs.extent(of: end) : extents.extent(of: identities[end])) : estimate
+                    origin += extent + gap
+                    end += 1
+                }
+                // Keep the same complete neighbour run at the trailing edge
+                // as the ordinary window, also when its last row is partial.
+                upper = min(identities.count, min(runCount, end + 1) * perRun)
+            } else {
+                // The first complete unknown run probes the selected native
+                // proposal before a page of potentially tall cards is built.
+                for run in first..<((upper + perRun - 1) / perRun) {
+                    let known = grid ? runs.hasMeasurement(for: run)
+                        : extents.hasMeasurement(for: identities[run])
+                    if !known {
+                        upper = min(identities.count, (run + 1) * perRun)
+                        break
+                    }
                 }
             }
             // Keep surviving native seats within this window attached while
@@ -213,7 +245,12 @@
                       place >= lower, place < requestedUpper else { continue }
                 upper = max(upper, min(requestedUpper, (place / perRun + 1) * perRun))
             }
-            needsMeasurement = upper < requestedUpper
+            // A measured row equal to 44 does not advance geometry.revision.
+            // Request completion therefore follows measurement presence, not
+            // a changed length or whether this batch stopped short of 44's window.
+            needsMeasurement = (first..<((upper + perRun - 1) / perRun)).contains { run in
+                grid ? !runs.hasMeasurement(for: run) : !extents.hasMeasurement(for: identities[run])
+            }
         }
         let within = !wanted.isEmpty && lower < upper ? lower..<upper : 0..<0
         if !needsMeasurement { inserting.formIntersection(identities[within]) }

@@ -74,6 +74,9 @@ fresh arithmetic is computed, independently of local cache disposal. Child
 lists are compared before scheduling a commit, so an unchanged list posts no
 work. Background painting uses pending children when present, preserving
 newly realized rows instead of overwriting them with the old native list.
+The native child-list commit uses WinRT object-identity sets for membership.
+Surviving children remain attached, and new children skip the native vector's
+linear search; existing children still use its normal move operation.
 Deferred size feedback invalidates the owning root using the normal XAML
 proposal; it does not prepare that root with an invented unbounded height.
 
@@ -83,13 +86,22 @@ agree, another notice sends no realization. The current ArrangeOverride
 bounds propagate safe contexts instead of reading the previous ActualSize
 during the callback.
 
-An incremental viewport fill measures each unknown run before requesting the
-next, retaining the strict window bound for tall rows. It places the final
-mounted window once after the synchronous fill, rather than arranging every
-surviving native subtree after every incoming run. Accumulated anchor shifts
-and insertion animations are consumed by that final placement. A fill that
-awaits a deferred render places the measurements completed so far and resumes
-after the pass.
+A viewport fill first measures an unknown run, then plans a batch from the
+measured run heights and the remaining viewport capacity. Planning changes
+the request range, not the document's 44-point unknown extents. Each completed
+batch replaces its own extents with native measurements and recalculates the
+window before requesting more. A grid probes and requests whole runs. This
+avoids a render and growing-prefix preparation for every short row, while a
+tall first row can still correct the initial request before other cards mount.
+The fill places its final mounted window once. Accumulated anchor shifts and
+insertion animations are consumed by that final placement. A fill that awaits
+a deferred render resumes after the pass.
+
+An idle viewport keeps its visible rows and fixed neighbours. Scroll look-ahead
+follows the native interaction state and latest offset, not queued movement
+reports. A distant predicted inertia endpoint does not require every
+intervening row to mount, and native Idle returns to the ordinary window.
+Programmatic jumps still request their target window before changing the view.
 
 GeometryReader accepts a safe allocation while retaining the remaining
 environment. Native window chrome that already sits outside the content row

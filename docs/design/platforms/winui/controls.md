@@ -28,6 +28,15 @@ as its text block was. What assistive technology meets of a label is its text
 block - a border has no automation peer - so its identifier, name, hint and
 heading level are the text block's.
 
+On native attachment, a label remeasures the proposals it already answered
+using its actual `XamlRoot` and inherited resources. It restores the last
+prepared proposal after checking the ideal and wrapped sizes. Matching sizes
+replace the label's cached answers without invalidating the placing layout;
+only a changed size invalidates the host's ancestor arithmetic and requests a
+geometry update. XAML can still schedule its native measure when the label is
+invalidated. The validation runs after the native pass and skips labels that
+have detached or are leaving.
+
 WinUI spaces letters in thousandths of an em and lines in DIPs, where SwiftOmniUI
 gives the first in points and the second as a multiple of the font's own
 line: both are worked out against the font's size, a line of Segoe UI taken as

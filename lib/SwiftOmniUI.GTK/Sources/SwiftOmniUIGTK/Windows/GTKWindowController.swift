@@ -103,10 +103,22 @@ final class GTKWindowController {
 
         if let arrangement = presentation.arrangement {
             let shown = Self.shownArrangement(arrangement)
-            if GTKElement.framedTypes.contains(shown.type) {
-                window.pageFrame?.show(shown.gtk.chrome)
+            let framed = GTKElement.framedTypes.contains(shown.type)
+            let rootChrome = shown.gtk.chrome
+            let commandFrame = framed && rootChrome.showsBar
+                ? window.pageFrame : shown.gtk.leadingHeaderFrame
+            let entries = GTKElement.appMenuEntries(of: element)
+            // Commands belong to a window, not to the page that supplies its title. Resolve their host from
+            // the actual native frames, and write them once while composing every bar (including inactive ones).
+            let show: (GTKPageFrame, GTKPageChrome) -> Void = { frame, chrome in
+                var chrome = chrome
+                chrome.appMenu = frame === commandFrame ? entries : []
+                frame.show(chrome)
             }
-            shown.gtk.composeChrome()
+            if framed, let frame = window.pageFrame {
+                show(frame, rootChrome)
+            }
+            shown.gtk.composeChrome(show: show)
         }
         adaptSplitViews()
         for (page, sheet) in sheets {

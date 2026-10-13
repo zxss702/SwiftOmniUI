@@ -390,14 +390,50 @@ class WinUIView {
         _ = measureNative(width: width, height: height)
     }
 
-    private func measureNative(width: Double?, height: Double?) -> LayoutSize {
+    /// Validate the proposals used before attachment in the real native tree.
+    /// An unchanged label needs fresh native text layout, but does not change
+    /// its ancestors' geometry. Nil asks the caller to wait for this pass to end.
+    func refreshNativeMeasurementsAfterAttachment() -> Bool? {
+        guard Self.arranging == 0, Self.measuring == 0 else { return nil }
+        var previous = measuredSizes
+        let selected = nativeProposal
+        // Rechecking ideal and wrapped sizes must leave XAML prepared at the
+        // proposal selected by the placing layout, rather than the ideal one.
+        if let selected,
+           let index = previous.firstIndex(where: { $0.width == selected.width && $0.height == selected.height }) {
+            let final = previous.remove(at: index)
+            previous.append(final)
+        }
+        measuredSizes.removeAll(keepingCapacity: true)
+        nativeProposal = nil
+        nativeMeasurePending = false
+        // Even with no recorded proposal, discard the unattached native text
+        // layout. Its next native Measure then happens in the attached tree.
+        invalidateNativeMeasure()
+        var changed = false
+        for proposal in previous {
+            let size = measureNative(width: proposal.width, height: proposal.height, invalidatesPreparation: false)
+            changed = changed || size != proposal.size
+        }
+        if let selected,
+           !previous.contains(where: { $0.width == selected.width && $0.height == selected.height }) {
+            _ = measureNative(width: selected.width, height: selected.height, invalidatesPreparation: false)
+        }
+        if changed {
+            measurementRevision &+= 1
+            invalidateAncestorPreparation()
+        }
+        return changed
+    }
+
+    private func measureNative(width: Double?, height: Double?, invalidatesPreparation: Bool = true) -> LayoutSize {
         let changedProposal: Bool
         if let nativeProposal {
             changedProposal = nativeProposal.width != width || nativeProposal.height != height
         } else {
             changedProposal = true
         }
-        if changedProposal {
+        if changedProposal, invalidatesPreparation {
             invalidateAncestorPreparation()
         }
         // This explicit preparation consumes the invalidation left by the

@@ -119,13 +119,18 @@ road of its own for it.
 `LazyCells` keeps scroll geometry for a lazy stack or grid. Each unmeasured
 row stays at an extent of 44; a native measurement replaces only that row's
 estimate and updates the document extent. Measured rows never change the
-estimates of unseen rows. WinUI fills a new window incrementally: it mounts
-an unknown row (a complete run for a grid), measures it, and rechecks the
-window before requesting more. A tall settings card therefore corrects the
-range before the provisional estimate builds all the cards behind it.
-The existing scroll look-ahead and neighbour policy still bounds the final
-window, and existing native seats within that window remain attached during
-an incremental fill.
+estimates of unseen rows. WinUI first probes an unknown row (a complete run
+for a grid), then uses measured run heights at the selected allocation to
+plan batches covering the remaining viewport. This planning estimate changes
+only the requested identities, never the document's offsets or anchor.
+Native measurements replace each batch's provisional extents before the
+window is checked again. A tall initial card therefore corrects the range
+before the rows behind it are requested, while short file rows do not each
+require their own render and preparation. When every measured run has zero
+extent, planning uses 44 rather than a zero-height density.
+Existing native seats within the requested window remain attached during
+a fill. An idle WinUI window requests the visible rows and their neighbours;
+additional look-ahead belongs to an actual scrolling window.
 
 The tree's prepared lazy source also retains each current window row's authored
 description. Extending an incremental window runs builders only for incoming

@@ -37,17 +37,21 @@ class WinUITextView: WinUIView {
     }
 
     /// The pre-attachment measurement does not establish the final native
-    /// text layout. Loaded commits one fresh measurement in the real tree,
-    /// including its XamlRoot scale/resources, before relying on cached sizes.
+    /// text layout. Loaded validates the used proposals in the real tree,
+    /// including its XamlRoot scale/resources. Only changed sizes invalidate
+    /// the placing layout; attaching every label must not remeasure every row.
     private func nativeTextLoaded() {
         guard !loadedMeasurePending else { return }
         loadedMeasurePending = true
         WinUIDoorbell.afterPass { [weak self] in
             guard let self else { return }
             self.loadedMeasurePending = false
-            guard !self.isDetached, self.sourceElement?.isDeparting != true else { return }
-            self.invalidateMeasure()
-            self.placingLayout?.commitMeasurementChange()
+            guard !self.isDetached, self.isAttached, self.sourceElement?.isDeparting != true else { return }
+            guard let changed = self.refreshNativeMeasurementsAfterAttachment() else {
+                self.nativeTextLoaded()
+                return
+            }
+            if changed { self.placingLayout?.commitMeasurementChange() }
         }
     }
 

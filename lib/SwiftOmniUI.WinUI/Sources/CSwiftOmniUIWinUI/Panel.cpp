@@ -45,10 +45,16 @@ namespace {
 
     void insertInOrder(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
                        std::vector<xaml::UIElement> const &held) {
+        std::unordered_set<IInspectable> present;
+        auto const count = items.Size();
+        present.reserve(count + held.size());
+        for (uint32_t index = 0; index < count; ++index) present.insert(items.GetAt(index));
         for (uint32_t index = 0; index < held.size(); ++index) {
             if (index < items.Size() && items.GetAt(index) == held[index]) continue;
             uint32_t previous;
-            if (items.IndexOf(held[index], previous)) items.RemoveAt(previous);
+            // A newly realized child is absent from this native parent. Do
+            // not scan the growing prefix for every new row in a batch.
+            if (!present.insert(held[index]).second && items.IndexOf(held[index], previous)) items.RemoveAt(previous);
             items.InsertAt(index, held[index]);
         }
     }
