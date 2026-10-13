@@ -65,11 +65,11 @@ namespace {
                 IsHitTestVisible(false);
                 gettingFocus = GettingFocus(winrt::auto_revoke,
                     guarded("handling a mask's GettingFocus",
-                    [](xaml::UIElement const &, xaml::Input::GettingFocusEventArgs const &args) {
-                        // A mask supplies drawing, never an input target. A
-                        // routed focus request from any descendant ends here.
-                        (void)args.TryCancel();
-                    }));
+                        [](xaml::UIElement const &, xaml::Input::GettingFocusEventArgs const &args) {
+                            // A mask supplies drawing, never an input target. A
+                            // routed focus request from any descendant ends here.
+                            (void)args.TryCancel();
+                        }));
             }
         }
         Size MeasureOverride(Size) { return Size(0, 0); }

@@ -87,7 +87,7 @@ class WinUILayoutView: WinUIView {
         super.init { number in swiftomniui_winui_panel_make(number) }
     }
 
-    init(_ make: (_ number: Int64) -> SwiftOmniUIObjectRef?) {
+    override init(_ make: (_ number: Int64) -> SwiftOmniUIObjectRef?) {
         super.init(make)
     }
 
