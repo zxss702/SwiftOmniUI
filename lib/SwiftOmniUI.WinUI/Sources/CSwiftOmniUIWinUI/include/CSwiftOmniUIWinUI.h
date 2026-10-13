@@ -237,6 +237,9 @@ void swiftomniui_winui_pump(double seconds);
 /// Posts one turn to the UI thread's queue; any thread.
 void swiftomniui_winui_post_turn(void);
 
+/// Posts optional layout-cache work below normal UI work; false when the queue is unavailable or shutting down.
+bool swiftomniui_winui_post_layout_cache(void (*work)(void));
+
 /// Keeps the application's loop alive while a scene exists, including one temporarily without windows.
 void swiftomniui_winui_keep_scene_alive(bool alive);
 
@@ -254,6 +257,10 @@ void swiftomniui_winui_release(SwiftOmniUIObjectRef object);
 /// A window, its activation and its minimizing told through `phaseChanged` under the number `window`.
 SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t window);
 void swiftomniui_winui_window_set_title(SwiftOmniUIObjectRef window, char const *title);
+/// A solid colour on the complete client root; false restores the system backdrop.
+void swiftomniui_winui_window_set_background(SwiftOmniUIObjectRef window, bool hasBackground, uint32_t background);
+/// The native root's solid fill, where one is set. What a test reads.
+bool swiftomniui_winui_window_background(SwiftOmniUIObjectRef window, uint32_t *background);
 void swiftomniui_winui_window_set_content(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef content);
 /// A native overlay in the existing content row, below TitleBar and above its
 /// ScrollView. It never creates another auto row or reduces the viewport.

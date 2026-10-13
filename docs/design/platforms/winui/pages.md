@@ -25,6 +25,16 @@ nothing after release or window teardown.
 
 ## The window's chrome
 
+The visible page's `windowBackground` paints the native root behind the entire
+client area; removing it restores the system backdrop. A composed page can
+supply that colour around its navigation arrangement.
+
+Hiding `.windowToolbar` removes the XAML title bar and its layout row. Content
+then reaches the window's top edge, beneath Windows' native caption buttons,
+whose resting backgrounds are transparent. The default caption drag strip is
+cleared so it does not intercept controls along that edge. Showing the toolbar
+again reattaches the same native title bar and restores its height.
+
 A window has one chrome: WinUI's `TitleBar`, across the top of a window
 whose content extends under its title bar, over a Mica backdrop, as
 Windows' own applications stand. The renderer composes it again from what

@@ -32,6 +32,10 @@ final class WinUIWindow {
     let menuBar = WinUIMenuBarView()
     let tabRow = WinUITabsView()
 
+    /// The toolbar occupies a row only while shown. Native caption buttons can overlay the full-size content.
+    private(set) var titleBarStands = true
+    private var windowBackground: UInt32??
+
     /// Whether the menu bar stands beneath the chrome: while the visible page has menus.
     private(set) var menuBarStands = false
 
@@ -94,6 +98,14 @@ final class WinUIWindow {
         swiftomniui_winui_window_set_title(handle, title ?? "")
     }
 
+    /// The window's own background, behind its complete client area; nil restores the system backdrop.
+    func setBackground(_ value: HostValue?) {
+        let color = value?.argb
+        guard windowBackground != .some(color) else { return }
+        windowBackground = .some(color)
+        swiftomniui_winui_window_set_background(handle, color != nil, color ?? 0)
+    }
+
     /// Moves and sizes the window as `frame` asks, each request alone: a place from the corner of the screen's work
     /// area, a size the content's, in DIPs.
     /// Design: docs/design/platforms/winui/runtime.md#a-windows-frame
@@ -126,9 +138,9 @@ final class WinUIWindow {
         // UpdateLayout would synchronously flush the page's pending layout as well,
         // including EffectiveViewportChanged and another lazy realization/render.
         let width = clientSize.width
-        let measuredCaption = titleBar.measure(width: width, height: nil).height
-        let caption = max(swiftomniui_winui_window_title_bar_height(handle),
-                          measuredCaption)
+        let caption = titleBarStands
+            ? max(swiftomniui_winui_window_title_bar_height(handle), titleBar.measure(width: width, height: nil).height)
+            : 0
         let bars: [WinUIView] = (menuBarStands ? [menuBar] : []) + (tabsStandInWindow ? [tabRow] : [])
         return bars.reduce(caption) { $0 + $1.measure(width: width, height: nil).height }
     }
@@ -225,6 +237,10 @@ final class WinUIWindow {
     func apply(_ chrome: WinUIWindowChrome, tabs: WinUIWindowTabs?) {
         setTitle(chrome.title)
         titleBar.apply(chrome)
+        if titleBarStands != chrome.showsToolbar {
+            titleBarStands = chrome.showsToolbar
+            standChrome()
+        }
         menuBar.show(chrome.menuBar)
         if chrome.menuBar.isEmpty == menuBarStands {
             menuBarStands.toggle()
@@ -254,7 +270,8 @@ final class WinUIWindow {
     /// Stands the chrome across the window, and beneath it the menu bar and the tabs where they stand there.
     private func standChrome() {
         swiftomniui_winui_window_set_chrome(
-            handle, titleBar.handle, menuBarStands ? menuBar.handle : nil, tabsStandInWindow ? tabRow.handle : nil)
+            handle, titleBarStands ? titleBar.handle : nil, menuBarStands ? menuBar.handle : nil,
+            tabsStandInWindow ? tabRow.handle : nil)
     }
 
     /// Shows `sheets` over everything the window shows, the last on top.

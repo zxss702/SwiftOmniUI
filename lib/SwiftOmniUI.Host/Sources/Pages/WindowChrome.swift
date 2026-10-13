@@ -77,7 +77,7 @@
         document = arrangement?.titledPage?.pageValue(.document)?.string
             ?? arrangement?.value(.document)?.string
         windowBackground = arrangement?.titledPage?.pageValue(.windowBackground)
-            ?? arrangement?.value(.windowBackground)
+            ?? arrangement?.pageValue(.windowBackground)
         toolbarVisibility = arrangement?.titledPage?.pageValue(.toolbarVisibility)
             ?? arrangement?.pageValue(.toolbarVisibility)
         toolbarBackground = arrangement?.titledPage?.pageValue(.toolbarBackground)

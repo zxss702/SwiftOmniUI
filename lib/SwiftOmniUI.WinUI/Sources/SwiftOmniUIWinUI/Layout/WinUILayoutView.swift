@@ -12,9 +12,11 @@ class WinUILayoutView: WinUIView {
     /// The sizes measured in the pass under way, by the width offered.
     let measurements = MeasurementCache()
 
-    /// XAML keeps only its last native proposal. Reuse preparation while the arithmetic
-    /// and its children's native measures still stand at that same width and revision.
-    private var preparedMeasure: (width: Double, revision: Int)?
+    /// Stable explicit preparations keep their children between viewport
+    /// batches. An independent XAML callback discards this native selection.
+    private var preparedMeasure: (width: Double, revision: Int, scope: Int?, provisionalRevision: Int)?
+    private var preparedChildren: (width: Double, revision: Int, scope: Int?, provisionalRevision: Int)?
+    private var refreshedMeasurementScope: Int?
     /// A speculative native size query can change a descendant's last XAML
     /// proposal without changing any arithmetic answer. Restore that branch
     /// on its next preparation; stable branches need no recursive walk.
@@ -246,6 +248,7 @@ class WinUILayoutView: WinUIView {
     /// Forgets the sizes this layout keeps.
     func forgetMeasurements() {
         preparedMeasure = nil
+        preparedChildren = nil
         guard !measurementsAreDirty else { return }
         measurementsAreDirty = true
         measurements.invalidate()
@@ -263,18 +266,49 @@ class WinUILayoutView: WinUIView {
     /// Marks this panel measured at its allocated width without discarding the natural
     /// sizes the arithmetic just computed. An independent XAML measure still refreshes them.
     func prepareMeasure(width: Double) {
+        WinUIView.withMeasurementScope { prepareMeasureInScope(width: width) }
+    }
+
+    private func prepareMeasureInScope(width: Double) {
         guard WinUIView.arranging == 0 else { return }
         let width = Double(Float(width))
-        if preparedMeasure?.width == width, preparedMeasure?.revision == measurementRevision,
-           !preparedChildrenDirty {
+        let childrenStand = preparedMeasure?.width == width && preparedMeasure?.revision == measurementRevision
+            && preparedMeasure?.provisionalRevision == WinUIView.provisionalMeasureRevision && !preparedChildrenDirty
+        let wasPreparing = preparingMeasure
+        // Across operations, let XAML decide whether this otherwise stable
+        // panel is dirty. A clean panel uses its native cache; a real callback
+        // refreshes resources or template changes instead of consuming them
+        // with the old arithmetic. Fresh children in this operation need no
+        // second preparation when our own native Measure calls back.
+        preparingMeasure = wasPreparing || !childrenStand || preparedMeasure?.scope == WinUIView.measurementScope
+        defer { preparingMeasure = wasPreparing }
+        if !childrenStand { prepareChildrenInScope(width: width) }
+        // A stable row needs no recursive walk in the next viewport batch.
+        // Its panel must still stand at the actual selected XAML constraint.
+        prepareNativeMeasure(width: width, height: nil)
+        if preparedChildren?.provisionalRevision == WinUIView.provisionalMeasureRevision {
+            preparedMeasure = (width, measurementRevision, WinUIView.measurementScope, WinUIView.provisionalMeasureRevision)
+            refreshedMeasurementScope = WinUIView.measurementScope
+        }
+    }
+
+    /// Native content presenters can ask the same panel repeatedly while a
+    /// stack probes ideal and allocated sizes. Prepare that proposal once;
+    /// arithmetic answers and the selected native proposal stay separate.
+    private func prepareChildrenInScope(width: Double) {
+        if preparedChildren?.width == width, preparedChildren?.revision == measurementRevision,
+           preparedChildren?.scope == WinUIView.measurementScope,
+           preparedChildren?.provisionalRevision == WinUIView.provisionalMeasureRevision,
+           !preparedChildrenDirty { return }
+        let startedAt = WinUIView.provisionalMeasureRevision
+        prepareChildren(width: width)
+        guard startedAt == WinUIView.provisionalMeasureRevision else {
+            preparedMeasure = nil
+            preparedChildren = nil
+            preparedChildrenDirty = true
             return
         }
-        let wasPreparing = preparingMeasure
-        preparingMeasure = true
-        defer { preparingMeasure = wasPreparing }
-        prepareChildren(width: width)
-        prepareNativeMeasure(width: width, height: nil)
-        preparedMeasure = (width, measurementRevision)
+        preparedChildren = (width, measurementRevision, WinUIView.measurementScope, startedAt)
         preparedChildrenDirty = false
     }
 
@@ -329,6 +363,10 @@ class WinUILayoutView: WinUIView {
     /// reads its size from `naturalSize(width:)`, and otherwise the room the children take, within the room offered.
     /// Design: docs/design/platforms/winui/layout.md#no-room-asked
     func measure(width: Double, height: Double) -> LayoutSize {
+        WinUIView.withMeasurementScope { measuredSizeInScope(width: width, height: height) }
+    }
+
+    private func measuredSizeInScope(width: Double, height: Double) -> LayoutSize {
         // WinUI arranging a marked element measures it first, inside the pass: the size it already measured
         // stands, and no child is measured - measuring one now marks it, and the marked element is arranged
         // again for ever.
@@ -343,8 +381,15 @@ class WinUILayoutView: WinUIView {
 
         let offered = width.isFinite ? width : nil
         if !preparingMeasure {
-            forgetMeasurements()
-            prepareChildren(width: width)
+            forgetNativeMeasureProposal()
+            preparedMeasure = nil
+            // A new native pass refreshes this panel. Repeated probes during
+            // that same synchronous operation retain its other width answers.
+            if refreshedMeasurementScope != WinUIView.measurementScope {
+                forgetMeasurements()
+                refreshedMeasurementScope = WinUIView.measurementScope
+            }
+            prepareChildrenInScope(width: Double(Float(width)))
         }
         _ = boxView?.measure(width: width, height: height)
         let size = naturalSize(width: offered)
@@ -387,6 +432,10 @@ class WinUILayoutView: WinUIView {
 
     /// The room the children take for the width offered, in DIPs, kept until a change beneath marks the layout.
     func naturalSize(width: Double?) -> LayoutSize {
+        WinUIView.withMeasurementScope { naturalSizeInScope(width: width) }
+    }
+
+    private func naturalSizeInScope(width: Double?) -> LayoutSize {
         let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         return measurements.size(offering: width) {
             Self.sizings += 1
@@ -400,6 +449,7 @@ class WinUILayoutView: WinUIView {
                 measurements.invalidate()
                 measurementsAreDirty = true
                 preparedMeasure = nil
+                preparedChildren = nil
             }
             return size
         }

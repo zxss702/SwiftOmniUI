@@ -43,6 +43,22 @@ parent discards its own cached arithmetic before finishing that measure.
 The current preparation carries the fresh result upward without scheduling
 a separate ancestor traversal for every row.
 
+One synchronous host measurement shares a short-lived scope across arithmetic,
+native control probes and child preparation. Repeated native proposals can
+reuse their answers within that scope, but preparation still restores XAML's
+last proposal to the actual allocation. A control's content presenter can
+re-enter the host through `MeasureOverride`; that callback shares the scope
+instead of discarding every already-computed width and preparing the same
+subtree again. A new independent XAML measure starts a fresh scope. Content
+invalidation and provisional measurements invalidate the affected scoped
+answers, and no scope survives an asynchronous doorbell or layout boundary.
+Stable explicit child preparations still survive between viewport batches.
+They ask XAML to restore the selected constraint without walking the unchanged
+subtree: a clean panel uses XAML's own cache, while a real dirty callback
+refreshes the host arithmetic. Native content-presenter callbacks also discard
+the old selected-constraint record, so a queried size never falsely proves
+that the allocated proposal is still selected.
+
 An independent native measure refreshes that layout's arithmetic and reports
 a changed natural size upward. A layout placed by another SwiftOmniUI layout
 still returns zero native DesiredSize: its parent reads the arithmetic size
@@ -97,11 +113,29 @@ The fill places its final mounted window once. Accumulated anchor shifts and
 insertion animations are consumed by that final placement. A fill that awaits
 a deferred render resumes after the pass.
 
-An idle viewport keeps its visible rows and fixed neighbours. Scroll look-ahead
-follows the native interaction state and latest offset, not queued movement
-reports. A distant predicted inertia endpoint does not require every
-intervening row to mount, and native Idle returns to the ordinary window.
-Programmatic jumps still request their target window before changing the view.
+The first viewport fills and arranges its visible rows before building the
+scroll cache. After that arrangement completes, low-priority dispatcher work prepares a
+viewport of neighbouring content on either side and retains this buffer
+while idle. This follows native virtualization's visible-first/cache-after-
+arrangement order: `ViewChanged` and `EffectiveViewportChanged` are too late
+to begin preparing all content the compositor will first reveal.
+Realization follows the latest native viewport and its bounded nearby cache,
+not the union of an old effective viewport and a new native offset. That
+union can span many screens when UI notices lag behind the compositor.
+Geometry and anchors continue to use the actual effective viewport. Source
+and allocation changes revalidate readiness; detached views cannot finish
+queued cache work. Programmatic jumps prepare their target window before
+changing the view.
+Cache work uses a separate dispatcher queue from normal layout completions,
+so it cannot be swept into an already queued normal-priority doorbell. Each
+completion re-reads the current native viewport and requires an actual local
+intersection; a sibling lazy container outside that viewport stays unrealized.
+
+A lazy preparation also follows its requested window and completed render,
+not only native child-list changes. An empty builder adds no native child,
+but its newly requested run must still be confirmed as zero before further
+realization can proceed. This invalidates local preparation without forcing
+another ancestor geometry update.
 
 GeometryReader accepts a safe allocation while retaining the remaining
 environment. Native window chrome that already sits outside the content row

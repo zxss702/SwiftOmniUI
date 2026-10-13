@@ -267,12 +267,49 @@ void swiftomniui::refreshSafeAreaScrollEdge(controls::ScrollView const &scroller
     }
 }
 
+extern "C" void swiftomniui_winui_window_set_background(
+    SwiftOmniUIObjectRef handle, bool hasBackground, uint32_t background
+) {
+    try {
+        xaml::Media::Brush fill{nullptr};
+        if (hasBackground) {
+            winrt::Windows::UI::Color color{
+                static_cast<uint8_t>(background >> 24), static_cast<uint8_t>(background >> 16),
+                static_cast<uint8_t>(background >> 8), static_cast<uint8_t>(background)};
+            fill = xaml::Media::SolidColorBrush(color);
+        }
+        root(borrow<xaml::Window>(handle)).Background(fill);
+    } catch (...) {
+        report("painting a window's background");
+    }
+}
+
+extern "C" bool swiftomniui_winui_window_background(SwiftOmniUIObjectRef handle, uint32_t *background) {
+    try {
+        auto fill = root(borrow<xaml::Window>(handle)).Background().try_as<xaml::Media::SolidColorBrush>();
+        if (!fill) return false;
+        auto color = fill.Color();
+        if (background) *background = (static_cast<uint32_t>(color.A) << 24) | (static_cast<uint32_t>(color.R) << 16)
+            | (static_cast<uint32_t>(color.G) << 8) | static_cast<uint32_t>(color.B);
+        return true;
+    } catch (...) {
+        report("reading a window's background");
+        return false;
+    }
+}
+
 extern "C" void swiftomniui_winui_window_set_chrome(
     SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef titleBar, SwiftOmniUIObjectRef menuBar, SwiftOmniUIObjectRef tabs
 ) {
     try {
         auto window = borrow<xaml::Window>(handle);
         auto grid = root(window);
+        xaml::UIElement previous{nullptr};
+        for (auto const &child : grid.Children()) {
+            auto part = child.as<xaml::FrameworkElement>();
+            if (!isLayer(part) && controls::Grid::GetRow(part) == 0) { previous = part; break; }
+        }
+        auto next = titleBar ? as<xaml::UIElement>(titleBar) : xaml::UIElement{nullptr};
         standInRow(grid, 0, titleBar);
         standInRow(grid, 1, menuBar);
         standInRow(grid, 2, tabs);
@@ -284,9 +321,25 @@ extern "C" void swiftomniui_winui_window_set_chrome(
         if (titleBar && !window.ExtendsContentIntoTitleBar()) {
             auto bar = as<controls::TitleBar>(titleBar);
             window.ExtendsContentIntoTitleBar(true);
-            window.SetTitleBar(bar);
-            window.AppWindow().TitleBar().PreferredHeightOption(winrt::Microsoft::UI::Windowing::TitleBarHeightOption::Tall);
             takeTheWayBack(grid, winrt::unbox_value<int64_t>(bar.Tag()));
+        }
+        if (previous != next) {
+            // Removing the XAML toolbar releases its layout row. The system still owns the caption buttons,
+            // overlaid on the content; they do not reserve a blank strip at the top of the client area.
+            window.SetTitleBar(next);
+            auto caption = window.AppWindow().TitleBar();
+            caption.PreferredHeightOption(titleBar ? windowing::TitleBarHeightOption::Tall
+                                                  : windowing::TitleBarHeightOption::Standard);
+            auto transparent = winrt::box_value(winrt::Windows::UI::Colors::Transparent())
+                .as<winrt::Windows::Foundation::IReference<winrt::Windows::UI::Color>>();
+            caption.ButtonBackgroundColor(transparent);
+            caption.ButtonInactiveBackgroundColor(transparent);
+            if (!titleBar) {
+                // SetTitleBar(nullptr) restores the default caption drag strip. Clear only that region so
+                // controls at the content's top edge receive input, leaving native caption buttons intact.
+                winrt::Microsoft::UI::Input::InputNonClientPointerSource::GetForWindowId(window.AppWindow().Id())
+                    .ClearRegionRects(winrt::Microsoft::UI::Input::NonClientRegionKind::Caption);
+            }
         }
         if (titleBar) as<controls::TitleBar>(titleBar).ApplyTemplate();
     } catch (...) {

@@ -22,6 +22,9 @@ final class GTKWindow {
     /// The frame a page shown by itself stands in; nil while the window shows an arrangement.
     private(set) var pageFrame: GTKPageFrame?
 
+    /// Native close controls over full-size content while the window's toolbar is hidden.
+    private(set) var floatingControls: GTKWidget?
+
     /// The layers the window's content and its overlay stand in.
     private let layers: GTKWidget
 
@@ -143,6 +146,22 @@ final class GTKWindow {
         if let fillClass { gtk_widget_remove_css_class(widget, fillClass) }
         if let wanted { gtk_widget_add_css_class(widget, wanted) }
         fillClass = wanted
+    }
+
+    /// Keep GTK's close action reachable without adding a header row or consuming content's safe area.
+    func showFloatingControls(_ shows: Bool) {
+        if shows, floatingControls == nil {
+            let controls = gtk_window_controls_new(GTK_PACK_END)!
+            gtk_window_controls_set_decoration_layout(controls.opaque, ":close")
+            gtk_widget_set_halign(controls, GTK_ALIGN_END)
+            gtk_widget_set_valign(controls, GTK_ALIGN_START)
+            gtk_widget_set_margin_top(controls, 6)
+            gtk_widget_set_margin_end(controls, 6)
+            gtk_overlay_add_overlay(layers.opaque, controls)
+            gtk_overlay_set_measure_overlay(layers.opaque, controls, 0)
+            floatingControls = controls
+        }
+        if let floatingControls { gtk_widget_set_visible(floatingControls, shows ? 1 : 0) }
     }
 
     /// The window's size as it opens, where the window element says one; a window already open takes it too.

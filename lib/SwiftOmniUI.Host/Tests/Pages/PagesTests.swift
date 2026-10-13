@@ -275,6 +275,29 @@ final class PagesTests: XCTestCase {
         XCTAssertEqual(title("stacked"), "Top", "a stack in a tab names the window by its top page")
     }
 
+    /// A wrapper's background still paints the window when its nested stack supplies the visible page/title.
+    func testWindowBackgroundFallsBackToComposedPageContent() throws {
+        let outer = Color.red.propValue
+        let inner = Color.blue.propValue
+        func window(_ detailBackground: HostValue?) -> HostPatch {
+            node("window", .windowScene, children: [node("wrapper", .page, children: [
+                node("content", .zStack, [.windowBackground: outer], children: [
+                    node("stack", .navigationStack, children: [
+                        node("detail", .page, detailBackground.map { [.windowBackground: $0] } ?? [:]),
+                    ]),
+                ]),
+            ])])
+        }
+        let runtime = runtime(window(nil)) { _ in }
+        let root = try XCTUnwrap(runtime.tree.root)
+        let wrapper = try XCTUnwrap(root.first(id: .manual("wrapper")))
+        XCTAssertEqual(WindowChrome(window: root, arrangement: wrapper).windowBackground, outer)
+
+        runtime.tree.apply(window(inner), complete: true)
+        XCTAssertEqual(WindowChrome(window: root, arrangement: wrapper).windowBackground, inner,
+                       "the visible page's own background still takes precedence")
+    }
+
     /// A menu walks its items, separators and submenus in order, each with its caption and whether it can be chosen;
     /// a bar holds only its menus.
     func testAMenuIsWalkedInOrder() throws {

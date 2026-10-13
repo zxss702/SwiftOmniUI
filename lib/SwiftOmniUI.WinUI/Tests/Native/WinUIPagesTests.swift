@@ -9,6 +9,51 @@ import SwiftOmniUIConformance
 import XCTest
 
 final class WinUIPagesTests: XCTestCase {
+    /// Hiding the toolbar removes its native row, while the complete client area keeps the window's own colour.
+    func testHiddenWindowToolbarUsesTheFullClientAreaAndRestoresDynamically() throws {
+        try onUIThread {
+            let visible = State(wrappedValue: false)
+            let background = State(wrappedValue: Color.red)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                HStack(spacing: 0) {
+                    Text("Recent").frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Divider().frame(maxHeight: .infinity)
+                    Text("Welcome").frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .frame(width: 480, height: 320)
+                .windowBackground(background.wrappedValue)
+                .toolbarVisibility(visible.wrappedValue ? .visible : .hidden, for: .windowToolbar)
+            }
+            let window = try XCTUnwrap(host.window)
+            let content = try XCTUnwrap(window.content)
+            var color: UInt32 = 0
+            XCTAssertTrue(swiftomniui_winui_window_background(window.handle, &color))
+            XCTAssertEqual(color, try XCTUnwrap(Color.red.propValue.argb))
+            XCTAssertFalse(window.titleBarStands)
+            XCTAssertEqual(window.chromeHeight, 0)
+            XCTAssertEqual(content.origin.y, 0, accuracy: 1, "no invisible caption row above the content")
+            XCTAssertEqual(content.frame.height, window.contentSize.height, accuracy: 1)
+
+            visible.wrappedValue = true
+            background.wrappedValue = .blue
+            host.runtime.pump.turn()
+            host.layOut()
+            XCTAssertTrue(window.titleBarStands)
+            XCTAssertGreaterThan(window.chromeHeight, 0)
+            XCTAssertEqual(content.origin.y, window.chromeHeight, accuracy: 1)
+            XCTAssertTrue(swiftomniui_winui_window_background(window.handle, &color))
+            XCTAssertEqual(color, try XCTUnwrap(Color.blue.propValue.argb))
+
+            visible.wrappedValue = false
+            host.runtime.pump.turn()
+            host.layOut()
+            XCTAssertEqual(content.origin.y, 0, accuracy: 1)
+            XCTAssertTrue(window.content === content, "changing chrome keeps the content identity")
+            window.setBackground(nil)
+            XCTAssertFalse(swiftomniui_winui_window_background(window.handle, &color), "no authored root brush")
+        }
+    }
+
     /// A detail page beside the open sidebar is laid out in the room beside it, however the sidebar opened: a
     /// scroller's content there is as wide as the scroller.
     func testADetailBesideTheSidebarTakesTheRoomBesideIt() throws {

@@ -48,4 +48,28 @@ extension WinUIDoorbell {
 
     /// Work waiting for the pass under way to end.
     @MainActor private static var pending: [@MainActor () -> Void] = []
+
+    /// Optional neighbouring rows are prepared after arrangement, below normal
+    /// layout and input work. The native dispatcher determines the ordering;
+    /// no elapsed-time delay or per-frame work budget participates.
+    @MainActor @discardableResult
+    static func afterLayoutCache(_ work: @escaping @MainActor () -> Void) -> Bool {
+        let needsTurn = layoutCachePending.isEmpty
+        layoutCachePending.append(work)
+        guard needsTurn else { return true }
+        let posted = swiftomniui_winui_post_layout_cache {
+            MainActor.assumeIsolated { WinUIDoorbell.layoutCacheTurn() }
+        }
+        if !posted { layoutCachePending.removeAll() }
+        return posted
+    }
+
+    @MainActor private static var layoutCachePending: [@MainActor () -> Void] = []
+
+    @MainActor private static func layoutCacheTurn() {
+        let works = layoutCachePending
+        layoutCachePending = []
+        for work in works { work() }
+        WinUIRenderer.shared?.runtime.pump.turn()
+    }
 }

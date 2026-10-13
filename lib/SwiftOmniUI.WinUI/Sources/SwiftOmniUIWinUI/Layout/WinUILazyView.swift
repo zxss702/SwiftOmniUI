@@ -52,8 +52,6 @@ class WinUILazyView: WinUITravellingLayout {
     /// The viewport the scroller's own notices last named - newer than the
     /// effective viewport while a move stands between them.
     private var announcedRect: Rect?
-    /// Nearby compositor prefetch belongs to a real move, not idle layout.
-    private var scrollPrefetch = false
     /// A program jump prepares its landing without realizing the intervening document.
     private var preparingProgrammaticMove = false
     /// The requested axis offset while a non-animated jump has yet to land.
@@ -65,6 +63,30 @@ class WinUILazyView: WinUITravellingLayout {
     /// after it, its viewport already taken.
     private var inViewportChange = false
     private var pendingViewport = false
+
+    private struct WindowPreparation: Equatable {
+        let built: Range<Int>
+        let content: Int
+        let current: Bool
+    }
+    private var preparedWindow: WindowPreparation?
+    private var preparedAtWidth: Double?
+
+    private struct ArrangedWindow {
+        let preparation: WindowPreparation
+        let width: Double
+        let measurement: Int
+        let geometry: Int
+        let planning: Int
+    }
+    private var arrangedWindow: ArrangedWindow?
+    private var cacheBuildPending = false
+    /// Fill the compositor's viewport-relative buffer only after the actual
+    /// visible rows have completed preparation and arrangement.
+    private var cacheEnabled = false
+    private var cacheContentRevision = -1
+    private var cacheWidth: Double?
+    private var cacheViewportRoom: Double?
 
     init(axis: StackArithmetic.Axis, cells: LazyCells) {
         self.axis = axis
@@ -144,7 +166,6 @@ class WinUILazyView: WinUITravellingLayout {
             if let announced = announcedRect,
                abs(announced.x - rect.x) < 1, abs(announced.y - rect.y) < 1 {
                 announcedRect = rect
-                if watching?.held != true { scrollPrefetch = false }
                 programmaticTarget = nil
             }
         }
@@ -163,47 +184,42 @@ class WinUILazyView: WinUITravellingLayout {
             }
         }
         guard let target = override ?? announcedRect ?? viewport else { return }
+        updateCacheBasis(width: preparedAtWidth)
         let grid = self is WinUILazyGridView
         let revision = grid ? cells.runs.revision : cells.extents.revision
-        // At rest only the actual window and its ordinary neighbour runs
-        // belong mounted. A moving compositor additionally needs the current
-        // and next nearby windows before their viewport notices arrive.
+        // A fresh layout first fills its actual visible rows. After those
+        // rows arrange, retain a bounded cache even at rest: ScrollView's
+        // post-move notices arrive too late to prepare its first moving frame.
         let span = self.span
-        let held = watching?.held == true
-        let moving = !preparingProgrammaticMove && programmaticTarget == nil && (scrollPrefetch || held)
         let incoming = windowSpan(in: target)
         var realize = incoming
-        if moving, let current = span {
-            realize = realize.map {
-                min($0.lowerBound, current.lowerBound)..<max($0.upperBound, current.upperBound)
-            } ?? current
+        let raw = axis == .vertical ? target.height : target.width
+        let room = (raw * 64).rounded() / 64
+        if cacheViewportRoom != nil, cacheViewportRoom != room { resetCache(invalidateArrangement: false) }
+        cacheViewportRoom = room
+        if cacheEnabled, let incoming, let kept = cells.window?.realize,
+           incoming.lowerBound >= kept.upperBound || incoming.upperBound <= kept.lowerBound {
+            // Disconnected landings start from their visible window. Joining
+            // a stale effective viewport to a far native offset would build
+            // every screen between them rather than a bounded nearby cache.
+            resetCache(invalidateArrangement: false)
         }
-        // While moving, a viewport either side covers the next compositor
-        // frames. An inertial final offset may be many screens away: it is
-        // not a reason to realize the whole path there at once.
-        if moving, let realized = realize {
-            // The look-ahead must stand on the same sixty-fourth grid the
-            // window's own bounds snap to, or a float's worth of room lands a
-            // boundary row on one side of the window and not the other.
-            let raw = axis == .vertical ? rect.height : rect.width
-            let room = (raw * 64).rounded() / 64
-            if held, let kept = cells.window?.realize, kept.lowerBound <= max(0, realized.lowerBound - room / 2),
-               kept.upperBound >= realized.upperBound + room / 2 {
-                realize = kept
-            } else {
-                realize = max(0, realized.lowerBound - room)..<(realized.upperBound + room)
-            }
+        if cacheEnabled, !preparingProgrammaticMove, programmaticTarget == nil,
+           let incoming, room > 0 {
+            realize = max(0, incoming.lowerBound - room)..<(incoming.upperBound + room)
         }
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)
             || cells.window?.realize != (realize ?? 0..<0)
             || cells.window?.revision != revision || cells.windowPlanningRevision != planningRevision
             || cells.needsMeasurement
             || measuredRevision != measurementRevision || geometryChanged
-        else { return }
+            || preparedWindow != windowPreparation || !windowIsArranged
+        else { buildCacheAfterArrangement(); return }
         let previous = lastTargetViewport
         lastTargetViewport = target
         if !cells.needsMeasurement, !geometryChanged, !cells.animatesChanges,
            measuredRevision == measurementRevision, cells.window?.revision == revision,
+           preparedWindow == windowPreparation, windowIsArranged,
            cells.windowPlanningRevision == planningRevision,
            (axis == .vertical ? previous?.width == target.width : previous?.height == target.height),
            let span, let realize {
@@ -215,6 +231,7 @@ class WinUILazyView: WinUITravellingLayout {
             let upper = min(cells.identities.count, (wanted.upperBound + 1) * perRun)
             if !wanted.isEmpty, (lower..<upper) == cells.built {
                 tellWindow(span, realize: realize)
+                buildCacheAfterArrangement()
                 return
             }
         }
@@ -234,8 +251,10 @@ class WinUILazyView: WinUITravellingLayout {
                 retell()
                 break
             }
+            needsArrangement = needsArrangement || !windowIsArranged
             if cells.built != built || cells.needsMeasurement
-                || measuredRevision != measurementRevision || cells.anchorShift != 0 {
+                || measuredRevision != measurementRevision || cells.anchorShift != 0
+                || preparedWindow != windowPreparation {
                 prepareMeasure(width: placed.width)
                 needsArrangement = true
             }
@@ -254,6 +273,7 @@ class WinUILazyView: WinUITravellingLayout {
         if needsArrangement, let placed, WinUIView.arranging == 0, WinUIView.measuring == 0 {
             arrange(width: placed.width, height: placed.height)
         }
+        buildCacheAfterArrangement()
     }
 
     /// The window `rect` shows of the run, clipped to its document extent.
@@ -311,15 +331,153 @@ class WinUILazyView: WinUITravellingLayout {
             if self.cells.needsMeasurement || self.cells.window?.span != (self.span ?? 0..<0)
                 || self.cells.window?.revision != revision
                 || self.cells.windowPlanningRevision != self.planningRevision
-                || self.measuredRevision != self.measurementRevision {
+                || self.measuredRevision != self.measurementRevision
+                || self.preparedWindow != self.windowPreparation || !self.windowIsArranged {
                 if let viewport = self.viewport { self.viewportChanged(viewport, effective: false) }
             }
+            self.buildCacheAfterArrangement()
         }
     }
 
     /// The places standing in `span`, as the kind's runs count them; `realize`
     /// is the window a moving scroller can show before the next notice.
     func tellWindow(_ span: Range<Double>, realize: Range<Double>) {}
+
+    private var windowPreparation: WindowPreparation {
+        WindowPreparation(built: cells.built, content: cells.element?.lazyContentRevision ?? 0,
+                          current: cells.requestedItemsAreCurrent)
+    }
+
+    /// A newly requested empty fragment changes no native child list. Its
+    /// window and render completion still belong to preparation, so the base
+    /// panel's width/revision cache must not skip confirming its zero extent.
+    override func prepareMeasure(width: Double) {
+        guard WinUIView.arranging == 0 else { return }
+        if preparedWindow != windowPreparation { forgetMeasurements() }
+        super.prepareMeasure(width: width)
+    }
+
+    /// The selected stack/grid proposal records this, including independent
+    /// XAML measurement that does not enter prepareMeasure above.
+    func didPrepareWindow(width: Double?) {
+        let width = width.map { Double(Float($0)) }
+        updateCacheBasis(width: width)
+        preparedAtWidth = width
+        preparedWindow = windowPreparation
+    }
+
+    private func updateCacheBasis(width: Double?) {
+        let content = cells.element?.lazyContentRevision ?? 0
+        if cacheContentRevision != content || cacheWidth != width {
+            resetCache()
+            cacheContentRevision = content
+            cacheWidth = width
+        }
+    }
+
+    private func resetCache(invalidateArrangement: Bool = true) {
+        cacheEnabled = false
+        if invalidateArrangement { arrangedWindow = nil }
+    }
+
+    /// Record completion after subclasses have placed every child, rather
+    /// than at the beginning of arrange(in:). Measurement flags can settle
+    /// on the following show; afterPass checks this same arrangement again.
+    override func arrange(width: Double, height: Double) {
+        super.arrange(width: width, height: height)
+        let width = Double(Float(width))
+        if let preparedWindow, preparedAtWidth == width {
+            arrangedWindow = ArrangedWindow(preparation: preparedWindow, width: width,
+                                           measurement: measurementRevision,
+                                           geometry: geometryRevision, planning: planningRevision)
+        } else {
+            arrangedWindow = nil
+        }
+        buildCacheAfterArrangement()
+    }
+
+    private var geometryRevision: Int {
+        self is WinUILazyGridView ? cells.runs.revision : cells.extents.revision
+    }
+
+    private var windowIsArranged: Bool {
+        guard let arranged = arrangedWindow else { return false }
+        return arranged.preparation == windowPreparation && arranged.width == preparedAtWidth
+            && arranged.measurement == measurementRevision && arranged.geometry == geometryRevision
+            && arranged.planning == planningRevision
+    }
+
+    private func coversVisibleWindow(in rect: Rect) -> Bool {
+        guard let span = windowSpan(in: rect) else { return true }
+        let perRun = cells.window?.perRun ?? 1
+        let wanted = self is WinUILazyGridView
+            ? cells.runs.places(in: span, overscan: 0, count: (cells.identities.count + perRun - 1) / perRun)
+            : cells.places(in: span, overscan: 0)
+        guard !wanted.isEmpty else { return true }
+        let lower = min(cells.identities.count, max(0, wanted.lowerBound - 1) * perRun)
+        let upper = min(cells.identities.count, (wanted.upperBound + 1) * perRun)
+        return cells.built.lowerBound <= lower && cells.built.upperBound >= upper
+    }
+
+    /// Native virtualizers grow their buffer after the owner arranges. Keep
+    /// that lifecycle here: the first visible pass never synchronously builds
+    /// another whole viewport, and a ready idle buffer survives until movement.
+    private func buildCacheAfterArrangement() {
+        guard !cacheEnabled, !cacheBuildPending, arrangedWindow != nil else { return }
+        cacheBuildPending = true
+        let posted = WinUIDoorbell.afterLayoutCache { [weak self] in
+            self?.finishCacheAfterArrangement(waitForRender: true)
+        }
+        if !posted { cacheBuildPending = false }
+    }
+
+    private func finishCacheAfterArrangement(waitForRender: Bool) {
+        guard !isDetached, !preparingProgrammaticMove, programmaticTarget == nil,
+              let scroll = watching else { cacheBuildPending = false; return }
+        guard cells.requestedItemsAreCurrent else {
+            // Doorbell works run before that turn's runtime pump. An unrelated
+            // pending render can therefore hide an already arranged window.
+            // Continue once after that pump, rather than polling or relying on
+            // an unrelated render to arrange this panel again.
+            if waitForRender {
+                let posted = WinUIDoorbell.afterLayoutCache { [weak self] in
+                    self?.finishCacheAfterArrangement(waitForRender: false)
+                }
+                if !posted { cacheBuildPending = false }
+            } else {
+                cacheBuildPending = false
+            }
+            return
+        }
+        cacheBuildPending = false
+        guard !cells.needsMeasurement, windowIsArranged else {
+            // A requested fragment or changed extent resumes the ordinary
+            // prepare/arrange path; a stable retell also attempts cache work.
+            retell()
+            return
+        }
+        var raw = [Double](repeating: 0, count: 6)
+        swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
+        let latest = Rect(x: raw[0], y: raw[1], width: raw[2], height: raw[3])
+        guard latest.x.isFinite, latest.y.isFinite,
+              latest.width > 0, latest.height > 0,
+              latest.width.isFinite, latest.height.isFinite else { return }
+        let origin = axis == .vertical ? latest.y : latest.x
+        let room = axis == .vertical ? latest.height : latest.width
+        let own = axis == .vertical ? committedLayoutFrame.height : committedLayoutFrame.width
+        // The native read is the parent's full viewport in this panel's
+        // coordinates. It must intersect the panel before end clamping; an
+        // offscreen lazy section must not build a fictitious first screen.
+        guard origin + room > 0, origin < own else { return }
+        if coversVisibleWindow(in: latest) {
+            cacheViewportRoom = (room * 64).rounded() / 64
+            cacheEnabled = true
+        }
+        // Re-read the native window instead of replaying the effective
+        // viewport captured before a resize, scroll or deferred render.
+        announcedRect = latest
+        viewportChanged(latest, effective: false, target: latest)
+    }
 
     /// A changed native cross-axis proposal cannot reuse a previous row density.
     func resetPlanningMeasurements() {
@@ -376,9 +534,10 @@ class WinUILazyView: WinUITravellingLayout {
         effectiveViewport = nil
         lastTargetViewport = nil
         announcedRect = nil
-        scrollPrefetch = false
         preparingProgrammaticMove = false
         programmaticTarget = nil
+        cacheViewportRoom = nil
+        resetCache()
         scrollEar = nil
         if let scroll {
             let ear = WinUIScrollEar(owner: self) { [weak self] in self?.scrollerMoved() }
@@ -419,8 +578,6 @@ class WinUILazyView: WinUITravellingLayout {
         rect.width = effectiveViewport?.width ?? raw[2]
         rect.height = effectiveViewport?.height ?? raw[3]
         if axis == .vertical { rect.y += next.y - standing.y } else { rect.x += next.x - standing.x }
-        let advances = axis == .vertical ? next.y != standing.y : next.x != standing.x
-        scrollPrefetch = !programLanding && (advances || scroll.held)
         announcedRect = rect
         viewportChanged(rect, effective: effectiveViewport == nil, target: rect)
         if programLanding { programmaticTarget = nil }
@@ -434,7 +591,7 @@ class WinUILazyView: WinUITravellingLayout {
         let preparing = preparingProgrammaticMove
         preparingProgrammaticMove = true
         defer { preparingProgrammaticMove = preparing }
-        scrollPrefetch = false
+        resetCache(invalidateArrangement: false)
         let current = scroll.scroller.standing
         let position = axis == .vertical ? current.offset.y : current.offset.x
         let requested = axis == .vertical ? target.y : target.x
@@ -477,9 +634,10 @@ class WinUILazyView: WinUITravellingLayout {
         effectiveViewport = nil
         lastTargetViewport = nil
         announcedRect = nil
-        scrollPrefetch = false
         preparingProgrammaticMove = false
         programmaticTarget = nil
+        cacheViewportRoom = nil
+        resetCache()
         watching = nil
         scrollEar = nil
     }
@@ -573,6 +731,7 @@ final class WinUILazyStackView: WinUILazyView {
             }
             measuredExtent = cells.total
             measuredRevision = measurementRevision
+            didPrepareWindow(width: width)
         }
     }
 
@@ -772,6 +931,7 @@ final class WinUILazyGridView: WinUILazyView {
             }
             measuredExtent = cells.runs.total(count: runCount)
             measuredRevision = measurementRevision
+            didPrepareWindow(width: width)
         }
     }
 

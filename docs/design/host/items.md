@@ -129,8 +129,11 @@ before the rows behind it are requested, while short file rows do not each
 require their own render and preparation. When every measured run has zero
 extent, planning uses 44 rather than a zero-height density.
 Existing native seats within the requested window remain attached during
-a fill. An idle WinUI window requests the visible rows and their neighbours;
-additional look-ahead belongs to an actual scrolling window.
+a fill. WinUI completes the first visible window before deferred work fills
+its neighbouring scroll cache, following the native arrangement lifecycle.
+The ready cache remains attached while idle so asynchronous scrolling can
+reveal content that is already prepared. Realization follows the latest
+native window rather than spanning from a stale effective viewport to it.
 
 The tree's prepared lazy source also retains each current window row's authored
 description. Extending an incremental window runs builders only for incoming

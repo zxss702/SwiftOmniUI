@@ -34,6 +34,15 @@ so a departing navigation page can remain owned by GTK through its slide.
 
 ## The chrome
 
+The visible page's `windowBackground` paints the native application window,
+including when a composed page supplies it around a navigation arrangement.
+Removing the colour restores GTK's background.
+
+Hiding `.windowToolbar` removes the header's reserved height. A native
+`GtkWindowControls` with only the close action stands over the top-right corner
+of the content, without contributing to its measurement or safe area. Showing
+the toolbar again hides those controls and restores the page's header.
+
 The chrome is composed by one function from what the window shows, after
 every render, and written on the header bar of each page shown:
 

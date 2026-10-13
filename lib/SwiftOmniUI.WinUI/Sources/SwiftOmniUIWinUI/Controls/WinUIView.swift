@@ -161,10 +161,12 @@ class WinUIView {
 
     /// Native sizes by proposal. DesiredSize alone belongs only to the last Measure call: a grid can ask for
     /// both an unconstrained size and a wrapped size before arranging either one.
-    private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize)] = []
+    private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize,
+                                scope: Int?, revision: Int, provisionalRevision: Int)] = []
     /// The constraint actually prepared in XAML, separate from the several
     /// proposals the arithmetic can query without changing that constraint.
-    private var nativeProposal: (width: Double?, height: Double?)?
+    private var nativeProposal: (width: Double?, height: Double?, scope: Int?,
+                                 revision: Int, provisionalRevision: Int)?
     private var pendingMeasures: [(width: Double?, height: Double?)] = []
     private var nativeMeasurePending = false
     /// Only views whose size changes are explicitly reported by the host can
@@ -176,6 +178,22 @@ class WinUIView {
     static var provisionalMeasureRevision = 0
     /// Changes when properties or a native size change invalidate this view, not on a repeated Measure query.
     var measurementRevision = 0
+
+    /// Repeated arithmetic and preparation queries share answers only while
+    /// this synchronous operation is on the stack. A later native pass, turn,
+    /// Loaded event, or template update starts a fresh scope.
+    private static var measurementScopeDepth = 0
+    private static var nextMeasurementScope = 0
+    static var measurementScope: Int? {
+        measurementScopeDepth == 0 ? nil : nextMeasurementScope
+    }
+
+    static func withMeasurementScope<Result>(_ work: () -> Result) -> Result {
+        if measurementScopeDepth == 0 { nextMeasurementScope &+= 1 }
+        measurementScopeDepth += 1
+        defer { measurementScopeDepth -= 1 }
+        return work()
+    }
 
     private static let live = LiveViews<WinUIView>()
 
@@ -330,6 +348,10 @@ class WinUIView {
     /// The element's size for the room offered, in DIPs; nil offers any.
     /// Design: docs/design/platforms/winui/layout.md#measured-every-pass
     func measure(width: Double?, height: Double?) -> LayoutSize {
+        Self.withMeasurementScope { measuredSizeInScope(width: width, height: height) }
+    }
+
+    private func measuredSizeInScope(width: Double?, height: Double?) -> LayoutSize {
         // An arrangement asking a child's size reads what this proposal measured: measuring an element
         // while WinUI arranges marks it, and the marked element is measured and arranged again for ever -
         // XAML aborts the eighth such pass with a layout cycle.
@@ -337,8 +359,12 @@ class WinUIView {
         // travelling through Measure and Arrange does not become two different proposals.
         let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         let height = height.flatMap { $0.isFinite ? Double(Float($0)) : nil }
-        if reusesNativeMeasurements || Self.arranging > 0,
-           let measured = measuredSizes.first(where: { $0.width == width && $0.height == height }) {
+        if let measured = measuredSizes.first(where: {
+            $0.width == width && $0.height == height
+                && (reusesNativeMeasurements || Self.arranging > 0
+                    || ($0.scope == Self.measurementScope && $0.revision == measurementRevision
+                        && $0.provisionalRevision == Self.provisionalMeasureRevision))
+        }) {
             return measured.size
         }
         if Self.arranging > 0 {
@@ -379,15 +405,30 @@ class WinUIView {
     /// Querying an ideal size must not repeatedly switch the native subtree
     /// away from its allocated width, or discard other width-keyed answers.
     func prepareNativeMeasure(width: Double?, height: Double?) {
+        Self.withMeasurementScope { prepareNativeProposalInScope(width: width, height: height) }
+    }
+
+    private func prepareNativeProposalInScope(width: Double?, height: Double?) {
         let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         let height = height.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         guard Self.arranging == 0 else {
             _ = measure(width: width, height: height)
             return
         }
-        if reusesNativeMeasurements, let nativeProposal,
-           nativeProposal.width == width, nativeProposal.height == height { return }
+        if let nativeProposal, nativeProposal.width == width, nativeProposal.height == height,
+           reusesNativeMeasurements
+            || (nativeProposal.scope == Self.measurementScope && nativeProposal.revision == measurementRevision
+                && nativeProposal.provisionalRevision == Self.provisionalMeasureRevision) { return }
         _ = measureNative(width: width, height: height)
+    }
+
+    /// A content presenter can measure a panel without going through our
+    /// native query. Its constraint then replaces the recorded selection;
+    /// arithmetic answers still stand, but preparation must restore the place.
+    func forgetNativeMeasureProposal() {
+        guard let _ = nativeProposal else { return }
+        nativeProposal = nil
+        invalidateAncestorPreparation()
     }
 
     /// Validate the proposals used before attachment in the real native tree.
@@ -450,11 +491,11 @@ class WinUIView {
         swiftomniui_winui_measure(handle, width ?? .infinity, height ?? .infinity, &size)
         let measured = LayoutSize(width: size[0], height: size[1])
         guard startedAt == Self.provisionalMeasureRevision, contentRevision == measurementRevision else { return measured }
-        nativeProposal = (width, height)
+        nativeProposal = (width, height, Self.measurementScope, contentRevision, startedAt)
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.
         if measuredSizes.count == 8 { measuredSizes.removeFirst() }
-        measuredSizes.append((width, height, measured))
+        measuredSizes.append((width, height, measured, Self.measurementScope, contentRevision, startedAt))
         return measured
     }
 

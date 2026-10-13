@@ -136,6 +136,7 @@ final class WinUIWindowController {
         let composed = WindowChrome(window: element, arrangement: presentation.arrangement)
         var chrome = WinUIWindowChrome()
         chrome.title = composed.title ?? ""
+        chrome.showsToolbar = composed.toolbarVisibility?.enumeration != Visibility.hidden.rawValue
         chrome.back = composed.back.map { back in
             WinUIToolbarAction(title: back.title, isEnabled: true, perform: { [weak element, weak stack = back.stack] in
                 if let element, let stack { runtime.goBack(.pop(stack), in: element) }
@@ -167,6 +168,7 @@ final class WinUIWindowController {
                 back: { [weak self] in self?.goBack(in: runtime) },
                 dismiss: { [weak self] in self?.dismissTopSheet(in: runtime) })
         }
+        window.setBackground(composed.windowBackground)
         window.apply(chrome, tabs: windowTabs)
     }
 

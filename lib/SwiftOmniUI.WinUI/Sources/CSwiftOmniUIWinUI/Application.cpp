@@ -230,6 +230,16 @@ extern "C" void swiftomniui_winui_post_turn(void) {
     }
 }
 
+extern "C" bool swiftomniui_winui_post_layout_cache(void (*work)(void)) {
+    try {
+        return queue && queue.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
+            guarded("building layout cache", [work] { work(); }));
+    } catch (...) {
+        report("posting layout cache work");
+        return false;
+    }
+}
+
 extern "C" void swiftomniui_winui_keep_scene_alive(bool alive) {
     if (!ownsMessageLoop) return;
     try {

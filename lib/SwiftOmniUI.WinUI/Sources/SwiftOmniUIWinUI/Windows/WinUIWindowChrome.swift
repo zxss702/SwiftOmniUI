@@ -11,6 +11,7 @@
 @MainActor
 struct WinUIWindowChrome {
     var title = ""
+    var showsToolbar = true
     var back: WinUIToolbarAction?
     var sidebarToggle: (() -> Void)?
     var leading: WinUIView?
