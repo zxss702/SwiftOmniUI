@@ -150,7 +150,6 @@ final class WinUIScrollView: WinUILayoutView {
         let context = layoutSafeArea(in: bounds)
         let viewport = box.clips ? bounds : context.viewport(in: bounds, axes: orientation)
         let insets = SafeAreaContext.insets(of: context.safe, in: viewport)
-        barsInsets = insets
         document.consumedInsets = context.consumed + insets
         let padding = SafeAreaArithmetic.physicalInsets(writtenPadding, direction: direction) + insets
         if document.layoutPadding != padding {
@@ -158,8 +157,9 @@ final class WinUIScrollView: WinUILayoutView {
             document.forgetMeasurements()
             wrapper.forgetMeasurements()
         }
-        pendingInsets = insets
-        if !commitPending {
+        if barsInsets != insets || document.padding != padding { pendingInsets = insets }
+        barsInsets = insets
+        if pendingInsets != nil, !commitPending {
             commitPending = true
             WinUIDoorbell.afterPass { [weak self] in
                 guard let self else { return }

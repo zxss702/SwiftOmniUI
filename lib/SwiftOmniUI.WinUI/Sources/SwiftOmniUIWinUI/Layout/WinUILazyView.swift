@@ -126,9 +126,13 @@ class WinUILazyView: WinUITravellingLayout {
         watchClip()
         if effective {
             effectiveViewport = rect
-            // Native clipping/layout is authoritative once reported. An old
-            // announcement must not keep selecting a viewport before resize.
-            announcedRect = rect
+            // EffectiveViewport can arrive after a newer ViewChanged notice.
+            // Acknowledge that window when layout catches up, or replace its
+            // dimensions on resize; never let an old offset evict the new rows.
+            if announcedRect == nil || announcedRect?.width != rect.width || announcedRect?.height != rect.height
+                || announcedRect.flatMap({ windowSpan(in: $0) }) == windowSpan(in: rect) {
+                announcedRect = rect
+            }
         }
         // A notice a mount or a place of this one's own raises answers nothing
         // new - but its viewport is news, so it re-asks once this one is over.
@@ -151,8 +155,15 @@ class WinUILazyView: WinUITravellingLayout {
         // Retaining the whole path until Idle turns a moving window into an
         // ever-growing document, especially with an animation's far endpoint.
         let incoming = windowSpan(in: target)
-        let span = incoming
+        let span = self.span ?? incoming
         var realize = incoming
+        // Layout and compositor notifications can name adjacent windows in
+        // one frame. Keep both while moving, without accumulating scroll history.
+        if watching?.held == true, let visible = self.span {
+            realize = realize.map {
+                min($0.lowerBound, visible.lowerBound)..<max($0.upperBound, visible.upperBound)
+            } ?? visible
+        }
         // Retain the existing viewport-sized look-ahead, but release rows
         // behind it as the view moves rather than waiting for scroll rest.
         if let realized = realize {
@@ -277,8 +288,13 @@ class WinUILazyView: WinUITravellingLayout {
     /// The ScrollViewer owns the physical scroll adjustment through its native anchor.
     func commitAnchor(perRun: Int = 1, grid: Bool = false) {
         guard let origin = cells.correctedOrigin(perRun: perRun, grid: grid) else { return }
-        if axis == .vertical { effectiveViewport?.y = origin }
-        else { effectiveViewport?.x = origin }
+        if axis == .vertical {
+            if let previous = effectiveViewport?.y { announcedRect?.y += origin - previous }
+            effectiveViewport?.y = origin
+        } else {
+            if let previous = effectiveViewport?.x { announcedRect?.x += origin - previous }
+            effectiveViewport?.x = origin
+        }
     }
 
     /// Recomputes the places when the scroller's window moved.

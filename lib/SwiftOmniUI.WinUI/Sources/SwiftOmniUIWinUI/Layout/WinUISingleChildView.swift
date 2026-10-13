@@ -15,12 +15,12 @@ class WinUISingleChildView: WinUILayoutView {
     override func contentSize(width: Double?) -> LayoutSize {
         let size = Self.querySize { SingleChildArithmetic.size(of: items.first, padding: padding, width: width) }
         if WinUIView.arranging == 0, Self.queryingSize == 0,
-           let item = items.first, item.isShown, let layout = item.view as? WinUILayoutView {
+           let item = items.first, item.isShown {
             let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
             let place = Self.querySize {
                 SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction)
             }
-            layout.prepareMeasure(width: place.width)
+            item.view.prepareMeasure(width: place.width)
             return Self.querySize { SingleChildArithmetic.size(of: items.first, padding: padding, width: width) }
         }
         return size

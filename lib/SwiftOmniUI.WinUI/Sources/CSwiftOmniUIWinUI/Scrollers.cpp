@@ -12,6 +12,7 @@
 #include <memory>
 #include <iterator>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -30,6 +31,7 @@ namespace {
         xaml::Thickness region{};
         std::vector<IndicatorMargin> indicators;
         bool pending = false;
+        winrt::event_token templateLayout{};
     };
     std::unordered_map<void *, std::weak_ptr<ScrollerInsets>> insetStates;
 
@@ -87,6 +89,19 @@ namespace {
             state->pending = false;
             if (auto scroller = weak.get()) applyInsets(scroller, *state);
         }))) state->pending = false;
+    }
+
+    void templateInsets(controls::ScrollView const &scroller, std::shared_ptr<ScrollerInsets> const &state) {
+        if (state->templateLayout) return;
+        // TemplateProperty changes before the new parts are arranged. Observe
+        // that one layout, then stop listening to unrelated window layouts.
+        state->templateLayout = scroller.LayoutUpdated(guarded("preparing changed scroller template",
+            [weak = winrt::make_weak(scroller), state](auto const &, auto const &) {
+            if (auto scroller = weak.get()) {
+                scroller.LayoutUpdated(std::exchange(state->templateLayout, {}));
+                queueInsets(scroller, state);
+            }
+        }));
     }
     controls::ScrollingScrollBarVisibility visibility(bool scrolls, int32_t bar) {
         if (!scrolls) return controls::ScrollingScrollBarVisibility::Hidden;
@@ -182,9 +197,13 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
         scroller.Loaded(guarded("preparing scroller margins", [insets](IInspectable const &sender, auto const &) {
             queueInsets(sender.as<controls::ScrollView>(), insets);
         }));
-        scroller.LayoutUpdated(guarded("refreshing scroller template margins", [weak = winrt::make_weak(scroller), insets](auto const &, auto const &) {
-            if (auto scroller = weak.get()) queueInsets(scroller, insets);
-        }));
+        scroller.RegisterPropertyChangedCallback(controls::Control::TemplateProperty(),
+            guarded("refreshing scroller template margins", [insets](xaml::DependencyObject const &sender,
+                xaml::DependencyProperty const &) { templateInsets(sender.as<controls::ScrollView>(), insets); }));
+        scroller.ActualThemeChanged(guarded("refreshing themed scroller margins",
+            [insets](xaml::FrameworkElement const &sender, auto const &) {
+                templateInsets(sender.as<controls::ScrollView>(), insets);
+            }));
         auto flight = std::make_shared<ScrollerFlight>();
         scroller.ZoomMode(controls::ScrollingZoomMode::Disabled);
         // The InteractionTracker's word of the view, every frame it moves: the
@@ -374,7 +393,9 @@ extern "C" void swiftomniui_winui_scroller_insets(
         auto found = insetStates.find(winrt::get_abi(scroller));
         if (found == insetStates.end()) return;
         if (auto state = found->second.lock()) {
-            state->region = xaml::Thickness{left, top, right, bottom};
+            auto region = xaml::Thickness{left, top, right, bottom};
+            if (sameMargin(state->region, region)) return;
+            state->region = region;
             queueInsets(scroller, state);
         }
     } catch (...) {

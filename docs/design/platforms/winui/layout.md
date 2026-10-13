@@ -37,6 +37,10 @@ Arithmetic queries and native preparation have separate scopes. A
 does not recursively prepare panels or replace lazy row geometry. Stacks,
 single-child containers and layers also calculate their child places in a
 query scope, then prepare only the selected places during native measurement.
+Repeated leaf probes read width-keyed answers without selecting another
+native proposal. A new leaf probe marks its placing ancestors' native
+preparation stale, while retaining their arithmetic answers. The selected
+places prepare native leaves as well as panels before arrangement.
 They read the resulting sizes again before answering, so an initially
 estimated lazy extent is not retained as the parent's completed size.
 
@@ -48,6 +52,8 @@ the arithmetic and reports a changed size upward. Repeating a preparation
 at the same width and revision does nothing unless a fresh query has changed
 the subtree's native proposals. This avoids the former alternating
 ideal/allocated-width queries clearing and rebuilding nested caches.
+Only a completed native measure records the prepared subtree's width;
+an arithmetic cache miss cannot overwrite that record.
 
 Nothing is measured while WinUI arranges: `Measure` written on an element
 inside an arrangement marks it, the marked element is measured and arranged
@@ -90,6 +96,11 @@ scroll's final endpoint. It releases rows behind its look-ahead while a
 scroll is still active; it does not keep the continuous path from the first
 viewport to the eventual endpoint mounted until Idle. Program jumps still
 announce and realize their destination before moving the native scroller.
+An older EffectiveViewport notice cannot replace a newer ViewChanged position
+until it reports that same window (or changes the viewport dimensions). While
+moving, realization covers both the layout viewport and the latest announced
+viewport, with the existing look-ahead; it retains no accumulated path.
+Anchor corrections shift both viewport records together.
 
 GeometryReader accepts a safe allocation while retaining the remaining
 environment. Native window chrome that already sits outside the content row
@@ -203,6 +214,10 @@ state, while native padding invalidation, scrollbar margin writes and bar
 ownership changes commit after the pass. A template search skips document
 content and nested scrollers, retaining each indicator's original margin.
 Template reloads reapply the current contribution without accumulating it.
+Margin commits run on initial loading, changed insets, and template/theme
+changes. Template changes use one LayoutUpdated notification, then remove
+the handler; unrelated window layouts do not traverse every scroller's
+template again. Unchanged resolved margins post no new commit.
 Native scroller proposals first encountered during arrangement are prepared
 after the pass. Size feedback to a placing layout is deferred as well.
 

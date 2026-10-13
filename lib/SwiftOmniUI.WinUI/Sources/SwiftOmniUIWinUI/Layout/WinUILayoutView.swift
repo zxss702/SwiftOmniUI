@@ -237,13 +237,17 @@ class WinUILayoutView: WinUIView {
     /// Forgets the sizes this layout keeps.
     func forgetMeasurements() {
         measurements.invalidate()
+        forgetNativePreparation()
+    }
+
+    func forgetNativePreparation() {
         preparedMeasure = nil
         hasSizing = false
     }
 
     /// Marks this panel measured at its allocated width without discarding the natural
     /// sizes the arithmetic just computed. An independent XAML measure still refreshes them.
-    func prepareMeasure(width: Double) {
+    override func prepareMeasure(width: Double) {
         guard WinUIView.arranging == 0, Self.queryingSize == 0 else { return }
         let width = Double(Float(width))
         let currentSizing = hasSizing && lastSizingWidth == (width.isFinite ? width : nil)
@@ -336,9 +340,7 @@ class WinUILayoutView: WinUIView {
             defer { Self.queryingSize -= 1 }
             let startedAt = WinUIView.provisionalMeasureRevision
             let size = contentSize(width: width)
-            lastSizingWidth = width
-            hasSizing = startedAt == WinUIView.provisionalMeasureRevision
-            if !hasSizing {
+            if startedAt != WinUIView.provisionalMeasureRevision {
                 // The next deferred proposal completes this result. Do not
                 // let a previous DesiredSize become a row's natural extent.
                 measurements.invalidate()

@@ -283,6 +283,12 @@ class WinUIView {
         swiftomniui_winui_invalidate_measure(handle)
     }
 
+    /// Restore the selected native proposal after arithmetic has probed other widths.
+    func prepareMeasure(width: Double) {
+        guard Self.arranging == 0, WinUILayoutView.queryingSize == 0 else { return }
+        _ = measure(width: width, height: nil)
+    }
+
     /// The element's size for the room offered, in DIPs; nil offers any.
     /// Design: docs/design/platforms/winui/layout.md#measured-every-pass
     func measure(width: Double?, height: Double?) -> LayoutSize {
@@ -293,6 +299,10 @@ class WinUIView {
         // travelling through Measure and Arrange does not become two different proposals.
         let width = width.map { Double(Float($0)) }
         let height = height.map { Double(Float($0)) }
+        if WinUILayoutView.queryingSize > 0,
+           let measured = measuredSizes.first(where: { $0.width == width && $0.height == height }) {
+            return measured.size
+        }
         if Self.arranging > 0 {
             if let measured = measuredSizes.first(where: { $0.width == width && $0.height == height }) {
                 return measured.size
@@ -334,6 +344,15 @@ class WinUIView {
         defer { Self.measuring -= 1 }
         swiftomniui_winui_measure(handle, width ?? .infinity, height ?? .infinity, &size)
         let measured = LayoutSize(width: size[0], height: size[1])
+        if WinUILayoutView.queryingSize > 0 {
+            // A new intrinsic proposal changed XAML's last measurement. Only
+            // native preparation is stale; arithmetic answers by width remain valid.
+            var parent = placingLayout
+            while let layout = parent {
+                layout.forgetNativePreparation()
+                parent = (layout as? WinUIScrollDocument)?.scrollView ?? layout.placingLayout
+            }
+        }
         guard startedAt == Self.provisionalMeasureRevision else { return measured }
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.

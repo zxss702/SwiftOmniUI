@@ -46,9 +46,7 @@ class WinUIZStackView: WinUITravellingLayout {
                 ZStackArithmetic.places(of: items, in: room, padding: padding, direction: direction)
             }
             for (item, place) in zip(items, places) {
-                if let place, let layout = item.view as? WinUILayoutView {
-                    layout.prepareMeasure(width: place.width)
-                }
+                if let place { item.view.prepareMeasure(width: place.width) }
             }
             return Self.querySize { ZStackArithmetic.size(of: items, padding: padding, width: width) }
         }
