@@ -117,7 +117,14 @@ extension GTKRenderer {
     static func running(
         clock: TestClock? = nil, reducesMotion: Bool = false, _ page: @escaping @MainActor @Sendable () -> any Page
     ) -> GTKRenderer {
-        stateUIUseApp(OneWindowApplication(page: page))
+        running(application: OneWindowApplication(page: page), clock: clock, reducesMotion: reducesMotion)
+    }
+
+    /// A complete application, including its scene commands and additional windows.
+    static func running(
+        application: any App, clock: TestClock? = nil, reducesMotion: Bool = false
+    ) -> GTKRenderer {
+        stateUIUseApp(application)
         let renderer = replacing(clock: clock, reducesMotion: reducesMotion)
         renderer.show()
         GTKTestHost.pump(0.02)

@@ -11,7 +11,7 @@ import CSwiftOmniUIGTK
 @MainActor
 final class GTKMenuButtonView: GTKView {
     /// The menu the button shows, holding its model and action group while it lasts.
-    private var menu: GTKMenu?
+    private(set) var menu: GTKMenu?
 
     /// A menu button, face a chevron until a label child's widget lands.
     init() {

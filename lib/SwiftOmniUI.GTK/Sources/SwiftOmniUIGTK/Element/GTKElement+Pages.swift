@@ -108,7 +108,7 @@ extension GTKElement {
             guard let split = view as? GTKSplitView else { return nil }
             if element.sidebarIsVisible, let frame = header(split.sidebarFrame, of: children.first) { return frame }
             if split.showsDetailColumn {
-                if split.showsContentColumn,
+                if split.isContentPresented,
                    let frame = header(split.contentFrame, of: children.dropFirst().first) { return frame }
                 return header(split.detailFrame, of: children.last)
             }
@@ -124,7 +124,7 @@ extension GTKElement {
     /// `sidebar` shows a split view's sidebar from the header bar of the page the user sees in its detail.
     func composeChrome(
         showingSidebar sidebar: (shows: Bool, toggle: () -> Void)? = nil,
-        show: (GTKPageFrame, GTKPageChrome) -> Void = { frame, chrome in frame.show(chrome) }
+        show: @MainActor (GTKPageFrame, GTKPageChrome) -> Void = { frame, chrome in frame.show(chrome) }
     ) {
         switch type {
         case .page:

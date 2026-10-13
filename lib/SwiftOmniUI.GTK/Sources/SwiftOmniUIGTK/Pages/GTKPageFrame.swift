@@ -30,7 +30,7 @@ final class GTKPageFrame {
     private(set) var buttons: [GTKButtonView] = []
     private(set) var leadingButtons: [GTKButtonView] = []
     private var sidebarButton: GTKButtonView?
-    private var appMenuButton: GTKMenuButtonView?
+    private(set) var appMenuButton: GTKMenuButtonView?
     /// What the app menu last showed, for writing it again only where it changed.
     private var appMenuDrawn: [MenuEntry] = []
     private var overflowButton: GTKWidget?
@@ -231,10 +231,13 @@ final class GTKPageFrame {
             adw_header_bar_pack_start(header.opaque, button.widget)
             appMenuButton = button
         }
-        let same = entries.count == appMenuDrawn.count && zip(entries, appMenuDrawn).allSatisfy {
-            $0.title == $1.title && $0.isEnabled == $1.isEnabled && $0.entries.count == $1.entries.count
+        func matches(_ entries: [MenuEntry], _ previous: [MenuEntry]) -> Bool {
+            entries.count == previous.count && zip(entries, previous).allSatisfy {
+                $0.kind == $1.kind && $0.title == $1.title && $0.isEnabled == $1.isEnabled
+                    && $0.element === $1.element && matches($0.entries, $1.entries)
+            }
         }
-        guard !same else { return }
+        guard !matches(entries, appMenuDrawn) else { return }
         appMenuButton?.setEntries(entries)
         appMenuDrawn = entries
     }

@@ -67,7 +67,10 @@ extension GTKDriver {
     /// The widget whose menu shows the item `element` - a view its context menu, a main menu's button - the menu,
     /// and the name of its action.
     private func menuItem(_ element: MountedElement) -> (GTKWidget, GTKMenu, String)? {
-        let shown: [(GTKWidget, GTKMenu)] = frames().compactMap { frame in frame.mainMenu.map { ($0.button, $0.menu) } }
+        let shown: [(GTKWidget, GTKMenu)] = frames().flatMap { frame in
+            (frame.mainMenu.map { [($0.button, $0.menu)] } ?? [])
+                + (frame.appMenuButton.flatMap { button in button.menu.map { [(button.widget, $0)] } } ?? [])
+        }
             + (renderer?.views(GTKView.self) ?? []).compactMap { view in view.contextMenu.map { (view.widget, $0.menu) } }
         for (widget, menu) in shown {
             if let name = menu.items.first(where: { $0.value() === element })?.key { return (widget, menu, name) }
@@ -89,7 +92,7 @@ extension GTKDriver {
     func frames() -> [GTKPageFrame] {
         guard let renderer else { return [] }
         return (renderer.window?.pageFrame.map { [$0] } ?? []) + renderer.views(GTKNavigationView.self).flatMap { $0.frames }
-            + renderer.views(GTKSplitView.self).flatMap { [$0.sidebarFrame, $0.detailFrame].compactMap { $0 } }
+            + renderer.views(GTKSplitView.self).flatMap { [$0.sidebarFrame, $0.contentFrame, $0.detailFrame].compactMap { $0 } }
     }
 
     /// The entries `model` holds as the drivers say them: captions, "!" before one whose action cannot run, "-"

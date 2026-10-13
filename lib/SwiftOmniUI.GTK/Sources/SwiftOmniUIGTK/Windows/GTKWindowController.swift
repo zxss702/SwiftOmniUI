@@ -23,6 +23,9 @@ final class GTKWindowController {
     /// A sheet for each page the window's modal stack presents, the last on top.
     private(set) var sheets: [(element: MountedElement, sheet: GTKSheet)] = []
 
+    /// The header currently hosting commands, including one in a tab that may become inactive.
+    private weak var commandsFrame: GTKPageFrame?
+
     /// The arrangement of pages the window shows.
     var arrangement: MountedElement? { presentation.arrangement }
 
@@ -107,6 +110,12 @@ final class GTKWindowController {
             let rootChrome = shown.gtk.chrome
             let commandFrame = framed && rootChrome.showsBar
                 ? window.pageFrame : shown.gtk.leadingHeaderFrame
+            if let previous = commandsFrame, previous !== commandFrame {
+                var chrome = previous.chrome
+                chrome.appMenu = []
+                previous.show(chrome)
+            }
+            commandsFrame = commandFrame
             let entries = GTKElement.appMenuEntries(of: element)
             // Commands belong to a window, not to the page that supplies its title. Resolve their host from
             // the actual native frames, and write them once while composing every bar (including inactive ones).

@@ -123,6 +123,17 @@ the main menu at the very end of its header bar - GNOME's
 `open-menu-symbolic` button - each a submenu holding its entries, joined by
 the host layer's rule. A page that declares none shows no main menu.
 
+Scene commands use a separate native menu button at the start of one visible
+header. A `CommandGroup(replacing: .appInfo)` contributes its entries there;
+a `CommandMenu` contributes a submenu. The window controller chooses the
+actual frame carrying the header, rather than comparing it with the page
+that supplies the window title: the window's own frame, the top navigation
+frame, or the leading visible split column. Page wrappers and tab selection
+do not drop commands, and hiding a split column moves the menu to the next
+visible header. Hidden and inactive frames carry no duplicate command menu.
+Unchanged entries keep their native model and actions; updates compare nested
+contents and target element identities as well as captions and enabled state.
+
 ## The window's overlay
 
 What a window lays over everything it shows - the inspector docked in it, an
