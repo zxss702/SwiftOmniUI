@@ -55,14 +55,16 @@ final class GTKGridView: GTKTravellingLayout {
         let context = layoutSafeArea(in: bounds)
         if let element = sourceElement, element.isSafeAreaBoundary, let item = items.first(where: { !$0.departing }) {
             let next = context.padding(SafeAreaArithmetic.physicalInsets(element.safeAreaPadding ?? EdgeInsets(0), direction: direction))
-            let place = SafeAreaArithmetic.base(of: item, boundary: item.element?.isSafeAreaBoundary == true,
+            let place = SafeAreaArithmetic.base(of: item, boundary: item.element?.preservesSafeAreaProposal == true,
                                                ignores: item.element?.ignoresSafeArea,
                                                in: next, direction: direction)
             self.place(item, at: place)
             return
         }
         if sourceElement?.isGeometryReader == true {
-            let places = GeometryReaderArithmetic.places(of: items, in: bounds, direction: direction)
+            let places = GeometryReaderArithmetic.places(of: items, in: bounds, direction: direction, safeArea: context) {
+                $0.element?.preservesSafeAreaProposal == true
+            }
             for (item, place) in zip(items, places) {
                 if let place { self.place(item, at: place) }
             }

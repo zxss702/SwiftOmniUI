@@ -17,6 +17,7 @@ class WinUITextView: WinUIView {
 
     /// Where the view's place is bound while it travels; nil where it stands.
     private var bound: Rect?
+    private var loadedMeasurePending = false
 
     /// The size WinUI draws body text at, in DIPs.
     static let platformFontSize = 14.0
@@ -26,6 +27,27 @@ class WinUITextView: WinUIView {
 
     init() {
         super.init { _ in swiftomniui_winui_text_make() }
+        swiftomniui_winui_text_on_loaded(handle, number) { number in
+            MainActor.assumeIsolated {
+                guard let text = WinUIView.find(number) as? WinUITextView else { return }
+                text.nativeTextLoaded()
+            }
+        }
+    }
+
+    /// The pre-attachment measurement does not establish the final native
+    /// text layout. Loaded commits one fresh measurement in the real tree,
+    /// including its XamlRoot scale/resources, before relying on cached sizes.
+    private func nativeTextLoaded() {
+        guard !loadedMeasurePending else { return }
+        loadedMeasurePending = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.loadedMeasurePending = false
+            guard self.sourceElement?.isDeparting != true else { return }
+            self.invalidateMeasure()
+            self.placingLayout?.commitMeasurementChange()
+        }
     }
 
     /// The words shown.

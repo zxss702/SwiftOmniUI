@@ -113,6 +113,17 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_text_make(void) {
     }
 }
 
+extern "C" void swiftomniui_winui_text_on_loaded(
+    SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t)
+) {
+    try {
+        borrow<controls::Border>(handle).Loaded(guarded("completing a loaded label's measurement",
+            [view, ready](IInspectable const &, xaml::RoutedEventArgs const &) {
+                if (ready) ready(view);
+            }));
+    } catch (...) { report("following a label's native attachment"); }
+}
+
 extern "C" void swiftomniui_winui_text_set_text(SwiftOmniUIObjectRef handle, char const *utf8) {
     try {
         labelWords(handle).Text(text(utf8));

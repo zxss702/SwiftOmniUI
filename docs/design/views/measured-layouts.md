@@ -56,6 +56,11 @@ children do not determine its natural size, finite proposals are accepted,
 and unspecified axes have an ideal extent of ten. Children stack from the
 leading top corner with the allocated proposal.
 
+An ordered safe-area boundary preserves the proposal for a reader or scroller,
+including transparent wrappers around them. The reader reports the actual full
+allocation and its remaining inset; the ScrollView resolves that inset into
+document margins. Ordinary content is placed within the safe region instead.
+
 The ten-number report still carries parent frame, window origin and safe
 rectangle. GTK and WinUI use actual native dimensions and the same remaining
 safe region that placed the view; `geometry.size` is its allocated size and

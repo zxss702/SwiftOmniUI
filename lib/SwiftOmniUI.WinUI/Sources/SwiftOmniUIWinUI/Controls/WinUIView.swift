@@ -298,7 +298,7 @@ class WinUIView {
                         for proposal in proposals {
                             _ = self.measure(width: proposal.width, height: proposal.height)
                         }
-                        self.placingLayout?.invalidateMeasurements()
+                        self.placingLayout?.commitMeasurementChange()
                     }
                 }
             }
@@ -339,9 +339,8 @@ class WinUIView {
                 if layout.standsAt != place.width,
                    !measuredSizes.contains(where: { $0.width == Double(Float(place.width)) && $0.height == nil }) {
                     WinUIDoorbell.afterPass { [weak self] in
-                        guard let self, let layout = self as? WinUILayoutView, let width = layout.standsAt else { return }
-                        layout.invalidateMeasurements()
-                        layout.prepareMeasure(width: width)
+                        guard let self, let layout = self as? WinUILayoutView, layout.standsAt != nil else { return }
+                        layout.commitMeasurementChange()
                     }
                 }
                 layout.standsAt = place.width

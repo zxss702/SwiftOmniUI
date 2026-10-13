@@ -12,10 +12,13 @@
     }
 
     @MainActor public static func places<Child: LayoutChild>(of items: [Child], in room: Rect,
-                                                          direction: LayoutDirection) -> [Rect?] {
+                                                          direction: LayoutDirection,
+                                                          safeArea: SafeAreaContext? = nil,
+                                                          preservesProposal: (Child) -> Bool = { _ in false }) -> [Rect?] {
         items.map { item in
             guard item.isShown else { return nil }
-            return SingleChildArithmetic.place(of: LeadingChild(base: item), in: room,
+            let proposal = preservesProposal(item) ? room : safeArea?.safe ?? room
+            return SingleChildArithmetic.place(of: LeadingChild(base: item), in: proposal,
                                                padding: EdgeInsets(0), direction: direction)
         }
     }

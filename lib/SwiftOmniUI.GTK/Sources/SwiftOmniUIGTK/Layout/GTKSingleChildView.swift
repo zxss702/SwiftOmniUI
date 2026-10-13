@@ -27,7 +27,7 @@ class GTKSingleChildView: GTKLayoutView {
         guard let item = items.first, item.isShown else { return }
 
         let context = layoutSafeArea(in: bounds)
-        let room = item.element?.isSafeAreaBoundary == true ? bounds : context.safe
+        let room = item.element?.preservesSafeAreaProposal == true ? bounds : context.safe
         item.view.layout(SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction))
     }
 }

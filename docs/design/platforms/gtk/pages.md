@@ -19,8 +19,11 @@ of it go once the slide is over.
 Page-level top inset surfaces are added after the native header and tabs in
 the same `AdwToolbarView`. Content extends to its top edge, while the placement
 context reserves only the native header/tabs there; each source inset reserves
-its own extent once. The native toolbar owns the combined backdrop and lower
-undershoot edge. Bottom, side and local insets remain transparent layouts.
+its own extent once. The native toolbar owns the combined backdrop. Since
+extend-content disables libadwaita's flat undershoot, page scrollers drive the
+native raised bar style while scrolled; its shadow lands below the complete
+top region. Only their displaced top scroller effects are suppressed. Bottom,
+side and local insets remain transparent layouts, with independent edge effects.
 
 A promoted authored widget has one native parent. Its logical source and
 placing layout remain unchanged, retaining ancestor animation matrices,

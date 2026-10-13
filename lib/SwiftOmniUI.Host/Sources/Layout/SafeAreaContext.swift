@@ -121,6 +121,23 @@ extension MountedElement {
         safeAreaInsetEdge != nil || safeAreaPadding != nil || ignoresSafeArea != nil
     }
 
+    /// Readers and scrollers observe the incoming proposal and its safe area
+    /// separately. A transparent composition/frame passes that responsibility
+    /// to its content; ordinary content consumes the safe placement instead.
+    public var preservesSafeAreaProposal: Bool {
+        if isSafeAreaBoundary || isGeometryReader || type == .scrollView { return true }
+        guard value(.clipsContent)?.bool != true,
+              number(.width) == nil, number(.height) == nil,
+              number(.maximumWidth).map({ !$0.isFinite || $0 < 0 }) ?? true,
+              number(.maximumHeight).map({ !$0.isFinite || $0 < 0 }) ?? true,
+              insets(.padding) == EdgeInsets(0), insets(.contentPadding) == EdgeInsets(0),
+              currentChildren.count == 1,
+              type == .page || !native.presentsView
+                || (type == .grid && currentChildren[0].value(.isFrameContent)?.bool == true)
+        else { return false }
+        return currentChildren[0].preservesSafeAreaProposal
+    }
+
     public var safeBarAllowsInput: Bool {
         var next: MountedElement? = self
         while let element = next {

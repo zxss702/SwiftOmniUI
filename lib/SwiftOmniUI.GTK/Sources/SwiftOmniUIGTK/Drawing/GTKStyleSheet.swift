@@ -19,6 +19,16 @@ enum GTKStyleSheet {
         return "swiftomniui-safe-area-bar"
     }
 
+    /// A promoted page header draws the scrolling edge below all native bars.
+    /// Suppress only the owning scroller's displaced top effect, not bottom
+    /// effects or effects belonging to a nested/local scroller.
+    static var mergedTopBarScroll: String {
+        let name = "swiftomniui-merged-top-bar-scroll"
+        write(name, "", states:
+            ".\(name) > undershoot.top, .\(name) > overshoot.top { background: none; box-shadow: none; }\n")
+        return name
+    }
+
     /// The class giving a widget `insets` of room between its edge and its content.
     static func padding(_ insets: EdgeInsets) -> String {
         let sides = [insets.top, insets.right, insets.bottom, insets.left].map { max(0, $0.isFinite ? $0 : 0) }

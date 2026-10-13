@@ -41,6 +41,8 @@ final class GTKPageFrame {
 
     private var safeBars: [GTKSafeAreaBarHost] = []
     private var refreshingSafeBars = false
+    private var scrollEdges: [(scroller: GTKScrollerView, ear: GTKScrollEar)] = []
+    private var scrollEdgePending = false
 
     /// The style sheet's class painting the header bar, and the tabs' bar with it.
     private var barClass: String?
@@ -87,6 +89,10 @@ final class GTKPageFrame {
     /// GTK can still own the departing page through its navigation slide.
     isolated deinit {
         page.rootSafeAreaContext = nil
+        for watched in scrollEdges {
+            watched.ear.owner = nil
+            gtk_widget_remove_css_class(watched.scroller.widget, GTKStyleSheet.mergedTopBarScroll)
+        }
         for host in safeBars {
             adw_toolbar_view_remove(widget.opaque, host.widget)
             host.releaseBar()
@@ -136,7 +142,10 @@ final class GTKPageFrame {
 
     private func refreshSafeBars() {
         let bars = page.sourceElement?.pageTopSafeAreaBars.compactMap { $0.gtk.view } ?? []
-        guard bars.count != safeBars.count || !zip(bars, safeBars).allSatisfy({ $0 === $1.bar }) else { return }
+        guard bars.count != safeBars.count || !zip(bars, safeBars).allSatisfy({ $0 === $1.bar }) else {
+            refreshScrollEdges()
+            return
+        }
         for host in safeBars {
             adw_toolbar_view_remove(widget.opaque, host.widget)
             host.releaseBar()
@@ -148,7 +157,55 @@ final class GTKPageFrame {
         }
         adw_toolbar_view_set_extend_content_to_top_edge(widget.opaque, safeBars.isEmpty ? 0 : 1)
         adw_toolbar_view_set_reveal_top_bars(widget.opaque, chrome.showsBar || !safeBars.isEmpty ? 1 : 0)
+        refreshScrollEdges()
         (page as? GTKLayoutView)?.invalidateMeasurements()
+    }
+
+    private func refreshScrollEdges() {
+        var scrollers: [GTKScrollerView] = []
+        func collect(_ element: MountedElement) {
+            guard element.value(.isVisible)?.bool != false else { return }
+            if let scroll = element.gtk.view as? GTKScrollView {
+                scrollers.append(scroll.scroller)
+                return // Nested scrolling has its own edge and lifecycle.
+            }
+            let children = element.currentChildren
+            if element.safeAreaInsetEdge != nil {
+                if let base = children.first { collect(base) }
+            } else {
+                for child in children { collect(child) }
+            }
+        }
+        if !safeBars.isEmpty, let source = page.sourceElement { collect(source) }
+        for watched in scrollEdges where !scrollers.contains(where: { $0 === watched.scroller }) {
+            watched.ear.owner = nil
+            gtk_widget_remove_css_class(watched.scroller.widget, GTKStyleSheet.mergedTopBarScroll)
+        }
+        scrollEdges = scrollers.map { scroller in
+            if let existing = scrollEdges.first(where: { $0.scroller === scroller }) { return existing }
+            gtk_widget_add_css_class(scroller.widget, GTKStyleSheet.mergedTopBarScroll)
+            let ear = GTKScrollEar(owner: self) { [weak self] in self?.requestScrollEdge() }
+            scroller.ears.append(ear)
+            return (scroller, ear)
+        }
+        requestScrollEdge()
+    }
+
+    private func requestScrollEdge() {
+        guard !scrollEdgePending else { return }
+        scrollEdgePending = true
+        GTKDoorbell.afterLayout { [weak self] in
+            guard let self else { return }
+            self.scrollEdgePending = false
+            // Extend-content disables AdwToolbarView's flat undershoot. Use
+            // its raised native surface at the complete top region's lower
+            // edge, driven by the owning scroll offset, outside allocation.
+            let scrolled = self.scrollEdges.contains { $0.scroller.standing.offset.y > 0.5 }
+            let style = scrolled ? ADW_TOOLBAR_RAISED : ADW_TOOLBAR_FLAT
+            if adw_toolbar_view_get_top_bar_style(self.widget.opaque) != style {
+                adw_toolbar_view_set_top_bar_style(self.widget.opaque, style)
+            }
+        }
     }
 
     /// The scene's commands in the window's app menu - a menu button at the

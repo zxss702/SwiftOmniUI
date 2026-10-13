@@ -67,8 +67,9 @@ A ScrollView is a SwiftOmniUI layout holding GTK's `GtkScrolledWindow`, which
 holds the document the core's scroll arithmetic lays out - never smaller than
 the viewport, and several children stacked down. GTK puts the document in a
 `GtkViewport`, which the host tells to give it its natural size along the ways
-the view scrolls and the viewport's own size across them; the document's
-least is nothing, so a viewport giving it its least would scroll nothing. A
+the view scrolls and the viewport's own size across them. The document also
+reports its complete natural extent as its minimum on scrolling axes, so the
+native viewport cannot compress the document and lose scroll reach. A
 way the view does not scroll holds the document to the viewport; a bar asked
 never to show still scrolls.
 

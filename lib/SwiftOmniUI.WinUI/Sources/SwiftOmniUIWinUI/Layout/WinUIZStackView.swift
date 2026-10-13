@@ -76,7 +76,7 @@ class WinUIZStackView: WinUITravellingLayout {
             insetContext = next
             let base = current[0]
             insetBase = base.view
-            let basePlace = SafeAreaArithmetic.base(of: base, boundary: base.element?.isSafeAreaBoundary == true,
+            let basePlace = SafeAreaArithmetic.base(of: base, boundary: base.element?.preservesSafeAreaProposal == true,
                                                    ignores: base.element?.ignoresSafeArea,
                                                    in: next, direction: direction)
             self.place(base, at: basePlace)

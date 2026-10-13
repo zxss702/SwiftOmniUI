@@ -414,6 +414,10 @@ void swiftomniui_winui_set_padding(SwiftOmniUIObjectRef element, double left, do
 void swiftomniui_winui_text_style(SwiftOmniUIObjectRef element, double *style);
 
 SwiftOmniUIObjectRef swiftomniui_winui_text_make(void);
+
+/// Native attachment completes the label's pre-attachment measurement. The
+/// callback names the live view; no native handler retains a Swift object.
+void swiftomniui_winui_text_on_loaded(SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t));
 /// What a label is drawn over: a colour, a gradient, or none - still hit across its bounds.
 void swiftomniui_winui_text_set_background(SwiftOmniUIObjectRef label, SwiftOmniUIBrush background);
 

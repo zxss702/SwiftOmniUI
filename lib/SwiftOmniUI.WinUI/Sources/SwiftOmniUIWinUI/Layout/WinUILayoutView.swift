@@ -139,6 +139,29 @@ class WinUILayoutView: WinUIView {
         ((self as? WinUIScrollDocument)?.scrollView ?? placingLayout)?.invalidateMeasurements()
     }
 
+    private var measurementCommitPending = false
+
+    /// A deferred native measurement changed our arithmetic while panels still
+    /// report zero DesiredSize to XAML. Prepare the placed tree and explicitly
+    /// request its new arrangement rather than waiting for an input repaint.
+    func commitMeasurementChange() {
+        guard WinUIView.arranging == 0 else { return }
+        invalidateMeasurements()
+        var root = self
+        while let parent = (root as? WinUIScrollDocument)?.scrollView ?? root.placingLayout {
+            root = parent
+        }
+        guard !root.measurementCommitPending else { return }
+        root.measurementCommitPending = true
+        WinUIDoorbell.afterPass { [weak root] in
+            guard let root else { return }
+            root.measurementCommitPending = false
+            let width = root.standsAt ?? root.placedFrame.width
+            if width.isFinite, width > 0 { root.prepareMeasure(width: width) }
+            root.invalidateArrange()
+        }
+    }
+
     /// Forgets the sizes this layout keeps.
     func forgetMeasurements() {
         measurements.invalidate()
@@ -214,7 +237,7 @@ class WinUILayoutView: WinUIView {
             guard let self else { return }
             self.sizeFeedbackPending = false
             guard self.placingLayout === placingLayout else { return }
-            placingLayout?.invalidateMeasurements()
+            placingLayout?.commitMeasurementChange()
         }
     }
 
