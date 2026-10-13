@@ -52,7 +52,8 @@ import CRT
 
     enum Axis { case x, y, z }
 
-    static func translation(_ x: Double, _ y: Double) -> HostMatrix {
+    /// Moves points in the parent's plane after the preceding drawing matrix.
+    public static func translation(_ x: Double, _ y: Double) -> HostMatrix {
         var matrix = HostMatrix()
         matrix.m41 = x
         matrix.m42 = y
