@@ -5,15 +5,15 @@ extension HostPath {
     /// Stable geometry records. Kinds 0...4 agree with HostCurveCommand;
     /// kind 5 retains an elliptical arc until the native boundary.
     public var numbers: [Double] {
-        commands.flatMap { command in
+        commands.flatMap { command -> [Double] in
             switch command {
-            case .move(let p): [0, p.x, p.y]
-            case .line(let p): [1, p.x, p.y]
-            case .cubic(let a, let b, let p): [2, a.x, a.y, b.x, b.y, p.x, p.y]
-            case .quadratic(let a, let p): [3, a.x, a.y, p.x, p.y]
-            case .close: [4]
+            case .move(let p): return [0, p.x, p.y]
+            case .line(let p): return [1, p.x, p.y]
+            case .cubic(let a, let b, let p): return [2, a.x, a.y, b.x, b.y, p.x, p.y]
+            case .quadratic(let a, let p): return [3, a.x, a.y, p.x, p.y]
+            case .close: return [4]
             case .arc(let x, let y, let rotation, let large, let sweep, let p):
-                [5, x, y, rotation, large ? 1 : 0, sweep ? 1 : 0, p.x, p.y]
+                return [5, x, y, rotation, large ? 1 : 0, sweep ? 1 : 0, p.x, p.y]
             }
         }
     }
