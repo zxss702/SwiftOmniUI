@@ -35,6 +35,9 @@ import CRT
 
     /// A content rebuild invalidates lazy measurements; viewport updates do not.
     public private(set) var lazyContentRevision = 0
+    /// Only a changed identity property advances this. Row and viewport patches
+    /// must not make a host read and compare the complete source again.
+    public private(set) var lazyItemsRevision = 0
     /// A lazy parent's data identity, kept separately from the view's explicit `.id()`.
     public private(set) var lazyIdentity: String?
     private var lazyIdentities: Set<String> = []
@@ -56,7 +59,9 @@ import CRT
     public private(set) var events: [Event: Int32] = [:]
 
     /// How this element's children animate, as its patches said; nil while it says nothing.
-    public private(set) var animation: HostLayoutMotion?
+    public var animation: HostLayoutMotion? { placementTransition ?? configuredAnimation }
+    private var configuredAnimation: HostLayoutMotion?
+    private var placementTransition: HostLayoutMotion?
 
     /// Whether this element's frame, or any frame under it, is read.
     public private(set) var framesRead = false
@@ -177,9 +182,17 @@ import CRT
         }
 
         if let animation = patch.animation {
-            self.animation = animation
+            configuredAnimation = animation
             // The application says its animation once; every layout that says none animates under it.
             if type == .app { tree.layoutMotion.applicationMotion = animation.animation }
+        }
+        if let transition = patch.layoutTransition {
+            placementTransition = transition
+        } else if !isLazyRun || patch.lazyContentChanged || changed.contains(.items) {
+            // A deferred lazy realization completes the same data change. Keep
+            // its timing until that data is replaced, rather than losing it in
+            // the intervening viewport-only render.
+            placementTransition = nil
         }
 
         if case .unchanged = patch.children { childrenChanged = patch.lazyContentChanged } else { childrenChanged = true }
@@ -191,6 +204,7 @@ import CRT
             tree.chromeMayChange = true
         }
         if lazy, changed.contains(.items) || !described {
+            lazyItemsRevision &+= 1
             lazyIdentities = Set(value(.items)?.strings ?? [])
         }
         switch patch.children {
@@ -286,7 +300,7 @@ import CRT
             } else {
                 recycling = false
             }
-            if !recycling, child.isDeparting || child.depart(room: child.native.departingRoom, closed: { [weak self] in
+            if !recycling, child.isDeparting || child.depart(room: child.native.departingRoom, under: placementTransition, closed: { [weak self] in
                 self?.departed(child)
             }) { arranged.append(child) }
         }

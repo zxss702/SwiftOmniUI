@@ -47,6 +47,8 @@ class WinUILazyView: WinUITravellingLayout {
     /// The viewport the scroller's own notices last named - newer than the
     /// effective viewport while a move stands between them.
     private var announcedRect: Rect?
+    /// A program jump deferred by native layout still owes its requested window.
+    private var preparedViewport: Rect?
     /// The ear the run hears its scroller's moves by, ahead of the effective viewport's notice.
     private var scrollEar: WinUIScrollEar?
     /// A notice realizing rows is under way; one it raises itself is heard
@@ -119,6 +121,21 @@ class WinUILazyView: WinUITravellingLayout {
         announcedRect ?? effectiveViewport
     }
 
+    /// Native scroll and effective-viewport callbacks can describe the same
+    /// frame several times. Record them promptly, then reconcile the latest
+    /// window once outside the native callback/layout stack.
+    func viewportReported(_ rect: Rect) {
+        guard rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite else { return }
+        watchClip()
+        effectiveViewport = rect
+        if announcedRect != nil, let scroll = watching {
+            var raw = [Double](repeating: 0, count: 6)
+            swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
+            announcedRect = Rect(raw[0], raw[1], rect.width, rect.height)
+        }
+        retell()
+    }
+
     /// Native viewport changes realize the required rows before XAML measures and arranges the new window.
     /// `override` is the freshest window a scroller's own notice can name - where its
     /// pending move already stands - while `rect` is the effective viewport reported.
@@ -131,6 +148,7 @@ class WinUILazyView: WinUITravellingLayout {
         // the last real viewport stands.
         guard rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite else { return }
         watchClip()
+        if let override { preparedViewport = override }
         if effective {
             effectiveViewport = rect
             if announcedRect != nil, let scroll = watching {
@@ -155,7 +173,7 @@ class WinUILazyView: WinUITravellingLayout {
                 }
             }
         }
-        guard let target = override ?? announcedRect ?? viewport else { return }
+        guard let target = override ?? preparedViewport ?? announcedRect ?? viewport else { return }
         let grid = self is WinUILazyGridView
         let revision = grid ? cells.runs.revision : cells.extents.revision
         let keeping = travellingIdentities
@@ -180,13 +198,14 @@ class WinUILazyView: WinUITravellingLayout {
             || cells.window?.revision != revision || cells.needsMeasurement
             || measuredRevision != measurementRevision || geometryChanged
             || cells.retained != keeping
-        else { return }
+        else { preparedViewport = nil; return }
         // Never replace native rows during a pass that cannot measure their
         // replacements. The frame clock resumes this whole update after the pass.
         guard WinUIView.arranging == 0, WinUIView.measuring == 0 else {
             retell()
             return
         }
+        preparedViewport = nil
         let previous = lastTargetViewport
         lastTargetViewport = target
         if !cells.needsMeasurement, !geometryChanged, !cells.animatesChanges,
@@ -276,11 +295,25 @@ class WinUILazyView: WinUITravellingLayout {
             // No clip to narrow by means all of it stands in view - a lazy
             // container outside any scroller builds every child.
             guard self.watching != nil else {
+                guard self.isAttached else { return }
                 self.cells.tellAll()
                 return
             }
+            // The first effective-viewport event can precede attachment to a
+            // ScrollView. It need not fire again after that relationship is
+            // installed. Seed the first window from the actual native scroller.
+            if self.viewport == nil, self.isAttached, let scroll = self.watching {
+                var raw = [Double](repeating: 0, count: 6)
+                swiftomniui_winui_scroller_viewport(scroll.scroller.handle, self.handle, &raw)
+                let rect = Rect(raw[0], raw[1], raw[2], raw[3])
+                if rect.width > 0, rect.height > 0,
+                   rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite {
+                    self.announcedRect = rect
+                }
+            }
             let revision = self is WinUILazyGridView ? self.cells.runs.revision : self.cells.extents.revision
-            if self.cells.needsMeasurement || self.cells.window?.span != (self.span ?? 0..<0)
+            if self.preparedViewport != nil || self.lastTargetViewport != self.viewport || self.cells.window == nil
+                || self.cells.needsMeasurement || self.cells.window?.span != (self.span ?? 0..<0)
                 || self.cells.window?.revision != revision
                 || self.measuredRevision != self.measurementRevision
                 || self.cells.retained != self.travellingIdentities {
@@ -314,6 +347,7 @@ class WinUILazyView: WinUITravellingLayout {
         effectiveViewport = nil
         lastTargetViewport = nil
         announcedRect = nil
+        preparedViewport = nil
         scrollEar = nil
         if let scroll {
             let ear = WinUIScrollEar(owner: self) { [weak self] in self?.scrollerMoved() }
@@ -339,7 +373,7 @@ class WinUILazyView: WinUITravellingLayout {
         rect.height = effectiveViewport?.height ?? raw[3]
         if axis == .vertical { rect.y += next.y - standing.y } else { rect.x += next.x - standing.x }
         announcedRect = rect
-        viewportChanged(rect, effective: false, target: rect)
+        retell()
     }
 
     /// A jump the program makes: realize the window it lands in before the
@@ -381,6 +415,7 @@ class WinUILazyView: WinUITravellingLayout {
         effectiveViewport = nil
         lastTargetViewport = nil
         announcedRect = nil
+        preparedViewport = nil
         watching = nil
         scrollEar = nil
     }

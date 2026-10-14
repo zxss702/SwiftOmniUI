@@ -95,11 +95,10 @@ enum WinUICallbacks {
                     WinUIRenderer.shared?.runtime.frames.laidOut()
                 }
             },
-            viewportChanged: { view, x, y, width, height, bringX, bringY in
+            viewportChanged: { view, x, y, width, height, _, _ in
                 MainActor.assumeIsolated {
-                    (WinUIView.find(view) as? WinUILazyView)?.viewportChanged(
-                        Rect(x: x, y: y, width: width, height: height),
-                        bring: Point(x: bringX, y: bringY))
+                    (WinUIView.find(view) as? WinUILazyView)?.viewportReported(
+                        Rect(x: x, y: y, width: width, height: height))
                 }
             },
             clicked: { view in

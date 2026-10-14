@@ -133,8 +133,12 @@ executing the row closure or constructing another view description. New
 rows alone run their builders. Explicit ids and transparent fragments retain
 their source identity independently of the ids mounted by the host.
 
-WinUI completes the fill in the viewport callback when measurement is
-allowed; a callback within another layout or patch resumes after that pass.
+WinUI records scroll and effective-viewport notices immediately and coalesces
+their realization outside the native callback/layout stack. Program jumps can
+still prepare their destination synchronously when measurement is allowed;
+a jump deferred by a native pass keeps its target until the pass completes.
+If the first effective-viewport event preceded attachment, layout seeds the
+window directly from the native scroller rather than waiting for a user scroll.
 It does not replace rows inside native measure or arrange. Pending work keeps
 the frame clock held and can resume on the next composed frame as well as a
 dispatcher turn.
@@ -143,6 +147,12 @@ native children as empty content, then arranges the resulting window once.
 GTK and WinUI source changes keep surviving rows'
 measurement caches. Their native revisions, placement values and cross-axis
 proposals decide which rows need fresh measurement.
+
+The mounted lazy element versions its identity property separately from row
+content. Viewport changes and drawing/row feedback do not read, compare or
+rebuild the full identity index. Actual identity changes still require a source
+scan; that scan is metadata work and does not build offscreen views. Settling
+child patches uses identity tables rather than a nested linear search.
 WinUI's ideal-size and window minimum-size queries read committed row
 geometry. Native preparation at the selected width, or viewport
 reconciliation, measures mounted rows and updates extents and anchors. A

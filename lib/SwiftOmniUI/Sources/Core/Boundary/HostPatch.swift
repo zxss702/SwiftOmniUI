@@ -71,6 +71,10 @@
     /// sent when it changed and only by an element that places children.
     public var animation: HostLayoutMotion?
 
+    /// This change's placement timing, from a transaction or an armed animation
+    /// gate. Unlike `animation`, this does not change the standing configuration.
+    public var layoutTransition: HostLayoutMotion?
+
     /// The sparse or complete change to this element's children.
     public var children: HostChildrenUpdate = .unchanged
 }

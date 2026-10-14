@@ -9,6 +9,26 @@ import XCTest
 /// arrives, and a child on its way bends, keeps its way, or stops as it leaves.
 @MainActor
 final class LayoutMotionTests: XCTestCase {
+    func testDeferredLazyRealizationKeepsTheDataTransactionButLaterContentClearsIt() throws {
+        let runtime = HostRuntime.still()
+        var first = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+        first.animation = HostLayoutMotion(animation: .none, lanes: .all)
+        runtime.tree.apply(first, complete: true)
+        let element = try XCTUnwrap(runtime.tree.root)
+        let law = Animation.eased(200, .linear)
+        var data = HostPatch(id: element.id, type: element.type)
+        data.lazyContentChanged = true
+        data.layoutTransition = HostLayoutMotion(animation: law, lanes: .all)
+        runtime.tree.apply(data, complete: false)
+        var viewport = HostPatch(id: element.id, type: element.type)
+        viewport.children = .arranged([HostPatch(id: .manual("row"), type: .text)])
+        runtime.tree.apply(viewport, complete: false)
+        XCTAssertEqual(element.animation?.animation, law, "the rows finish the transaction that requested them")
+        data.layoutTransition = nil
+        runtime.tree.apply(data, complete: false)
+        XCTAssertEqual(element.animation?.animation, Animation.none, "the standing configuration survives the transaction")
+    }
+
     func testBusinessFrameReadArrivesEvenDuringAnExistingLayoutAnimation() {
         for y in [2.0, 0.25] {
             let layout = HandWoundLayout()

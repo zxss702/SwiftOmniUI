@@ -20,6 +20,11 @@ private final class Builds {
     var count = 0
 }
 
+private struct WalkSum: PreferenceKey {
+    static let defaultValue = 0
+    static func reduce(value: inout Int, nextValue: () -> Int) { value += nextValue() }
+}
+
 /// A composed view reading ONE of two states it is handed, by a decision the
 /// test flips - the `decision ? first : second` shape.
 private final class Chooses: View {
@@ -214,6 +219,56 @@ private struct Tabbed: View {
     private var changed: Set<ObjectIdentifier> { Renderer.shared.pendingChanges }
 
     // MARK: - The clean walk
+
+    func testACleanWalkDoesNotRefoldUnrelatedMountedBranches() {
+        for count in [10, 1_000] {
+            let folds = Builds()
+            let state = State(wrappedValue: 0)
+            let renders = Renders()
+            let page = VStack {
+                Shows(state: state).id("changed")
+                VStack {
+                    ForEach(0..<count) { number in
+                        Text("Row \(number)")
+                            .preference(key: WalkSum.self, value: number)
+                            .transformPreference(WalkSum.self) { value in
+                                folds.count += 1
+                                return value
+                            }
+                    }
+                }
+                .id("unrelated")
+            }
+            renders.render(page.node)
+            let baseline = folds.count
+            state.wrappedValue = 1
+            let patch = renders.revisit(changed: changed)
+            XCTAssertEqual(patch.child("changed")?.props[.text], .string("1"))
+            XCTAssertEqual(folds.count, baseline, "a sibling's update must not walk \(count) unrelated rows")
+            XCTAssertNil(patch.child("unrelated"))
+            Renderer.shared.clearInvalidation()
+        }
+    }
+
+    func testReaderIndexFollowsReparentingAndDoesNotOwnDepartedSubtrees() {
+        let first = Builds(), second = Builds()
+        var child: RenderedNode? = RenderedNode(
+            id: .manual("child"), type: .text,
+            props: [:], events: [:], reads: [ObjectIdentifier(first)], children: [])
+        let oldParent = RenderedNode(id: .manual("old"), type: .vStack, props: [:], events: [:], children: [child!])
+        let parent = RenderedNode(id: .manual("new"), type: .vStack, props: [:], events: [:], children: [child!])
+        let affected = Renderer.shared.affectedNodes(reading: [ObjectIdentifier(first)])
+        XCTAssertTrue(affected.contains(ObjectIdentifier(parent)))
+        XCTAssertFalse(affected.contains(ObjectIdentifier(oldParent)))
+        child!.reads = [ObjectIdentifier(second)]
+        XCTAssertTrue(Renderer.shared.affectedNodes(reading: [ObjectIdentifier(first)]).isEmpty)
+        weak var departed = child
+        oldParent.children = []
+        parent.children = []
+        child = nil
+        XCTAssertNil(departed, "the reader index and parent links must not retain offscreen rows")
+        XCTAssertTrue(Renderer.shared.affectedNodes(reading: [ObjectIdentifier(second)]).isEmpty)
+    }
 
     func testAChangedStateRebuildsOnlyTheViewThatReadIt() {
         let renders = Renders()

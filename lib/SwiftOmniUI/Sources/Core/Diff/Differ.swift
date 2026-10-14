@@ -39,6 +39,9 @@ final class Differ {
 
     /// The states written since the tree the host holds was built.
     private(set) var changed: Set<ObjectIdentifier> = []
+    /// Nil for a fresh description; otherwise only the ownership paths whose
+    /// live readers intersect this clean walk's changes.
+    private var affected: Set<ObjectIdentifier>?
 
     /// What each changed state is called, for `debugInfo()` (Builds.swift).
     var named: [ObjectIdentifier: String] = [:]
@@ -105,6 +108,7 @@ final class Differ {
     ) -> (node: RenderedNode, patch: HostPatch) {
         self.describeAll = describeAll
         self.changed = changed
+        affected = nil
         stylesMoved = !StyleSheet.same(styles, self.styles)
         self.styles = styles
         walkStamp += 1
@@ -134,6 +138,7 @@ final class Differ {
     ) -> (node: RenderedNode, patch: HostPatch) {
         describeAll = false
         self.changed = changed
+        affected = Renderer.shared.affectedNodes(reading: changed)
         stylesMoved = false
         walkStamp += 1
         seedScope()
@@ -154,6 +159,9 @@ final class Differ {
         _ rendered: RenderedNode,
         walking: Bool = true
     ) -> (node: RenderedNode, patch: HostPatch) {
+        if let affected, !affected.contains(ObjectIdentifier(rendered)) {
+            return (rendered, HostPatch(id: rendered.id, type: rendered.type))
+        }
         let windowOnly = rendered.lazySource?.lazyWindow.map {
             rendered.reads.intersection(changed) == Set([$0])
         } ?? false
@@ -227,9 +235,11 @@ final class Differ {
                 of: rendered, node: source, into: &patch, sizesArrive: rendered.sizesArrive,
                 keepingLazyRows: true)
         } else {
-            for (index, child) in rendered.children.enumerated() {
+            var children: [RenderedNode] = []
+            children.reserveCapacity(rendered.children.count)
+            for child in rendered.children {
                 let (node, childPatch) = revisit(child)
-                rendered.children[index] = node
+                children.append(node)
 
                 if node.type == .fragment {
                     let nested: [HostPatch] = switch childPatch.children {
@@ -245,6 +255,7 @@ final class Differ {
                     addressed.append(childPatch)
                 }
             }
+            rendered.children = children
 
             if addressed.map(\.id) != held {
                 patch.children = .arranged(addressed)
@@ -256,6 +267,17 @@ final class Differ {
                 }
             }
 
+        }
+
+        // A layout can be carried while a descendant changes its size or joins
+        // it. The write's transaction must reach that placement as well.
+        if NodeType.saysMotion.contains(rendered.type), rendered.type != .app,
+           patch.layoutTransition == nil, let transaction, patch.children.hasChange {
+            var law = rendered.animation ?? .inherited
+            if transaction.disablesAnimations { law = .none }
+            else if let override = transaction.animation, !law.isCustom { law = override }
+            let lanes: AnimationLanes = transaction.isGeometryFeedback ? [] : rendered.lanes
+            patch.layoutTransition = HostLayoutMotion(animation: law, lanes: lanes)
         }
 
         // A kept element folds its subtree's preference answers again - a

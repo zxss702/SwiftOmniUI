@@ -81,6 +81,103 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testFirstWindowIsSeededWithoutAnEffectiveViewportNotification() throws {
+        try onUIThread {
+            let host = WinUIRenderer.bare(reducesMotion: true)
+            var lazyPatch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+            lazyPatch.properties = [.items: .strings((0..<10_000).map(String.init)), .spacing: .number(0)]
+            lazyPatch.children = .arranged((0..<8).map { number in
+                var row = HostPatch(id: .manual(String(number)), type: .text)
+                row.properties = [.text: .string("File \(number)"), .height: .number(28)]
+                return row
+            })
+            var scrollPatch = HostPatch(id: .manual("scroll"), type: .scrollView)
+            scrollPatch.children = .arranged([lazyPatch])
+            host.runtime.tree.apply(scrollPatch, complete: true)
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            swiftomniui_winui_panel_watch_viewport(lazy.handle, false)
+            let root = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            WinUITestHost.window.show(root)
+            for _ in 0..<12 { host.layOut(); WinUIDoorbell.commitPending() }
+            XCTAssertTrue(lazy.isAttached)
+            let window = try XCTUnwrap(lazy.cells.window)
+            XCTAssertGreaterThan(window.span.upperBound, window.span.lowerBound)
+            XCTAssertFalse(lazy.cells.built.isEmpty, "attachment must request the first window without waiting for a scroll")
+            XCTAssertLessThan(lazy.cells.built.count, 80)
+        }
+    }
+
+    func testDeferredRapidViewportChangesKeepOnlyTheLatestRequestedWindow() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<10_000) { Text("File \($0)").frame(height: 28) }
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let requests = lazy.cells.requests
+            do {
+                let previous = WinUIView.arranging
+                WinUIView.arranging += 1
+                defer { WinUIView.arranging = previous }
+                for offset in stride(from: 1_000.0, through: 8_000.0, by: 100) {
+                    let rect = Rect(0, offset, 320, 240)
+                    lazy.viewportChanged(rect, effective: false, target: rect)
+                }
+                XCTAssertEqual(lazy.cells.requests, requests, "native layout must not be reentered to realize intermediate windows")
+            }
+            WinUIDoorbell.commitPending()
+            XCTAssertGreaterThan(lazy.cells.built.lowerBound, 100, "the deferred request must not revert to the old first window")
+            XCTAssertLessThan(lazy.cells.requests - requests, 6, "coalesce the notices, allowing bounded measurement refinement")
+            XCTAssertLessThan(lazy.mounted.count, 80)
+        }
+    }
+
+    func testWithAnimationMovesLazyInsertionsAndDoesNotAnimateLaterScrolling() throws {
+        try onUIThread {
+            let rows = State(wrappedValue: Array(0..<1_000))
+            let clock = TestClock()
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            Text("File \(number)")
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                        }
+                        .transition(.opacity)
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            host.runtime.layoutMotion.applicationMotion = .none
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let identity = lazy.cells.identities[4]
+            let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
+            let before = retained.placedFrame.y
+            withAnimation(.eased(200, .linear)) { rows.wrappedValue.insert(-1, at: 0) }
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertTrue(lazy.mounted[identity]?.view === retained)
+            clock.now = 100
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(retained.placedFrame.y, before + 14, accuracy: 1)
+            clock.now = 200
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(retained.placedFrame.y, before + 28, accuracy: 1)
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            scroll.scroller.move(to: Point(0, 4_000))
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertFalse(host.runtime.animator.isMoving, "scroll recycling must not inherit a data insertion transaction")
+            XCTAssertLessThan(lazy.mounted.count, 80)
+            for item in lazy.mounted.values { XCTAssertEqual(item.view.drawnOpacity, 1, accuracy: 0.01) }
+        }
+    }
+
     func testGraphRowsReleaseOffscreenViewsAndNeverBuildClosedDetails() throws {
         try onUIThread {
             let builds = ModifiedLazyBuilds()

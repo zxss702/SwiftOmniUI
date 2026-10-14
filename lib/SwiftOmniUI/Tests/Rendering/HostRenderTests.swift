@@ -104,6 +104,26 @@ import XCTest
         XCTAssertEqual(changed.map(\.id), [.auto(2)])
     }
 
+    func testSettlingMergesLargeReorderedChildrenAndKeepsPlacementTransaction() {
+        var earlier = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+        earlier.children = .arranged((0..<10_000).map { number in
+            var row = HostPatch(id: .manual(String(number)), type: .text)
+            row.properties[.text] = .string("Row \(number)")
+            return row
+        })
+        let law = Animation.eased(200, .linear)
+        earlier.layoutTransition = HostLayoutMotion(animation: law, lanes: .all)
+        var later = HostPatch(id: earlier.id, type: earlier.type)
+        later.children = .arranged((0..<10_000).reversed().map {
+            HostPatch(id: .manual(String($0)), type: .text)
+        })
+        let merged = earlier.merging(later)
+        XCTAssertEqual(merged.layoutTransition?.animation, law)
+        XCTAssertEqual(merged.children.first?.id, .manual("9999"))
+        XCTAssertEqual(merged.children.first?.properties[.text], .string("Row 9999"))
+        XCTAssertEqual(merged.children.last?.properties[.text], .string("Row 0"))
+    }
+
     func testANativeHostReadsAndReportsTwoWayText() throws {
         let name = State("Ada")
         let renders = Renders()

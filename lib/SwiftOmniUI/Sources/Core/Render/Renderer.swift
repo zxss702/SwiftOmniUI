@@ -41,6 +41,10 @@ public final class Renderer: @unchecked Sendable {
     /// state nobody reads asks for nothing. Behind `guarded`.
     /// Design: docs/design/core/invalidation.md#live-readers
     private var readers: [ObjectIdentifier: Int] = [:]
+    private struct WeakReader {
+        weak var node: RenderedNode?
+    }
+    private var readingNodes: [ObjectIdentifier: [ObjectIdentifier: WeakReader]] = [:]
 
     /// The observation tokens builds armed, by identity. One is held so its id
     /// names it alone while a live element's reads keep it - a freed token's id
@@ -267,6 +271,43 @@ public final class Renderer: @unchecked Sendable {
     /// Whether any live element reads this state - what a test asks.
     func isRead(_ state: AnyObject) -> Bool {
         guarded.withLock { readers[ObjectIdentifier(state)] != nil }
+    }
+
+    /// This index never owns a view. Entries leave with the exact read set that
+    /// installed them, including a lazy row's closure reads as its window moves.
+    func index(_ node: RenderedNode, adding: Set<ObjectIdentifier>, removing: Set<ObjectIdentifier>) {
+        guard !adding.isEmpty || !removing.isEmpty else { return }
+        let key = ObjectIdentifier(node)
+        guarded.withLock {
+            for state in removing {
+                readingNodes[state]?[key] = nil
+                if readingNodes[state]?.isEmpty == true { readingNodes[state] = nil }
+            }
+            for state in adding { readingNodes[state, default: [:]][key] = WeakReader(node: node) }
+        }
+    }
+
+    func unindex(_ node: RenderedNode, reading states: Set<ObjectIdentifier>) {
+        index(node, adding: [], removing: states)
+    }
+
+    /// The ownership paths to the changed readers; no search through the tree
+    /// or through every registered state is needed for a viewport report.
+    func affectedNodes(reading states: Set<ObjectIdentifier>) -> Set<ObjectIdentifier> {
+        let nodes: [RenderedNode] = guarded.withLock {
+            states.flatMap { state -> [RenderedNode] in
+                guard let entries = readingNodes[state] else { return [] }
+                return entries.values.compactMap { $0.node }
+            }
+        }
+        var affected: Set<ObjectIdentifier> = []
+        for node in nodes {
+            var next: RenderedNode? = node
+            while let current = next, affected.insert(ObjectIdentifier(current)).inserted {
+                next = current.parent
+            }
+        }
+        return affected
     }
 
     /// What the next render will act on - for tests driving a differ of their own.

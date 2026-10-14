@@ -74,6 +74,13 @@ Observation callbacks hold their token weakly. The renderer owns that token
 while a live element reads it, so a model cannot keep an abandoned observation
 alive through its callback.
 
+The renderer also indexes the actual rendered readers weakly by state. A clean
+walk follows their parent links to mark affected ownership paths, then skips
+unrelated subtrees, including their preference folds. New descriptions update
+those parent links; changed lazy row-read sets update the index along with the
+reader counts. Neither the index nor a parent link keeps an offscreen row alive.
+Untracked changes and a resync still take the full-description path.
+
 A state's own `readAtBuild` flag spares even the call to the renderer: a state
 no build ever read has no reader to find. The flag is sticky - a state read
 once and then abandoned goes on asking and is refused - which is the cheap

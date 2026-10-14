@@ -6,6 +6,41 @@
 import XCTest
 
 final class LazyGeometryTests: XCTestCase {
+    @MainActor
+    func testContentAndWindowUpdatesDoNotReindexTheWholeSource() throws {
+        let runtime = HostRuntime.still()
+        var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+        patch.properties = [.items: .strings((0..<10_000).map(String.init))]
+        runtime.tree.apply(patch, complete: true)
+        let element = try XCTUnwrap(runtime.tree.root)
+        let cells = LazyCells(element, in: runtime)
+        XCTAssertTrue(cells.takeItems())
+        let source = element.lazyItemsRevision
+        cells.extents.measure("5", extent: 28)
+        cells.show(0..<240)
+        let built = cells.built
+        let geometry = cells.extents.revision
+        for _ in 0..<100 {
+            var update = HostPatch(id: element.id, type: element.type)
+            update.lazyContentChanged = true
+            runtime.tree.apply(update, complete: false)
+            XCTAssertTrue(cells.takeItems())
+            XCTAssertEqual(element.lazyItemsRevision, source)
+            XCTAssertEqual(cells.built, built)
+            XCTAssertEqual(cells.extents.revision, geometry)
+            XCTAssertTrue(cells.inserting.isEmpty)
+            runtime.tree.apply(HostPatch(id: element.id, type: element.type), complete: false)
+            XCTAssertFalse(cells.takeItems())
+        }
+        patch.properties = [.items: .strings(["new"] + (0..<10_000).map(String.init))]
+        runtime.tree.apply(patch, complete: false)
+        XCTAssertTrue(cells.takeItems())
+        XCTAssertNotEqual(element.lazyItemsRevision, source)
+        XCTAssertEqual(cells.position(of: "5"), 6)
+        XCTAssertEqual(cells.extents.extent(of: "5"), 28)
+        XCTAssertEqual(cells.inserting, ["new"])
+    }
+
     func testMeasurementsReplaceOnlyTheirOwnProvisionalExtents() {
         let identities = ["hero", "file", "unseen"]
         var extents = LazyExtents()

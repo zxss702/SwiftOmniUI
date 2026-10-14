@@ -27,6 +27,7 @@
     public private(set) var identities: [String] = []
 
     private var contentRevision = -1
+    private var itemsRevision = -1
     private var positions: [String: Int] = [:]
 
     /// Content changes waiting for arrangement. Measurement and viewport realization must
@@ -84,29 +85,36 @@
     /// measured sizes of surviving identities; changed content invalidates them.
     @discardableResult
     public func takeItems() -> Bool {
-        let now = element?.value(.items)?.strings ?? []
-        let revision = element?.lazyContentRevision ?? 0
-        guard now != identities || revision != contentRevision else { return false }
+        guard let element else { return false }
+        let revision = element.lazyContentRevision
+        let sourceRevision = element.lazyItemsRevision
+        guard sourceRevision != itemsRevision || revision != contentRevision else { return false }
         if contentRevision >= 0 {
             animatesChanges = true
-            inserting.formUnion(Set(now).subtracting(identities))
         }
         contentRevision = revision
-        inserting.formIntersection(now)
         // Identities arriving or leaving change what the window mounts and
         // which measurements survive. A content revision bump alone changes
         // neither; the patched children re-measure on their next layout pass.
-        if now != identities {
-            extents.keep(identities: Set(now))
-            positions = Dictionary(now.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
-            extents.adopt(positions: positions)
-            built = 0..<0
-            window = nil
-            needsMeasurement = false
-            runs.reset()
+        if sourceRevision != itemsRevision {
+            let wasKnown = itemsRevision >= 0
+            itemsRevision = sourceRevision
+            let now = element.value(.items)?.strings ?? []
+            if now != identities {
+                let next = Dictionary(now.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+                if wasKnown { inserting.formUnion(next.keys.filter { positions[$0] == nil }) }
+                inserting = inserting.filter { next[$0] != nil }
+                extents.keep(identities: Set(next.keys))
+                positions = next
+                extents.adopt(positions: positions)
+                identities = now
+                built = 0..<0
+                window = nil
+                needsMeasurement = false
+                runs.reset()
+            }
         }
-        identities = now
-        if now.isEmpty {
+        if identities.isEmpty {
             anchor = nil
             anchorShift = 0
             retained = []

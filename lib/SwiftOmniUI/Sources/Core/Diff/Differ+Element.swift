@@ -501,12 +501,18 @@ extension Differ {
 
             // A measured layout's children take their sizes at once.
             if node.childSizesArrive { lanes.subtract([.width, .height]) }
-            if transacting?.isGeometryFeedback == true { lanes = [] }
-
             let stood = describeAll ? AnimationLanes.all : (previous?.lanes ?? .all)
 
             if was != mine || stood != lanes {
                 patch.animation = HostLayoutMotion(animation: mine, lanes: lanes)
+            }
+            if node.type != .app, transacting != nil || !armed.isEmpty {
+                var moving = lanes
+                if animating(.place).isNothing { moving.subtract(.place) }
+                if animating(.width).isNothing { moving.subtract(.width) }
+                if animating(.height).isNothing { moving.subtract(.height) }
+                if transacting?.isGeometryFeedback == true { moving = [] }
+                patch.layoutTransition = HostLayoutMotion(animation: animating(.place), lanes: moving)
             }
         }
 

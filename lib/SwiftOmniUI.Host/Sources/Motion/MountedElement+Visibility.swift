@@ -121,11 +121,11 @@ extension MountedElement {
     /// Answers whether it goes by transition (else it should leave at once).
     ///
     /// `room` is the place its view last stood at, which a `move` measures by.
-    public func depart(room: Rect?, closed: @escaping () -> Void) -> Bool {
+    public func depart(room: Rect?, under placement: HostLayoutMotion? = nil, closed: @escaping () -> Void) -> Bool {
         guard !isDeparting, let tree, let transition else { return false }
         let components = phaseValues(transition.removal, room: room)
         guard !components.isEmpty,
-              let law = transition.animation ?? tree.layoutMotion.law(of: animation)
+              let law = transition.animation ?? tree.layoutMotion.law(of: placement ?? animation)
         else { return false }
 
         isDeparting = true

@@ -15,6 +15,29 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class MotionTests: XCTestCase {
+    func testWithAnimationHasPlacementTimingWithoutChangingStandingConfiguration() throws {
+        let rows = State(wrappedValue: [0, 1])
+        let differ = Differ()
+        let page = LazyVStack {
+            ForEach(rows.wrappedValue) { Text("Row \($0)").frame(height: 28) }
+        }
+        let first = differ.reconcile(nil, with: page.node)
+        let law = Animation.eased(200, .linear)
+        withAnimation(law) { rows.wrappedValue.append(2) }
+        differ.transaction = Transaction(animation: law)
+        let update = differ.revisit(first.node, changed: Renderer.shared.pendingChanges)
+        let lazy = try XCTUnwrap(update.patch.subtree.first { $0.type == .lazyVStack })
+        XCTAssertEqual(lazy.layoutTransition?.animation, law)
+        XCTAssertEqual(lazy.layoutTransition?.lanes, .all)
+        XCTAssertNil(lazy.animation, "a transaction must not replace the standing animation")
+
+        differ.transaction = nil
+        rows.wrappedValue.append(3)
+        let ordinary = differ.revisit(update.node, changed: Renderer.shared.pendingChanges)
+        let next = try XCTUnwrap(ordinary.patch.subtree.first { $0.type == .lazyVStack })
+        XCTAssertNil(next.layoutTransition, "later unanimated data must not inherit the earlier transaction")
+    }
+
     /// A panel of a stated opacity, which is a number with a half-way.
     private func panel(_ opacity: Double, id: String = "panel") -> Node {
         ZStack { Text("x") }.opacity(opacity).id(id).node

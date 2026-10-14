@@ -32,6 +32,9 @@ public enum ElementId: Hashable, Sendable {
 /// One element as it stands on the host - a class, so unchanged parts of one
 /// tree are shared into the next.
 final class RenderedNode {
+    /// The live ownership path used to reach a state's readers without walking
+    /// unrelated mounted rows, pages or windows.
+    weak var parent: RenderedNode?
     /// Who this element is. Fixed for as long as it stays in the tree.
     let id: ElementId
 
@@ -77,6 +80,7 @@ final class RenderedNode {
             let removed = oldValue.subtracting(reads)
             if !added.isEmpty { Renderer.shared.reading(added) }
             if !removed.isEmpty { Renderer.shared.unreading(removed) }
+            Renderer.shared.index(self, adding: added, removing: removed)
         }
     }
 
@@ -163,7 +167,9 @@ final class RenderedNode {
     let readings: [Sampling]
 
     /// The elements under it, in the order the host has them.
-    var children: [RenderedNode]
+    var children: [RenderedNode] {
+        didSet { for child in children { child.parent = self } }
+    }
 
     /// How its children were last told to animate; nil until said.
     var animation: Animation?
@@ -225,11 +231,13 @@ final class RenderedNode {
         self.events = events
         self.key = key
         self.children = children
+        for child in children { child.parent = self }
 
         // A reader of what it read for as long as it lives; an element that read
         // nothing skips the lock.
         if !reads.isEmpty {
             Renderer.shared.reading(reads)
+            Renderer.shared.index(self, adding: reads, removing: [])
         }
 
         // And one of the living, for the tally's `alive`.
@@ -239,6 +247,7 @@ final class RenderedNode {
     deinit {
         if !reads.isEmpty {
             Renderer.shared.unreading(reads)
+            Renderer.shared.unindex(self, reading: reads)
         }
 
         Renderer.shared.nodeGone()
@@ -254,6 +263,7 @@ extension HostPatch {
             && !lazyContentChanged
             && lazyIdentity == nil
             && animation == nil
+            && layoutTransition == nil
             && properties.isEmpty
             && clearedProperties.isEmpty
             && events == nil
@@ -293,6 +303,7 @@ extension HostPatch {
         merged.lazyContentChanged = lazyContentChanged || later.lazyContentChanged
         merged.lazyIdentity = later.lazyIdentity ?? lazyIdentity
         merged.animation = later.animation ?? animation
+        merged.layoutTransition = later.layoutTransition ?? layoutTransition
         merged.driven = later.driven ?? driven
         merged.events = later.events ?? events
         merged.children = HostChildrenUpdate.merging(children, with: later.children)
@@ -336,16 +347,17 @@ extension HostChildrenUpdate {
 
         case .arranged(let laterPatches):
             let earlierPatches = earlier.patches
+            let byID = Dictionary(earlierPatches.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             return .arranged(laterPatches.map { child in
-                earlierPatches.first { $0.id == child.id }
-                    .map { $0.merging(child) } ?? child
+                byID[child.id].map { $0.merging(child) } ?? child
             })
 
         case .changed(let laterPatches):
             var merged = earlier.patches
+            var places = Dictionary(merged.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
 
             for child in laterPatches {
-                if let at = merged.firstIndex(where: { $0.id == child.id }) {
+                if let at = places[child.id] {
                     merged[at] = merged[at].merging(child)
                 } else {
                     // A sparse list names only children that stand.
@@ -353,6 +365,7 @@ extension HostChildrenUpdate {
                         assertionFailure(
                             "a later patch names a child the earlier arrangement has not got")
                     }
+                    places[child.id] = merged.count
                     merged.append(child)
                 }
             }

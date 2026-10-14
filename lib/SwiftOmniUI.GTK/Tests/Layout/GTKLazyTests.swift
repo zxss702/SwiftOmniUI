@@ -67,6 +67,47 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on GTK answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class GTKLazyTests: XCTestCase {
+    func testWithAnimationMovesLazyInsertionsAndDoesNotAnimateLaterScrolling() throws {
+        try onUIThread {
+            let rows = State(wrappedValue: Array(0..<1_000))
+            let clock = TestClock()
+            let host = GTKRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            Text("File \(number)")
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                        }
+                        .transition(.opacity)
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            host.runtime.layoutMotion.applicationMotion = .none
+            let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
+            let identity = lazy.cells.identities[4]
+            let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
+            let before = retained.placedFrame.y
+            withAnimation(.eased(200, .linear)) { rows.wrappedValue.insert(-1, at: 0) }
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertTrue(lazy.mounted[identity]?.view === retained)
+            clock.now = 100
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(retained.placedFrame.y, before + 14, accuracy: 1)
+            clock.now = 200
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(retained.placedFrame.y, before + 28, accuracy: 1)
+            let scroll = try XCTUnwrap(host.views(GTKScrollView.self).first)
+            scroll.scroller.move(to: Point(0, 4_000))
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertFalse(host.runtime.animator.isMoving, "scroll recycling must not inherit a data insertion transaction")
+            XCTAssertLessThan(lazy.mounted.count, 80)
+            for item in lazy.mounted.values { XCTAssertEqual(item.view.drawnOpacity, 1, accuracy: 0.01) }
+        }
+    }
+
     func testGraphRowsReleaseOffscreenViewsAndNeverBuildClosedDetails() throws {
         try onUIThread {
             let builds = ModifiedLazyBuilds()
