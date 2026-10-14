@@ -239,11 +239,14 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_blur_make(SwiftOmniUIObjectRef
         auto made = winrt::make_self<BlurPresenter>();
         auto shown = made.as<xaml::UIElement>();
         auto placed = element.as<xaml::FrameworkElement>();
+        auto placement = shown.as<xaml::FrameworkElement>();
         // Copy parent-owned placement and move shared drawing to the new root.
-        controls::Grid::SetRow(shown, controls::Grid::GetRow(placed));
-        controls::Grid::SetColumn(shown, controls::Grid::GetColumn(placed));
-        controls::Grid::SetRowSpan(shown, controls::Grid::GetRowSpan(placed));
-        controls::Grid::SetColumnSpan(shown, controls::Grid::GetColumnSpan(placed));
+        // Grid's attached properties require FrameworkElement on both sides;
+        // the exported handle remains UIElement for the relay's content slots.
+        controls::Grid::SetRow(placement, controls::Grid::GetRow(placed));
+        controls::Grid::SetColumn(placement, controls::Grid::GetColumn(placed));
+        controls::Grid::SetRowSpan(placement, controls::Grid::GetRowSpan(placed));
+        controls::Grid::SetColumnSpan(placement, controls::Grid::GetColumnSpan(placed));
         controls::Canvas::SetZIndex(shown, controls::Canvas::GetZIndex(element));
         shown.CanBeScrollAnchor(element.CanBeScrollAnchor());
         shown.Visibility(element.Visibility());
