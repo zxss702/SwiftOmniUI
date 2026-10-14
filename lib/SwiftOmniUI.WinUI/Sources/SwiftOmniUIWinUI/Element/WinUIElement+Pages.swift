@@ -17,6 +17,8 @@ extension WinUIElement {
     var showsSidebar: Bool? {
         (view as? WinUISplitView)?.isPresented
     }
+    var showsContentColumn: Bool? { (view as? WinUISplitView)?.isContentPresented }
+    var showsDetailColumn: Bool? { (view as? WinUISplitView)?.showsDetailColumn }
 
     /// Keeps an arrangement's own parts with the tree: a tabbed view's row, a split view's sidebar.
     func arrangePages(changed: Set<Prop>) {
@@ -63,8 +65,13 @@ extension WinUIElement {
     func changeSidebarVisibility(to presented: Bool) {
         guard type == .navigationSplitView, let split = view as? WinUISplitView, split.isPresented != presented else { return }
 
-        split.present(presented)
-        sidebarShown(presented)
+        if split.hasContentColumn {
+            split.present(visibility: presented ? .all : .doubleColumn)
+            columnsShown(presented ? .all : .doubleColumn)
+        } else {
+            split.present(presented)
+            sidebarShown(presented)
+        }
     }
 
     /// The sidebar showed or hid: the host layer tells its page and the state, and the chrome follows.

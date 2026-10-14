@@ -18,6 +18,7 @@ final class GTKElement: NativeElement {
 
     /// Whether a label shows its spans' runs in place of its own words.
     var hasRuns = false
+    var contextMenuChanged = false
 
     /// Where the element last said it stands; empty before it has said.
 
@@ -64,9 +65,18 @@ final class GTKElement: NativeElement {
         configureLayoutMotion()
         arrangeChildren()
         arrangePages(changed: changed)
+        if changed.contains(.preferredColumnWidth) || (element.childrenChanged && parent?.type == .navigationSplitView),
+           let split = element.parent?.enclosing(type: .navigationSplitView)?.gtk {
+            split.arrangeChildren()
+        }
         if wasDescribed, element.childrenChanged, type == .navigationStack,
            let enclosing = element.parent?.enclosing(type: .page)?.enclosing(type: .navigationStack) {
             enclosing.gtk.arrangeChildren()
+        }
+        var declared = element.enclosing(type: .contextMenu)
+        while let owner = declared?.parent {
+            owner.gtk.contextMenuChanged = true
+            declared = owner.parent?.enclosing(type: .contextMenu)
         }
         offerContextMenu()
         if let view { host?.runtime.frames.follow(self, order: view.number, reads: readsFrame) }

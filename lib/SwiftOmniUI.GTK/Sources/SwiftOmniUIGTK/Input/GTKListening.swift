@@ -74,6 +74,7 @@ final class GTKListening {
 
     private func makeTaps() -> OpaquePointer {
         let click = gtk_gesture_click_new()!
+        gtk_gesture_single_set_button(click, guint(GDK_BUTTON_PRIMARY))
         connectSignal(UnsafeMutableRawPointer(click), "pressed", number: number) { _, _, x, y, data in
             let number = viewNumber(data)
             MainActor.assumeIsolated { GTKListening.find(number)?.tapPressed(at: Point(x: x, y: y)) }

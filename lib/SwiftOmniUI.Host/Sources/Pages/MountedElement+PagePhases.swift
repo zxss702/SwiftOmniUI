@@ -30,8 +30,7 @@ extension MountedElement {
         case .tabView:
             selectedTab?.setPagePresented(presented, reason: .appearance)
         case .navigationSplitView:
-            currentChildren.dropFirst().first?.setPagePresented(presented, reason: .appearance)
-            if sidebarIsVisible { currentChildren.first?.setPagePresented(presented, reason: .appearance) }
+            for column in shownChildren { column.setPagePresented(presented, reason: .appearance) }
         default:
             break
         }

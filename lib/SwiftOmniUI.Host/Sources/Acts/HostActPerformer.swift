@@ -59,7 +59,7 @@
         case .alert, .confirm, .chooseAction, .prompt:
             guard let question = HostQuestion(call) else { return fail(call, "the act asks nothing") }
             ask(call, .question(question))
-        case .openFiles, .openFolders, .saveFile, .readFile, .launchFile, .launchLink:
+        case .openFiles, .openFolders, .saveFile, .readFile, .launchFile, .launchLink, .revealFile:
             guard let files else { return fail(call, notPerformed(call)) }
             perform(call, files: files)
         case .copyText:
@@ -158,6 +158,8 @@
         case .launchFile:
             guard let file else { return fail(call, "the act names no file") }
             files.launch(file, answered: launched)
+        case .revealFile:
+            files.reveal(path: call.arguments.value(0)?.string ?? "", answered: launched)
         default:
             files.launch(address: call.arguments.value(0)?.string ?? "", answered: launched)
         }

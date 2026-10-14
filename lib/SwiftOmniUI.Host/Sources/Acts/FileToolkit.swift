@@ -22,4 +22,11 @@
     /// Hands `address` to the system to open in the application it gives it, and calls `answered` with whether one
     /// took it.
     func launch(address: String, answered: @escaping (Bool) -> Void)
+
+    /// Selects the local item in its containing folder.
+    func reveal(path: String, answered: @escaping (Bool) -> Void)
+}
+
+@_spi(Host) extension FileToolkit {
+    public func reveal(path: String, answered: @escaping (Bool) -> Void) { answered(false) }
 }

@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <shobjidl.h>
+#include <shlobj.h>
 
 #include <winrt/Microsoft.UI.h>
 #include <winrt/Microsoft.UI.Windowing.h>
@@ -324,6 +325,28 @@ extern "C" void swiftomniui_winui_launch(int64_t ticket, char const *target, boo
             }));
     } catch (...) {
         report("launching");
+        launchAnswer(ticket, false);
+    }
+}
+
+extern "C" void swiftomniui_winui_reveal(int64_t ticket, char const *path) {
+    auto named = std::string(path ? path : "");
+    if (launchesHeld) return launchAnswer(ticket, true);
+    try {
+        std::thread([ticket, named] {
+            auto initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+            PIDLIST_ABSOLUTE item = nullptr;
+            HRESULT result = initialized;
+            try {
+                if (SUCCEEDED(result)) result = SHParseDisplayName(winrt::to_hstring(named).c_str(), nullptr, &item, 0, nullptr);
+                if (SUCCEEDED(result)) result = SHOpenFolderAndSelectItems(item, 0, nullptr, 0);
+            } catch (...) { result = winrt::to_hresult(); }
+            CoTaskMemFree(item);
+            if (SUCCEEDED(initialized)) CoUninitialize();
+            runOnUIThread([ticket, taken = SUCCEEDED(result)] { launchAnswer(ticket, taken); });
+        }).detach();
+    } catch (...) {
+        report("locating a file in Explorer");
         launchAnswer(ticket, false);
     }
 }

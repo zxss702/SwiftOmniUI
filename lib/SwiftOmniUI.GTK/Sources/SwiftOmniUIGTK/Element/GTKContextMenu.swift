@@ -65,6 +65,7 @@ final class GTKContextMenu {
     private func listen() {
         let click = gtk_gesture_click_new()!
         gtk_gesture_single_set_button(click, guint(GDK_BUTTON_SECONDARY))
+        gtk_event_controller_set_propagation_phase(click, GTK_PHASE_CAPTURE)
         connectSignal(UnsafeMutableRawPointer(click), "pressed", number: number) { gesture, _, x, y, data in
             let number = viewNumber(data)
             nonisolated(unsafe) let gesture = gesture

@@ -200,6 +200,10 @@ system, which opens it in the application it gives it. The answer is
 whether one took it - false where nothing opens that scheme or kind - and
 not that it opened: the application starts on its own.
 
+`Links.reveal(path)` selects a local file or folder in its containing system
+file-manager window. It is a distinct act from URI launching; a bare filesystem
+path does not become a URL. Hosts without a file manager answer false.
+
 ## Announcements
 
 `ScreenReader.announce` is an act for the same reason every act is one: it is

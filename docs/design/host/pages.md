@@ -122,3 +122,17 @@ own, each entry with its caption, its picture, whether the user can choose
 it, whether choosing it destroys something and its identifier; a menu bar
 holds only its menus. A host builds its toolkit's menu
 from the walk, and an item's element hears it chosen.
+
+Menu content has its own environment scope. A view-labeled Button keeps a
+clicked handler and its label under a semantic button node; it does not become
+an ordinary content tap. MenuEntry walks grouping views, reads labels, and
+interprets view-labeled Menu triggers as submenus. Caption lookup excludes
+slot children so a submenu cannot borrow its first command's title. Descendant
+changes mark each menu owner dirty; the native menu is refreshed after that
+owner's children have been patched.
+
+Split-column width vectors retain all three positions. An omitted bound is
+encoded as -1; legacy single-width vectors still mean a fixed width.
+SplitColumnWidth normalizes the bounds for native hosts. The visible column
+list, including an optional auxiliary detail, drives page lifecycle rather than
+assuming every split consists of only sidebar and one main page.

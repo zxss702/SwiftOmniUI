@@ -73,6 +73,8 @@
 
     /// Whether a split view shows its sidebar on screen; nil where the tree's word stands.
     var showsSidebar: Bool? { get }
+    var showsContentColumn: Bool? { get }
+    var showsDetailColumn: Bool? { get }
 }
 
 @_spi(Host) extension NativeElement {
@@ -87,6 +89,8 @@
 
     /// The sidebar as the tree says.
     public var showsSidebar: Bool? { nil }
+    public var showsContentColumn: Bool? { nil }
+    public var showsDetailColumn: Bool? { nil }
 
     /// A view that lays nothing out by direction takes none.
     public func directionChanged() {}

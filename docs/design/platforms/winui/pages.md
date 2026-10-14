@@ -110,41 +110,35 @@ it pops the visible stack's top page.
 
 ## A split view
 
-A split view's sidebar stands in WinUI's `NavigationView` pane, the detail in
-its content: WinUI decides, as for any Windows application, whether the pane
-stands beside the detail - from 1008 DIPs, where its navigation pane expands -
-or opens over it, closed by a click beside it. The view shows none of its own
-buttons, which the window's chrome carries, and no compact rail: a sidebar is
-a page, with no icons to stand in one. The pane's own content stands, in
-WinUI's template, in a row sized to what it holds, however tall - a sidebar's
-scroller would hold all its rows and never scroll - so once the view is
-loaded that row takes the pane's room, and the row of the items the view
-holds none of takes only theirs. The row exists only once WinUI has measured
-the view, so the sidebar has been laid out in it by then; everything in the
-pane is measured again, or a layout inside keeps the places that first layout
-gave it - a footer under a scroller stood below the window.
+A split view uses WinUI's `SplitView`, with the sidebar in its leading pane.
+From 1008 DIPs it stands inline; below that it overlays the content and the
+native light-dismiss interaction closes it. There is no NavigationView item
+rail or template row to replace: each column receives the full finite height.
 
-Whether the sidebar shows is SwiftOmniUI's binding, which follows what WinUI
-shows: the pane opening or closing of WinUI's accord - a click beside it, the
-window's room - reaches the binding. The host's one adaptation is that a
-window wide enough for both panes opens with the sidebar shown; after that,
-the user and the application decide. The window learns its room inside a
-layout pass, so the binding hears it in the turn after it.
+A three-column split nests a trailing `SplitView` inside the outer content.
+Its pane holds the auxiliary detail; its content holds the flexible middle
+column. The trailing split stays inline. A detail width of zero removes that
+native column, and `.detailOnly` hides the middle column so detail takes the
+remaining room. Page identities and business navigation state stay in Swift.
+
+Both pane boundaries use native `Thumb` drag capture. Minimum/ideal/maximum
+bounds choose the initial pane width and constrain resizing; unchanged bounds
+do not overwrite the user's width. Content minimum/maximum constrain the
+remaining column. Native owners release their children before a page moves
+between the two-column and three-column forms. Native column configuration
+is coalesced outside MeasureOverride/ArrangeOverride.
+
+Whether the sidebar shows follows the binding and native pane events. The
+first wide room opens it once; after that the user and the application decide.
+The shared page path includes every visible column for appearance/disappearance.
 
 ## A native arrangement
 
-WinUI's navigation view lays its pages out in the room it is arranged in, and
-a page it places is measured by it at that room. So the host measures the
-navigation view at the size it last arranged it at - in the first pass at
-the room offered - and a new room measures it again at the new size before it
-is arranged there; the second pass then asks for what the first gave, and the
-layout settles ([no room asked](layout.md#no-room-asked)).
-
-The split view answers WinUI with what the navigation view asked and never
-measures its pages itself. WinUI arranges an element at no less than it was
-last measured, so a detail page measured at the split's whole width would
-keep that width beside an open pane and run past the window's edge by the
-pane's width.
+Native SplitViews measure their own columns at the finite room supplied by the
+parent. Swift measures the outer split before arrangement and reports that
+result; it never measures a content page at the whole window width or calls
+Measure from Arrange. Changes of content or column width invalidate the native
+measurement without rebuilding page trees.
 
 ## Tabs
 

@@ -65,7 +65,15 @@ final class WinUIElement: NativeElement {
         configureLayoutMotion()
         arrangeChildren()
         arrangePages(changed: changed)
-        if type == .contextMenu { parent?.contextMenuChanged = true }
+        if changed.contains(.preferredColumnWidth) || (element.childrenChanged && parent?.type == .navigationSplitView),
+           let split = element.parent?.enclosing(type: .navigationSplitView)?.winUI {
+            split.arrangeChildren()
+        }
+        var declared = element.enclosing(type: .contextMenu)
+        while let owner = declared?.parent?.winUI {
+            owner.contextMenuChanged = true
+            declared = owner.element.parent?.enclosing(type: .contextMenu)
+        }
         refreshContextMenu()
         if let view { host?.runtime.frames.follow(self, order: view.number, reads: readsFrame) }
     }

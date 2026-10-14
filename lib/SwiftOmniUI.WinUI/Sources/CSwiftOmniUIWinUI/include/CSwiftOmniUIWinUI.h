@@ -944,14 +944,15 @@ void swiftomniui_winui_title_bar_set_slots(SwiftOmniUIObjectRef bar, SwiftOmniUI
 /// away.
 void swiftomniui_winui_title_bar_set_app_menu(SwiftOmniUIObjectRef bar, SwiftOmniUIObjectRef button);
 
-/// A split view: WinUI's NavigationView, the sidebar in its pane as wide as WinUI opens it - beside the detail from
-/// `expandsAt` DIPs, over it and closed by a click beside it below - with none of the view's own buttons, which the
-/// window's chrome carries; `row` stands across the top of the detail.
-SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, double expandsAt);
+/// A native SplitView; a trailing pane holds an auxiliary detail column. A zero breakpoint keeps it inline.
+SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, double expandsAt, bool trailing);
+void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef split);
+double swiftomniui_winui_split_minimum_width(SwiftOmniUIObjectRef split);
 
-/// The pane's open length is `paneLength` where it is positive, or WinUI's own.
+/// Width bounds apply to the pane and remaining content. The native drag handle retains the user's width.
 void swiftomniui_winui_split_set(SwiftOmniUIObjectRef split, SwiftOmniUIObjectRef pane, SwiftOmniUIObjectRef content,
-                             SwiftOmniUIObjectRef row, bool open, double paneLength);
+                             SwiftOmniUIObjectRef row, bool open, double minimum, double ideal, double maximum,
+                             bool contentShown, double contentMinimum, double contentMaximum);
 
 /// A tabbed view's row of tabs: a SelectorBar, `selected` chosen.
 SwiftOmniUIObjectRef swiftomniui_winui_tabs_make(int64_t view);

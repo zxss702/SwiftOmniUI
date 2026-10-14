@@ -44,6 +44,8 @@ final class GTKActPerformer {
             chooseFiles(call, window: window)
         case .openFolders:
             openFolders(call, window: window)
+        case .revealFile, .launchFile, .launchLink:
+            launch(call, window: window)
         case .copyText:
             let text = call.arguments.first?.string ?? ""
             text.withCString { gdk_clipboard_set_text(gdk_display_get_clipboard(gdk_display_get_default()), $0) }
@@ -89,6 +91,63 @@ final class GTKActPerformer {
             call, in: tree, core: core, view: { ($0.native as? GTKElement)?.view }, log: { GTKRenderer.log.error($0) })
         else { return }
         fail(call, "the GTK host does not perform the act '\(call.act.name)'")
+    }
+
+    /// Native asynchronous launchers keep the UI responsive while the desktop opens the item.
+    private func launch(_ call: HostActCall, window: GTKWindow?) {
+        let operation = Launch(call: call, core: core)
+        let data = Unmanaged.passRetained(operation).toOpaque()
+        let ready: GAsyncReadyCallback = { _, result, data in
+            guard let data else { return }
+            let operation = Unmanaged<GTKActPerformer.Launch>.fromOpaque(data).takeRetainedValue()
+            nonisolated(unsafe) let result = result
+            MainActor.assumeIsolated { operation.finish(result) }
+        }
+        let parent = window?.widget.of(GtkWindow.self)
+        if call.act == .launchLink {
+            gtk_uri_launcher_launch(operation.launcher, parent, nil, ready, data)
+        } else if call.act == .revealFile {
+            gtk_file_launcher_open_containing_folder(operation.launcher, parent, nil, ready, data)
+        } else {
+            gtk_file_launcher_launch(operation.launcher, parent, nil, ready, data)
+        }
+    }
+
+    @MainActor private final class Launch {
+        let call: HostActCall
+        let core: CoreLink
+        let launcher: OpaquePointer
+
+        init(call: HostActCall, core: CoreLink) {
+            self.call = call
+            self.core = core
+            if call.act == .launchLink {
+                launcher = gtk_uri_launcher_new(call.arguments.first?.string ?? "")!
+            } else {
+                let path = call.act == .revealFile ? call.arguments.first?.string
+                    : call.arguments.first.flatMap(ChosenFile.init(propValue:))?.address
+                let file = g_file_new_for_path(path ?? "")!
+                launcher = gtk_file_launcher_new(file)!
+                g_object_unref(UnsafeMutableRawPointer(file))
+            }
+        }
+
+        isolated deinit { g_object_unref(UnsafeMutableRawPointer(launcher)) }
+
+        func finish(_ result: OpaquePointer?) {
+            guard let result else { core.reply(call, [.bool(false)]); return }
+            var error: UnsafeMutablePointer<GError>?
+            let took: gboolean
+            if call.act == .launchLink {
+                took = gtk_uri_launcher_launch_finish(launcher, result, &error)
+            } else if call.act == .revealFile {
+                took = gtk_file_launcher_open_containing_folder_finish(launcher, result, &error)
+            } else {
+                took = gtk_file_launcher_launch_finish(launcher, result, &error)
+            }
+            if let error { g_error_free(error) }
+            core.reply(call, [.bool(took != 0)])
+        }
     }
 
     /// The platform's file dialog for `chooseFiles` - the picked paths answer

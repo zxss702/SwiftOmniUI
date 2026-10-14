@@ -95,6 +95,12 @@ final class WinUIFileToolkit: FileToolkit {
         swiftomniui_winui_launch(ticket, address, false)
     }
 
+    func reveal(path: String, answered: @escaping (Bool) -> Void) {
+        let ticket = Self.ticket()
+        launches[ticket] = answered
+        swiftomniui_winui_reveal(ticket, path)
+    }
+
     /// What was launched under `ticket` was taken by an application, or not.
     func launched(ticket: Int64, taken: Bool) {
         launches.removeValue(forKey: ticket)?(taken)

@@ -34,14 +34,14 @@ public struct Menu: View, ModifiableElement {
     ///   row that opens it inside another menu.
     /// - Parameter items: the entries, in the order they are written.
     @_disfavoredOverload public init<S: StringProtocol>(_ text: S, @ViewBuilder items: () -> any View) {
-        node = Node(contract: MenuContract.self, children: items().node.asChildren)
+        node = Node(contract: MenuContract.self, children: items().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren)
         node.write(MenuContract.text, String(text))
     }
 
     /// A menu captioned what `key` looks up - `Menu("File")` looks "File" up,
     /// as SwiftUI's does.
     public init(_ key: LocalizedStringKey, @ViewBuilder items: () -> any View) {
-        node = Node(contract: MenuContract.self, children: items().node.asChildren)
+        node = Node(contract: MenuContract.self, children: items().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren)
         node.write(MenuContract.text, key.displayString)
         node.write(MenuContract.textKey, key)
     }
@@ -84,7 +84,7 @@ public struct Menu: View, ModifiableElement {
         node = Node(contract: MenuButtonContract.self)
         node.children = label().node.asChildren
         node.children.append(
-            Node(contract: ContextMenuContract.self, children: content().node.asChildren))
+            Node(contract: ContextMenuContract.self, children: content().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren))
     }
 
     /// A menu button captioned `text`.

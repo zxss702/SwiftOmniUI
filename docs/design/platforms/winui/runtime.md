@@ -244,6 +244,11 @@ A file or an address is launched through `Launcher`, which answers whether
 an application took it. Every answer reaches the host on the UI thread, by
 the ticket the call was given.
 
+`revealFile` uses SHParseDisplayName and SHOpenFolderAndSelectItems on a
+COM-initialized worker, selecting the actual file or folder rather than
+passing its path to LaunchUriAsync. The completion returns to the UI thread
+through the existing launch ticket mechanism.
+
 ## Kept values
 
 Windows keeps no store for an application that is no package, so the host

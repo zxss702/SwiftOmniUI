@@ -469,4 +469,5 @@ extension NodeType {
     static let readFile = AppContract.readFile.token
     static let launchFile = AppContract.launchFile.token
     static let launchLink = AppContract.launchLink.token
+    static let revealFile = AppContract.revealFile.token
 }

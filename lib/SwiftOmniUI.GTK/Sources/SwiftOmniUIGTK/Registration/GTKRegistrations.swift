@@ -51,6 +51,7 @@ enum GTKRegistrations {
         VisualElementContract.focus, VisualElementContract.unfocus,
         AppContract.alert, AppContract.announce, AppContract.chooseAction,
         AppContract.chooseFiles, AppContract.copyText, AppContract.openFolders,
+        AppContract.revealFile, AppContract.launchFile, AppContract.launchLink,
         AppContract.confirm, AppContract.currentTime, AppContract.currentTimeZone,
         AppContract.handlerFailed, AppContract.hideOnScreenKeyboard, AppContract.persistValue,
         AppContract.prompt, AppContract.utcOffset, CanvasContract.measureText,

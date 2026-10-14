@@ -169,12 +169,20 @@ extension MountedElement {
     /// detail and - while it shows - its sidebar.
     public var shownChildren: [MountedElement] {
         switch type {
-        case .page: contentArrangement.map { [$0] } ?? []
-        case .navigationStack: currentChildren.last.map { [$0] } ?? []
-        case .tabView: selectedTab.map { [$0] } ?? []
+        case .page: return contentArrangement.map { [$0] } ?? []
+        case .navigationStack: return currentChildren.last.map { [$0] } ?? []
+        case .tabView: return selectedTab.map { [$0] } ?? []
         case .navigationSplitView:
-            Array(currentChildren.dropFirst().prefix(1)) + (sidebarIsVisible ? Array(currentChildren.prefix(1)) : [])
-        default: []
+            let columns = currentChildren
+            let sidebar = sidebarIsVisible ? Array(columns.prefix(1)) : []
+            guard columns.count > 2 else { return Array(columns.dropFirst().prefix(1)) + sidebar }
+            let hasDetail = native.showsDetailColumn
+                ?? (SplitColumnWidth(columns.last?.pageValue(.preferredColumnWidth)?.numbers).maximum != 0)
+            guard hasDetail else { return [columns[1]] + sidebar }
+            let showsContent = native.showsContentColumn
+                ?? (value(.columnVisibility)?.enumeration != NavigationSplitViewVisibility.detailOnly.rawValue)
+            return (showsContent ? [columns[1]] : []) + [columns[2]] + sidebar
+        default: return []
         }
     }
 

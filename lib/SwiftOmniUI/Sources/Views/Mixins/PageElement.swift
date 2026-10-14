@@ -241,7 +241,7 @@ extension View {
     public func navigationSplitViewColumnWidth(
         min: Double? = nil, ideal: Double? = nil, max: Double? = nil
     ) -> ModifiedContent {
-        setting(PageElementContract.preferredColumnWidth, [min, ideal, max].compactMap { $0 })
+        setting(PageElementContract.preferredColumnWidth, [min ?? -1, ideal ?? -1, max ?? -1])
     }
 
     /// A fixed width for the split-view column this view leads.

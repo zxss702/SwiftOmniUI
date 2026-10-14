@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The native parts of a window and its arrangements of pages: the window's
-// chrome in WinUI's TitleBar, a split view's NavigationView, and a row of tabs.
+// chrome in WinUI's TitleBar, native SplitViews, and a row of tabs.
 // Each says what the user chose by the view's number and the entry's place.
 // Design: docs/design/platforms/winui/pages.md
 
@@ -12,6 +12,9 @@
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Content.h>
+#include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
+#include <algorithm>
+#include <cmath>
 #include <winrt/Microsoft.UI.Windowing.h>
 
 using namespace swiftomniui;
@@ -104,19 +107,34 @@ namespace {
         if (slot.Content() != shown) slot.Content(shown);
     }
 
-    /// A split's pane content, which WinUI leaves drawn under an overlay it has closed, is collapsed or shown.
-    void showSidebar(controls::NavigationView const &split, bool shown) {
-        auto sidebar = split.PaneCustomContent();
-        auto visibility = shown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed;
-        if (sidebar && sidebar.Visibility() != visibility) sidebar.Visibility(visibility);
+    using SplitWidths = winrt::Windows::Foundation::Collections::IVector<double>;
+
+    // The native pane remembers a user-resized width independently of the modifier's ideal.
+    // Tag holds minimum, ideal, maximum, user width, breakpoint, and content minimum/maximum.
+    void sizeSplit(controls::SplitView const &split) {
+        auto widths = split.Tag().as<SplitWidths>();
+        auto content = split.Content().as<controls::Grid>();
+        auto width = split.ActualWidth();
+        bool alone = content.Visibility() == xaml::Visibility::Collapsed;
+        auto pane = split.Pane().as<controls::Grid>();
+        auto grip = pane.Children().GetAt(1).as<controls::Primitives::Thumb>();
+        bool resizable = widths.GetAt(0) < widths.GetAt(2);
+        bool beside = widths.GetAt(4) == 0 || alone
+            || width >= std::max(widths.GetAt(4), widths.GetAt(0) + widths.GetAt(5) + (resizable ? grip.Width() : 0));
+        split.DisplayMode(beside ? controls::SplitViewDisplayMode::Inline : controls::SplitViewDisplayMode::Overlay);
+        bool handleShown = split.IsPaneOpen() && beside && !alone && resizable;
+        auto gutter = handleShown ? grip.Width() : 0;
+        grip.Visibility(handleShown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+        auto length = std::clamp(widths.GetAt(3), widths.GetAt(0), widths.GetAt(2));
+        if (width > 0 && beside) {
+            auto available = std::max(0.0, width - gutter);
+            auto least = std::max(widths.GetAt(0), available - widths.GetAt(6));
+            auto most = std::max(least, std::min(widths.GetAt(2), available - widths.GetAt(5)));
+            length = alone ? width : std::min(available, std::clamp(length, least, most)) + gutter;
+        } else { length += gutter; }
+        if (split.OpenPaneLength() != length) split.OpenPaneLength(length);
     }
 
-    /// Asks WinUI to measure `element` and everything in it again.
-    void measureAgain(xaml::DependencyObject const &element) {
-        if (auto each = element.try_as<xaml::UIElement>()) each.InvalidateMeasure();
-        for (int32_t index = 0, count = xaml::Media::VisualTreeHelper::GetChildrenCount(element); index < count; ++index)
-            measureAgain(xaml::Media::VisualTreeHelper::GetChild(element, index));
-    }
 }
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view) {
@@ -350,48 +368,65 @@ extern "C" void swiftomniui_winui_title_bar_set_app_menu(SwiftOmniUIObjectRef ha
     }
 }
 
-extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, double expandsAt) {
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, double expandsAt, bool trailing) {
     try {
-        controls::NavigationView split;
-        split.PaneDisplayMode(controls::NavigationViewPaneDisplayMode::Auto);
-        split.CompactModeThresholdWidth(expandsAt);
-        split.ExpandedModeThresholdWidth(expandsAt);
+        controls::SplitView split;
+        split.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
+        split.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
         split.CompactPaneLength(0);
-        split.IsSettingsVisible(false);
-        split.IsBackButtonVisible(controls::NavigationViewBackButtonVisible::Collapsed);
-        split.IsPaneToggleButtonVisible(false);
-        split.IsTitleBarAutoPaddingEnabled(false);
+        split.PaneBackground(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+        split.PanePlacement(trailing ? controls::SplitViewPanePlacement::Right : controls::SplitViewPanePlacement::Left);
+        split.Tag(winrt::single_threaded_vector<double>({0, 256, INFINITY, 256, expandsAt, 0, INFINITY}));
         split.Content(rows({true, false}));
-        // The pane's own content stands in a row sized to what it holds, so a sidebar's scroller would never scroll.
-        // Design: docs/design/platforms/winui/pages.md#a-split-view
-        split.Loaded(guarded("handling Loaded", [](IInspectable const &sender, xaml::RoutedEventArgs const &) {
-            auto split = sender.as<controls::NavigationView>();
-            auto sidebar = first<controls::ContentControl>(split, L"PaneCustomContentBorder");
-            auto items = first<controls::Grid>(split, L"ItemsContainerGrid");
-            auto pane = sidebar ? xaml::Media::VisualTreeHelper::GetParent(sidebar).try_as<controls::Grid>() : nullptr;
-            if (!pane || !items) return;
-            auto rows = pane.RowDefinitions();
-            rows.GetAt(controls::Grid::GetRow(sidebar)).Height(xaml::GridLengthHelper::FromValueAndType(1, xaml::GridUnitType::Star));
-            rows.GetAt(controls::Grid::GetRow(items)).Height(xaml::GridLengthHelper::Auto());
-            // Laid out once already, in the row sized to what it holds: measured again, it takes the pane's height.
-            measureAgain(sidebar);
+        controls::Grid pane;
+        controls::ColumnDefinition faceColumn, handleColumn;
+        faceColumn.Width(xaml::GridLengthHelper::FromValueAndType(1, xaml::GridUnitType::Star));
+        handleColumn.Width(xaml::GridLengthHelper::Auto());
+        pane.ColumnDefinitions().Append(trailing ? handleColumn : faceColumn);
+        pane.ColumnDefinitions().Append(trailing ? faceColumn : handleColumn);
+        controls::ContentControl face;
+        face.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
+        face.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
+        controls::Grid::SetColumn(face, trailing ? 1 : 0);
+        controls::Primitives::Thumb grip;
+        grip.Width(6);
+        grip.Background(media::SolidColorBrush(winrt::Windows::UI::Color{32, 128, 128, 128}));
+        xaml::Automation::AutomationProperties::SetName(grip, trailing ? L"Resize detail column" : L"Resize sidebar column");
+        grip.VerticalAlignment(xaml::VerticalAlignment::Stretch);
+        controls::Grid::SetColumn(grip, trailing ? 0 : 1);
+        pane.Children().Append(face);
+        pane.Children().Append(grip);
+        split.Pane(pane);
+        auto weak = winrt::make_weak(split);
+        grip.DragDelta(guarded("resizing a split column",
+            [weak, trailing](IInspectable const &, controls::Primitives::DragDeltaEventArgs const &args) {
+                if (auto split = weak.get()) {
+                    auto widths = split.Tag().as<SplitWidths>();
+                    auto least = widths.GetAt(0);
+                    auto gutter = split.Pane().as<controls::Grid>().Children().GetAt(1).as<controls::Primitives::Thumb>().Width();
+                    auto available = std::max(0.0, split.ActualWidth() - gutter);
+                    least = std::max(least, available - widths.GetAt(6));
+                    auto most = std::max(least, std::min(widths.GetAt(2), available - widths.GetAt(5)));
+                    auto length = split.OpenPaneLength() - gutter + (trailing ? -1 : 1) * args.HorizontalChange();
+                    widths.SetAt(3, std::clamp(length, least, most));
+                    sizeSplit(split);
+                }
+            }));
+        split.SizeChanged(guarded("sizing a split view", [](IInspectable const &sender, xaml::SizeChangedEventArgs const &) {
+            sizeSplit(sender.as<controls::SplitView>());
         }));
         split.PaneOpening(guarded("handling PaneOpening",
-            [view](controls::NavigationView const &sender, IInspectable const &) {
-            showSidebar(sender, true);
-            callbacks.presented(view, true);
-        }));
+            [view](controls::SplitView const &sender, IInspectable const &) {
+                sender.Pane().as<controls::Grid>().Children().GetAt(0).Visibility(xaml::Visibility::Visible);
+                callbacks.presented(view, true);
+            }));
         split.PaneClosing(guarded("handling PaneClosing",
-            [view](controls::NavigationView const &, controls::NavigationViewPaneClosingEventArgs const &) {
-            callbacks.presented(view, false);
-        }));
-        split.PaneClosed(guarded("handling PaneClosed",
-            [](controls::NavigationView const &sender, IInspectable const &) {
-            if (!sender.IsPaneOpen()) showSidebar(sender, false);
-        }));
-        split.DisplayModeChanged(guarded("handling DisplayModeChanged",
-            [](controls::NavigationView const &sender, IInspectable const &) {
-            if (!sender.IsPaneOpen()) showSidebar(sender, false);
+            [view](controls::SplitView const &, controls::SplitViewPaneClosingEventArgs const &) {
+                callbacks.presented(view, false);
+            }));
+        split.PaneClosed(guarded("handling PaneClosed", [](controls::SplitView const &sender, IInspectable const &) {
+            if (!sender.IsPaneOpen())
+                sender.Pane().as<controls::Grid>().Children().GetAt(0).Visibility(xaml::Visibility::Collapsed);
         }));
         return detach(split);
     } catch (...) {
@@ -400,24 +435,56 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
     }
 }
 
+extern "C" void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef handle) {
+    try {
+        auto split = borrow<controls::SplitView>(handle);
+        split.Pane().as<controls::Grid>().Children().GetAt(0).as<controls::ContentControl>().Content(nullptr);
+        split.Content().as<controls::Grid>().Children().Clear();
+    } catch (...) { report("releasing split columns"); }
+}
+
+extern "C" double swiftomniui_winui_split_minimum_width(SwiftOmniUIObjectRef handle) {
+    try {
+        auto split = borrow<controls::SplitView>(handle);
+        auto widths = split.Tag().as<SplitWidths>();
+        bool contentShown = split.Content().as<controls::Grid>().Visibility() == xaml::Visibility::Visible;
+        auto minimum = contentShown ? widths.GetAt(5) : 0;
+        if (split.IsPaneOpen()) {
+            minimum += widths.GetAt(0);
+            if (contentShown && widths.GetAt(0) < widths.GetAt(2))
+                minimum += split.Pane().as<controls::Grid>().Children().GetAt(1).as<controls::Primitives::Thumb>().Width();
+        }
+        return minimum;
+    } catch (...) { report("reading split column bounds"); return 0; }
+}
+
 extern "C" void swiftomniui_winui_split_set(
     SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef pane, SwiftOmniUIObjectRef content, SwiftOmniUIObjectRef row, bool open,
-    double paneLength
+    double minimum, double ideal, double maximum, bool contentShown, double contentMinimum, double contentMaximum
 ) {
     try {
-        auto split = borrow<controls::NavigationView>(handle);
-        auto sidebar = pane ? as<xaml::UIElement>(pane) : xaml::UIElement{nullptr};
-        bool anew = split.PaneCustomContent() != sidebar;
-        if (anew) split.PaneCustomContent(sidebar);
+        auto split = borrow<controls::SplitView>(handle);
+        auto widths = split.Tag().as<SplitWidths>();
+        if (widths.GetAt(0) != minimum || widths.GetAt(1) != ideal || widths.GetAt(2) != maximum) {
+            widths.SetAt(0, minimum);
+            widths.SetAt(1, ideal);
+            widths.SetAt(2, maximum);
+            widths.SetAt(3, std::clamp(ideal, minimum, maximum));
+        }
+        widths.SetAt(5, contentMinimum);
+        widths.SetAt(6, contentMaximum);
+        auto face = split.Pane().as<controls::Grid>().Children().GetAt(0).as<controls::ContentControl>();
+        bool anew = face.Content() != (pane ? as<xaml::UIElement>(pane) : xaml::UIElement{nullptr});
+        fill(face, pane);
+        if (open || anew || !split.IsLoaded()) face.Visibility(open ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
         auto detail = split.Content().as<controls::Grid>();
+        detail.MinWidth(contentMinimum);
+        detail.MaxWidth(contentMaximum);
+        detail.Visibility(contentShown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
         standInRow(detail, 0, row);
         standInRow(detail, 1, content);
-        // A pane over the detail collapses its sidebar once it has closed; one beside it tells no closing, and a
-        // view WinUI has not loaded, or a new sidebar, tells nothing.
-        bool beside = split.DisplayMode() == controls::NavigationViewDisplayMode::Expanded;
-        if (open || anew || beside || !split.IsLoaded()) showSidebar(split, open);
         if (split.IsPaneOpen() != open) split.IsPaneOpen(open);
-        if (paneLength > 0 && split.OpenPaneLength() != paneLength) split.OpenPaneLength(paneLength);
+        sizeSplit(split);
     } catch (...) {
         report("setting a split view");
     }

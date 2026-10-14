@@ -228,7 +228,15 @@ struct ToolbarContentKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+struct MenuContentKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
+    var isMenuContent: Bool {
+        get { self[MenuContentKey.self] }
+        set { self[MenuContentKey.self] = newValue }
+    }
     var isToolbarContent: Bool {
         get { self[ToolbarContentKey.self] }
         set { self[ToolbarContentKey.self] = newValue }
@@ -237,6 +245,7 @@ extension EnvironmentValues {
 
 struct ContentButton: View {
     @Environment(\.isToolbarContent) private var isToolbarContent
+    @Environment(\.isMenuContent) private var isMenuContent
     /// What a press runs.
     let action: EventHandler
 
@@ -245,6 +254,11 @@ struct ContentButton: View {
 
     /// The label, answering a tap.
     var body: any View {
+        if isMenuContent {
+            var button = Button().onClicked(action)
+            button.node.children = [label.node]
+            return button
+        }
         if isToolbarContent {
             let face = unwrappedStatement(label)
             if let label = face as? Label, let source = label.semanticParts.icon {

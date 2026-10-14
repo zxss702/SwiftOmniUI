@@ -21,7 +21,7 @@
     /// launches.
     public static let files: [any ContractMember] = [
         AppContract.openFiles, AppContract.openFolders, AppContract.saveFile, AppContract.readFile,
-        AppContract.launchFile, AppContract.launchLink,
+        AppContract.launchFile, AppContract.launchLink, AppContract.revealFile,
     ]
 
     /// The answer to `currentTime`: the hour, the minute, the second and the millisecond of the local time.

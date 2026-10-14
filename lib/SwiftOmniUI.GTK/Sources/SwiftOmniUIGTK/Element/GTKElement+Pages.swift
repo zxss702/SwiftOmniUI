@@ -3,12 +3,15 @@
 
 @_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
+import CSwiftOmniUIGTK
 
 /// Pages and their arrangements on GTK: the chrome each page's header bar shows - its title or title view, its
 /// actions, whether it offers the way back - and the user's choices handed to the host layer, which tells the pages
 /// and the states.
 /// Design: docs/design/platforms/gtk/pages.md
 extension GTKElement {
+    var showsContentColumn: Bool? { (view as? GTKSplitView)?.isContentPresented }
+    var showsDetailColumn: Bool? { (view as? GTKSplitView)?.showsDetailColumn }
     /// What stands in a frame of its own, with a header bar: a page, and a tabbed view.
     static let framedTypes: Set<NodeType> = [.page, .tabView]
 
@@ -145,23 +148,38 @@ extension GTKElement {
             let showing: (shows: Bool, toggle: () -> Void) = (shows, { [weak self] in
                 self?.changeSidebarVisibility(to: !shows)
             })
+            let indices = (shows ? [0] : []) + (split.showsDetailColumn
+                ? ((split.isContentPresented ? [1] : []) + [2]) : [1])
+            func showColumn(_ index: Int, _ frame: GTKPageFrame, _ chrome: GTKPageChrome) {
+                // GtkPaned does not provide AdwHeaderBar's automatic column-edge context.
+                adw_header_bar_set_show_start_title_buttons(frame.header.opaque,
+                    split.isCollapsed || index == indices.first ? 1 : 0)
+                adw_header_bar_set_show_end_title_buttons(frame.header.opaque,
+                    split.isCollapsed || index == indices.last ? 1 : 0)
+                show(frame, chrome)
+            }
             if let sidebar = children.first {
-                if let frame = split.sidebarFrame { show(frame, sidebar.chrome) }
-                sidebar.composeChrome(show: show)
+                if let frame = split.sidebarFrame { showColumn(0, frame, sidebar.chrome) }
+                sidebar.composeChrome { frame, chrome in showColumn(0, frame, chrome) }
             }
             if split.showsDetailColumn, let content = children.dropFirst().first {
-                if let frame = split.contentFrame { show(frame, content.chrome) }
-                content.composeChrome(show: show)
+                if let frame = split.contentFrame {
+                    var chrome = content.chrome
+                    chrome.sidebar = showing
+                    showColumn(1, frame, chrome)
+                }
+                content.composeChrome(showingSidebar: showing) { frame, chrome in showColumn(1, frame, chrome) }
             }
             let detail = split.showsDetailColumn ? children.last : children.dropFirst().first
+            let index = split.showsDetailColumn ? 2 : 1
             if let detail {
                 if let frame = split.detailFrame {
                     var chrome = detail.chrome
-                    chrome.sidebar = showing
-                    show(frame, chrome)
-                    detail.composeChrome(show: show)
+                    if !split.showsDetailColumn || !split.isContentPresented { chrome.sidebar = showing }
+                    showColumn(index, frame, chrome)
+                    detail.composeChrome { frame, chrome in showColumn(index, frame, chrome) }
                 } else {
-                    detail.composeChrome(showingSidebar: showing, show: show)
+                    detail.composeChrome(showingSidebar: showing) { frame, chrome in showColumn(index, frame, chrome) }
                 }
             }
         case .tabView:

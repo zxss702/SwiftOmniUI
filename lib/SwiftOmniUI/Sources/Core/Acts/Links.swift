@@ -7,6 +7,12 @@
 /// Addresses the system opens in the application it gives them, asked of the
 /// host - the act form of `\.openURL`, for code that holds no view.
 public enum Links {
+    /// Opens the system file manager and selects the local file or folder at `path`.
+    @discardableResult
+    public static nonisolated(nonsending) func reveal(_ path: String) async throws -> Bool {
+        try await stateUICall(AppContract.revealFile, path)
+    }
+
     /// Opens an address in the application the system gives it - a web page in
     /// the browser, a mail address in the mail application.
     ///

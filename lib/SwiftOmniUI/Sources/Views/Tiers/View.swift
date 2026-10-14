@@ -551,7 +551,8 @@ extension View {
         revised {
             // After the view's own children; the host finds it by type.
             // Design: docs/design/views/modifiers.md#slot-children
-            $0.children.append(Node(contract: ContextMenuContract.self, children: items().node.asChildren))
+            $0.children.append(Node(contract: ContextMenuContract.self,
+                                   children: items().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren))
         }
     }
 }

@@ -301,7 +301,7 @@ namespace {
         if (what == "tint") return tint(object);
         if (what == "scope") return scope(object);
         if (auto bar = object.try_as<controls::TitleBar>()) return chrome(bar, what);
-        if (auto split = object.try_as<controls::NavigationView>(); split && what == "paneOpen") {
+        if (auto split = object.try_as<controls::SplitView>(); split && what == "paneOpen") {
             return flag(split.IsPaneOpen());
         }
         if (auto tabs = object.try_as<controls::SelectorBar>()) {

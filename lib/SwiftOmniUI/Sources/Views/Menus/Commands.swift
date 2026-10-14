@@ -197,7 +197,7 @@ public struct CommandGroup<Content: View>: Commands, CommandsEntry {
     /// A group whose entries stand in `placement`'s region instead of what
     /// the platform put there.
     public init(replacing placement: CommandGroupPlacement, @ViewBuilder content: () -> Content) {
-        node = Node(contract: MenuContract.self, children: content().node.asChildren)
+        node = Node(contract: MenuContract.self, children: content().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren)
         node.write(MenuContract.placement, placement)
     }
 }
@@ -223,13 +223,13 @@ public struct CommandMenu<Content: View>: Commands, CommandsEntry {
 
     /// A menu captioned `title`, holding whatever the closure lists.
     @_disfavoredOverload public init<S: StringProtocol>(_ title: S, @ViewBuilder content: () -> Content) {
-        node = Node(contract: MenuContract.self, children: content().node.asChildren)
+        node = Node(contract: MenuContract.self, children: content().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren)
         node.write(MenuContract.text, String(title))
     }
 
     /// A menu captioned what `key` looks up.
     public init(_ titleKey: LocalizedStringKey, @ViewBuilder content: () -> Content) {
-        node = Node(contract: MenuContract.self, children: content().node.asChildren)
+        node = Node(contract: MenuContract.self, children: content().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren)
         node.write(MenuContract.text, titleKey.displayString)
         node.write(MenuContract.textKey, titleKey)
     }

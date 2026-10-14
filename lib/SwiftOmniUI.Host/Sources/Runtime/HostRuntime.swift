@@ -182,8 +182,10 @@
     /// visibility the binding carries. The sidebar's page is the one a hidden sidebar takes off screen.
     public func columnsShown(_ split: MountedElement, _ visibility: NavigationSplitViewVisibility) {
         if split.isPagePresented {
-            split.children.first?.setPagePresented(
-                visibility == .all || visibility == .automatic, reason: .appearance)
+            let shown = split.shownChildren
+            for column in split.currentChildren {
+                column.setPagePresented(shown.contains { $0 === column }, reason: .appearance)
+            }
         }
         split.reportUserChange(
             .columnVisibility, .columnVisibilityChanged, .enumeration(visibility.rawValue), in: self) { _ in }

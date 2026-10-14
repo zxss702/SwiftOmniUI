@@ -22,13 +22,11 @@ final class WinUISplitView: WinUILayoutView {
     /// What the split does when the user moves which of three columns show.
     var onVisibilityChanged: ((NavigationSplitViewVisibility) -> Void)?
 
-    /// WinUI's navigation view, whose pane is the sidebar.
+    /// WinUI's split view, whose pane is the sidebar.
     let sidebar = WinUISidebarView()
 
-    /// The middle column's own navigation view inside the outer one's
-    /// detail: its pane is the content column, its content the detail - a
-    /// three-column split as two two-column ones.
-    let middle = WinUISidebarView()
+    /// The inner split keeps the main content flexible and the auxiliary detail in a trailing pane.
+    let middle = WinUISidebarView(trailing: true)
 
     /// Whether the content column shows, where three columns can.
     private(set) var isContentPresented = true
@@ -36,34 +34,30 @@ final class WinUISplitView: WinUILayoutView {
     /// The sidebar's [minimum, ideal, maximum] width the tree asks: the
     /// pane's open length is the ideal, or the minimum it has alone.
     var sidebarPaneLength: [Double]? {
-        didSet { configure() }
+        didSet { if sidebarPaneLength != oldValue { configure() } }
     }
 
     /// The content column's [minimum, ideal, maximum] width, as
     /// `sidebarPaneLength` is the sidebar's.
     var contentPaneLength: [Double]? {
-        didSet { configure() }
+        didSet { if contentPaneLength != oldValue { configure() } }
     }
 
     var detailWidthBounds: [Double]? {
         didSet { if detailWidthBounds != oldValue { configure(); invalidateMeasurements() } }
     }
 
-    /// The pane's open length from a width triple: the ideal, or the minimum.
-    private static func paneLength(_ bounds: [Double]?) -> Double {
-        guard let bounds else { return 0 }
-        return bounds.count > 1 ? bounds[1] : (bounds.first ?? 0)
-    }
-
     /// The sidebar page and the detail page, as the tree gives them, and the row across the detail.
     private var pages: [WinUILayoutItem] = []
     private(set) weak var detailRow: WinUIView?
 
-    /// The size WinUI's navigation view was last arranged at, which it is measured at too; and what it last asked.
+    /// The size WinUI's split view was last arranged at, which it is measured at too; and what it last asked.
     private var arranged: LayoutSize?
     private var asked = LayoutSize.zero
     private var adaptation = SidebarAdaptation()
     private var configurationPending = false
+    private var ownedPages: [WinUIView] = []
+    private var ownedThreeColumns = false
 
     override init() {
         super.init()
@@ -77,18 +71,12 @@ final class WinUISplitView: WinUILayoutView {
                 onPresentationChanged?(open)
             }
         }
-        middle.onPresented = { [weak self] open in
-            guard let self, open != isContentPresented else { return }
-            isContentPresented = open
-            if let visibility = effectiveVisibility {
-                onVisibilityChanged?(visibility)
-            }
-        }
         setChildren([sidebar])
     }
 
     /// Whether a content column stands between the sidebar and the detail.
-    private var hasContentColumn: Bool { pages.count > 2 }
+    var hasContentColumn: Bool { pages.count > 2 }
+    var showsDetailColumn: Bool { hasContentColumn && SplitColumnWidth(detailWidthBounds, defaultIdeal: 320).maximum != 0 }
 
     /// Which columns stand shown on screen, where three can.
     private var effectiveVisibility: NavigationSplitViewVisibility? {
@@ -101,7 +89,7 @@ final class WinUISplitView: WinUILayoutView {
         }
     }
 
-    /// The pages go in WinUI's navigation view, which places them; the panel holds it alone.
+    /// The pages go in WinUI's split view, which places them; the panel holds it alone.
     @discardableResult
     override func setItems(_ items: [WinUILayoutItem]) -> Bool {
         guard items.count != pages.count || !zip(items, pages).allSatisfy({ $0.arranges(like: $1) }) else { return false }
@@ -154,7 +142,7 @@ final class WinUISplitView: WinUILayoutView {
         configure()
     }
 
-    /// What WinUI's navigation view asked, never its pages' own sizes: WinUI measures them in the room it gives them.
+    /// What WinUI's split view asked, never its pages' own sizes: WinUI measures them in the room it gives them.
     override func contentSize(width: Double?) -> LayoutSize {
         asked
     }
@@ -174,7 +162,6 @@ final class WinUISplitView: WinUILayoutView {
         let size = LayoutSize(width: bounds.width, height: bounds.height)
         if size != arranged {
             arranged = size
-            asked = sidebar.measure(width: size.width, height: size.height)
         }
         adaptToFirstRoom(width: bounds.width)
         sidebar.layout(bounds)
@@ -185,7 +172,8 @@ final class WinUISplitView: WinUILayoutView {
         guard adaptation.room(width, breakpoint: WinUISidebarView.expandsAt, shown: isPresented) else { return }
 
         present(true)
-        onPresentationChanged?(true)
+        if let visibility = effectiveVisibility { onVisibilityChanged?(visibility) }
+        else { onPresentationChanged?(true) }
     }
 
     private func configure() {
@@ -201,23 +189,39 @@ final class WinUISplitView: WinUILayoutView {
             return
         }
         ProgramWrite.perform {
-            if pages.count > 2, detailWidthBounds?.last != 0 {
+            let three = pages.count > 2 && SplitColumnWidth(detailWidthBounds, defaultIdeal: 320).maximum != 0
+            let views = pages.map(\.view)
+            if three != ownedThreeColumns || views.count != ownedPages.count
+                || !zip(views, ownedPages).allSatisfy({ $0 === $1 }) {
+                // Release each native owner before moving a page between two and three columns.
+                sidebar.clear()
+                middle.clear()
+                ownedPages = views
+                ownedThreeColumns = three
+            }
+            if three {
+                let detail = SplitColumnWidth(detailWidthBounds, defaultIdeal: 320)
+                let content = SplitColumnWidth(contentPaneLength)
                 middle.set(
-                    sidebar: pages[1].view, detail: pages[2].view, row: detailRow,
-                    open: isContentPresented, paneLength: Self.paneLength(contentPaneLength))
+                    sidebar: pages[2].view, detail: pages[1].view, row: detailRow, open: true,
+                    widths: detail, contentShown: isContentPresented, contentWidths: content)
                 sidebar.set(
                     sidebar: pages.first?.view, detail: middle, row: nil,
-                    open: isPresented, paneLength: Self.paneLength(sidebarPaneLength))
+                    open: isPresented, widths: SplitColumnWidth(sidebarPaneLength),
+                    contentWidths: SplitColumnWidth([middle.minimumRoom, -1, -1]))
             } else {
-                middle.set(sidebar: nil, detail: nil, row: nil, open: false)
                 sidebar.set(
                     sidebar: pages.first?.view, detail: pages.dropFirst().first?.view, row: detailRow,
-                    open: isPresented, paneLength: Self.paneLength(sidebarPaneLength))
+                    open: isPresented, widths: SplitColumnWidth(sidebarPaneLength),
+                    contentWidths: SplitColumnWidth(contentPaneLength))
             }
         }
     }
 
     override func detach() {
+        sidebar.clear()
+        middle.clear()
+        ownedPages = []
         super.detach()
         onPresentationChanged = nil
         onVisibilityChanged = nil

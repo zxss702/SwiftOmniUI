@@ -92,6 +92,11 @@ size in pixels, its scale and its refresh rate.
 
 ## Acts
 
+URI/file launches use GtkUriLauncher/GtkFileLauncher asynchronously.
+`revealFile` uses GtkFileLauncher.open_containing_folder to select the local
+item in its parent directory. Each operation retains its launcher until finish
+and replies once with the native result, including failure or cancellation.
+
 The acts the application calls are performed after each turn's render and
 answered, a reply or a failure with its reason, so no caller waits on an act
 nobody performs. The time of day is GLib's local time; the zone is GLib's

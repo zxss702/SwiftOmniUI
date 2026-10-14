@@ -95,16 +95,23 @@ page for a title.
 
 ## A split view
 
-A split view is libadwaita's `AdwOverlaySplitView`: the sidebar beside the
-detail, and over it in a window narrower than 400sp - a breakpoint of the
-window's, as GNOME's applications collapse theirs, the window then saying the
-smallest size GNOME's windows keep. Whether the sidebar shows is SwiftOmniUI's
-binding: the program's write shows or hides it, and GTK's own change - a click
-beside a sidebar over the detail, a swipe - and the detail's toggle report
-back into it. The split's first room wider than nothing decides, by the host
-layer's rule ([a sidebar on the first room](../../host/pages.md#a-sidebar-on-the-first-room)):
-wide enough for both panes - 400sp at the desktop's text scale - it opens
-with the sidebar shown, said once GTK has laid the frame out.
+Wide split views use native `GtkPaned` boundaries: the sidebar at the leading
+edge, flexible main content in the middle, and an optional detail at the
+trailing edge. Each pane retains its user's width, starting at the modifier's
+ideal and clamped to the minimum/maximum and the neighboring column's room.
+GtkPaned owns pointer capture and keyboard resizing. Width requests are placed
+on native slot wrappers, leaving the authored page's requests intact.
+
+A detail width of zero removes the auxiliary pane. Column visibility also
+controls the middle column and every visible column's appearance lifecycle.
+Frames follow their page when columns change, and native owners release each
+widget before it is assigned another parent.
+
+Below the window's 400sp breakpoint, libadwaita's `AdwOverlaySplitView` hosts
+the sidebar over the same content. Its light-dismiss and swipe interactions
+update the binding; wide windows return the sidebar to the draggable layout.
+Parent changes and constrained positions are committed outside GTK allocation.
+The first wide room opens the sidebar once, as the shared adaptation specifies.
 
 ## Tabs
 

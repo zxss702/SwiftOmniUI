@@ -5,7 +5,7 @@
 @_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIWinUI
 
-/// WinUI's `NavigationView`: the sidebar page in its pane - beside the detail page where the window is wide, over it
+/// WinUI's `SplitView`: the sidebar page in its pane - beside the detail page where the window is wide, over it
 /// where it is narrow - and a row across the top of the detail. WinUI chooses which, as it does for any Windows app.
 /// Design: docs/design/platforms/winui/pages.md#a-split-view
 @MainActor
@@ -16,15 +16,22 @@ final class WinUISidebarView: WinUIView {
     /// What the view does when its pane opens or closes of WinUI's accord.
     var onPresented: ((Bool) -> Void)?
 
-    init() {
-        super.init { number in swiftomniui_winui_split_make(number, Self.expandsAt) }
+    init(trailing: Bool = false) {
+        super.init { number in swiftomniui_winui_split_make(number, trailing ? 0 : Self.expandsAt, trailing) }
     }
 
-    /// The two pages, the row over the detail, whether the pane is open, and
-    /// how wide it stands open - `paneLength` of zero or less leaves WinUI's own.
-    func set(sidebar: WinUIView?, detail: WinUIView?, row: WinUIView?, open: Bool, paneLength: Double = 0) {
-        swiftomniui_winui_split_set(handle, sidebar?.handle, detail?.handle, row?.handle, open, paneLength)
+    /// The pane and content pages, their width constraints, and a row above the content.
+    func set(sidebar: WinUIView?, detail: WinUIView?, row: WinUIView?, open: Bool,
+             widths: SplitColumnWidth = SplitColumnWidth(nil), contentShown: Bool = true,
+             contentWidths: SplitColumnWidth = SplitColumnWidth(nil)) {
+        swiftomniui_winui_split_set(handle, sidebar?.handle, detail?.handle, row?.handle, open,
+                                   widths.minimum, widths.ideal, widths.maximum,
+                                   contentShown, contentWidths.minimum, contentWidths.maximum)
+        invalidateMeasure()
     }
+
+    func clear() { swiftomniui_winui_split_clear(handle) }
+    var minimumRoom: Double { swiftomniui_winui_split_minimum_width(handle) }
 
     override func presented(_ open: Bool) {
         guard !ProgramWrite.isWriting else { return }

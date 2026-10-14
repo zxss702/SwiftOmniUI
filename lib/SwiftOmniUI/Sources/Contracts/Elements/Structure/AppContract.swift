@@ -79,6 +79,9 @@ public enum AppContract: ElementContract, ApplicationTier {
     /// See `Links.launch(_:)`.
     public static let launchLink = ElementAct<Self, String, Bool>("launchLink")
 
+    /// Selects a local file or folder in the system file manager.
+    public static let revealFile = ElementAct<Self, String, Bool>("revealFile")
+
     /// What a lookup key resolves to in the host's tables - the pattern and
     /// its arguments in, the words out; the act `*Key` members' mounted
     /// resolution shares, called directly where a string crosses outside a
@@ -153,6 +156,6 @@ public enum AppContract: ElementContract, ApplicationTier {
     public static let members: [any ContractMember] = [
         alert, announce, chooseAction, chooseFiles, confirm, copyText, currentTime, currentTimeZone, handlerFailed,
         hideOnScreenKeyboard, launchFile, launchLink, localizedString, openFiles, openFolders, persistSceneValue,
-        persistValue, prompt, readFile, saveFile, urlOpened, utcOffset,
+        persistValue, prompt, readFile, revealFile, saveFile, urlOpened, utcOffset,
     ]
 }
