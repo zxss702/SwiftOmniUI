@@ -5,7 +5,7 @@ import Foundation
 import Testing
 @testable import SwiftOmniUIJsonData
 import JsonData
-import SwiftOmniUICore
+@_spi(Host) @testable import SwiftOmniUICore
 
 /// A model the query tests keep in memory.
 @Model
@@ -62,6 +62,34 @@ struct ModelLayerTests {
         result.attach(to: container.mainContext)
 
         #expect(result.context === container.mainContext)
+    }
+
+    /// Build a real @Query read, including its written descriptor and environment context.
+    @Test @MainActor func queryWrappedValueReadsItsWrittenSortOrder() throws {
+        let container = try ModelContainer(
+            for: Schema([Row.self]),
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
+        let marker = "wrapped-query-\(UUID().uuidString)"
+        container.mainContext.insert(Row(name: "\(marker)-a"))
+        container.mainContext.insert(Row(name: "\(marker)-z"))
+        try container.mainContext.save()
+
+        struct Page: View {
+            @Query(sort: \Row.name, order: .reverse) private var rows: [Row]
+            let marker: String
+
+            init(marker: String) {
+                self.marker = marker
+            }
+
+            var body: some View {
+                Text(rows.filter { $0.name.hasPrefix(marker) }.map(\.name).joined(separator: "|"))
+            }
+        }
+
+        let node = Page(marker: marker).modelContainer(container).node.built
+        #expect(node.type == .text)
+        #expect(node.props[.text] == .string("\(marker)-z|\(marker)-a"))
     }
 
     /// The full spelling an application writes compiles and builds a node.

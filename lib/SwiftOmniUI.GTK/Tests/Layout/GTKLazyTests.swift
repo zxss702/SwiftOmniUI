@@ -10,6 +10,7 @@ import CSwiftOmniUIGTK
 
 /// The modified source mirrors a file tree beside an ordinary settings card.
 @MainActor private final class ModifiedLazyBuilds {
+    var calls = 0
     var numbers: Set<Int> = []
     var rows: [Int: ModifiedLazyInputRow] = [:]
 }
@@ -66,6 +67,130 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on GTK answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class GTKLazyTests: XCTestCase {
+    func testFolderExpansionRetainsSurvivingRowMeasurements() throws {
+        try onUIThread {
+            let original = Array(0..<1_000)
+            let rows = State(wrappedValue: original)
+            let host = GTKRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            HStack {
+                                Text("File \(number)")
+                                Text("Kind").font(.caption)
+                            }
+                            .frame(height: 40)
+                        }
+                        .transition(.opacity)
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step() }
+            let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
+            for list in [Array(0..<3) + [1_000, 1_001] + Array(3..<1_000), original] {
+                let before = lazy.cells.measurements
+                let held = lazy.mounted.mapValues(\.view)
+                rows.wrappedValue = list
+                for _ in 0..<12 { host.step() }
+                let incoming = lazy.mounted.filter { held[$0.key] !== $0.value.view }
+                XCTAssertEqual(lazy.cells.measurements - before, incoming.count,
+                               "a new content closure must not discard unchanged rows' sizes")
+                for (identity, view) in held where lazy.mounted[identity] != nil {
+                    XCTAssertTrue(lazy.mounted[identity]?.view === view)
+                }
+            }
+        }
+    }
+
+    func testFolderAnimationFramesReuseRowsAndMeasurements() throws {
+        try onUIThread {
+            let original = Array(0..<1_000)
+            let rows = State(wrappedValue: original)
+            let builds = ModifiedLazyBuilds()
+            let clock = TestClock()
+            let host = GTKRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            builds.calls += 1
+                            builds.numbers.insert(number)
+                            return Button {} label: {
+                                HStack {
+                                    Image(systemName: "folder")
+                                    Text("File \(number)")
+                                    Spacer()
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .frame(height: 28)
+                        }
+                        .transition(.opacity.combined(with: .offset(y: -48)))
+                    }
+                    .animation(.eased(200, .linear))
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
+            clock.now += 200
+            for _ in 0..<12 { host.step(); host.frame() }
+            let identity = lazy.cells.identities[6]
+            let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
+            let initialY = retained.placedFrame.y
+            for expanded in [true, false] {
+                let began = clock.now
+                let before = retained.placedFrame.y
+                rows.wrappedValue = expanded
+                    ? Array(0..<3) + [1_000, 1_001] + Array(3..<1_000) : original
+                for _ in 0..<12 { host.step(); host.frame() }
+                let measurements = lazy.cells.measurements
+                let descriptions = builds.calls
+                let target = initialY + (expanded ? 56 : 0)
+                for tick in stride(from: 20.0, through: 180.0, by: 20) {
+                    clock.now = began + tick
+                    host.frame()
+                    host.step()
+                    XCTAssertTrue(lazy.mounted[identity]?.view === retained)
+                    XCTAssertEqual(retained.placedFrame.y, before + (target - before) * tick / 200, accuracy: 1)
+                    XCTAssertEqual(lazy.cells.measurements, measurements, "moving rows reuse their measured sizes")
+                    XCTAssertEqual(builds.calls, descriptions, "animation ticks must not describe the row source")
+                }
+                clock.now = began + 200
+                for _ in 0..<12 { host.step(); host.frame() }
+                XCTAssertEqual(retained.placedFrame.y, target, accuracy: 1)
+                XCTAssertLessThan(builds.numbers.count, 80, "only the viewport and its overscan are built")
+            }
+        }
+    }
+
+    func testNativeIntrinsicSizeChangesStillRefreshACachedLazyRow() throws {
+        try onUIThread {
+            let host = GTKRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<1_000) { number in
+                            Text("File \(number)").frame(width: 120)
+                        }
+                    }
+                }
+                .frame(width: 160, height: 240)
+            }
+            for _ in 0..<12 { host.step() }
+            let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
+            let identity = lazy.cells.identities[0]
+            let row = try XCTUnwrap(lazy.mounted[identity]?.view)
+            let label = try XCTUnwrap(host.views(GTKTextView.self).first { $0.text == "File 0" })
+            let before = lazy.cells.extents.extent(of: identity)
+            // Exercise a native requisition change with no patch or lazy content revision.
+            label.setText(String(repeating: "Words that wrap onto another line. ", count: 12))
+            for _ in 0..<12 { host.step() }
+            XCTAssertTrue(lazy.mounted[identity]?.view === row)
+            XCTAssertGreaterThan(lazy.cells.extents.extent(of: identity), before)
+            XCTAssertLessThan(lazy.mounted.count, 80)
+        }
+    }
+
     func testModifiedSourcesStayWindowedAcrossRepeatedPageSwitches() throws {
         try onUIThread {
             let showing = State(wrappedValue: true)

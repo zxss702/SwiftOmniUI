@@ -217,8 +217,9 @@ public struct Query<Element: PersistentModel> {
     public var wrappedValue: [Element] {
         // Builds run on the UI thread, which is the main actor for every host.
         let context = _context, result = _result
-        return MainActor.assumeIsolated {
-            result.wrappedValue.attach(to: context.wrappedValue, descriptor: request.descriptor, animation: animation)
+        let descriptor = request.descriptor, animation = animation
+        return MainActor.assumeIsolated { [context, result, descriptor, animation] in
+            result.wrappedValue.attach(to: context.wrappedValue, descriptor: descriptor, animation: animation)
             return OnMain(result.wrappedValue.items)
         }.value
     }
