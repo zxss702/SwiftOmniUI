@@ -206,6 +206,7 @@ class GTKLazyView: GTKTravellingLayout {
     }
 
     override func detach() {
+        cells.cancelPrefetch()
         super.detach()
         ear?.owner = nil
         ear = nil
@@ -332,7 +333,9 @@ final class GTKLazyStackView: GTKLazyView {
     }
 
     override func tellWindow(_ span: Range<Double>) {
-        cells.show(span, keeping: travellingIdentities)
+        let room = span.upperBound - span.lowerBound
+        cells.show(span, realize: max(0, span.lowerBound - room)..<(span.upperBound + room),
+                   keeping: travellingIdentities, prefetch: true)
     }
 }
 
@@ -502,7 +505,10 @@ final class GTKLazyGridView: GTKLazyView {
     }
 
     override func tellWindow(_ span: Range<Double>) {
-        cells.show(span, perRun: perRun, grid: true, keeping: travellingIdentities)
+        let room = span.upperBound - span.lowerBound
+        cells.show(span, perRun: perRun, grid: true,
+                   realize: max(0, span.lowerBound - room)..<(span.upperBound + room),
+                   keeping: travellingIdentities, prefetch: true)
     }
 }
 

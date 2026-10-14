@@ -55,6 +55,11 @@ private struct CountedLazyIdentity: Hashable, CustomStringConvertible {
     }
 }
 
+private struct SameSpellingLazyID: Hashable, CustomStringConvertible {
+    let value: Int
+    var description: String { "file" }
+}
+
 /// The lazy view under test, built inside a body - where it always stands
 /// when an application writes it, so its `@State` is read at build, not at
 /// a test's convenience.
@@ -87,6 +92,69 @@ private struct LazyPage: View {
         return renders.revisit(changed: Renderer.shared.pendingChanges)
     }
 
+    func testFolderEditsInternOnlyNewIDsAndKeepFreshVisibleBuilders() throws {
+        let built = Built()
+        let renders = Renders()
+        let original = (0..<10_000).map { CountedLazyIdentity(value: $0, built: built) }
+        func page(_ items: [CountedLazyIdentity], version: Int) -> LazyPage {
+            LazyPage {
+                LazyVStack {
+                    ForEach(items) { item in
+                        built.numbers[item.value, default: 0] += 1
+                        return Text("v\(version):\(item.value)")
+                    }
+                    .transition(.opacity)
+                }
+            }
+        }
+        let first = try lazy(.lazyVStack, in: renders.render(page(original, version: 0).node))
+        let source = try XCTUnwrap(first.lazyRows)
+        XCTAssertNil(first.props[.items], "managed lazy sources no longer copy IDs through properties")
+        XCTAssertEqual(built.count, 10_000)
+        _ = try realize([source.identities[3], source.identities[4]], in: renders, lazy: first)
+        let before = built.count
+        let inserted = (10_000..<10_100).map { CountedLazyIdentity(value: $0, built: built) }
+        let expanded = Array(original[..<5]) + inserted + Array(original[5...])
+        let change = try lazy(.lazyVStack, in: renders.render(page(expanded, version: 1).node))
+        let next = try XCTUnwrap(change.lazyRows)
+        XCTAssertEqual(next.predecessor, ObjectIdentifier(source))
+        XCTAssertEqual(built.count - before, 102, "100 new host names and two requested row keys")
+        XCTAssertEqual(Set(built.numbers.keys), [3, 4], "expanded offscreen rows do not build")
+        XCTAssertEqual(change.child(source.identities[3])?.props[.text], .string("v1:3"))
+        XCTAssertEqual(next.identities[3], source.identities[3])
+        XCTAssertEqual(next.inserted.count, 100)
+
+        let collapsed = try lazy(.lazyVStack, in: renders.render(page(original, version: 2).node))
+        XCTAssertEqual(collapsed.lazyRows?.removed.count, 100)
+        XCTAssertEqual(collapsed.lazyRows?.identities, source.identities)
+        XCTAssertEqual(Set(built.numbers.keys), [3, 4])
+    }
+
+    func testHashableIdentityDoesNotCollapseRowsWithTheSameDescription() throws {
+        let renders = Renders()
+        let first = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack {
+                ForEach([SameSpellingLazyID(value: 1), SameSpellingLazyID(value: 2)]) {
+                    Text("Row \($0.value)")
+                }
+            }
+        }.node))
+        let ids = try XCTUnwrap(first.lazyRows?.identities)
+        XCTAssertEqual(Set(ids).count, 2)
+        let shown = try lazy(.lazyVStack, in: realize(ids, in: renders, lazy: first))
+        XCTAssertEqual(shown.children.compactMap { $0.props[.text]?.string }, ["Row 1", "Row 2"])
+        let reordered = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack {
+                ForEach([SameSpellingLazyID(value: 2), SameSpellingLazyID(value: 1)]) {
+                    Text("Updated \($0.value)")
+                }
+            }
+        }.node))
+        XCTAssertEqual(reordered.lazyRows?.identities, ids.reversed().map { $0 })
+        XCTAssertEqual(reordered.children.map(\.id), ids.reversed().map { .manual($0) })
+        XCTAssertEqual(reordered.children.compactMap { $0.props[.text]?.string }, ["Updated 2", "Updated 1"])
+    }
+
     func testForegroundOnAModifiedRowSourceFillsOnlyRequestedShapes() throws {
         let built = Built()
         let renders = Renders()
@@ -100,7 +168,7 @@ private struct LazyPage: View {
                 .foregroundStyle(.black.opacity(0.03))
             }
         }.node))
-        let ids = try XCTUnwrap(container.props[.items]?.strings)
+        let ids = try XCTUnwrap(container.lazyRows?.identities)
         XCTAssertTrue(built.numbers.isEmpty)
 
         let shown = try lazy(.lazyVStack, in: realize([ids[20], ids[21]], in: renders, lazy: container))
@@ -131,7 +199,7 @@ private struct LazyPage: View {
                 }
             }
             let container = try lazy(type, in: renders.render(page.node))
-            let ids = try XCTUnwrap(container.props[.items]?.strings)
+            let ids = try XCTUnwrap(container.lazyRows?.identities)
             XCTAssertEqual(ids.count, 10_000)
             XCTAssertTrue(built.numbers.isEmpty, "node modifiers must not execute offscreen row closures")
 
@@ -165,7 +233,7 @@ private struct LazyPage: View {
                 Text("After")
             }
         }.node))
-        let ids = try XCTUnwrap(container.props[.items]?.strings)
+        let ids = try XCTUnwrap(container.lazyRows?.identities)
         XCTAssertEqual(ids.count, 10_003)
         XCTAssertEqual(ids.first, "#0")
         XCTAssertEqual(ids.last, "#2")
@@ -201,7 +269,7 @@ private struct LazyPage: View {
         }
         let items = Array(0..<10_000)
         let container = try lazy(.lazyVStack, in: renders.render(tree(items, version: 0)))
-        let ids = try XCTUnwrap(container.props[.items]?.strings)
+        let ids = try XCTUnwrap(container.lazyRows?.identities)
         _ = try realize([ids[1], ids[2]], in: renders, lazy: container)
         let first = try XCTUnwrap(built.rows[1])
         first.counter = 7
@@ -236,7 +304,7 @@ private struct LazyPage: View {
                 }
             }.node))
             if version == 0 {
-                ids = try XCTUnwrap(container.props[.items]?.strings)
+                ids = try XCTUnwrap(container.lazyRows?.identities)
                 XCTAssertEqual(built.count, 10_000)
                 _ = try realize([ids[3], ids[4]], in: renders, lazy: container)
             } else {
@@ -319,7 +387,7 @@ private struct LazyPage: View {
                 }
             }.node)
             let grid = try lazy(type, in: patch)
-            let ids = try XCTUnwrap(grid.props[.items]?.strings)
+            let ids = try XCTUnwrap(grid.lazyRows?.identities)
             let shown = try lazy(type, in: realize(Array(ids.prefix(2)), in: renders, lazy: grid))
             let words = shown.subtree.filter { $0.type == .text }
             XCTAssertEqual(words.count, 2)
@@ -337,7 +405,7 @@ private struct LazyPage: View {
         let stack = try lazy(.lazyVStack, in: renders.render(LazyPage {
             LazyVStack(spacing: 8) { ForEach(0..<4) { Text("\($0)") } }
         }.node))
-        let ids = try XCTUnwrap(stack.props[.items]?.strings)
+        let ids = try XCTUnwrap(stack.lazyRows?.identities)
         let shown = try lazy(.lazyVStack, in: realize([ids[0]], in: renders, lazy: stack))
         XCTAssertNil(shown.subtree.first { $0.props["lazyRowStack"] != nil })
     }
@@ -419,7 +487,7 @@ private struct LazyPage: View {
         XCTAssertTrue(retained.children.isEmpty, "the retained row's label and button need no new arrangement")
     }
 
-    /// Every identity crosses in `items`, and no `ForEach` row's content runs
+    /// The shared snapshot names every identity, and no row's content runs
     /// before a host asks for it - the laziness SwiftUI's name promises.
     func testTheIdentitiesCrossAndNoRowIsBuiltUnasked() throws {
         let built = Built()
@@ -434,7 +502,7 @@ private struct LazyPage: View {
             }
         }.node))
 
-        XCTAssertEqual(stack.props[.items], .strings((0..<1_000).map { "0.\($0)" }))
+        XCTAssertEqual(stack.lazyRows?.identities, (0..<1_000).map { "0.\($0)" })
         XCTAssertEqual(stack.children.count, 0, "no row is built before the host asks")
         XCTAssertEqual(built.count, 0, "no row's content ran")
     }
@@ -578,7 +646,7 @@ private struct LazyPage: View {
 
         // A row's `.id()` is read when the row is built - the names the host
         // is asked to realize are the items' identities, built or not.
-        let items = try XCTUnwrap(stack.props[.items]?.strings)
+        let items = try XCTUnwrap(stack.lazyRows?.identities)
         XCTAssertEqual(items.first, "0.0")
         XCTAssertEqual(items[49], "0.49")
 
@@ -627,7 +695,7 @@ private struct LazyPage: View {
             }
         }.node))
 
-        let items = try XCTUnwrap(stack.props[.items]?.strings)
+        let items = try XCTUnwrap(stack.lazyRows?.identities)
         XCTAssertEqual(items.count, 1_002, "the header, every row's identity, the footer")
         XCTAssertEqual(items.first, "#0", "a static child is named by its path")
         XCTAssertEqual(items.last, "#2")
@@ -658,7 +726,7 @@ private struct LazyPage: View {
             }
         }.node))
 
-        let items = try XCTUnwrap(stack.props[.items]?.strings)
+        let items = try XCTUnwrap(stack.lazyRows?.identities)
         XCTAssertEqual(items.count, 202, "two headers and two hundred cells, all flat")
         XCTAssertEqual(items[0], "#0.0.0", "the first section's header, under turn and statement")
         XCTAssertEqual(items[1], "0.0.1.0", "statement.turn.statement.item")
@@ -687,7 +755,7 @@ private struct LazyPage: View {
             }
         }.node))
 
-        XCTAssertEqual(grid.props[.items], .strings((0..<200).map { "0.\($0)" }))
+        XCTAssertEqual(grid.lazyRows?.identities, (0..<200).map { "0.\($0)" })
         XCTAssertTrue(built.numbers.isEmpty)
 
         let shown = try lazy(.lazyVGrid, in: realize(["0.0", "0.1", "0.2", "0.3"], in: renders, lazy: grid))
@@ -713,7 +781,7 @@ private struct LazyPage: View {
             }
         }.node))
 
-        let items = try XCTUnwrap(stack.props[.items]?.strings)
+        let items = try XCTUnwrap(stack.lazyRows?.identities)
         XCTAssertEqual(items.count, 101)
         XCTAssertEqual(items[0], "#0")
         XCTAssertTrue(items[1].hasSuffix("0"), "the branch keys the row: \(items[1])")

@@ -40,6 +40,8 @@ import CRT
     public private(set) var lazyItemsRevision = 0
     /// A lazy parent's data identity, kept separately from the view's explicit `.id()`.
     public private(set) var lazyIdentity: String?
+    /// Shared with the renderer; hosts do not reconstruct this index from properties.
+    public private(set) var lazyRows: HostLazySource?
     private var lazyIdentities: Set<String> = []
 
     /// The child the host keeps for this element as one its parent's view draws - a map's marker - the same object
@@ -188,14 +190,16 @@ import CRT
         }
         if let transition = patch.layoutTransition {
             placementTransition = transition
-        } else if !isLazyRun || patch.lazyContentChanged || changed.contains(.items) {
+        } else if !isLazyRun || patch.lazyContentChanged || patch.lazyRows != nil || changed.contains(.items) {
             // A deferred lazy realization completes the same data change. Keep
             // its timing until that data is replaced, rather than losing it in
             // the intervening viewport-only render.
             placementTransition = nil
         }
 
-        if case .unchanged = patch.children { childrenChanged = patch.lazyContentChanged } else { childrenChanged = true }
+        if case .unchanged = patch.children {
+            childrenChanged = patch.lazyContentChanged || patch.lazyRows != nil
+        } else { childrenChanged = true }
 
         let lazy = type == .lazyVStack || type == .lazyHStack || type == .lazyVGrid || type == .lazyHGrid
         // What a lazy run builds or lets go - its rows and the run itself - names no page's chrome.
@@ -203,8 +207,13 @@ import CRT
            sequence(first: self, next: \.parent).allSatisfy({ !$0.isLazyRun }) {
             tree.chromeMayChange = true
         }
-        if lazy, changed.contains(.items) || !described {
+        if lazy, let source = patch.lazyRows {
+            if lazyRows !== source { lazyItemsRevision &+= 1 }
+            lazyRows = source
+            lazyIdentities = []
+        } else if lazy, changed.contains(.items) || !described {
             lazyItemsRevision &+= 1
+            lazyRows = nil
             lazyIdentities = Set(value(.items)?.strings ?? [])
         }
         switch patch.children {
@@ -213,7 +222,7 @@ import CRT
 
         case .arranged(let childPatches):
             writingOrder = Dictionary(childPatches.enumerated().map { ($1.id, $0) }) { first, _ in first }
-            arrange(childPatches, tree: tree, virtualized: lazy ? lazyIdentities : nil)
+            arrange(childPatches, tree: tree, virtualized: lazy)
 
         case .changed(let childPatches):
             // Each child patch finds its child by id: one table for a long list, not a search a patch.
@@ -272,7 +281,7 @@ import CRT
     }
 
     /// Reconciles a complete child arrangement by key.
-    private func arrange(_ patches: [HostPatch], tree: MountedTree, virtualized: Set<String>?) {
+    private func arrange(_ patches: [HostPatch], tree: MountedTree, virtualized: Bool) {
         let before = children
         let previous = Dictionary(uniqueKeysWithValues: children.map { ($0.id, $0) })
 
@@ -281,7 +290,7 @@ import CRT
                 child.parent = self
                 // A lazy window's complete arrangement includes unchanged seats.
                 // Their native properties, effects and descendants need no update.
-                if virtualized == nil || !patch.isEmpty || child.isDeparting {
+                if !virtualized || !patch.isEmpty || child.isDeparting {
                     child.apply(patch)
                 }
                 return child
@@ -295,8 +304,9 @@ import CRT
         let staying = Set(arranged.map(ObjectIdentifier.init))
         for child in before where !staying.contains(ObjectIdentifier(child)) {
             let recycling: Bool
-            if case .manual(let identity) = child.id, let virtualized {
-                recycling = virtualized.contains(child.lazyIdentity ?? identity)
+            if case .manual(let identity) = child.id, virtualized {
+                let key = child.lazyIdentity ?? identity
+                recycling = lazyRows.map { $0.positions[key] != nil } ?? lazyIdentities.contains(key)
             } else {
                 recycling = false
             }

@@ -47,6 +47,7 @@
 
     /// Where the application, its scenes and its windows stand, as the toolkit told it.
     public let lifecycle = ApplicationLifecycle()
+    public let lazyPrefetch = LazyPrefetchQueue()
 
     /// Whether a settling of what the toolkit told waits for its turn.
     private var settling = false
@@ -77,6 +78,8 @@
         clock.onFrame = { [weak self] now in self?.displayCycle.frame(now: now) }
         layoutMotion.onStart = { [weak self] in self?.displayCycle.hold() }
         tree.onAnimation = { [weak self] in self?.displayCycle.hold() }
+        displayCycle.lazyPrefetch = lazyPrefetch
+        lazyPrefetch.onPending = { [weak displayCycle] in displayCycle?.hold() }
     }
 
     /// Reports a native event and runs its handler, then a turn; one raised while a patch applies, or inside a

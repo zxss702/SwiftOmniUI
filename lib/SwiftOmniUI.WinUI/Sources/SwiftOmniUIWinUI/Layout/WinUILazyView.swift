@@ -195,7 +195,7 @@ class WinUILazyView: WinUITravellingLayout {
         }
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)
             || cells.window?.realize != (realize ?? 0..<0)
-            || cells.window?.revision != revision || cells.needsMeasurement
+            || cells.window?.revision != revision || cells.needsWindowUpdate
             || measuredRevision != measurementRevision || geometryChanged
             || cells.retained != keeping
         else { preparedViewport = nil; return }
@@ -219,7 +219,8 @@ class WinUILazyView: WinUITravellingLayout {
             let lower = min(cells.identities.count, max(0, wanted.lowerBound - 1) * perRun)
             let upper = min(cells.identities.count, (wanted.upperBound + 1) * perRun)
             if !wanted.isEmpty, (lower..<upper) == cells.built {
-                cells.show(span, perRun: perRun, grid: grid, realize: realize, keeping: keeping)
+                cells.show(span, perRun: perRun, grid: grid, realize: realize, keeping: keeping,
+                           prefetch: true, demand: incoming)
                 return
             }
         }
@@ -231,7 +232,7 @@ class WinUILazyView: WinUITravellingLayout {
         while true {
             let built = cells.built
             let before = grid ? cells.runs.revision : cells.extents.revision
-            tellWindow(span ?? 0..<0, realize: realize ?? 0..<0)
+            tellWindow(span ?? 0..<0, realize: realize ?? 0..<0, demand: incoming)
             // Reconcile the bounded window as one render, then refine its
             // measured coverage before committing one final arrangement.
             guard WinUIView.arranging == 0, WinUIView.measuring == 0,
@@ -324,7 +325,7 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// The places standing in `span`, as the kind's runs count them; `realize`
     /// is the window a moving scroller can show before the next notice.
-    func tellWindow(_ span: Range<Double>, realize: Range<Double>) {}
+    func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {}
 
     /// Adopt the anchor's coordinates when committed measurements change the document.
     /// The ScrollViewer owns the physical scroll adjustment through its native anchor.
@@ -410,6 +411,7 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     override func detach() {
+        cells.cancelPrefetch()
         super.detach()
         swiftomniui_winui_panel_watch_viewport(handle, false)
         effectiveViewport = nil
@@ -549,8 +551,8 @@ final class WinUILazyStackView: WinUILazyView {
         }
     }
 
-    override func tellWindow(_ span: Range<Double>, realize: Range<Double>) {
-        cells.show(span, realize: realize, keeping: travellingIdentities)
+    override func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {
+        cells.show(span, realize: realize, keeping: travellingIdentities, prefetch: true, demand: demand)
     }
 }
 
@@ -736,8 +738,9 @@ final class WinUILazyGridView: WinUILazyView {
         }
     }
 
-    override func tellWindow(_ span: Range<Double>, realize: Range<Double>) {
-        cells.show(span, perRun: perRun, grid: true, realize: realize, keeping: travellingIdentities)
+    override func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {
+        cells.show(span, perRun: perRun, grid: true, realize: realize, keeping: travellingIdentities,
+                   prefetch: true, demand: demand)
     }
 }
 

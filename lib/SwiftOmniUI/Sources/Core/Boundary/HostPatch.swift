@@ -29,6 +29,9 @@
     /// Hosts invalidate cached offscreen sizes when that source can have changed.
     public var lazyContentChanged = false
 
+    /// A new shared identity snapshot; nil keeps the mounted source unchanged.
+    public var lazyRows: HostLazySource?
+
     /// The source row used by lazy geometry; the element's own `id` still retains its view.
     public var lazyIdentity: String?
 

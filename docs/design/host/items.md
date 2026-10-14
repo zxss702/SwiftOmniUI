@@ -116,16 +116,43 @@ road of its own for it.
 
 ## Lazy layout windows
 
+Managed lazy containers share one immutable `HostLazySource` between the core
+and mounted layout. It contains identity order, the position index, a predecessor
+token and a range replacement or block move. View closures remain in the core.
+The direct host SPI still accepts `.items` as a fallback. Viewport patches carry
+neither the full property nor another index. The source does not retain earlier
+snapshots; a host skipping a version rebuilds its geometry once.
+
+`ForEach` identities retain their Hashable values, scoped by declaration path.
+Only new identities allocate descriptive host tokens; equal descriptions do not
+merge unequal IDs. Ordinary collection replacements still need an ID scan to
+discover edits, without comparing complete models or building offscreen rows.
+The latest collection and closures always provide requested rows, including
+content changes at an unchanged identity.
+
 `LazyCells` keeps scroll geometry for a lazy stack or grid. Each unmeasured
 row stays at an extent of 44; a native measurement replaces only that row's
 estimate and updates the document extent. Measured rows never change the
-estimates of unseen rows. GTK and WinUI request a bounded viewport window
+estimates of unseen rows. An immutable AVL sequence compresses uniform runs
+and caches subtree counts and measured sums. Range edits change boundary paths
+and inserted runs, without re-summing the complete measurement history. Aligned
+grid edits retain unaffected runs; regrouping invalidates the affected suffix.
+Cross-axis proposal changes still invalidate measurements.
+
+GTK and WinUI request a bounded viewport window
 together, then replace its estimates with the mounted rows' measurements.
 WinUI rechecks coverage after that render: newly measured tall rows may
 reduce the requested range, and shorter rows may extend it. It does not run
 a growing render and native arrangement for each unknown row. Look-ahead
 and neighbour policy still bound realization; nothing requests the entire
-source merely because its rows have no measurements yet.
+source merely because its rows have no measurements yet. The actual window (or
+a program jump's destination) is synchronous demand. A viewport of optional
+neighbours on either side is prefetched on the UI thread, one run per owner per
+frame, only while time remains in the frame's four millisecond work budget after
+visible rendering. A builder cannot be preempted; the deadline is checked before
+each run. New sources, direction changes, jumps and detach cancel or replace
+stale work. Native layout and paint retain the rest of the frame. Images still
+load synchronously when their row is requested.
 
 Viewport-only reconciliation names retained source identities before
 materializing content. Those rows reuse their rendered subtrees without
@@ -148,7 +175,7 @@ GTK and WinUI source changes keep surviving rows'
 measurement caches. Their native revisions, placement values and cross-axis
 proposals decide which rows need fresh measurement.
 
-The mounted lazy element versions its identity property separately from row
+The mounted lazy element versions its shared identity snapshot separately from row
 content. Viewport changes and drawing/row feedback do not read, compare or
 rebuild the full identity index. Actual identity changes still require a source
 scan; that scan is metadata work and does not build offscreen views. Settling

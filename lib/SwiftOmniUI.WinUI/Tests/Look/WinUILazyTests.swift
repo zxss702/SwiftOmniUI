@@ -81,6 +81,62 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testFolderChangesShareSourcesAndKeepNativeWorkBoundedAsTheTreeGrows() throws {
+        try onUIThread {
+            for count in [10_000, 100_000] {
+                let rows = State(wrappedValue: Array(0..<count))
+                let builds = ModifiedLazyBuilds()
+                let host = WinUIRenderer.running(reducesMotion: true) {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(rows.wrappedValue) { number in
+                                builds.numbers.insert(number)
+                                return Text("File \(number)").frame(height: 28)
+                            }
+                            .transition(.opacity)
+                        }
+                    }
+                    .frame(width: 320, height: 240)
+                }
+                for _ in 0..<12 { host.step(); host.frame() }
+                let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+                let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+                let source = try XCTUnwrap(lazy.cells.element?.lazyRows)
+                let identity = source.identities[3]
+                let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
+                XCTAssertLessThan(builds.numbers.count, 80)
+                withAnimation(.eased(200, .linear)) {
+                    rows.wrappedValue.insert(contentsOf: count..<(count + 100), at: 5)
+                }
+                for _ in 0..<12 { host.step(); host.frame() }
+                let expanded = try XCTUnwrap(lazy.cells.element?.lazyRows)
+                XCTAssertEqual(expanded.predecessor, ObjectIdentifier(source))
+                XCTAssertEqual(expanded.inserted.count, 100)
+                XCTAssertNil(lazy.cells.element?.value(.items))
+                XCTAssertTrue(lazy.mounted[identity]?.view === retained)
+                XCTAssertLessThan(lazy.mounted.count, 80)
+                XCTAssertLessThan(builds.numbers.count, 120, "offscreen inserted views must stay unbuilt")
+
+                // A distant jump followed by a reversal must not let an old
+                // optional request restore the previous window or retain its seats.
+                scroll.scroller.move(to: Point(0, 4_000))
+                for _ in 0..<12 { host.step(); host.frame() }
+                scroll.scroller.move(to: Point(0, 800))
+                for _ in 0..<12 { host.step(); host.frame() }
+                let span = try XCTUnwrap(lazy.span)
+                let visible = lazy.cells.places(in: span, overscan: 0)
+                XCTAssertFalse(visible.isEmpty)
+                for place in visible {
+                    let item = try XCTUnwrap(lazy.mounted[lazy.cells.identities[place]])
+                    XCTAssertGreaterThan(item.view.frame.height, 0)
+                    XCTAssertGreaterThan(item.view.frame.width, 0)
+                }
+                XCTAssertNil(lazy.mounted[identity])
+                XCTAssertLessThan(lazy.mounted.count, 80)
+            }
+        }
+    }
+
     func testFirstWindowIsSeededWithoutAnEffectiveViewportNotification() throws {
         try onUIThread {
             let host = WinUIRenderer.bare(reducesMotion: true)
@@ -1118,14 +1174,22 @@ final class WinUILazyTests: XCTestCase {
                     let last = Int((span.upperBound / extent).rounded(.up))
                     let margin = Int(viewport / extent)
                     let expected = max(0, first - 1 - margin) * perRun..<min(1_000, (last + 1 + margin) * perRun)
-                    XCTAssertEqual(lazy.cells.built, expected, "kind \(kind), offset \(offset)")
-                    XCTAssertEqual(lazy.mounted.count, expected.count)
+                    let visible = max(0, first - 1) * perRun..<min(1_000, (last + 1) * perRun)
+                    XCTAssertLessThanOrEqual(lazy.cells.built.lowerBound, visible.lowerBound)
+                    XCTAssertGreaterThanOrEqual(lazy.cells.built.upperBound, visible.upperBound)
+                    XCTAssertGreaterThanOrEqual(lazy.cells.built.lowerBound, expected.lowerBound)
+                    XCTAssertLessThanOrEqual(lazy.cells.built.upperBound, expected.upperBound)
+                    XCTAssertEqual(lazy.mounted.count, lazy.cells.built.count)
                     for (identity, item) in lazy.mounted {
                         if let kept = previous[identity] { XCTAssertTrue(kept === item.view) }
                         XCTAssertGreaterThan(item.view.frame.width, 0)
                         XCTAssertGreaterThan(item.view.frame.height, 0)
                     }
                     previous = lazy.mounted.mapValues(\.view)
+                }
+                for _ in 0..<48 where host.runtime.lazyPrefetch.isPending {
+                    host.runtime.lazyPrefetch.drain(until: ContinuousClock.now.advanced(by: .seconds(1)))
+                    host.step()
                 }
                 let work = [lazy.cells.searches, lazy.cells.requests, lazy.cells.measurements]
                 for _ in 0..<200 { host.step() }
@@ -1222,8 +1286,12 @@ final class WinUILazyTests: XCTestCase {
                             let last = Int((span.upperBound / extent).rounded(.up))
                             let margin = Int((horizontal ? frame.width : frame.height) / extent)
                             let expected = max(0, first - 1 - margin) * perRun..<min(count, (last + 1 + margin) * perRun)
-                            XCTAssertEqual(lazy.cells.built, expected, "kind \(kind), step \(step)")
-                            XCTAssertEqual(lazy.mounted.count, expected.count)
+                            let visible = max(0, first - 1) * perRun..<min(count, (last + 1) * perRun)
+                            XCTAssertLessThanOrEqual(lazy.cells.built.lowerBound, visible.lowerBound)
+                            XCTAssertGreaterThanOrEqual(lazy.cells.built.upperBound, visible.upperBound)
+                            XCTAssertGreaterThanOrEqual(lazy.cells.built.lowerBound, expected.lowerBound)
+                            XCTAssertLessThanOrEqual(lazy.cells.built.upperBound, expected.upperBound)
+                            XCTAssertEqual(lazy.mounted.count, lazy.cells.built.count)
                         }
                         for (identity, item) in lazy.mounted {
                             XCTAssertGreaterThan(item.view.laidOutFrame.width, 0)
@@ -1551,6 +1619,10 @@ final class WinUILazyTests: XCTestCase {
                 XCTAssertEqual(footer.origin.y + footer.laidOutFrame.height,
                                scroll.scroller.origin.y + scroll.scroller.laidOutFrame.height, accuracy: 1,
                                "the visible footer must meet the viewport bottom at the scroll limit")
+                for _ in 0..<48 where host.runtime.lazyPrefetch.isPending {
+                    host.runtime.lazyPrefetch.drain(until: ContinuousClock.now.advanced(by: .seconds(1)))
+                    host.step()
+                }
                 let work = [lazy.cells.searches, lazy.cells.requests, lazy.cells.measurements]
                 for _ in 0..<200 { host.step() }
                 XCTAssertEqual([lazy.cells.searches, lazy.cells.requests, lazy.cells.measurements], work)

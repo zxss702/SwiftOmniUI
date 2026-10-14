@@ -304,6 +304,7 @@ public struct Node {
     /// their builders. Values are their existing manual ids, including explicit ids.
     var lazyProducer: (([String: String]) -> [Node])?
     var lazyRowReadings: LazyRowReadings?
+    var lazyRows: HostLazySource?
 
     /// Runs the producer, if pending, filing its nodes ahead of the slots. Idempotent.
     mutating func materialize(reusing rows: [String: String] = [:]) {

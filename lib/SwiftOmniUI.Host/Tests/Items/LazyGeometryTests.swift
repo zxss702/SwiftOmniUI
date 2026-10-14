@@ -7,6 +7,57 @@ import XCTest
 
 final class LazyGeometryTests: XCTestCase {
     @MainActor
+    func testDrawingContentUpdatesKeepTheWindowUsedToRecognizeANewScrollAnchor() throws {
+        let runtime = HostRuntime.still()
+        var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+        patch.lazyRows = HostLazySource((0..<10_000).map(String.init))
+        runtime.tree.apply(patch, complete: true)
+        let element = try XCTUnwrap(runtime.tree.root)
+        let cells = LazyCells(element, in: runtime)
+        cells.takeItems()
+        cells.show(10_000..<10_240, realize: 9_760..<10_480, prefetch: true)
+        let previous = try XCTUnwrap(cells.window)
+        var drawing = HostPatch(id: element.id, type: element.type)
+        drawing.lazyContentChanged = true
+        runtime.tree.apply(drawing, complete: false)
+        cells.takeItems()
+        XCTAssertEqual(cells.window?.span, previous.span)
+        XCTAssertTrue(cells.needsWindowUpdate)
+        cells.show(11_000..<11_240, realize: 10_760..<11_480, prefetch: true)
+        XCTAssertFalse(cells.needsWindowUpdate)
+        XCTAssertNil(cells.correctedOrigin(), "a drawing update must not restore the earlier scroll position")
+    }
+
+    @MainActor
+    func testRendererAndMountedLayoutShareTheSourceAcrossFolderEdits() throws {
+        let runtime = HostRuntime.still()
+        let source = HostLazySource((0..<100_000).map(String.init))
+        var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+        patch.lazyRows = source
+        runtime.tree.apply(patch, complete: true)
+        let element = try XCTUnwrap(runtime.tree.root)
+        let cells = LazyCells(element, in: runtime)
+        cells.takeItems()
+        XCTAssertTrue(element.lazyRows === source)
+        XCTAssertNil(element.value(.items))
+        cells.extents.measure("500", extent: 28)
+        cells.show(0..<240)
+        let next = HostLazySource(["new"] + source.identities, following: source)
+        var update = HostPatch(id: element.id, type: element.type)
+        update.lazyRows = next
+        runtime.tree.apply(update, complete: false)
+        cells.takeItems()
+        XCTAssertTrue(element.lazyRows === next)
+        XCTAssertEqual(cells.position(of: "500"), 501)
+        XCTAssertEqual(cells.extents.extent(of: "500"), 28)
+        XCTAssertEqual(cells.inserting, ["new"])
+        XCTAssertEqual(cells.total, 100_001 * 44 - 16)
+        XCTAssertLessThan(cells.extents.storageNodes, 12)
+        runtime.tree.apply(HostPatch(id: element.id, type: element.type), complete: false)
+        XCTAssertFalse(cells.takeItems(), "viewport updates do not re-adopt the source")
+    }
+
+    @MainActor
     func testContentAndWindowUpdatesDoNotReindexTheWholeSource() throws {
         let runtime = HostRuntime.still()
         var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)

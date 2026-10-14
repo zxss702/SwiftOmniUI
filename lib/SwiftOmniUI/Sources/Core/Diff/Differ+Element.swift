@@ -628,6 +628,9 @@ extension Differ {
             of: previous, node: node, into: &patch, sizesArrive: node.childSizesArrive)
 
         if let source = lazySource {
+            if describeAll || source.lazyRows !== previous?.lazySource?.lazyRows {
+                patch.lazyRows = source.lazyRows
+            }
             // Recreating a content closure (for example for a sibling's lifetime
             // counter) does not change the measurements of the retained rows.
             // Keep its fresh builders and handlers, but invalidate sizes only
@@ -638,6 +641,7 @@ extension Differ {
             case .unchanged: []
             }
             patch.lazyContentChanged = previous == nil
+                || patch.lazyRows != nil
                 || previous?.props[.items] != node.props[.items]
                 || !contentReads.isDisjoint(with: self.changed)
                 || changedChildren.contains { !$0.fresh && !$0.isEmpty }

@@ -23,6 +23,7 @@
 @_spi(Host) @MainActor public final class DisplayCycle {
     /// What the frame presents through.
     public weak var presenter: (any FramePresenter)?
+    public var lazyPrefetch: LazyPrefetchQueue?
 
     private let core: CoreLink
     private let clock: any FrameClock
@@ -60,9 +61,14 @@
 
     /// One frame: the user's reports, the animations, the core's cycle, one walk, a render, the hold.
     public func frame(now: Double) {
+        let began = ContinuousClock.now
         presenter?.commitUserReports(now: now)
         drain(now: now)
         presenter?.renderIfNeeded()
+        // Visible work consumes the budget first. Leave native layout and paint
+        // room even on a high refresh display; unused budget builds neighbours.
+        lazyPrefetch?.drain(until: began.advanced(by: .milliseconds(4)))
+        hold()
     }
 
     /// Advances the animations, runs the core's cycle, presents what moved and holds the clock.
@@ -105,6 +111,7 @@
             || animator.isMoving
             || core.cyclesPending
             || presenter?.wantsFrames == true
+            || lazyPrefetch?.isPending == true
     }
 
     private func follow(_ steps: [AnimationStep]) {

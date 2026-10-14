@@ -29,6 +29,12 @@
     private var contentRevision = -1
     private var itemsRevision = -1
     private var positions: [String: Int] = [:]
+    private var source: HostLazySource?
+    private var prefetchPlan: (demand: Range<Double>, target: Range<Double>, perRun: Int, grid: Bool)?
+    private var prefetchForward = true
+    private var prefetchInvalidated = false
+    private var lastDemand: Range<Double>?
+    private var lastPerRun = 1
 
     /// Content changes waiting for arrangement. Measurement and viewport realization must
     /// not consume this; the host clears it after beginning the changed arrangement.
@@ -47,6 +53,9 @@
     /// An incremental host stopped at an unmeasured run. Measure it before
     /// expanding the same window; an unchanged 44-point estimate still resumes.
     public private(set) var needsMeasurement = false
+
+    /// A repeated native viewport must still resume invalidated optional work.
+    public var needsWindowUpdate: Bool { needsMeasurement || prefetchInvalidated }
 
     /// Requested rows have finished their render. During a patch or a held
     /// transaction, a missing native row can still be waiting for that render.
@@ -93,25 +102,45 @@
             animatesChanges = true
         }
         contentRevision = revision
+        cancelPrefetch()
         // Identities arriving or leaving change what the window mounts and
         // which measurements survive. A content revision bump alone changes
         // neither; the patched children re-measure on their next layout pass.
         if sourceRevision != itemsRevision {
             let wasKnown = itemsRevision >= 0
             itemsRevision = sourceRevision
-            let now = element.value(.items)?.strings ?? []
-            if now != identities {
-                let next = Dictionary(now.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
-                if wasKnown { inserting.formUnion(next.keys.filter { positions[$0] == nil }) }
-                inserting = inserting.filter { next[$0] != nil }
-                extents.keep(identities: Set(next.keys))
-                positions = next
-                extents.adopt(positions: positions)
-                identities = now
+            if let next = element.lazyRows {
+                let follows = source.map { next.predecessor == ObjectIdentifier($0) } ?? false
+                if wasKnown {
+                    if follows { inserting.formUnion(next.inserted) }
+                    else { inserting.formUnion(next.identities.filter { positions[$0] == nil }) }
+                }
+                inserting = inserting.filter { next.positions[$0] != nil }
+                extents.adopt(next)
+                source = next
+                positions = next.positions
+                identities = next.identities
+                runs.adopt(next, perRun: lastPerRun)
                 built = 0..<0
                 window = nil
                 needsMeasurement = false
-                runs.reset()
+            } else {
+                // Direct host SPI users can still provide the .items property.
+                let now = element.value(.items)?.strings ?? []
+                if now != identities {
+                    let next = Dictionary(now.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+                    if wasKnown { inserting.formUnion(next.keys.filter { positions[$0] == nil }) }
+                    inserting = inserting.filter { next[$0] != nil }
+                    extents.keep(identities: Set(next.keys))
+                    positions = next
+                    extents.adopt(positions: positions)
+                    identities = now
+                    source = nil
+                    built = 0..<0
+                    window = nil
+                    needsMeasurement = false
+                    runs.resetSource()
+                }
             }
         }
         if identities.isEmpty {
@@ -165,18 +194,27 @@
 
     /// Reads a viewport only when it or the content geometry changed. Shared
     /// by every host's stack and grid, including empty and clipped windows.
-    /// `realize`, where it differs from `span`, is the window a scroller moving
-    /// under its own power can show before the next notice: the cells it covers
-    /// are mounted while `span`'s own arithmetic - shown places, the anchor -
-    /// keeps reading the true viewport.
+    /// `span` describes the actual anchor. `demand` can prepare a program jump;
+    /// with `prefetch`, the rest of `realize` is optional work for later frames.
     public func show(_ span: Range<Double>, perRun: Int = 1, grid: Bool = false, realize: Range<Double>? = nil,
-                     measureBeforeExpanding: Bool = false, keeping: Set<String> = []) {
+                     measureBeforeExpanding: Bool = false, keeping: Set<String> = [],
+                     prefetch: Bool = false, demand: Range<Double>? = nil) {
+        let perRun = max(1, perRun)
+        lastPerRun = perRun
+        if grid { runs.group(perRun: perRun, items: identities.count) }
         let revision = grid ? runs.revision : extents.revision
         let realize = realize ?? span
         let keeping = keeping.filter { positions[$0] != nil }
         guard window?.span != span || window?.revision != revision || window?.perRun != perRun
-            || window?.realize != realize || needsMeasurement || retained != keeping else { return }
+            || window?.realize != realize || needsMeasurement || retained != keeping
+            || prefetch && prefetchInvalidated else { return }
         let moved = window?.revision == revision && window?.span != span
+        prefetchInvalidated = false
+        let nextDemand = demand ?? span
+        if let previous = lastDemand, nextDemand != previous {
+            prefetchForward = nextDemand.lowerBound >= previous.lowerBound
+        }
+        lastDemand = nextDemand
         window = (span, revision, perRun, realize)
         searches += 1
         let runCount = (identities.count + perRun - 1) / perRun
@@ -197,8 +235,8 @@
             anchor = (identities[place], place, span.lowerBound - origin, span.lowerBound,
                       span.upperBound - span.lowerBound, span.lowerBound > 0 && abs(span.upperBound - total) < 1)
         }
-        guard let element, let runtime else { return }
-        let lower = min(identities.count, max(0, wanted.lowerBound - 1) * perRun)
+        guard let element else { return }
+        var lower = min(identities.count, max(0, wanted.lowerBound - 1) * perRun)
         var upper = min(identities.count, (wanted.upperBound + 1) * perRun)
         let requestedUpper = upper
         needsMeasurement = false
@@ -227,9 +265,70 @@
             }
             needsMeasurement = upper < requestedUpper
         }
-        let within = !wanted.isEmpty && lower < upper ? lower..<upper : 0..<0
+        if prefetch, !measureBeforeExpanding {
+            let visible = requestedRange(in: demand ?? span, perRun: perRun, grid: grid)
+            let target = !wanted.isEmpty && lower < upper ? lower..<upper : 0..<0
+            var within = visible
+            let start = max(built.lowerBound, target.lowerBound)
+            let held = start..<max(start, min(built.upperBound, target.upperBound))
+            // Keep only contiguous, bounded neighbours, never the intervening
+            // document after a jump to a distant viewport.
+            if !held.isEmpty, !visible.isEmpty,
+               held.lowerBound <= visible.upperBound, visible.lowerBound <= held.upperBound {
+                within = min(held.lowerBound, visible.lowerBound)..<max(held.upperBound, visible.upperBound)
+            }
+            lower = within.lowerBound
+            upper = within.upperBound
+            if !visible.isEmpty, within != target, element.handler(.realizedChanged) != nil {
+                prefetchPlan = (demand ?? span, realize, perRun, grid)
+                runtime?.lazyPrefetch.schedule(owner: self) { [weak self] in self?.prefetchOne() ?? false }
+            } else { cancelPrefetch(invalidate: false) }
+        } else { cancelPrefetch(invalidate: false) }
+        let within = lower < upper && !wanted.isEmpty ? lower..<upper : 0..<0
         if !needsMeasurement { inserting.formIntersection(identities[within]) }
-        guard within != built || retained != keeping else { return }
+        request(within, keeping: keeping)
+    }
+
+    private func requestedRange(in span: Range<Double>, perRun: Int, grid: Bool) -> Range<Int> {
+        let count = (identities.count + perRun - 1) / perRun
+        let places = grid ? runs.places(in: span, overscan: 0, count: count)
+            : extents.places(in: span, overscan: 0, in: identities)
+        guard !places.isEmpty else { return 0..<0 }
+        let lower = min(identities.count, max(0, places.lowerBound - 1) * perRun)
+        return lower..<min(identities.count, (places.upperBound + 1) * perRun)
+    }
+
+    /// Stops optional work when the source or the native presentation disappears.
+    public func cancelPrefetch(invalidate: Bool = true) {
+        prefetchPlan = nil
+        if invalidate { prefetchInvalidated = true }
+        runtime?.lazyPrefetch.cancel(owner: self)
+    }
+
+    private func prefetchOne() -> Bool {
+        guard let plan = prefetchPlan, !built.isEmpty else { return false }
+        guard requestedItemsAreCurrent else { return true }
+        let target = requestedRange(in: plan.target, perRun: plan.perRun, grid: plan.grid)
+        guard !target.isEmpty else { prefetchPlan = nil; return false }
+        var lower = max(built.lowerBound, target.lowerBound)
+        var upper = min(built.upperBound, target.upperBound)
+        guard lower < upper else { prefetchPlan = nil; return false }
+        if prefetchForward, upper < target.upperBound || lower == target.lowerBound {
+            upper = min(target.upperBound, upper + plan.perRun)
+        } else if lower > target.lowerBound {
+            lower = max(target.lowerBound, lower - plan.perRun)
+        } else {
+            upper = min(target.upperBound, upper + plan.perRun)
+        }
+        let within = lower..<upper
+        request(within, keeping: retained)
+        let more = within != target
+        if !more { prefetchPlan = nil }
+        return more
+    }
+
+    private func request(_ within: Range<Int>, keeping: Set<String>) {
+        guard let element, let runtime, within != built || retained != keeping else { return }
         if !inserting.isDisjoint(with: identities[within]) { animatesChanges = true }
         built = within
         retained = keeping
@@ -266,6 +365,7 @@
 
     /// Without a scroller there is no viewport to narrow by.
     public func tellAll() {
+        cancelPrefetch()
         guard let element, let runtime, built != 0..<identities.count else { return }
         if !inserting.isEmpty { animatesChanges = true }
         built = 0..<identities.count
@@ -275,38 +375,6 @@
         element.send(.realizedChanged, [.strings(identities)], in: runtime)
     }
 
-}
-
-/// Fenwick sums over a run's places: the extents measured so far and how many places they are, so the
-/// offset of any place is found in O(log n) however many places stand unmeasured.
-private struct MeasuredSums: Sendable {
-    private var extents: [Double]
-    private var counts: [Int]
-
-    init(places: Int = 0) {
-        extents = Array(repeating: 0, count: places + 1)
-        counts = Array(repeating: 0, count: places + 1)
-    }
-
-    mutating func add(_ place: Int, extent: Double, count: Int) {
-        var node = place + 1
-        while node < extents.count {
-            extents[node] += extent
-            counts[node] += count
-            node += node & -node
-        }
-    }
-
-    /// The sums over the places before `place`.
-    func before(_ place: Int) -> (extent: Double, count: Int) {
-        var node = min(place, extents.count - 1), extent = 0.0, count = 0
-        while node > 0 {
-            extent += extents[node]
-            count += counts[node]
-            node -= node & -node
-        }
-        return (extent, count)
-    }
 }
 
 /// Measured child extents; each place not yet measured stands at 44.
@@ -326,7 +394,11 @@ private struct MeasuredSums: Sendable {
     public private(set) var revision = 0
     private var measured: [String: Double] = [:]
     private var index: [String: Int] = [:]
-    private var sums = MeasuredSums()
+    private var sums = LazyExtentTree()
+    private var source: HostLazySource?
+
+    // Internal structural checks used by regression tests, without runtime logging.
+    var storageNodes: Int { sums.storageNodes }
 
     /// Starts with a provisional extent until the first window is measured.
     public init() {}
@@ -337,7 +409,7 @@ private struct MeasuredSums: Sendable {
         let before = measured[identity]
         let previous = before ?? estimate
         measured[identity] = extent
-        if let place = index[identity] { sums.add(place, extent: extent - (before ?? 0), count: before == nil ? 1 : 0) }
+        if let place = index[identity] { sums.measure(place, extent: extent) }
         if extent != previous { revision += 1 }
     }
 
@@ -345,23 +417,52 @@ private struct MeasuredSums: Sendable {
     public mutating func keep(identities: Set<String>) {
         measured = measured.filter { identities.contains($0.key) }
         index = [:]
-        sums = MeasuredSums()
+        source = nil
+        sums = LazyExtentTree()
         revision += 1
     }
 
     /// Takes the places the identities stand at, summing what is measured over them.
     public mutating func adopt(positions: [String: Int]) {
+        source = nil
         index = positions
-        sums = MeasuredSums(places: positions.count)
+        var ordered = Array(repeating: Optional<Double>.none, count: positions.count)
         for (identity, extent) in measured {
-            if let place = index[identity] { sums.add(place, extent: extent, count: 1) }
+            if let place = positions[identity] { ordered[place] = extent }
         }
+        sums = LazyExtentTree(ordered) { $0 }
+    }
+
+    /// Applies the source's local edit without re-summing surviving measurements.
+    /// A skipped snapshot or a raw SPI source has no applicable edit: rebuild once.
+    public mutating func adopt(_ next: HostLazySource) {
+        guard source !== next else { return }
+        if let source, next.predecessor == ObjectIdentifier(source) {
+            switch next.edit {
+            case .replace(let before, let after):
+                let allNew = after.count == next.inserted.count
+                    && next.inserted.allSatisfy { measured[$0] == nil }
+                let replacement = allNew ? LazyExtentTree(count: after.count)
+                    : LazyExtentTree(next.identities[after]) { measured[$0] }
+                sums.replace(before, with: replacement)
+            case .move(let range, let destination):
+                sums.move(range, to: destination)
+            }
+            for identity in next.removed { measured[identity] = nil }
+        } else {
+            measured = measured.filter { next.positions[$0.key] != nil }
+            sums = measured.isEmpty ? LazyExtentTree(count: next.identities.count)
+                : LazyExtentTree(next.identities) { measured[$0] }
+        }
+        source = next
+        index = next.positions
+        revision += 1
     }
 
     /// Forget sizes that were measured under a different layout proposal.
     public mutating func reset() {
         measured = [:]
-        sums = MeasuredSums(places: index.count)
+        sums = LazyExtentTree(count: index.count)
         revision += 1
     }
 
@@ -432,48 +533,83 @@ private struct MeasuredSums: Sendable {
     public let estimate: Double = 44
     /// Geometry version used to reuse viewport searches.
     public private(set) var revision = 0
-    private var measured: [Int: Double] = [:]
-    private var runs = 0
-    private var sums = MeasuredSums()
+    private var sums = LazyExtentTree()
+    private var source: HostLazySource?
+    private var sourcePerRun = 1
 
     /// Starts with a provisional extent until the first window is measured.
     public init() {}
 
     /// A complete run, measured as the largest of its current cells. Zero is a valid size.
     public mutating func measure(_ run: Int, extent: Double) {
-        guard extent.isFinite, extent >= 0, measured[run] != extent else { return }
-        let before = measured[run]
-        let previous = before ?? estimate
-        measured[run] = extent
-        if run < runs { sums.add(run, extent: extent - (before ?? 0), count: before == nil ? 1 : 0) }
+        guard run >= 0, extent.isFinite, extent >= 0, sums.extent(at: run) != extent else { return }
+        let previous = sums.extent(at: run) ?? estimate
+        if run >= sums.count {
+            sums.replace(sums.count..<sums.count, with: LazyExtentTree(count: run + 1 - sums.count))
+        }
+        sums.measure(run, extent: extent)
         if extent != previous { revision += 1 }
     }
 
     /// Forget sizes that were measured under a different layout proposal.
     public mutating func reset() {
-        measured = [:]
-        sums = MeasuredSums(places: runs)
+        sums = LazyExtentTree(count: sums.count)
         revision += 1
     }
 
-    /// The measured run extent, or the current estimate.
-    public func extent(of run: Int) -> Double {
-        measured[run] ?? estimate
+    mutating func resetSource() {
+        source = nil
+        reset()
     }
 
-    /// Whether this complete grid run has been measured.
-    public func hasMeasurement(for run: Int) -> Bool { measured[run] != nil }
+    /// The measured run extent, or the current estimate.
+    public func extent(of run: Int) -> Double { sums.extent(at: run) ?? estimate }
 
-    private mutating func sync(_ count: Int) {
-        guard runs != count else { return }
-        runs = count
-        sums = MeasuredSums(places: count)
-        for (run, extent) in measured where run < count { sums.add(run, extent: extent, count: 1) }
+    /// Whether this complete grid run has been measured.
+    public func hasMeasurement(for run: Int) -> Bool { sums.extent(at: run) != nil }
+
+    mutating func group(perRun: Int, items: Int) {
+        guard perRun != sourcePerRun else { return }
+        sourcePerRun = perRun
+        sums = LazyExtentTree(count: (items + perRun - 1) / perRun)
+        revision += 1
+    }
+
+    /// Aligned edits preserve unaffected grid runs. An edit changing how cells
+    /// group invalidates only the suffix starting at its first affected run.
+    public mutating func adopt(_ next: HostLazySource, perRun: Int) {
+        let perRun = max(1, perRun)
+        let count = (next.identities.count + perRun - 1) / perRun
+        if let source, next.predecessor == ObjectIdentifier(source), sourcePerRun == perRun {
+            switch next.edit {
+            case .replace(let before, let after):
+                let first = before.lowerBound / perRun
+                if (after.count - before.count).isMultiple(of: perRun) {
+                    let end = min(sums.count, (before.upperBound + perRun - 1) / perRun)
+                    let newEnd = min(count, (after.upperBound + perRun - 1) / perRun)
+                    sums.replace(first..<end, with: LazyExtentTree(count: newEnd - first))
+                } else {
+                    sums.replace(first..<sums.count, with: LazyExtentTree(count: count - first))
+                }
+            case .move(let range, let destination):
+                if range.lowerBound.isMultiple(of: perRun), range.upperBound.isMultiple(of: perRun),
+                   destination.isMultiple(of: perRun) {
+                    sums.move((range.lowerBound / perRun)..<(range.upperBound / perRun), to: destination / perRun)
+                } else {
+                    let first = min(range.lowerBound, destination) / perRun
+                    sums.replace(first..<sums.count, with: LazyExtentTree(count: count - first))
+                }
+            }
+        } else { sums = LazyExtentTree(count: count) }
+        source = next
+        sourcePerRun = perRun
+        revision += 1
     }
 
     /// Where run `place` begins: the extents before it and a gap after each. O(log n).
     public mutating func offset(of place: Int, count: Int) -> Double {
-        sync(count)
+        // Speculative track counts must not truncate committed measurements.
+        // Places beyond the stored sequence are already covered by the estimate.
         let place = max(0, min(place, count))
         let known = sums.before(place)
         return padding.head + known.extent + estimate * Double(place - known.count) + Double(place) * spacing

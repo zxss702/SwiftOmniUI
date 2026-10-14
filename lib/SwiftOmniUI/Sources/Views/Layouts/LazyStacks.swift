@@ -70,15 +70,12 @@ public struct LazyVStack: View {
         if let spacing { element.node.write(StackBaseContract.spacing, spacing) }
         let held = $realized
         let axis = alignment.axis
-        element.node.write(
-            LazyVStackContract.items,
-            children.take(content(), into: &element.node, realized: held) { child, _ in
-                if child.props[.horizontalAlignment] == nil {
-                    child.write(ViewContract.horizontalAlignment,
-                                child.props[.maximumWidth]?.number == .infinity ? .fill : axis)
-                }
+        children.take(content(), into: &element.node, realized: held) { child, _ in
+            if child.props[.horizontalAlignment] == nil {
+                child.write(ViewContract.horizontalAlignment,
+                            child.props[.maximumWidth]?.number == .infinity ? .fill : axis)
             }
-        )
+        }
         element.node.addHandler(LazyVStackContract.realizedChanged.token) {
             guard let identities = MemberValues.carried(
                 EventBuffer.current, by: LazyVStackContract.realizedChanged.name, as: [String].self),
@@ -146,15 +143,12 @@ public struct LazyHStack: View {
         if let spacing { element.node.write(StackBaseContract.spacing, spacing) }
         let held = $realized
         let axis = alignment.axis
-        element.node.write(
-            LazyHStackContract.items,
-            children.take(content(), into: &element.node, realized: held) { child, _ in
-                if child.props[.verticalAlignment] == nil {
-                    child.write(ViewContract.verticalAlignment,
-                                child.props[.maximumHeight]?.number == .infinity ? .fill : axis)
-                }
+        children.take(content(), into: &element.node, realized: held) { child, _ in
+            if child.props[.verticalAlignment] == nil {
+                child.write(ViewContract.verticalAlignment,
+                            child.props[.maximumHeight]?.number == .infinity ? .fill : axis)
             }
-        )
+        }
         element.node.addHandler(LazyHStackContract.realizedChanged.token) {
             guard let identities = MemberValues.carried(
                 EventBuffer.current, by: LazyHStackContract.realizedChanged.name, as: [String].self),
@@ -182,8 +176,8 @@ struct LazyHStackElement: StackBase {
 ///
 /// A child's identity is the one it was written with - a `ForEach` item's
 /// or an `.id()`'s - or the place it stands at, told apart from an equal
-/// one before it the way an `List` item's is. The names cross as the `items`
-/// prop; the host answers with `realizedChanged`, and the producer gives the
+/// one before it the way a `List` item's is. The identity snapshot is shared
+/// with the host; the host answers with `realizedChanged`, and the producer gives the
 /// differ only the children the host asks for.
 ///
 /// A `ForEach` - alone, or a statement among others - is a `LazyRows`: it
@@ -201,18 +195,22 @@ struct LazyHStackElement: StackBase {
     }
 
     private var previous: [Segment] = []
-    private var identities: [String] = []
-    private var owned: [String: (segment: Int, local: Int, place: Int)] = [:]
-    private var positions: [String: Int] = [:]
+    private enum Key: Hashable {
+        case row(AnyHashable, occurrence: Int)
+        case node(String, occurrence: Int)
+        case place(Int)
+    }
+    private var tokens: [Key: String] = [:]
+    private var tokenKeys: [String: Key] = [:]
+    private var source: HostLazySource?
 
     /// Names the children of `content` - `prepare` dressing each as its
     /// container asks - and sets `node`'s producer to the ones `realized`
-    /// names, in the order they show. Answers every child's identity in the
-    /// order it shows.
+    /// names, in the order they show. The node keeps the shared identity index.
     func take(
         _ content: any View, into node: inout Node, realized: Binding<[String]>,
         prepare: @escaping (inout Node, Int) -> Void
-    ) -> [String] {
+    ) {
         var segments: [Segment] = []
         var children: [Node] = []
 
@@ -232,8 +230,8 @@ struct LazyHStackElement: StackBase {
         for element in (content as? TupleView)?.lazyElements ?? [content] { append(element) }
         if !children.isEmpty { segments.append(.nodes(children)) }
 
-        // Comparing an unchanged range or value collection avoids stringifying
-        // and indexing every identity again when only a lifetime counter moved.
+        // An unchanged range has a constant-time proof. Other sources compare
+        // only IDs; the complete model values never participate in this check.
         // The current segments still supply every row's newest captured values.
         let same = segments.count == previous.count && zip(segments, previous).allSatisfy { now, before in
             switch (now, before) {
@@ -248,51 +246,79 @@ struct LazyHStackElement: StackBase {
             }
         }
         previous = segments
-        if !same {
-            var taken: Set<String> = []
-            identities = []
-            owned = [:]
-            var index = 0
-            for (segmentIndex, segment) in segments.enumerated() {
+        if !same || source == nil {
+            var names: [String] = []
+            var occurrences: [AnyHashable: Int] = [:]
+            var nodeOccurrences: [String: Int] = [:]
+            var variants: [String: Int] = [:]
+            func append(_ key: Key, spelling: () -> String) {
+                let identity: String
+                if let held = tokens[key] {
+                    identity = held
+                } else {
+                    let base = spelling()
+                    var candidate = base, variant = variants[base, default: 1]
+                    // Reserve surviving names before allocating a collision suffix.
+                    // Unequal Hashable values may legitimately have equal descriptions.
+                    while tokenKeys[candidate] != nil {
+                        candidate = "\(base)\u{0}\(variant)"
+                        variant += 1
+                    }
+                    variants[base] = variant
+                    identity = candidate
+                    tokens[key] = identity
+                    tokenKeys[identity] = key
+                }
+                names.append(identity)
+            }
+            for segment in segments {
                 switch segment {
                 case .rows(let rows):
                     for local in 0..<rows.lazyRowCount {
-                        let base = rows.lazyRowIdentity(at: local) ?? "#\(index)"
-                        var identity = base
-                        var variant = 1
-                        while taken.contains(identity) {
-                            identity = "\(base)\u{0}\(variant)"
-                            variant += 1
+                        if let id = rows.lazyRowID(at: local) {
+                            let occurrence = occurrences[id, default: 0]
+                            occurrences[id] = occurrence + 1
+                            append(.row(id, occurrence: occurrence)) { String(describing: id) }
+                        } else {
+                            let place = names.count
+                            append(.place(place)) { "#\(place)" }
                         }
-                        taken.insert(identity)
-                        owned[identity] = (segmentIndex, local, index)
-                        identities.append(identity)
-                        index += 1
                     }
-
                 case .nodes(let children):
-                    for local in children.indices {
-                        let base = children[local].id
-                            ?? children[local].key.map { "#\($0)" }
-                            ?? "#\(index)"
-                        var identity = base
-                        var variant = 1
-                        while taken.contains(identity) {
-                            identity = "\(base)\u{0}\(variant)"
-                            variant += 1
+                    for child in children {
+                        if let base = child.id ?? child.key.map({ "#\($0)" }) {
+                            let occurrence = nodeOccurrences[base, default: 0]
+                            nodeOccurrences[base] = occurrence + 1
+                            append(.node(base, occurrence: occurrence)) { base }
+                        } else {
+                            let place = names.count
+                            append(.place(place)) { "#\(place)" }
                         }
-                        taken.insert(identity)
-                        owned[identity] = (segmentIndex, local, index)
-                        identities.append(identity)
-                        index += 1
                     }
                 }
             }
-            positions = Dictionary(uniqueKeysWithValues: identities.enumerated().map { ($1, $0) })
+            if source?.identities != names {
+                let next = HostLazySource(names, following: source)
+                for identity in next.removed {
+                    if let key = tokenKeys.removeValue(forKey: identity) { tokens[key] = nil }
+                }
+                source = next
+            }
         }
-
-        let positions = positions
-        let owned = owned
+        guard let source else { return }
+        node.lazyRows = source
+        // Segment boundaries are small, structural metadata. A row finds its
+        // current builder by index; no second per-row ownership table is needed.
+        var starts: [Int] = [], count = 0
+        for segment in segments {
+            starts.append(count)
+            switch segment {
+            case .rows(let rows): count += rows.lazyRowCount
+            case .nodes(let nodes): count += nodes.count
+            }
+        }
+        let boundaries = starts
+        let positions = source.positions
         let rowStack: PropValue? = node.type == .lazyVStack || node.type == .lazyHStack
             ? .numbers([node.type == .lazyHStack ? 1 : 0, node.props[.spacing]?.number ?? 0]) : nil
         node.lazyWindow = realized.lender.map(ObjectIdentifier.init)
@@ -303,7 +329,13 @@ struct LazyHStackElement: StackBase {
             let nodes: [Node] = realized.wrappedValue.filter { positions[$0] != nil }
                 .sorted { positions[$0]! < positions[$1]! }
                 .compactMap { identity in
-                    guard let owner = owned[identity] else { return nil }
+                    guard let place = positions[identity] else { return nil }
+                    var low = 0, high = boundaries.count
+                    while low < high {
+                        let middle = low + (high - low) / 2
+                        if boundaries[middle] <= place { low = middle + 1 } else { high = middle }
+                    }
+                    let segment = low - 1, local = place - boundaries[segment]
                     if let id = retained[identity] {
                         // reconcileChildren keeps the existing rendered subtree. Do
                         // not construct a view just to discard its description there.
@@ -314,11 +346,11 @@ struct LazyHStackElement: StackBase {
                     }
                     let (made, rowReads) = ReadScope.observed { () -> Node in
                         var child: Node
-                        switch segments[owner.segment] {
+                        switch segments[segment] {
                         case .nodes(let nodes):
-                            child = nodes[owner.local]
+                            child = nodes[local]
                         case .rows(let rows):
-                            child = rows.lazyRow(at: owner.local).node
+                            child = rows.lazyRow(at: local).node
                         }
                         if child.type == .fragment { child.materialize() }
                         // A builder fragment has no box. Apply the container's defaults to its actual
@@ -328,9 +360,9 @@ struct LazyHStackElement: StackBase {
                         }
                         child.lazyIdentity = identity
                         if child.type == .fragment {
-                            for index in child.children.indices { prepare(&child.children[index], owner.place) }
+                            for index in child.children.indices { prepare(&child.children[index], place) }
                         } else {
-                            prepare(&child, owner.place)
+                            prepare(&child, place)
                         }
                         if child.type != .fragment { child.props[.lazyRowStack] = rowStack }
                         // A fragment is retained by the differ even though only
@@ -353,7 +385,6 @@ struct LazyHStackElement: StackBase {
         }
         node.lazyProducer = make
         node.producer = { make([:]) }
-        return identities
     }
 
 }

@@ -261,6 +261,7 @@ extension HostPatch {
     @_spi(Host) public var isEmpty: Bool {
         !replace
             && !lazyContentChanged
+            && lazyRows == nil
             && lazyIdentity == nil
             && animation == nil
             && layoutTransition == nil
@@ -301,6 +302,7 @@ extension HostPatch {
         merged.clearedProperties.sort()
 
         merged.lazyContentChanged = lazyContentChanged || later.lazyContentChanged
+        merged.lazyRows = later.lazyRows ?? lazyRows
         merged.lazyIdentity = later.lazyIdentity ?? lazyIdentity
         merged.animation = later.animation ?? animation
         merged.layoutTransition = later.layoutTransition ?? layoutTransition

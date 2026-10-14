@@ -67,6 +67,62 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on GTK answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class GTKLazyTests: XCTestCase {
+    func testFolderChangesShareSourcesAndKeepNativeWorkBoundedAsTheTreeGrows() throws {
+        try onUIThread {
+            for count in [10_000, 100_000] {
+                let rows = State(wrappedValue: Array(0..<count))
+                let builds = ModifiedLazyBuilds()
+                let host = GTKRenderer.running(reducesMotion: true) {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(rows.wrappedValue) { number in
+                                builds.numbers.insert(number)
+                                return Text("File \(number)").frame(height: 28)
+                            }
+                            .transition(.opacity)
+                        }
+                    }
+                    .frame(width: 320, height: 240)
+                }
+                for _ in 0..<12 { host.step(); host.frame() }
+                let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
+                let scroll = try XCTUnwrap(host.views(GTKScrollView.self).first)
+                let source = try XCTUnwrap(lazy.cells.element?.lazyRows)
+                let identity = source.identities[3]
+                let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
+                XCTAssertLessThan(builds.numbers.count, 80)
+                withAnimation(.eased(200, .linear)) {
+                    rows.wrappedValue.insert(contentsOf: count..<(count + 100), at: 5)
+                }
+                for _ in 0..<12 { host.step(); host.frame() }
+                let expanded = try XCTUnwrap(lazy.cells.element?.lazyRows)
+                XCTAssertEqual(expanded.predecessor, ObjectIdentifier(source))
+                XCTAssertEqual(expanded.inserted.count, 100)
+                XCTAssertNil(lazy.cells.element?.value(.items))
+                XCTAssertTrue(lazy.mounted[identity]?.view === retained)
+                XCTAssertLessThan(lazy.mounted.count, 80)
+                XCTAssertLessThan(builds.numbers.count, 120, "offscreen inserted views must stay unbuilt")
+
+                // A distant jump followed by a reversal must not let an old
+                // optional request restore the previous window or retain its seats.
+                scroll.scroller.move(to: Point(0, 4_000))
+                for _ in 0..<12 { host.step(); host.frame() }
+                scroll.scroller.move(to: Point(0, 800))
+                for _ in 0..<12 { host.step(); host.frame() }
+                let span = try XCTUnwrap(lazy.span)
+                let visible = lazy.cells.places(in: span, overscan: 0)
+                XCTAssertFalse(visible.isEmpty)
+                for place in visible {
+                    let item = try XCTUnwrap(lazy.mounted[lazy.cells.identities[place]])
+                    XCTAssertGreaterThan(item.view.frame.height, 0)
+                    XCTAssertGreaterThan(item.view.frame.width, 0)
+                }
+                XCTAssertNil(lazy.mounted[identity])
+                XCTAssertLessThan(lazy.mounted.count, 80)
+            }
+        }
+    }
+
     func testWithAnimationMovesLazyInsertionsAndDoesNotAnimateLaterScrolling() throws {
         try onUIThread {
             let rows = State(wrappedValue: Array(0..<1_000))
@@ -641,16 +697,25 @@ final class GTKLazyTests: XCTestCase {
                     let span = try XCTUnwrap(lazy.span)
                     let first = Int((span.lowerBound / extent).rounded(.down))
                     let last = Int((span.upperBound / extent).rounded(.up))
-                    let expected = max(0, first - 1) * perRun..<min(1_000, (last + 1) * perRun)
-                    XCTAssertEqual(lazy.cells.built, expected, "kind \(kind), offset \(offset)")
-                    XCTAssertEqual(lazy.mounted.count, expected.count)
+                    let visible = max(0, first - 1) * perRun..<min(1_000, (last + 1) * perRun)
+                    let margin = Int(viewport / extent)
+                    let target = max(0, first - 1 - margin) * perRun..<min(1_000, (last + 1 + margin) * perRun)
+                    XCTAssertLessThanOrEqual(lazy.cells.built.lowerBound, visible.lowerBound)
+                    XCTAssertGreaterThanOrEqual(lazy.cells.built.upperBound, visible.upperBound)
+                    XCTAssertGreaterThanOrEqual(lazy.cells.built.lowerBound, target.lowerBound)
+                    XCTAssertLessThanOrEqual(lazy.cells.built.upperBound, target.upperBound)
+                    XCTAssertEqual(lazy.mounted.count, lazy.cells.built.count)
                     for (identity, item) in lazy.mounted {
                         if let kept = previous[identity] { XCTAssertTrue(kept === item.view) }
                         XCTAssertGreaterThan(item.view.frame.width, 0)
                         XCTAssertGreaterThan(item.view.frame.height, 0)
                     }
                     previous = lazy.mounted.mapValues(\.view)
-                    if kind == 1 && offset == 1_600 { XCTAssertEqual(lazy.mounted.count, 8) }
+                    if kind == 1 && offset == 1_600 { XCTAssertGreaterThanOrEqual(lazy.mounted.count, 8) }
+                }
+                for _ in 0..<48 where host.runtime.lazyPrefetch.isPending {
+                    host.runtime.lazyPrefetch.drain(until: ContinuousClock.now.advanced(by: .seconds(1)))
+                    host.step()
                 }
                 let work = [lazy.cells.searches, lazy.cells.requests, lazy.cells.measurements]
                 for _ in 0..<200 { host.step() }

@@ -67,8 +67,8 @@ public struct ForEach<Items: RandomAccessCollection, Id: Hashable, Content: View
     /// sequence's offsets being the usual case:
     /// `ForEach(Array(titles.enumerated()), id: \.offset)`.
     ///
-    /// An identity is compared as text, `String(describing:)`: a `description`
-    /// that says less than the value gives two items one identity.
+    /// Lazy containers compare the Hashable identity itself, independently of
+    /// its textual description.
     ///
     /// - Parameter id: which part of an item is its identity - distinct
     ///   across the items, stable while the item means the same row.
@@ -111,11 +111,17 @@ extension ForEach: LazyRows {
         String(describing: items[self.items.index(items.startIndex, offsetBy: index)][keyPath: identity])
     }
 
+    func lazyRowID(at index: Int) -> AnyHashable? {
+        AnyHashable(items[items.index(items.startIndex, offsetBy: index)][keyPath: identity])
+    }
+
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
-        guard let other = other as? Self, identity == other.identity,
-              let current = items as? any Equatable, let previous = other.items as? any Equatable
-        else { return false }
-        return Input.same([("items", .value(current))], [("items", .value(previous))])
+        guard let other = other as? Self, identity == other.identity else { return false }
+        // Comparing whole models is both unnecessary and potentially expensive.
+        // Ranges have an O(1) proof; other collections scan only their IDs once.
+        if let range = items as? Range<Int>, let old = other.items as? Range<Int> { return range == old }
+        if let range = items as? ClosedRange<Int>, let old = other.items as? ClosedRange<Int> { return range == old }
+        return false
     }
 
     func lazyRow(at index: Int) -> any Element {

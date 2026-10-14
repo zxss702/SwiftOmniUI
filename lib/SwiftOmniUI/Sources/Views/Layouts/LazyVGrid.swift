@@ -100,20 +100,17 @@ public struct LazyVGrid: View {
         let held = $realized
         let across = alignment.axis
         element.node.write(ViewContract.horizontalContentAlignment, across)
-        element.node.write(
-            LazyVGridContract.items,
-            children.take(content(), into: &element.node, realized: held) { cell, index in
-                let item = columns.isEmpty ? GridItem() : columns[index % count]
-                let over = item.alignment?.horizontal.axis ?? .center
-                if cell.props[.horizontalAlignment] == nil {
-                    cell.write(ViewContract.horizontalAlignment,
-                               cell.props[.maximumWidth]?.number == .infinity ? .fill : over)
-                }
-                if let down = item.alignment?.vertical.axis, down != .fill {
-                    cell.write(ViewContract.verticalAlignment, down)
-                }
+        children.take(content(), into: &element.node, realized: held) { cell, index in
+            let item = columns.isEmpty ? GridItem() : columns[index % count]
+            let over = item.alignment?.horizontal.axis ?? .center
+            if cell.props[.horizontalAlignment] == nil {
+                cell.write(ViewContract.horizontalAlignment,
+                           cell.props[.maximumWidth]?.number == .infinity ? .fill : over)
             }
-        )
+            if let down = item.alignment?.vertical.axis, down != .fill {
+                cell.write(ViewContract.verticalAlignment, down)
+            }
+        }
         element.node.addHandler(LazyVGridContract.realizedChanged.token) {
             guard let identities = MemberValues.carried(
                 EventBuffer.current, by: LazyVGridContract.realizedChanged.name, as: [String].self),
@@ -204,20 +201,17 @@ public struct LazyHGrid: View {
         let held = $realized
         let down = alignment.axis
         element.node.write(ViewContract.verticalContentAlignment, down)
-        element.node.write(
-            LazyHGridContract.items,
-            children.take(content(), into: &element.node, realized: held) { cell, index in
-                let item = rows.isEmpty ? GridItem() : rows[index % count]
-                let over = item.alignment?.vertical.axis ?? .center
-                if cell.props[.verticalAlignment] == nil {
-                    cell.write(ViewContract.verticalAlignment,
-                               cell.props[.maximumHeight]?.number == .infinity ? .fill : over)
-                }
-                if let across = item.alignment?.horizontal.axis, across != .fill {
-                    cell.write(ViewContract.horizontalAlignment, across)
-                }
+        children.take(content(), into: &element.node, realized: held) { cell, index in
+            let item = rows.isEmpty ? GridItem() : rows[index % count]
+            let over = item.alignment?.vertical.axis ?? .center
+            if cell.props[.verticalAlignment] == nil {
+                cell.write(ViewContract.verticalAlignment,
+                           cell.props[.maximumHeight]?.number == .infinity ? .fill : over)
             }
-        )
+            if let across = item.alignment?.horizontal.axis, across != .fill {
+                cell.write(ViewContract.horizontalAlignment, across)
+            }
+        }
         element.node.addHandler(LazyHGridContract.realizedChanged.token) {
             guard let identities = MemberValues.carried(
                 EventBuffer.current, by: LazyHGridContract.realizedChanged.name, as: [String].self),

@@ -18,12 +18,19 @@ protocol LazyRows: Element {
     /// The identity `index`'s row carries - `nil` for one with none.
     func lazyRowIdentity(at index: Int) -> String?
 
+    /// Hashable identity, kept as a value until a new host token is needed.
+    func lazyRowID(at index: Int) -> AnyHashable?
+
     /// Whether a fresh source can reuse the previous source's identity index.
     /// Row builders are always refreshed, even when this answers true.
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool
 
     /// The row at `index`, built only when asked.
     func lazyRow(at index: Int) -> any Element
+}
+
+extension LazyRows {
+    func lazyRowID(at index: Int) -> AnyHashable? { lazyRowIdentity(at: index).map(AnyHashable.init) }
 }
 
 /// UI-thread-owned dependencies of the currently requested row closures.
@@ -87,6 +94,7 @@ private struct ModifiedLazyRows: LazyRows {
     var lazyRowCount: Int { rows.lazyRowCount }
 
     func lazyRowIdentity(at index: Int) -> String? { rows.lazyRowIdentity(at: index) }
+    func lazyRowID(at index: Int) -> AnyHashable? { rows.lazyRowID(at: index) }
 
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
         guard let other = other as? Self else { return false }
@@ -130,6 +138,10 @@ struct LazyKeyed: LazyRows {
         rows.lazyRowIdentity(at: index).map { "\(segment).\($0)" }
     }
 
+    func lazyRowID(at index: Int) -> AnyHashable? {
+        rows.lazyRowID(at: index).map { AnyHashable(ScopedLazyID(segment: segment, value: $0)) }
+    }
+
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
         guard let other = other as? Self, segment == other.segment else { return false }
         return rows.hasSameLazyIdentities(as: other.rows)
@@ -140,6 +152,12 @@ struct LazyKeyed: LazyRows {
     func lazyRow(at index: Int) -> any Element {
         SegmentKeyed(segment: segment, raw: rows.lazyRow(at: index))
     }
+}
+
+private struct ScopedLazyID: Hashable, CustomStringConvertible {
+    let segment: String
+    let value: AnyHashable
+    var description: String { "\(segment).\(value)" }
 }
 
 /// A lazy row under one more path segment, as `LazyKeyed.lazyRow` wraps it.
