@@ -197,7 +197,12 @@ public struct Button: VisualElement, TextElement, FontElement, PaddingElement, B
 
     /// `isOn` from a state, `$x`: the host sets each new look as it stands.
     @_spi(Host) public func isOn(_ state: Binding<Bool>) -> Modified {
-        plain(ButtonContract.isOn, by: state)
+        // Model properties and closure bindings have no host storage. The
+        // member must still be present so native buttons keep their check;
+        // Toggle writes the reported flip through its original binding.
+        state.image == nil
+            ? setValue(ButtonContract.isOn, state.wrappedValue)
+            : plain(ButtonContract.isOn, by: state)
     }
 
     /// Runs as a staying-pressed button flips - `true` for now pressed.

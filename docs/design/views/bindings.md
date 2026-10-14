@@ -118,6 +118,12 @@ view - takes its binding in one of two ways, decided by the binding:
                                   and renders on every report.
 ```
 
+Button-style `Toggle` follows the same distinction for its `isOn` look:
+whole state storage is carried, while a model property or closure binding is
+read into the description. The `isOn` member remains present even when false,
+so the native button keeps its checked state. Its `toggled` handler writes
+through the original binding, preserving any binding transaction or animation.
+
 The date and time pickers carry their value as three lanes: year, month and
 day, or hour, minute and second. A value the platform cannot show - a day
 outside the picker's range, a time longer than a day - is shown as the platform
