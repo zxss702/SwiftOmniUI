@@ -419,7 +419,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
         gripOverlay.Children().Append(grip);
         gripOverlay.Loaded(guarded("setting a split resize cursor",
             [](IInspectable const &sender, xaml::RoutedEventArgs const &) {
-                winrt::get_self<SplitGrip>(sender.as<controls::Panel>())->resizeCursor();
+                winrt::get_self<SplitGrip>(sender.as<xaml::IFrameworkElementOverrides>())->resizeCursor();
             }));
         pane.Children().Append(face);
         pane.Children().Append(gripOverlay);
