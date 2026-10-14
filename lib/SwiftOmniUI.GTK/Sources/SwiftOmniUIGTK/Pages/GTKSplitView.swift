@@ -253,8 +253,8 @@ private final class GTKColumnPaned: GTKView {
     func clear() {
         setting = true
         defer { setting = false }
-        while let child = gtk_widget_get_first_child(startSlot.widget) { gtk_box_remove(startSlot.widget.opaque, child) }
-        while let child = gtk_widget_get_first_child(endSlot.widget) { gtk_box_remove(endSlot.widget.opaque, child) }
+        while let child = gtk_widget_get_first_child(startSlot.widget) { gtk_box_remove(startSlot.widget.of(GtkBox.self), child) }
+        while let child = gtk_widget_get_first_child(endSlot.widget) { gtk_box_remove(endSlot.widget.of(GtkBox.self), child) }
         gtk_paned_set_start_child(native, nil)
         gtk_paned_set_end_child(native, nil)
     }
@@ -264,12 +264,12 @@ private final class GTKColumnPaned: GTKView {
         defer { setting = false }
         if let start {
             gtk_widget_set_vexpand(start, 1)
-            gtk_box_append(startSlot.widget.opaque, start)
+            gtk_box_append(startSlot.widget.of(GtkBox.self), start)
             gtk_paned_set_start_child(native, startSlot.widget)
         }
         if let end {
             gtk_widget_set_vexpand(end, 1)
-            gtk_box_append(endSlot.widget.opaque, end)
+            gtk_box_append(endSlot.widget.of(GtkBox.self), end)
             gtk_paned_set_end_child(native, endSlot.widget)
         }
         schedule()
