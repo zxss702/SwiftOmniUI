@@ -107,6 +107,7 @@ extension WinUIElement {
         for property in own {
             switch property {
             case .opacity: view.setOpacity(value(.opacity)?.number ?? 1)
+            case .blur: view.setBlur(value(.blur)?.number ?? 0)
             case .isVisible: view.setShown(isShown)
             // Ignored, the view and all in it are passed over: a click goes to what is under it.
             case .ignoresInput: view.setIgnoresInput(element.bool(.ignoresInput) == true)

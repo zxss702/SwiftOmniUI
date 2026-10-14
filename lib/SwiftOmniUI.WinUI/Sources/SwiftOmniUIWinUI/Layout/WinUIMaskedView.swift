@@ -27,7 +27,7 @@ final class WinUIMaskedView: WinUIZStackView {
     }
 
     override func holdNativeChildren(_ handles: [SwiftOmniUIObjectRef?]) {
-        swiftomniui_winui_masked_panel_set_children(handle, handles, Int32(handles.count), maskView?.handle)
+        swiftomniui_winui_masked_panel_set_children(handle, handles, Int32(handles.count), maskView?.presentationHandle)
     }
 
     /// A mask uses the source's allocation; its own intrinsic size must not

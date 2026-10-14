@@ -15,6 +15,11 @@ every frame: a label's padding and background, a button's box, a field's
 font and colours, a slider's tint, the bars' colours; and a window's place and
 size, which the desktop keeps. Those arrive at once.
 
+Blur is an additional drawing capability for every actual GTK view. Its
+local filter provider takes the radius the host clock presents on each
+frame, including insertion and removal phases; it never contributes layout
+room or adds a class to the global style sheet.
+
 A property's animation begins where the element stands: the opacity the host
 last wrote, the value a slider's thumb shows. GTK keeps a widget's opacity in
 256 steps, so what it draws is the nearest step; the animation runs on the

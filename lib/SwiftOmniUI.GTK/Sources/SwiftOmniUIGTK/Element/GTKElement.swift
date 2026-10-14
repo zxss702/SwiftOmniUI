@@ -43,13 +43,14 @@ final class GTKElement: NativeElement {
     func standingValue(_ property: Prop) -> HostValue? {
         switch (type, property) {
         case (_, .opacity): view.map { .number($0.opacity) }
+        case (_, .blur): view.map { .number($0.blur) }
         case (.slider, .value): (view as? GTKSliderView).map { .number($0.value) }
         default: nil
         }
     }
 
     func animates(_ property: Prop) -> Bool {
-        (presentsView && TransitionSurface.presentsDrawing(property))
+        (presentsView && (property == .blur || TransitionSurface.presentsDrawing(property)))
             || GTKTransitionSurface.presents(property, on: type)
     }
 

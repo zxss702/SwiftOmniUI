@@ -85,16 +85,25 @@ Insertion and removal phases use this same native capability check. An
 actual native view supports opacity and drawing transforms independently of
 its type: pages, lazy containers and custom controls retain these transitions,
 while type tables still limit their text, layout and control properties.
-A scale's pivot is part of its supported drawing transform. An unsupported blur still
-has the transition's supported opacity crossing, but creates no invisible
-blur animation and no extra wait before removal. Blur belongs to drawing,
-not measurement, regardless of whether a backend implements its effect.
+A scale's pivot is part of its supported drawing transform. GTK and WinUI
+also advertise blur for every actual native view. Static radii, driven radii
+and transition phases use the same native setter. A backend without blur
+continues to omit that component instead of keeping an invisible animation
+alive. Blur belongs to drawing, not measurement; its radius does not change
+the frame, geometry reports or the lazy realization window.
 
 What a moved value asks of the elements around it is the host layer's too
 ([one frame](runtime.md#one-frame)): a window's frame, a title bar's
 colours and a stack's or a tabbed view's bar colours are the window's
 chrome, which the host composes again on the frames that move them
 (`WindowChrome.follows`).
+
+Canvas and custom Shape drawing request local allocation sizes independently
+of business geometry reports. GTK and WinUI read those dimensions directly
+for a size-only reporter, without computing window transforms, named spaces
+or safe-area coordinates on every scroll or animation frame. Equal sizes
+produce no drawing feedback; views that also request positions retain full
+frame reporting.
 
 ## Layout animation
 

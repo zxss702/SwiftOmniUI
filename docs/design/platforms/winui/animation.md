@@ -19,6 +19,12 @@ window's chrome again, and a window's place and size stand the window again.
 A property's animation begins where the element stands: the opacity it is
 drawn at, the value a slider's thumb shows.
 
+Blur is an additional drawing capability for every actual WinUI view.
+Declared blur transitions prepare their native presentation boundary before
+insertion. The host clock updates the retained Gaussian effect's radius,
+with the same lifetime and reversal rules as opacity and transforms. The
+radius does not ask XAML to measure or arrange the view again.
+
 ## Moved, turned and scaled
 
 An element is moved, turned and scaled by a `CompositeTransform`, its render

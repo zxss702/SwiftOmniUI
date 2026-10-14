@@ -153,6 +153,41 @@ Composition changes update the drawing without bitmap snapshots or a redraw
 timer. Detaching clears the child visual and the surfaces' source references.
 GTK continues to composite alpha with `gtk_snapshot_push_mask`.
 
+## Blur
+
+A view declaring `blur(radius:)`, a driven blur or a blur transition gets a
+retained native presentation panel. Its original control handle remains the
+target for control properties, focus, events and accessibility; layouts and
+native content slots attach the presentation handle. The extra panel passes
+the proposal and allocation through unchanged. Views without blur acquire
+no extra panel or effect resources.
+
+An unstyled source grid holds the actual control subtree. A live
+[`CompositionVisualSurface`](https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.composition.compositionvisualsurface)
+and surface brush feed a Gaussian blur effect, exposed through the SDK's
+`IGraphicsEffectD2D1Interop`. A sprite on the presentation panel draws its
+output, separately from the captured source. Only the source grid's
+Composition opacity is zero, as in the alpha mask pipeline; descendants'
+authored drawing and native input stay intact. No XAML-owned visual is
+reparented in the Composition tree, and no bitmap capture or polling timer
+is used. This is a content filter; it does not replace Material brushes.
+
+Radii are logical pixels. Direct2D's standard-deviation range is 0...250.
+Soft borders reserve a three-sigma transparent extent outside the frame;
+the surface window uses the greater of the authored and transition radii
+and stays allocated while the radius animates. The compiled effect factory
+is shared per compositor, with independent brushes per view. A frame only
+changes the brush's scalar; size changes update the surface window. Blur
+does not invalidate layout or enlarge the lazy realization window.
+
+At zero the original source is drawn again and the output sprite is hidden.
+The presentation boundary stays attached, so changing the radius never
+moves a control between parents. A modifier first added to an existing view
+replaces its native owning slot once, outside Measure and Arrange. A
+promoted safe bar mirrors ancestor blur by Gaussian variance. Detaching
+disconnects the source surface, output brush and child visual before the
+view's native references are released.
+
 ## A canvas
 
 The closure-based Canvas listens to allocated width and height through passive

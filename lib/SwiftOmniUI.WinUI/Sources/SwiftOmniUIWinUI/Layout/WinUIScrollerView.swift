@@ -41,7 +41,7 @@ final class WinUIScrollerView: WinUIView {
         case .neither: 3
         default: 0
         }
-        swiftomniui_winui_scroller_set(handle, content.handle, way, Self.bar(verticalBar), Self.bar(horizontalBar))
+        swiftomniui_winui_scroller_set(handle, content.presentationHandle, way, Self.bar(verticalBar), Self.bar(horizontalBar))
     }
 
     /// Whether each axis moves at all: WinUI's own `ScrollMode` - 0 off, 1 on, 2 where the content fills the view.

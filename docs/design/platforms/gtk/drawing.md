@@ -37,6 +37,23 @@ the color scheme's own for the same widget. A rule is written the first time its
 asked for and stays, the sheet written again in the rules' order; a value
 that moves every frame has its own road, never a rule a frame.
 
+## Blur
+
+`blur(radius:)` filters the complete widget snapshot, including a native
+control's children, through GTK's [CSS `filter`](https://docs.gtk.org/gtk4/css-properties.html).
+GTK turns `blur()` into a GSK blur node. The radius uses logical pixels;
+alpha spreads beyond the layout frame until an enclosing clip cuts it.
+This filters the view's own content. Material backgrounds have their
+separate brush implementation.
+
+Each blurred view owns one local CSS provider. Updating an animated radius
+replaces that provider's small rule and queues drawing; it never appends
+rules to the display-wide style sheet. Zero removes the provider, and the
+view releases it on disposal. The property stays outside measurement and
+does not change size or hit testing. A top safe bar promoted to native
+toolbar hosting mirrors its logical ancestors' blur along with their
+opacity and transforms; successive Gaussian radii combine by variance.
+
 ## The application's pictures
 
 The application's pictures stand in an `Images` folder beside its

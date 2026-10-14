@@ -104,6 +104,7 @@ extension GTKElement {
         for property in own {
             switch property {
             case .opacity: view.setOpacity(value(.opacity)?.number ?? 1)
+            case .blur: view.setBlur(value(.blur)?.number ?? 0)
             case .isEnabled: view.setEnabled(value(.isEnabled)?.bool ?? true)
             case .isVisible: view.setShown(isShown)
             case .hint:

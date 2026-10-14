@@ -12,6 +12,15 @@ class WinUIView {
     /// The element, held until this is released.
     let handle: SwiftOmniUIObjectRef
 
+    /// Parents attach the drawing boundary when one is needed; control APIs
+    /// continue to use `handle`, preserving the actual native control identity.
+    var presentationHandle: SwiftOmniUIObjectRef { blurPresenter ?? handle }
+    private var blurPresenter: SwiftOmniUIObjectRef?
+    private(set) var blur = 0.0
+    private var inheritedBlur = 0.0
+    private var writtenBlur = 0.0
+    private var blurCommitPending = false
+
     /// The number the relay's callbacks name this view by.
     let number: Int64
 
@@ -39,6 +48,8 @@ class WinUIView {
 
     func clearSafeBarDrawing() {
         safeBarDrawing = nil
+        inheritedBlur = 0
+        writeBlur()
         setPlacedDrawing(nil, opacity: 1)
         writeTransform()
     }
@@ -48,6 +59,7 @@ class WinUIView {
         (nativeSafeBarOwner as? WinUIView)?.setIgnoresInput(sourceElement?.safeBarAllowsInput == false)
         var matrix = HostMatrix.identity
         var opacity = 1.0
+        var blurVariance = 0.0
         var x = placedFrame.x, y = placedFrame.y
         var totalX = 0.0, totalY = 0.0
         var next = sourceElement?.parent
@@ -61,6 +73,7 @@ class WinUIView {
                 totalY += y
                 matrix = matrix * moved * view.drawing.matrix(width: frame.width, height: frame.height)
                 opacity *= view.opacity * view.placedOpacity
+                blurVariance += view.blur * view.blur
                 x = frame.x
                 y = frame.y
             }
@@ -70,6 +83,8 @@ class WinUIView {
         unmoved.m41 = -totalX
         unmoved.m42 = -totalY
         safeBarDrawing = matrix * unmoved
+        inheritedBlur = blurVariance.squareRoot()
+        writeBlur()
         setPlacedDrawing(placedDrawing, opacity: opacity)
         writeTransform()
     }
@@ -157,6 +172,10 @@ class WinUIView {
 
     isolated deinit {
         Self.live.release(number)
+        if let blurPresenter {
+            swiftomniui_winui_blur_clear(blurPresenter)
+            swiftomniui_winui_release(blurPresenter)
+        }
         swiftomniui_winui_release(handle)
     }
 
@@ -172,7 +191,7 @@ class WinUIView {
 
     func setShown(_ shown: Bool) {
         isShown = shown
-        swiftomniui_winui_set_shown(handle, shown)
+        swiftomniui_winui_set_shown(presentationHandle, shown)
     }
 
     /// How opaque the view's own property draws it, with a placing layout's opacity over it; written only where
@@ -182,8 +201,57 @@ class WinUIView {
         let drawn = opacity * placedOpacity
         guard drawn != writtenOpacity else { return }
         writtenOpacity = drawn
-        swiftomniui_winui_set_opacity(handle, drawn)
+        swiftomniui_winui_set_opacity(presentationHandle, drawn)
         refreshNativeSafeBarDrawing()
+    }
+
+    /// Prepare before insertion where a declared modifier or transition needs
+    /// blur. Adding a modifier later creates the same retained native boundary.
+    func prepareBlur() {
+        guard blurPresenter == nil, !isDetached else { return }
+        guard Self.arranging == 0, Self.measuring == 0 else {
+            scheduleBlurCommit()
+            return
+        }
+        blurPresenter = swiftomniui_winui_blur_make(handle)
+    }
+
+    func setBlur(_ radius: Double) {
+        let radius = radius.isFinite ? max(0, radius) : 0
+        guard radius != blur else { return }
+        blur = radius
+        writeBlur()
+        refreshNativeSafeBarDrawing()
+    }
+
+    private func scheduleBlurCommit() {
+        guard !blurCommitPending else { return }
+        blurCommitPending = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.blurCommitPending = false
+            guard !self.isDetached else { return }
+            self.writeBlur()
+        }
+    }
+
+    private func writeBlur() {
+        let radius = (blur * blur + inheritedBlur * inheritedBlur).squareRoot()
+        guard radius != writtenBlur else { return }
+        // Creating a presenter changes native ownership exactly once. Never
+        // change parent/child relationships during Measure or Arrange.
+        if blurPresenter == nil, radius > 0 {
+            guard Self.arranging == 0, Self.measuring == 0 else {
+                scheduleBlurCommit()
+                return
+            }
+            prepareBlur()
+        }
+        guard let blurPresenter else { return }
+        let transition = sourceElement?.transition
+        let reserve = max(radius, max(sourceElement?.resolvedValue(.blur)?.number ?? 0,
+                                     max(transition?.insertion.blur ?? 0, transition?.removal.blur ?? 0)))
+        if swiftomniui_winui_blur_set(blurPresenter, radius, reserve) { writtenBlur = radius }
     }
 
     /// How a placing layout draws the view over the place it gave, and how opaque; nil and 1 for as the view says.
@@ -200,7 +268,7 @@ class WinUIView {
 
     /// Whether clicks and touches go through the view to what is behind it.
     func setIgnoresInput(_ ignores: Bool) {
-        swiftomniui_winui_set_hit_testable(handle, !ignores)
+        swiftomniui_winui_set_hit_testable(presentationHandle, !ignores)
     }
 
     /// Whether the view lays itself out and writes in its element's direction: a control does; a layout, whose
@@ -222,7 +290,7 @@ class WinUIView {
     func setZIndex(_ z: Int32) {
         guard z != writtenZIndex else { return }
         writtenZIndex = z
-        swiftomniui_winui_set_z_index(handle, z)
+        swiftomniui_winui_set_z_index(presentationHandle, z)
     }
 
     /// Moves, turns and scales the view where its layout put it, in DIPs and degrees.
@@ -245,18 +313,18 @@ class WinUIView {
         let drawn = drawing
         let size = placed ?? Rect(x: 0, y: 0, width: 0, height: 0)
         swiftomniui_winui_set_transform(
-            handle, drawn.translationX, drawn.translationY, drawn.rotation,
+            presentationHandle, drawn.translationX, drawn.translationY, drawn.rotation,
             drawn.scaleX, drawn.scaleY, drawn.pivotX * size.width, drawn.pivotY * size.height)
         let ownTip = drawn.tip(width: size.width, height: size.height)
         let tip = safeBarDrawing.map { (ownTip ?? .identity) * $0 } ?? ownTip
         guard tip != writtenTip else { return }
         writtenTip = tip
-        guard let tip else { return swiftomniui_winui_set_projection(handle, nil) }
+        guard let tip else { return swiftomniui_winui_set_projection(presentationHandle, nil) }
         let numbers = [
             tip.m11, tip.m12, tip.m13, tip.m14, tip.m21, tip.m22, tip.m23, tip.m24,
             tip.m31, tip.m32, tip.m33, tip.m34, tip.m41, tip.m42, tip.m43, tip.m44,
         ]
-        swiftomniui_winui_set_projection(handle, numbers)
+        swiftomniui_winui_set_projection(presentationHandle, numbers)
     }
 
     /// Asks WinUI to measure this element again, and every panel above it.
@@ -280,7 +348,7 @@ class WinUIView {
     /// Native invalidation is separate from discarding Swift's arithmetic:
     /// a viewport notice may update the tree inside ArrangeOverride.
     func invalidateNativeMeasure() {
-        swiftomniui_winui_invalidate_measure(handle)
+        swiftomniui_winui_invalidate_measure(presentationHandle)
     }
 
     /// Restore the selected native proposal after arithmetic has probed other widths.
@@ -342,7 +410,7 @@ class WinUIView {
         var size = [0.0, 0.0]
         Self.measuring += 1
         defer { Self.measuring -= 1 }
-        swiftomniui_winui_measure(handle, width ?? .infinity, height ?? .infinity, &size)
+        swiftomniui_winui_measure(presentationHandle, width ?? .infinity, height ?? .infinity, &size)
         let measured = LayoutSize(width: size[0], height: size[1])
         if WinUILayoutView.queryingSize > 0 {
             // A new intrinsic proposal changed XAML's last measurement. Only
@@ -364,7 +432,7 @@ class WinUIView {
     /// What the element last measured at, read from WinUI without marking it.
     var desiredSize: LayoutSize {
         var size = [0.0, 0.0]
-        swiftomniui_winui_desired_size(handle, &size)
+        swiftomniui_winui_desired_size(presentationHandle, &size)
         return LayoutSize(width: size[0], height: size[1])
     }
 
@@ -394,7 +462,7 @@ class WinUIView {
                 layout.standsAt = place.width
             }
             let room = wordsRoom ?? place
-            swiftomniui_winui_arrange(handle, place.x, place.y, room.width, room.height)
+            swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
         } else if moved {
             placingLayout?.invalidateArrange()
         }
@@ -442,7 +510,7 @@ class WinUIView {
     /// Where WinUI laid the element out in its parent, in DIPs.
     var laidOutFrame: Rect {
         var frame = [0.0, 0.0, 0.0, 0.0]
-        swiftomniui_winui_frame(handle, &frame)
+        swiftomniui_winui_frame(presentationHandle, &frame)
         return Rect(x: frame[0], y: frame[1], width: frame[2], height: frame[3])
     }
 
@@ -580,6 +648,7 @@ class WinUIView {
     /// overrides this lets go of what every view holds first, then of its own.
     func detach() {
         isDetached = true
+        if let blurPresenter { swiftomniui_winui_blur_clear(blurPresenter) }
         hear([]) { _ in }
         setFocusChanged(nil)
         menuActions = []

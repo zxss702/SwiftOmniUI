@@ -37,6 +37,7 @@ enum WinUIRegistrations {
     static func shared(_ registry: Registry<WinUIView>) {
         registry.everyElementMeetsAssistiveTechnology()
         registry.everyElementRealizes(VisualElementContract.opacity)
+        registry.everyElementRealizes(VisualElementContract.blur)
         registry.everyElementRealizes(VisualElementContract.isVisible)
         registry.everyElementRealizes(VisualElementContract.transition)
         registry.everyElementTakesItsPlace()

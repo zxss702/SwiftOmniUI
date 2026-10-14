@@ -428,6 +428,12 @@ void swiftomniui_winui_masked_panel_set_children(
 /// Disconnects the composition surfaces when the panel leaves or is disposed.
 void swiftomniui_winui_masked_panel_clear(SwiftOmniUIObjectRef panel);
 
+/// A drawing-only presentation boundary retaining the original native control.
+SwiftOmniUIObjectRef swiftomniui_winui_blur_make(SwiftOmniUIObjectRef element);
+/// Updates a retained live Composition Gaussian-blur brush, in logical pixels.
+bool swiftomniui_winui_blur_set(SwiftOmniUIObjectRef presenter, double radius, double reserveRadius);
+void swiftomniui_winui_blur_clear(SwiftOmniUIObjectRef presenter);
+
 /// How words look on a text block or any control showing them: the font - a size of 0 or less and an empty
 /// family are the platform's - the colour as 0xAARRGGBB, `has` false putting back the platform's, and the room
 /// around them in DIPs.

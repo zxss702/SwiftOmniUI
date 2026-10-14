@@ -35,6 +35,7 @@ enum GTKRegistrations {
     /// on every element GTK shows.
     static func shared(_ registry: Registry<GTKView>) {
         registry.everyElementRealizes(VisualElementContract.opacity)
+        registry.everyElementRealizes(VisualElementContract.blur)
         registry.everyElementRealizes(VisualElementContract.isVisible)
         registry.everyElementRealizes(VisualElementContract.transition)
         registry.everyElementRealizes(VisualElementContract.isEnabled)

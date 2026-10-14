@@ -54,7 +54,7 @@ final class WinUITitleBarView: WinUIView {
                     WinUIStrings.withCStrings(actions.map { $0.symbol ?? "" }) { symbols in
                         swiftomniui_winui_title_bar_set_actions(
                             handle, titles, identifiers, icons, symbols, overflows, actions.map(\.isEnabled),
-                            actions.map(\.view?.handle), actions.map { $0.spacer.map { Int32($0.rawValue) + 1 } ?? 0 },
+                            actions.map(\.view?.presentationHandle), actions.map { $0.spacer.map { Int32($0.rawValue) + 1 } ?? 0 },
                             Int32(actions.count), Int32(chrome.leadingActions.count))
                     }
                     }
@@ -68,7 +68,7 @@ final class WinUITitleBarView: WinUIView {
 
         if previous.leading !== chrome.leading || previous.center !== chrome.center
             || previous.trailing !== chrome.trailing {
-            swiftomniui_winui_title_bar_set_slots(handle, chrome.leading?.handle, chrome.center?.handle, chrome.trailing?.handle)
+            swiftomniui_winui_title_bar_set_slots(handle, chrome.leading?.presentationHandle, chrome.center?.presentationHandle, chrome.trailing?.presentationHandle)
         }
     }
 

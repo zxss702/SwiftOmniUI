@@ -24,7 +24,7 @@ final class WinUISidebarView: WinUIView {
     func set(sidebar: WinUIView?, detail: WinUIView?, row: WinUIView?, open: Bool,
              widths: SplitColumnWidth = SplitColumnWidth(nil), contentShown: Bool = true,
              contentWidths: SplitColumnWidth = SplitColumnWidth(nil)) {
-        swiftomniui_winui_split_set(handle, sidebar?.handle, detail?.handle, row?.handle, open,
+        swiftomniui_winui_split_set(handle, sidebar?.presentationHandle, detail?.presentationHandle, row?.presentationHandle, open,
                                    widths.minimum, widths.ideal, widths.maximum,
                                    contentShown, contentWidths.minimum, contentWidths.maximum)
         invalidateMeasure()

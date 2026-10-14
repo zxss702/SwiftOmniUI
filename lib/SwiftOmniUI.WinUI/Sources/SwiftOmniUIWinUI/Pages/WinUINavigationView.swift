@@ -19,7 +19,7 @@ final class WinUINavigationView: WinUILayoutView {
     }
 
     override func holdNativeChildren(_ handles: [SwiftOmniUIObjectRef?]) {
-        swiftomniui_winui_navigation_set(handle, boxView?.handle, items.last?.view.handle,
+        swiftomniui_winui_navigation_set(handle, boxView?.presentationHandle, items.last?.view.presentationHandle,
                                          depth > 0, items.count < depth)
         depth = items.count
     }

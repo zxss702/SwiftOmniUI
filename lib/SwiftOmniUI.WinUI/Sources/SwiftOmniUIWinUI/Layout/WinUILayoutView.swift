@@ -144,7 +144,7 @@ class WinUILayoutView: WinUIView {
         guard boxView !== heldBox || views.count != held.count || !zip(views, held).allSatisfy({ $0 === $1 })
         else { return }
 
-        let handles: [SwiftOmniUIObjectRef?] = (boxView.map { [$0.handle] } ?? []) + views.map(\.handle)
+        let handles: [SwiftOmniUIObjectRef?] = (boxView.map { [$0.presentationHandle] } ?? []) + views.map(\.presentationHandle)
         holdNativeChildren(handles)
         held = views
         heldBox = boxView
@@ -205,7 +205,7 @@ class WinUILayoutView: WinUIView {
             return
         }
         nativeArrangePending = false
-        swiftomniui_winui_invalidate_arrange(handle)
+        swiftomniui_winui_invalidate_arrange(presentationHandle)
     }
 
     /// Forgets the kept sizes and asks WinUI to measure again.
@@ -260,7 +260,7 @@ class WinUILayoutView: WinUIView {
 
         // A speculative width can have measured the children since this panel's last
         // native pass. Even if XAML still holds this width, that subtree must be prepared again.
-        if !currentSizing { swiftomniui_winui_invalidate_measure(handle) }
+        if !currentSizing { swiftomniui_winui_invalidate_measure(presentationHandle) }
         let wasPreparing = preparingMeasure
         preparingMeasure = true
         defer { preparingMeasure = wasPreparing }

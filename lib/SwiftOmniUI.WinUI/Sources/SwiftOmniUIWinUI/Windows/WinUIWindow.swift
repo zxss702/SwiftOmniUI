@@ -92,7 +92,7 @@ final class WinUIWindow {
                 }
                 self.safeBarFrame = nil
             }
-            let handles: [SwiftOmniUIObjectRef?] = self.safeBars.map(\.handle)
+            let handles: [SwiftOmniUIObjectRef?] = self.safeBars.map(\.presentationHandle)
             let background = self.titleBar.chrome.background?.argb
             self.safeBarBackground = .some(background)
             swiftomniui_winui_window_set_safe_area_bars(
@@ -234,7 +234,7 @@ final class WinUIWindow {
             return SafeAreaContext(bounds: Rect(bounds.x, bounds.y - top, bounds.width, bounds.height + top),
                                    layout: bounds, container: bounds)
         }
-        swiftomniui_winui_window_set_content(handle, view?.handle)
+        swiftomniui_winui_window_set_content(handle, view?.presentationHandle)
         if present { activateFirstTime() }
     }
 
@@ -310,7 +310,7 @@ final class WinUIWindow {
     /// Shows `sheets` over everything the window shows, the last on top.
     /// Design: docs/design/platforms/winui/pages.md#the-modal-stack
     func showSheets(_ sheets: [WinUISheetView]) {
-        let handles: [SwiftOmniUIObjectRef?] = sheets.map(\.handle)
+        let handles: [SwiftOmniUIObjectRef?] = sheets.map(\.presentationHandle)
         swiftomniui_winui_window_set_sheets(handle, handles, Int32(handles.count))
     }
 
@@ -319,7 +319,7 @@ final class WinUIWindow {
     /// Design: docs/design/platforms/winui/pages.md#the-windows-overlay
     func showOverlay(_ view: WinUIView?) {
         overlay = view
-        swiftomniui_winui_window_set_overlay(handle, view?.handle)
+        swiftomniui_winui_window_set_overlay(handle, view?.presentationHandle)
     }
 
     /// Closes the window; one closed already stays as it is.

@@ -287,6 +287,12 @@ extern "C" void swiftomniui_winui_navigation_set(
         insertInOrder(held.Children(), children);
         auto next = content ? as<xaml::UIElement>(content) : xaml::UIElement{nullptr};
         if (next == owner->navigationContent) return;
+        // Adding a drawing boundary can replace the current page's native
+        // content without changing its logical page or navigation depth.
+        if (auto page = frame.Content().try_as<controls::Page>(); page && page.Content() == next) {
+            owner->navigationContent = next;
+            return;
+        }
         if (!next) {
             frame.Content(nullptr);
             owner->navigationContent = nullptr;

@@ -184,7 +184,7 @@ public enum VisualElementContract: Contract {
     /// Which of its overlapping siblings in a grid or an absolute layout the element is drawn over.
     public static let zIndex = ElementProperty<Self, Double>("zIndex", layer: .native, travels: false)
 
-    /// The blur the element is drawn with, in device units - 0 for none.
+    /// The Gaussian blur the element is drawn with, in logical pixels - 0 for none.
     public static let blur = ElementProperty<Self, Double>(
         "blur", layer: .native, moves: .opacity)
 

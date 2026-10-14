@@ -25,7 +25,7 @@ final class WinUIMenuButtonView: WinUIView {
 
     /// The face the press opens the menu from: the label child's view; nil for the chevron alone.
     func setFace(_ face: WinUIView?) {
-        swiftomniui_winui_menu_button_set_face(handle, face?.handle)
+        swiftomniui_winui_menu_button_set_face(handle, face?.presentationHandle)
     }
 
     /// Whether the face draws the chevron that says it opens a menu.

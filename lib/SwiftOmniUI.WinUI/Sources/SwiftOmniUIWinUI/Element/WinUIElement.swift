@@ -28,6 +28,10 @@ final class WinUIElement: NativeElement {
         self.host = host
         view = makeView()
         view?.sourceElement = element
+        if element.value(.blur) != nil || element.driven[.blur] != nil
+            || element.transition?.insertion.blur != nil || element.transition?.removal.blur != nil {
+            view?.prepareBlur()
+        }
     }
 
     // MARK: - The element's tree, read through its mounted element
@@ -44,13 +48,14 @@ final class WinUIElement: NativeElement {
     func standingValue(_ property: Prop) -> HostValue? {
         switch (type, property) {
         case (_, .opacity): view.map { .number($0.opacity) }
+        case (_, .blur): view.map { .number($0.blur) }
         case (.slider, .value): (view as? WinUISliderView).map { .number($0.value) }
         default: nil
         }
     }
 
     func animates(_ property: Prop) -> Bool {
-        (presentsView && TransitionSurface.presentsDrawing(property))
+        (presentsView && (property == .blur || TransitionSurface.presentsDrawing(property)))
             || TransitionSurface.presents(property, on: type)
     }
 

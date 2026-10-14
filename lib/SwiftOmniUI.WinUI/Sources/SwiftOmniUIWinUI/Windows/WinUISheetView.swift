@@ -13,6 +13,6 @@ final class WinUISheetView: WinUIView {
     /// Shows `page` under `title`, the card `height` tall - under 0 the window's height minus it, 0 the content's.
     func show(title: String, page: WinUIView?, height: Double = 0) {
         swiftomniui_winui_sheet_set_height(handle, height)
-        swiftomniui_winui_sheet_set(handle, title, page?.handle)
+        swiftomniui_winui_sheet_set(handle, title, page?.presentationHandle)
     }
 }

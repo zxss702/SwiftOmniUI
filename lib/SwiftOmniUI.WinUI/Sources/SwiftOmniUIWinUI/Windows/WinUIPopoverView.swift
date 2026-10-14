@@ -36,7 +36,7 @@ final class WinUIPopoverView: WinUISingleChildView {
     }
 
     private func show() {
-        guard let anchor = anchor(), let flyout = flyout ?? swiftomniui_winui_popover_make(number, handle) else { return }
+        guard let anchor = anchor(), let flyout = flyout ?? swiftomniui_winui_popover_make(number, presentationHandle) else { return }
         self.flyout = flyout
         swiftomniui_winui_popover_show(flyout, anchor.handle, Int32(edge.rawValue))
     }
