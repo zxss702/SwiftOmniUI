@@ -125,12 +125,23 @@ Inherited foreground styles keep the entire brush, while an explicit fill wins.
 values include miter, dash lengths and phase in path units. The older SPI dash
 setters continue to use stroke widths, independently for pattern and phase.
 
+`clipShape(_:style:)`, `contentShape(_:eoFill:)` and `background(_:in:fillStyle:)`
+accept `Shape`, including custom implementations of `path(in:)`. The built-in
+native-outline optimization is internal; applications do not need a separate
+clipping protocol or a platform-specific shape constraint.
+
 `clipShape(_:style:)` uses the existing fast outline for fixed shapes. A custom
 shape uses an independent path clip evaluated at the content's allocated size.
 An empty path clips everything; removing the property restores ordinary drawing.
 GTK snapshots push a GSK fill around the content; WinUI uses a Direct2D geometry
 source in a Composition geometric clip, retaining the clip object as paths change.
 Custom `.background(_:in:)` draws the same shape adapter behind the content.
+`contentShape` instead writes an independent input region (`hitPath` and its
+fill rule for custom shapes), leaving drawing unchanged. GTK evaluates its
+panel's input region with GSK. WinUI's existing input-region gap remains:
+neither the fixed `hitShape` nor custom `hitPath` has a native registration
+there. Accepting Shape in the public API does not imply that every host
+implements all input-region behavior.
 
 ## Text runs
 

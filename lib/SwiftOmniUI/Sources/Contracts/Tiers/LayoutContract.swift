@@ -32,11 +32,17 @@ public enum LayoutContract: Contract {
     /// outside it reaches nothing the layout holds.
     public static let hitShape = ElementProperty<Self, ContainerShape>("hitShape", layer: .native)
 
+    /// An independent local-coordinate input region. An empty path accepts no
+    /// point; unlike clipPath it does not change what the layout draws.
+    public static let hitPath = ElementProperty<Self, [Double]>("hitPath", layer: .native, travels: false)
+    public static let hitFillRule = ElementProperty<Self, FillRule>("hitFillRule", layer: .native)
+
     /// Whether the layout's children are the targets a scroller settles on.
     public static let scrollTargetLayout = ElementProperty<Self, Bool>("scrollTargetLayout", layer: .adaptive)
 
     /// The tier's own members.
     public static let members: [any ContractMember] = [
-        ignoresSafeArea, clipsContent, letsInputThrough, hitShape, scrollTargetLayout, clipPath, clipFillRule,
+        ignoresSafeArea, clipsContent, letsInputThrough, hitShape, hitPath, hitFillRule,
+        scrollTargetLayout, clipPath, clipFillRule,
     ]
 }

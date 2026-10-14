@@ -18,30 +18,23 @@ extension Node {
     }
 }
 
-/// What a `.clipShape` cuts by - the outline a shape stands for:
-///
-///     Image("avatar.png")
-///         .clipShape(Circle())
-///
-/// `Rectangle` and `Ellipse` answer for themselves; `RoundedRectangle`,
-/// `Capsule` and `Circle` are views of their own too, so the same word names
-/// what is drawn and what it cuts to.
-@preconcurrency @MainActor public protocol ClipShape {
-    /// The outline the shape stands for.
+/// The native outline optimization for built-in shapes. Public modifiers
+/// accept Shape; custom shapes supply their allocated path instead.
+@MainActor protocol PrimitiveShape: Shape {
     var outline: ContainerShape { get }
 }
 
-extension Rectangle: ClipShape {
+extension Rectangle: PrimitiveShape {
     /// A square-cornered box.
     public var outline: ContainerShape { .rectangle }
 }
 
-extension Ellipse: ClipShape {
+extension Ellipse: PrimitiveShape {
     /// An oval the room's shape.
     public var outline: ContainerShape { .ellipse }
 }
 
-extension UnevenRoundedRectangle: ClipShape {
+extension UnevenRoundedRectangle: PrimitiveShape {
     /// A rectangle rounded at each corner by its own radius.
     public var outline: ContainerShape {
         .unevenRoundedRectangle(.corners(
@@ -65,7 +58,7 @@ public enum RoundedCornerStyle: Sendable {
 ///
 ///     RoundedRectangle(cornerRadius: 8).fill(.cornflowerBlue)
 ///     Text("…").clipShape(RoundedRectangle(cornerRadius: 8))
-public struct RoundedRectangle: Shape, VisualElement, ShapeProperties, ClipShape {
+public struct RoundedRectangle: Shape, VisualElement, ShapeProperties {
     /// The node this control describes.
     public var node: Node
 
@@ -94,7 +87,7 @@ public struct RoundedRectangle: Shape, VisualElement, ShapeProperties, ClipShape
 ///
 ///     Capsule().fill(.tomato).frame(width: 80, height: 32)
 ///     Text("…").clipShape(Capsule())
-public struct Capsule: Shape, VisualElement, ShapeProperties, ClipShape {
+public struct Capsule: Shape, VisualElement, ShapeProperties {
     /// The node this control describes.
     public var node: Node
 
@@ -119,7 +112,7 @@ public struct Capsule: Shape, VisualElement, ShapeProperties, ClipShape {
 ///
 ///     Circle().fill(.teal).frame(width: 24, height: 24)
 ///     Image("avatar.png").clipShape(Circle())
-public struct Circle: Shape, VisualElement, ShapeProperties, ClipShape {
+public struct Circle: Shape, VisualElement, ShapeProperties {
     /// The node this control describes.
     public var node: Node
 
@@ -132,6 +125,10 @@ public struct Circle: Shape, VisualElement, ShapeProperties, ClipShape {
     public var outline: ContainerShape { .circle }
 }
 
+extension RoundedRectangle: PrimitiveShape {}
+extension Capsule: PrimitiveShape {}
+extension Circle: PrimitiveShape {}
+
 extension View {
     /// Cuts the view to `shape`'s outline - everything outside it away:
     ///
@@ -141,18 +138,8 @@ extension View {
     ///
     /// The clip is the container the view is wrapped in's, so it cuts what the
     /// view draws of its own too.
-    @_disfavoredOverload public func clipShape(_ shape: some ClipShape) -> ModifiedContent {
-        var wrapper = Node(contract: ZStackContract.self)
-        let content = node
-        wrapper.producer = { content.asChildren }
-        wrapper.props[BorderElementContract.shape.token] = shape.outline.propValue
-        wrapper.props[LayoutContract.clipsContent.token] = .bool(true)
-        return ModifiedContent(node: wrapper)
-    }
-
-    /// Cuts by any Shape, evaluated in this view's allocated local bounds.
-    public func clipShape<S: Shape>(_ shape: S, style: FillStyle = FillStyle()) -> ModifiedContent {
-        if let fixed = shape as? any ClipShape {
+    public func clipShape(_ shape: some Shape, style: FillStyle = FillStyle()) -> ModifiedContent {
+        if let fixed = shape as? any PrimitiveShape {
             var wrapper = Node(contract: ZStackContract.self)
             let content = node
             wrapper.producer = { content.asChildren }
@@ -160,7 +147,7 @@ extension View {
             wrapper.write(LayoutContract.clipsContent, true)
             return ModifiedContent(node: wrapper)
         }
-        return ModifiedContent(node: SizedPathClip(content: self, shape: shape, style: style).node)
+        return ModifiedContent(node: SizedPathShape(content: self, shape: shape, style: style, role: .clip).node)
     }
 
     /// Cuts the view to its own bounds - a `.clipShape` by the bounds'
@@ -187,12 +174,16 @@ extension View {
     ///
     /// The shape is the container the view is wrapped in's, so the whole room
     /// the view was given answers.
-    public func contentShape(_ shape: some ClipShape) -> ModifiedContent {
-        var wrapper = Node(contract: ZStackContract.self)
-        let content = node
-        wrapper.producer = { content.asChildren }
-        wrapper.props[LayoutContract.hitShape.token] = shape.outline.propValue
-        return ModifiedContent(node: wrapper)
+    public func contentShape(_ shape: some Shape, eoFill: Bool = false) -> ModifiedContent {
+        if let fixed = shape as? any PrimitiveShape {
+            var wrapper = Node(contract: ZStackContract.self)
+            let content = node
+            wrapper.producer = { content.asChildren }
+            wrapper.write(LayoutContract.hitShape, fixed.outline)
+            return ModifiedContent(node: wrapper)
+        }
+        return ModifiedContent(node: SizedPathShape(
+            content: self, shape: shape, style: FillStyle(eoFill: eoFill), role: .interaction).node)
     }
 
     /// Draws the view only where `mask`'s alpha allows: where the mask paints

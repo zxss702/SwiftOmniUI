@@ -15,6 +15,27 @@ class GTKPanelView: GTKView {
     /// where a point anywhere inside the bounds counts.
     var hitShape: ContainerShape?
 
+    private var hitCommands: [Double]?
+    private var hitPath: OpaquePointer?
+    private var hitEvenOdd = false
+
+    isolated deinit { if let hitPath { gsk_path_unref(hitPath) } }
+
+    func setHitPath(_ commands: [Double]?, evenOdd: Bool) {
+        guard commands != hitCommands || evenOdd != hitEvenOdd else { return }
+        hitCommands = commands
+        hitEvenOdd = evenOdd
+        if let hitPath { gsk_path_unref(hitPath) }
+        hitPath = commands.map { GTKShapeView.build($0, moved: [1, 0, 0, 1, 0, 0]) }
+    }
+
+    func contains(_ point: Point, in room: Rect) -> Bool {
+        guard hitShape?.contains(point, in: room) ?? true else { return false }
+        guard let hitPath else { return true }
+        var native = graphene_point_t(x: Float(point.x), y: Float(point.y))
+        return gsk_path_in_fill(hitPath, &native, hitEvenOdd ? GSK_FILL_RULE_EVEN_ODD : GSK_FILL_RULE_WINDING) != 0
+    }
+
     init() {
         super.init { number in GTKPanel.make(number: number) }
     }

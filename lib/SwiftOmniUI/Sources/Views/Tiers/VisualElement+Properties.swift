@@ -553,17 +553,14 @@ extension View {
     ///     Text("…").background(.ultraThinMaterial, in: Capsule())
     ///     row.background(isHovered ? .gray.opacity(0.1) : .clear,
     ///         in: RoundedRectangle(cornerRadius: 8))
-    @_disfavoredOverload
-    public func background(_ style: some ShapeStyle, in shape: some ClipShape) -> some View {
-        background { OutlinedFill(outline: shape.outline, brush: style.brush) }
-    }
-
-    public func background<S: Shape>(_ style: some ShapeStyle, in shape: S) -> some View {
+    public func background(_ style: some ShapeStyle, in shape: some Shape,
+                           fillStyle: FillStyle = FillStyle()) -> some View {
         background {
-            if let fixed = shape as? any ClipShape {
+            if let fixed = shape as? any PrimitiveShape {
                 OutlinedFill(outline: fixed.outline, brush: style.brush)
+                    .setting(ShapeContract.fillRule, fillStyle.isEOFilled ? .evenOdd : .nonzero)
             } else {
-                shape.fill(style.brush)
+                shape.fill(style, style: fillStyle)
             }
         }
     }

@@ -82,9 +82,7 @@ enum GTKPanel {
                     height: Double(gtk_widget_get_height(widget)))
                 let (passes, inside) = MainActor.assumeIsolated {
                     let view = GTKPanel.view(number)
-                    let inside = view?.hitShape.map {
-                        $0.contains(Point(x: x, y: y), in: room)
-                    } ?? true
+                    let inside = view?.contains(Point(x: x, y: y), in: room) ?? true
                     return (view?.passesBeside == true, inside)
                 }
                 return passes || !inside ? 0 : GTKPanel.widgetContains?(widget, x, y) ?? 0

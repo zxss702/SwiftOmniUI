@@ -24,6 +24,12 @@ point holds none - passes a click beside its children on to what is under
 it, while its children still take theirs. A view that ignores input takes
 none, nor does anything in it.
 
+A panel's `contentShape` can use a fixed native outline or a local path from
+any Shape. GSK tests the latter with the requested winding/even-odd fill rule;
+an empty path accepts no point on the panel. Geometry is retained until its
+commands change and released with the panel. Descendants retain GTK's native
+picking order. This input region does not alter the snapshot's drawing clip.
+
 ## Taps
 
 A tap is `GtkGestureClick`'s release of the primary button, or of a finger,

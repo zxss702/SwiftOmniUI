@@ -174,10 +174,12 @@ extension GTKRegistrations {
         VisualElementContract.background,
         BorderElementContract.stroke, BorderElementContract.strokeWidth, BorderElementContract.shape,
         LayoutContract.clipsContent, LayoutContract.clipPath, LayoutContract.clipFillRule,
+        LayoutContract.hitPath, LayoutContract.hitFillRule,
     ]
 
     private static func applyBox<Realized: ElementContract>(_ view: GTKLayoutView, _ values: ElementValues<Realized>) {
         view.setPathClip(values[LayoutContract.clipPath], evenOdd: (values[LayoutContract.clipFillRule] ?? .nonzero) == .evenOdd)
+        view.setHitPath(values[LayoutContract.hitPath], evenOdd: (values[LayoutContract.hitFillRule] ?? .nonzero) == .evenOdd)
         view.setBackground(values[VisualElementContract.background]?.propValue)
         view.setOutline(
             stroke: values[BorderElementContract.stroke]?.propValue,
