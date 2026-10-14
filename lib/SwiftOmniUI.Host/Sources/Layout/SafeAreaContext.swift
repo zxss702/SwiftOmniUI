@@ -136,8 +136,8 @@ extension MountedElement {
         return safeAreaForwardedChild?.preservesSafeAreaProposal == true
     }
 
-    /// Transparent wrappers forward the safe-area environment without
-    /// consuming it. Ordinary content that was placed safely consumes it.
+    /// Transparent wrappers, including unpadded single-child stacks, forward
+    /// the safe-area environment. Ordinary content placed safely consumes it.
     public var observesSafeArea: Bool {
         if isSafeAreaBoundary || isGeometryReader || type == .scrollView { return true }
         return safeAreaForwardedChild?.observesSafeArea == true
@@ -151,6 +151,7 @@ extension MountedElement {
               insets(.padding) == EdgeInsets(0), insets(.contentPadding) == EdgeInsets(0),
               currentChildren.count == 1,
               type == .page || !native.presentsView
+                || type == .vStack || type == .hStack || type == .zStack
                 || (type == .grid && currentChildren[0].value(.isFrameContent)?.bool == true)
         else { return nil }
         return currentChildren[0]

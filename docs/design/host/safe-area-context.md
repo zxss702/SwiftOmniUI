@@ -82,6 +82,16 @@ when they would change the native bar's proposal. Bottom and side bars add no
 implicit backdrop. The context has independent keyboard storage; these desktop
 paths do not fabricate a software-keyboard inset when none is supplied.
 
+An unpadded, unconstrained VStack/HStack/ZStack with one current child forwards
+that child's safe-area role, like a frame wrapper. A ScrollView inside it keeps
+the full proposal and consumes the bar as document/indicator margins; an outer
+background therefore continues behind a transparent bottom or side bar.
+Previously the stack consumed the contribution before the scroller could see
+it, shortening the viewport and exposing the window background under the bar.
+Ordinary content still uses the safe allocation. Padding, finite frames,
+clipping and multi-child stacks keep their own layout scope. This forwarding
+does not promote a local bar into native toolbar chrome or add a bar background.
+
 The pasted Windows stack identifies an unhandled XAML/fail-fast path, but does
 not establish a unique cause. This change removes visible measurement-time
 margin mutations and synchronous native scroller measurement during arrange,
