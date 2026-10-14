@@ -128,7 +128,10 @@ column. The trailing split stays inline. A detail width of zero removes that
 native column, and `.detailOnly` hides the middle column so detail takes the
 remaining room. Page identities and business navigation state stay in Swift.
 
-Both pane boundaries use native `Thumb` drag capture. Minimum/ideal/maximum
+Both pane boundaries use native `Thumb` drag capture. A transparent template
+keeps the grip invisible in every state. The grip overlays the pane's edge,
+contributes no desired size or column width, and uses the native horizontal
+resize cursor on hover and during pointer capture. Minimum/ideal/maximum
 bounds choose the initial pane width and constrain resizing; unchanged bounds
 do not overwrite the user's width. Content minimum/maximum constrain the
 remaining column. Native owners release their children before a page moves

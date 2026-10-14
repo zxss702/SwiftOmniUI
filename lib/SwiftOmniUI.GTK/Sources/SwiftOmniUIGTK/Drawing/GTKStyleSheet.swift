@@ -29,6 +29,16 @@ enum GTKStyleSheet {
         return name
     }
 
+    /// GtkPaned's narrow handle already extends its native hit area over both
+    /// columns. Remove its allocation and drawing without disabling that input.
+    static var splitColumns: String {
+        let name = "swiftomniui-split-columns"
+        write(name, "", states:
+            "paned.\(name) > separator { min-width: 0; min-height: 0; padding: 0; margin: 0; border: none; "
+                + "background: none; box-shadow: none; outline: none; -gtk-icon-source: none; }\n")
+        return name
+    }
+
     /// The class giving a widget `insets` of room between its edge and its content.
     static func padding(_ insets: EdgeInsets) -> String {
         let sides = [insets.top, insets.right, insets.bottom, insets.left].map { max(0, $0.isFinite ? $0 : 0) }

@@ -13,6 +13,8 @@
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Content.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
+#include <winrt/Microsoft.UI.Xaml.Markup.h>
+#include <winrt/Microsoft.UI.Input.h>
 #include <algorithm>
 #include <cmath>
 #include <winrt/Microsoft.UI.Windowing.h>
@@ -109,6 +111,30 @@ namespace {
 
     using SplitWidths = winrt::Windows::Foundation::Collections::IVector<double>;
 
+    // Only the transparent Thumb is a hit target. Its overlay contributes no
+    // desired size, and the cursor follows native hit testing and drag capture.
+    struct SplitGrip : controls::PanelT<SplitGrip> {
+        explicit SplitGrip(bool trailing) : trailing(trailing) {}
+
+        void resizeCursor() {
+            ProtectedCursor(winrt::Microsoft::UI::Input::InputSystemCursor::Create(
+                winrt::Microsoft::UI::Input::InputSystemCursorShape::SizeWestEast));
+        }
+
+        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size room) {
+            Children().GetAt(0).Measure({6, room.Height});
+            return {0, 0};
+        }
+
+        winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size room) {
+            auto width = std::min(6.0f, room.Width);
+            Children().GetAt(0).Arrange({trailing ? 0.0f : room.Width - width, 0, width, room.Height});
+            return room;
+        }
+
+        bool trailing;
+    };
+
     // The native pane remembers a user-resized width independently of the modifier's ideal.
     // Tag holds minimum, ideal, maximum, user width, breakpoint, and content minimum/maximum.
     void sizeSplit(controls::SplitView const &split) {
@@ -117,21 +143,20 @@ namespace {
         auto width = split.ActualWidth();
         bool alone = content.Visibility() == xaml::Visibility::Collapsed;
         auto pane = split.Pane().as<controls::Grid>();
-        auto grip = pane.Children().GetAt(1).as<controls::Primitives::Thumb>();
+        auto grip = pane.Children().GetAt(1);
         bool resizable = widths.GetAt(0) < widths.GetAt(2);
         bool beside = widths.GetAt(4) == 0 || alone
-            || width >= std::max(widths.GetAt(4), widths.GetAt(0) + widths.GetAt(5) + (resizable ? grip.Width() : 0));
+            || width >= std::max(widths.GetAt(4), widths.GetAt(0) + widths.GetAt(5));
         split.DisplayMode(beside ? controls::SplitViewDisplayMode::Inline : controls::SplitViewDisplayMode::Overlay);
         bool handleShown = split.IsPaneOpen() && beside && !alone && resizable;
-        auto gutter = handleShown ? grip.Width() : 0;
         grip.Visibility(handleShown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
         auto length = std::clamp(widths.GetAt(3), widths.GetAt(0), widths.GetAt(2));
         if (width > 0 && beside) {
-            auto available = std::max(0.0, width - gutter);
+            auto available = width;
             auto least = std::max(widths.GetAt(0), available - widths.GetAt(6));
             auto most = std::max(least, std::min(widths.GetAt(2), available - widths.GetAt(5)));
-            length = alone ? width : std::min(available, std::clamp(length, least, most)) + gutter;
-        } else { length += gutter; }
+            length = alone ? width : std::min(available, std::clamp(length, least, most));
+        }
         if (split.OpenPaneLength() != length) split.OpenPaneLength(length);
     }
 
@@ -379,23 +404,25 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
         split.Tag(winrt::single_threaded_vector<double>({0, 256, INFINITY, 256, expandsAt, 0, INFINITY}));
         split.Content(rows({true, false}));
         controls::Grid pane;
-        controls::ColumnDefinition faceColumn, handleColumn;
-        faceColumn.Width(xaml::GridLengthHelper::FromValueAndType(1, xaml::GridUnitType::Star));
-        handleColumn.Width(xaml::GridLengthHelper::Auto());
-        pane.ColumnDefinitions().Append(trailing ? handleColumn : faceColumn);
-        pane.ColumnDefinitions().Append(trailing ? faceColumn : handleColumn);
         controls::ContentControl face;
         face.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
         face.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
-        controls::Grid::SetColumn(face, trailing ? 1 : 0);
         controls::Primitives::Thumb grip;
-        grip.Width(6);
-        grip.Background(media::SolidColorBrush(winrt::Windows::UI::Color{32, 128, 128, 128}));
+        grip.Template(xaml::Markup::XamlReader::Load(
+            LR"(<ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                                 TargetType="Thumb"><Grid Background="Transparent" /></ControlTemplate>)")
+            .as<controls::ControlTemplate>());
         xaml::Automation::AutomationProperties::SetName(grip, trailing ? L"Resize detail column" : L"Resize sidebar column");
+        grip.UseSystemFocusVisuals(false);
         grip.VerticalAlignment(xaml::VerticalAlignment::Stretch);
-        controls::Grid::SetColumn(grip, trailing ? 0 : 1);
+        auto gripOverlay = winrt::make<SplitGrip>(trailing).as<controls::Panel>();
+        gripOverlay.Children().Append(grip);
+        gripOverlay.Loaded(guarded("setting a split resize cursor",
+            [](IInspectable const &sender, xaml::RoutedEventArgs const &) {
+                winrt::get_self<SplitGrip>(sender.as<controls::Panel>())->resizeCursor();
+            }));
         pane.Children().Append(face);
-        pane.Children().Append(grip);
+        pane.Children().Append(gripOverlay);
         split.Pane(pane);
         auto weak = winrt::make_weak(split);
         grip.DragDelta(guarded("resizing a split column",
@@ -403,11 +430,10 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
                 if (auto split = weak.get()) {
                     auto widths = split.Tag().as<SplitWidths>();
                     auto least = widths.GetAt(0);
-                    auto gutter = split.Pane().as<controls::Grid>().Children().GetAt(1).as<controls::Primitives::Thumb>().Width();
-                    auto available = std::max(0.0, split.ActualWidth() - gutter);
+                    auto available = std::max(0.0, split.ActualWidth());
                     least = std::max(least, available - widths.GetAt(6));
                     auto most = std::max(least, std::min(widths.GetAt(2), available - widths.GetAt(5)));
-                    auto length = split.OpenPaneLength() - gutter + (trailing ? -1 : 1) * args.HorizontalChange();
+                    auto length = split.OpenPaneLength() + (trailing ? -1 : 1) * args.HorizontalChange();
                     widths.SetAt(3, std::clamp(length, least, most));
                     sizeSplit(split);
                 }
@@ -449,11 +475,7 @@ extern "C" double swiftomniui_winui_split_minimum_width(SwiftOmniUIObjectRef han
         auto widths = split.Tag().as<SplitWidths>();
         bool contentShown = split.Content().as<controls::Grid>().Visibility() == xaml::Visibility::Visible;
         auto minimum = contentShown ? widths.GetAt(5) : 0;
-        if (split.IsPaneOpen()) {
-            minimum += widths.GetAt(0);
-            if (contentShown && widths.GetAt(0) < widths.GetAt(2))
-                minimum += split.Pane().as<controls::Grid>().Children().GetAt(1).as<controls::Primitives::Thumb>().Width();
-        }
+        if (split.IsPaneOpen()) minimum += widths.GetAt(0);
         return minimum;
     } catch (...) { report("reading split column bounds"); return 0; }
 }

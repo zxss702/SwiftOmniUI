@@ -238,6 +238,8 @@ private final class GTKColumnPaned: GTKView {
     init(trailing: Bool) {
         self.trailing = trailing
         super.init { _ in gtk_paned_new(GTK_ORIENTATION_HORIZONTAL) }
+        gtk_widget_add_css_class(widget, GTKStyleSheet.splitColumns)
+        gtk_paned_set_wide_handle(native, 0)
         gtk_paned_set_resize_start_child(native, trailing ? 1 : 0)
         gtk_paned_set_resize_end_child(native, trailing ? 0 : 1)
         gtk_paned_set_shrink_start_child(native, 1)

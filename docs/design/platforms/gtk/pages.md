@@ -108,6 +108,9 @@ trailing edge. Each pane retains its user's width, starting at the modifier's
 ideal and clamped to the minimum/maximum and the neighboring column's room.
 GtkPaned owns pointer capture and keyboard resizing. Width requests are placed
 on native slot wrappers, leaving the authored page's requests intact.
+Its narrow separator has zero allocated width and no drawing; GtkPaned's native
+extended hit area overlays the column boundary and keeps the `col-resize`
+cursor. Hover, press and focus do not add a visible separator or reserve room.
 
 A detail width of zero removes the auxiliary pane. Column visibility also
 controls the middle column and every visible column's appearance lifecycle.
