@@ -131,7 +131,7 @@ WinUI completes the fill in the viewport callback when measurement is
 allowed; a callback within another layout or patch resumes after that pass.
 It waits for requested fragments to commit before interpreting missing
 native children as empty content, then arranges the resulting window once.
-Source changes keep surviving rows'
+GTK and WinUI source changes keep surviving rows'
 measurement caches. Their native revisions, placement values and cross-axis
 proposals decide which rows need fresh measurement.
 WinUI's ideal-size and window minimum-size queries read committed row

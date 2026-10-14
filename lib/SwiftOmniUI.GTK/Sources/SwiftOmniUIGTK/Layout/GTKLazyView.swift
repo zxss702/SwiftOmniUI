@@ -30,8 +30,7 @@ class GTKLazyView: GTKTravellingLayout {
 
     /// Natural sizes survive scrolling; content invalidation or a changed
     /// cross-axis proposal clears only the measurements that can be stale.
-    var measured: [String: (proposal: Double?, size: LayoutSize)] = [:]
-    var measuredRevision = -1
+    var measured: [String: (proposal: Double?, size: LayoutSize, revision: Int)] = [:]
     var measuredAcross: Double?
     var naturalAcross = 44.0
     var anchorTarget: Double?
@@ -57,14 +56,8 @@ class GTKLazyView: GTKTravellingLayout {
     func setItems(_ items: [(identity: String, item: GTKLayoutItem)]) {
         let now = Dictionary(items.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
         guard now.keys != mounted.keys || now.contains(where: {
-            mounted[$0.key]?.view !== $0.value.view || mounted[$0.key]?.values != $0.value.values
+            mounted[$0.key]?.arranges(like: $0.value) != true
         }) else { return }
-        if now.contains(where: { identity, item in
-            mounted[identity].map { $0.values != item.values } ?? false
-        }) {
-            cells.extents.reset()
-            cells.runs.reset()
-        }
         for (identity, previous) in mounted {
             if now[identity]?.view !== previous.view || now[identity]?.values != previous.values {
                 measured.removeValue(forKey: identity)
@@ -74,7 +67,6 @@ class GTKLazyView: GTKTravellingLayout {
         for item in items { item.item.view.placingLayout = self }
         setChildren(items.map(\.item.view))
         invalidateMeasurements()
-        measuredRevision = measurements.revision
     }
 
     /// The nearest scroller clipping this run on its own axis, or none: a
@@ -127,7 +119,6 @@ class GTKLazyView: GTKTravellingLayout {
             if self.geometryChanged {
                 self.geometryChanged = false
                 self.invalidateMeasurements()
-                self.measuredRevision = self.measurements.revision
                 // GTK updates the adjustment's bounds during allocation. Applying an anchor now
                 // would use the previous extent and the next allocation would clamp it again.
                 // allocate schedules the next retell after the new document has been committed.
@@ -197,6 +188,19 @@ class GTKLazyView: GTKTravellingLayout {
 
     /// GTK asks the run's measure again where its places moved.
     override func measure(across: Bool, forSize: Int32) -> Double {
+        // GTK can invalidate an intrinsic size without a core patch (native input,
+        // font or CSS changes). Revalidate the retained proposals through GTK's
+        // requisition cache when GTK asks for measurement, never on allocation-only
+        // animation ticks. In particular, do not turn a parent resize into a
+        // blanket loss of every row's arithmetic cache.
+        for (identity, item) in mounted where !item.departing {
+            guard let cached = measured[identity] else { continue }
+            let size = item.size(offered: cached.proposal)
+            if size != cached.size || cached.revision != item.view.measurementRevision {
+                measured[identity] = (cached.proposal, size, item.view.measurementRevision)
+                cells.measurements += 1
+            }
+        }
         retell()
         return super.measure(across: across, forSize: forSize)
     }
@@ -247,18 +251,18 @@ final class GTKLazyStackView: GTKLazyView {
             measured = [:]
             measuredAcross = across
         }
-        if measuredRevision != measurements.revision { measured = [:] }
         for (identity, item) in mounted {
             guard !item.departing, cells.position(of: identity) != nil else { continue }
             let margin = item.values.margin
             let proposal: Double? = axis == .vertical
                 ? max(0, across - margin.left - margin.right) : nil
             let size: LayoutSize
-            if let cached = measured[identity], cached.proposal == proposal {
+            if let cached = measured[identity], cached.proposal == proposal,
+               cached.revision == item.view.measurementRevision {
                 size = cached.size
             } else {
                 size = item.size(offered: proposal)
-                measured[identity] = (proposal, size)
+                measured[identity] = (proposal, size, item.view.measurementRevision)
                 cells.measurements += 1
             }
             let extent = axis == .vertical
@@ -284,7 +288,6 @@ final class GTKLazyStackView: GTKLazyView {
             measurements.invalidate()
             geometryChanged = true
         }
-        measuredRevision = measurements.revision
         for (identity, item) in mounted {
             let margin = item.values.margin
             guard let place = cells.position(of: identity), let size = measured[identity]?.size else { continue }
@@ -411,7 +414,6 @@ final class GTKLazyGridView: GTKLazyView {
         let widths = columns
         guard !widths.isEmpty else { return }
         let revision = cells.runs.revision
-        if measuredRevision != measurements.revision { measured = [:] }
         var runExtents: [Int: Double] = [:]
         for (identity, item) in mounted {
             guard let place = cells.position(of: identity) else { continue }
@@ -420,11 +422,12 @@ final class GTKLazyGridView: GTKLazyView {
             let proposal: Double? = axis == .vertical
                 ? max(0, widths[track] - margin.left - margin.right) : nil
             let size: LayoutSize
-            if let cached = measured[identity], cached.proposal == proposal {
+            if let cached = measured[identity], cached.proposal == proposal,
+               cached.revision == item.view.measurementRevision {
                 size = cached.size
             } else {
                 size = item.size(offered: proposal)
-                measured[identity] = (proposal, size)
+                measured[identity] = (proposal, size, item.view.measurementRevision)
                 cells.measurements += 1
             }
             let extent = axis == .vertical
@@ -443,7 +446,6 @@ final class GTKLazyGridView: GTKLazyView {
             measurements.invalidate()
             geometryChanged = true
         }
-        measuredRevision = measurements.revision
         var trackOrigins: [Double] = []
         let extent = widths.reduce(0, +) + Double(max(widths.count - 1, 0)) * trackSpacing
         var start = Extent.start(option: trackAlignment.rawValue, extent: extent,

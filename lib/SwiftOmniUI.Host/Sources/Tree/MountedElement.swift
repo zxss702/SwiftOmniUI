@@ -110,6 +110,7 @@ import CRT
         properties = patch.properties
         native = nil
         native = tree.makeNative(self)
+        tree.remember(self)
         tree.tally?.made += 1
         apply(patch)
     }
@@ -165,6 +166,7 @@ import CRT
         }
 
         if case .replace(let driven) = patch.driven {
+            tree.replaceBindings(on: self, with: driven)
             self.driven = driven
             drivenValues = drivenValues.filter { driven[$0.key] != nil }
         }
@@ -368,6 +370,7 @@ import CRT
     public func leave() {
         if let tree {
             for state in wornStates { tree.stateChannels.detach(state) }
+            tree.forget(self)
             tree.removeMotions(mount: mount)
         }
         wornStates = []
@@ -457,13 +460,23 @@ import CRT
         for child in children { child.forgetForTesting(where: matches) }
     }
 
-    /// Presents one frame in one walk: bound states' values and moved properties, each parent arranged once.
+    /// Presents one frame's affected branches: bound states and moved properties, each parent arranged once.
     /// Design: docs/design/host/runtime.md#one-frame
     @discardableResult
     public func applyFrame(
         states valuesByState: [Int32: HostStateValue],
         properties propertiesByMount: [UInt64: Set<Prop>]
     ) -> FrameImpact {
+        let affected = tree?.frameMounts(states: valuesByState, properties: propertiesByMount) ?? []
+        return applyFrame(states: valuesByState, properties: propertiesByMount, affected: affected)
+    }
+
+    private func applyFrame(
+        states valuesByState: [Int32: HostStateValue],
+        properties propertiesByMount: [UInt64: Set<Prop>],
+        affected: Set<UInt64>
+    ) -> FrameImpact {
+        guard affected.contains(mount) else { return .none }
         var changed = propertiesByMount[mount] ?? []
 
         for (property, binding) in driven where binding.mode != .in {
@@ -475,17 +488,24 @@ import CRT
         let own = changed.isEmpty ? FrameImpact.none : presentFrame(changed)
         var descendants = FrameImpact.none
 
-        for child in children {
-            descendants = descendants.union(child.applyFrame(states: valuesByState, properties: propertiesByMount))
+        for child in children where affected.contains(child.mount) {
+            descendants = descendants.union(child.applyFrame(
+                states: valuesByState, properties: propertiesByMount, affected: affected))
         }
 
         // A child's place is its parent's business; an element with no view passes it up.
-        let restacked = restack()
-        if own.content || descendants.arrangement || restacked { native.arrangeChildren() }
+        let restacked = descendants.content ? restack() : false
+        // Opacity and drawing transforms already reach the native view in presentFrame.
+        // Reassembling its children here would turn every transition tick into a layout update.
+        let arrangesOwn = own.content && (!native.presentsView || !changed.isSubset(of: Self.drawingFrameProperties))
+        if arrangesOwn || descendants.arrangement || restacked { native.arrangeChildren() }
         guard native.presentsView else { return own.union(descendants) }
         descendants.arrangement = false
         return own.union(descendants)
     }
+
+    private static let drawingFrameProperties = Set<Prop>([.opacity, .blur, .renderTransform])
+        .union(transformProperties)
 
     /// Presents `changed` on a frame and says what that asks around the element, the same on every host: its own
     /// presentation; its parent's arrangement where it moved in its slot or shows no view of its own, being drawn

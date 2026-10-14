@@ -76,7 +76,7 @@ display cycle, in this order, in every runtime:
                                                    the channels' reports reach the core
     3  CoreLink.cycle(now)                         engines and conversions run in the core;
                                                    StateChannels take the changes
-    4  one walk of the mounted tree                each element's native setters once,
+    4  one walk of the affected branches           each element's native setters once,
                                                    each changed parent arranged once,
                                                    after its children;
                                                    finished animations answer their waiters
@@ -93,6 +93,19 @@ of the elements around it is decided once, for every host
 parent arranges again where a value that places it moved, or where it shows
 no view of its own and is drawn by its parent's; and the window's chrome is
 composed again where it shows what moved (`WindowChrome.follows`).
+
+The mounted tree indexes output state bindings and mount numbers. A frame
+finds its changed elements and their ancestors through those indexes; it
+does not inspect unrelated document, page or row subtrees. Binding replacement
+and unmounting update the indexes, including plain bindings and multiple
+properties wearing the same state. Parent arrangement still follows its
+children in tree order, and each affected element is presented once per batch.
+
+Opacity and drawing transforms update a native view without reassembling
+its children. They do not change its measured size or placement values.
+Elements drawn by their parent, such as text runs, still pass their changes
+up for recomposition. Widths, heights and other arrangement properties
+retain their layout updates; drawing order still follows a changed zIndex.
 
 Finished described animations run their landing callbacks after their final
 values have been presented. A callback can remove a child and clear its motion

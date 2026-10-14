@@ -306,6 +306,124 @@ final class MountedTreeTests: XCTestCase {
         XCTAssertTrue(bar.windowChrome, "a bar's colour is the window's chrome")
     }
 
+    @MainActor
+    func testDrawingFramesVisitOnlyChangedBranchesWithoutReassemblingNativeChildren() throws {
+        let (tree, log) = Self.tree()
+        var row = HostPatch(id: .manual("row"), type: .hStack)
+        row.children = .arranged([HostPatch(id: .manual("words"), type: .text)])
+        var sidebar = HostPatch(id: .manual("sidebar"), type: .lazyVStack)
+        sidebar.children = .arranged([row])
+        var root = HostPatch(id: .manual("root"), type: .hStack)
+        root.children = .arranged([sidebar, Self.stack("document", (0..<1_000).map { "line-\($0)" })])
+        tree.apply(root, complete: true)
+        let mountedRow = try XCTUnwrap(tree.root?.first(id: row.id))
+        let branch = try XCTUnwrap(mountedRow.parent)
+        let rootMount = try XCTUnwrap(tree.root?.mount)
+        let changes: [UInt64: Set<Prop>] = [mountedRow.mount: [.opacity, .translationY]]
+        XCTAssertEqual(tree.frameMounts(states: [:], properties: changes), [mountedRow.mount, branch.mount, rootMount])
+        log.arranged.removeAll()
+        log.presented.removeAll()
+
+        for _ in 0..<60 {
+            let impact = tree.present(states: [:], properties: changes)
+            XCTAssertTrue(impact.content)
+            XCTAssertFalse(impact.arrangement)
+        }
+        XCTAssertEqual(log.presented, Array(repeating: "row", count: 60))
+        XCTAssertEqual(log.arranged, [], "drawing an offset must not rebuild the button, text runs or lazy items")
+    }
+
+    @MainActor
+    func testDrawingAViewlessRunStillReassemblesItsNativeLabel() throws {
+        let (tree, log) = Self.tree(viewless: ["run"])
+        var label = HostPatch(id: .manual("label"), type: .text)
+        label.children = .arranged([HostPatch(id: .manual("run"), type: .span)])
+        tree.apply(label, complete: true)
+        let run = try XCTUnwrap(tree.root?.children.first)
+        log.arranged.removeAll()
+        tree.present(states: [:], properties: [run.mount: [.opacity]])
+        XCTAssertEqual(log.arranged, ["run", "label"], "a run has no native drawing of its own")
+    }
+
+    @MainActor
+    func testFrameIndexFollowsBindingReplacementAndRemoval() throws {
+        let (tree, log) = Self.tree()
+        var child = HostPatch(id: .manual("child"), type: .text)
+        child.driven = .replace([
+            .width: HostStateBinding(state: 700, mode: .out, kind: .plain),
+            .height: HostStateBinding(state: 700, mode: .out, kind: .plain),
+        ])
+        var root = HostPatch(id: .manual("root"), type: .vStack)
+        root.children = .arranged([child])
+        tree.apply(root, complete: true)
+        let mounted = try XCTUnwrap(tree.root?.children.first)
+        let rootMount = try XCTUnwrap(tree.root?.mount)
+        let expected: Set<UInt64> = [rootMount, mounted.mount]
+        XCTAssertEqual(tree.frameMounts(states: [700: .lanes([20])], properties: [:]), expected)
+
+        // Removing one property must not detach another property wearing the same state.
+        child.driven = .replace([
+            .width: HostStateBinding(state: 701, mode: .out, kind: .plain),
+            .height: HostStateBinding(state: 700, mode: .out, kind: .plain),
+        ])
+        root.children = .changed([child])
+        tree.apply(root, complete: false)
+        XCTAssertEqual(tree.frameMounts(states: [700: .lanes([30])], properties: [:]), expected)
+        XCTAssertEqual(tree.frameMounts(states: [701: .lanes([40])], properties: [:]), expected)
+        tree.present(states: [700: .lanes([30]), 701: .lanes([40])], properties: [:])
+        XCTAssertEqual(mounted.number(.height), 30)
+        XCTAssertEqual(mounted.number(.width), 40)
+
+        child.driven = .replace([.width: HostStateBinding(state: 701, mode: .in, kind: .plain)])
+        root.children = .changed([child])
+        tree.apply(root, complete: false)
+        XCTAssertTrue(tree.frameMounts(states: [700: .lanes([1]), 701: .lanes([2])], properties: [:]).isEmpty)
+
+        root.children = .arranged([])
+        tree.apply(root, complete: false)
+        log.presented.removeAll()
+        tree.present(states: [:], properties: [mounted.mount: [.opacity]])
+        XCTAssertEqual(log.presented, [], "an old mount held by a client has left the presentation index")
+
+        child.driven = .replace([.width: HostStateBinding(state: 700, mode: .out, kind: .plain)])
+        root.children = .arranged([child])
+        tree.apply(root, complete: false)
+        let replacement = try XCTUnwrap(tree.root?.children.first)
+        XCTAssertNotEqual(replacement.mount, mounted.mount)
+        XCTAssertEqual(tree.frameMounts(states: [700: .lanes([50])], properties: [:]), [rootMount, replacement.mount])
+        tree.present(states: [700: .lanes([50])], properties: [:])
+        XCTAssertEqual(log.presented, ["child"])
+        XCTAssertEqual(replacement.number(.width), 50)
+    }
+
+    @MainActor
+    func testAFramePresentsEveryWearerOfAStateOnceInTreeOrder() throws {
+        let (tree, log) = Self.tree()
+        var first = HostPatch(id: .manual("first"), type: .text)
+        first.driven = .replace([
+            .width: HostStateBinding(state: 700, mode: .out, kind: .plain),
+            .height: HostStateBinding(state: 700, mode: .out, kind: .plain),
+        ])
+        var last = HostPatch(id: .manual("last"), type: .text)
+        last.driven = .replace([.width: HostStateBinding(state: 700, mode: .out, kind: .plain)])
+        var stack = HostPatch(id: .manual("stack"), type: .vStack)
+        stack.children = .arranged([first, last])
+        tree.apply(stack, complete: true)
+        log.presented.removeAll()
+        log.arranged.removeAll()
+        tree.present(states: [700: .lanes([20])], properties: [:])
+        XCTAssertEqual(log.presented, ["first", "last"])
+        XCTAssertEqual(log.arranged, ["first", "last", "stack"])
+
+        // One subscriber leaving must not detach the state's remaining subscriber.
+        stack.children = .arranged([last])
+        tree.apply(stack, complete: false)
+        log.presented.removeAll()
+        tree.present(states: [700: .lanes([30])], properties: [:])
+        XCTAssertEqual(log.presented, ["last"])
+        XCTAssertEqual(try XCTUnwrap(tree.root?.children.first).number(.width), 30)
+    }
+
     /// A grid's and a ZStack's children stand in the order they are drawn: by `zIndex`, ties in the order
     /// written. A sparse change restacks them; a stack's children never overlap and keep the order written.
     @MainActor
@@ -620,6 +738,7 @@ private final class NativeLog {
     var arranged: [String] = []
     var left: [String] = []
     var presentedWriting: [Bool] = []
+    var presented: [String] = []
 }
 
 /// A native half that records what the tree asks of it.
@@ -646,6 +765,7 @@ private final class RecordingNative: NativeElement {
     func animates(_ property: Prop) -> Bool { false }
     func applied(changed: Set<Prop>, wasDescribed: Bool) { log.applied.append(name) }
     func presentFrame(_ changed: Set<Prop>) {
+        log.presented.append(name)
         log.presentedWriting.append(ProgramWrite.isWriting)
     }
     func arrangeChildren() { log.arranged.append(name) }

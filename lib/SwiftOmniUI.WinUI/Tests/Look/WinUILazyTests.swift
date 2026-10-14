@@ -12,6 +12,7 @@ import WinSDK
 
 /// The modified source mirrors a file tree beside an ordinary settings card.
 @MainActor private final class ModifiedLazyBuilds {
+    var calls = 0
     var numbers: Set<Int> = []
     var rows: [Int: ModifiedLazyInputRow] = [:]
 }
@@ -80,6 +81,67 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testFolderAnimationFramesReuseRowsAndMeasurements() throws {
+        try onUIThread {
+            let original = Array(0..<1_000)
+            let rows = State(wrappedValue: original)
+            let builds = ModifiedLazyBuilds()
+            let clock = TestClock()
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            builds.calls += 1
+                            builds.numbers.insert(number)
+                            return Button {} label: {
+                                HStack {
+                                    Image(systemName: "folder")
+                                    Text("File \(number)")
+                                    Spacer()
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .frame(height: 28)
+                        }
+                        .transition(.opacity.combined(with: .offset(y: -48)))
+                    }
+                    .animation(.eased(200, .linear))
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            clock.now += 200
+            for _ in 0..<12 { host.step(); host.frame() }
+            let identity = lazy.cells.identities[6]
+            let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
+            let initialY = retained.placedFrame.y
+            for expanded in [true, false] {
+                let began = clock.now
+                let before = retained.placedFrame.y
+                rows.wrappedValue = expanded
+                    ? Array(0..<3) + [1_000, 1_001] + Array(3..<1_000) : original
+                for _ in 0..<12 { host.step(); host.frame() }
+                let measurements = lazy.cells.measurements
+                let descriptions = builds.calls
+                let target = initialY + (expanded ? 56 : 0)
+                for tick in stride(from: 20.0, through: 180.0, by: 20) {
+                    clock.now = began + tick
+                    host.frame()
+                    host.step()
+                    XCTAssertTrue(lazy.mounted[identity]?.view === retained)
+                    XCTAssertEqual(retained.placedFrame.y, before + (target - before) * tick / 200, accuracy: 1)
+                    XCTAssertEqual(lazy.cells.measurements, measurements, "moving rows reuse their measured sizes")
+                    XCTAssertEqual(builds.calls, descriptions, "animation ticks must not describe the row source")
+                }
+                clock.now = began + 200
+                for _ in 0..<12 { host.step(); host.frame() }
+                XCTAssertEqual(retained.placedFrame.y, target, accuracy: 1)
+                XCTAssertLessThan(builds.numbers.count, 80, "only the viewport and its overscan are built")
+            }
+        }
+    }
+
     func testAnEmptyFirstRowDoesNotBlockTheMeasuredWindow() throws {
         try onUIThread {
             let builds = ModifiedLazyBuilds()

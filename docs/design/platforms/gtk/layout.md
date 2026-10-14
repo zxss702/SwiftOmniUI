@@ -35,6 +35,14 @@ size would hold the window at the size of its content. Each measure GTK asks
 for measures the children again; GTK keeps each child's own answer until
 something about it changes, so asking again costs little.
 
+Lazy containers also retain each mounted row's arithmetic size by identity,
+proposal and the row's measurement revision. A source update or a sibling's
+insertion does not discard surviving rows' sizes. Allocation-only animation
+frames reuse them; changed placement values or content invalidate the
+affected row. When GTK requests a native measurement, the lazy container
+revalidates retained proposals through GTK's own requisition cache, so native
+text, font and CSS changes can still update row extents without a core patch.
+
 ## Measuring a widget
 
 A widget's size counts its CSS padding, border and padding: a button measured

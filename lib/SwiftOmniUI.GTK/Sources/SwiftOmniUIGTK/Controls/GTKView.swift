@@ -18,6 +18,9 @@ class GTKView {
     /// The layout that places this view, which a place written between passes asks to allocate again.
     weak var placingLayout: GTKLayoutView?
 
+    /// Content-size invalidation belongs to this view, not to every row in its lazy parent.
+    var measurementRevision = 0
+
     /// Logical ancestry survives native toolbar hosting.
     weak var sourceElement: MountedElement?
     var safeAreaContext: SafeAreaContext? {
@@ -250,6 +253,7 @@ class GTKView {
 
     /// Asks GTK to measure this widget again, and every widget above it.
     func invalidateMeasure() {
+        measurementRevision &+= 1
         gtk_widget_queue_resize(widget)
     }
 

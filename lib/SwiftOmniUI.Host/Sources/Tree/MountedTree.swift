@@ -138,6 +138,12 @@
     private(set) var languageDirection: LayoutDirection?
     private var patchReducesMotion: Bool?
 
+    private struct MountedReference {
+        weak var element: MountedElement?
+    }
+    private var mounted: [UInt64: MountedReference] = [:]
+    private var stateMounts: [Int32: Set<UInt64>] = [:]
+
     /// Whether a render since the windows last composed their chrome touched anything outside lazy runs' rows: a
     /// window composes its chrome again only then. The host clears it once its windows have.
     public var chromeMayChange = true
@@ -207,7 +213,7 @@
         root?.directionTurned(arrangingItself: true)
     }
 
-    /// Presents one frame's batch in one walk of the tree, every write in it the program's.
+    /// Presents one frame's affected branches, every write in it the program's.
     /// Design: docs/design/host/patches.md#program-write
     @discardableResult
     public func present(states: [Int32: HostStateValue], properties: [UInt64: Set<Prop>]) -> FrameImpact {
@@ -254,6 +260,38 @@
         precondition(nextMount < .max, "the mounted tree ran out of numbers")
         nextMount += 1
         return nextMount
+    }
+
+    func remember(_ element: MountedElement) {
+        mounted[element.mount] = MountedReference(element: element)
+    }
+
+    func replaceBindings(on element: MountedElement, with bindings: [Prop: HostStateBinding]) {
+        let previous = Set(element.driven.values.filter { $0.mode != .in }.map(\.state))
+        let next = Set(bindings.values.filter { $0.mode != .in }.map(\.state))
+        for state in previous.subtracting(next) {
+            stateMounts[state]?.remove(element.mount)
+            if stateMounts[state]?.isEmpty == true { stateMounts[state] = nil }
+        }
+        for state in next.subtracting(previous) { stateMounts[state, default: []].insert(element.mount) }
+    }
+
+    func forget(_ element: MountedElement) {
+        replaceBindings(on: element, with: [:])
+        mounted[element.mount] = nil
+    }
+
+    /// Find the changed elements and their ancestry without inspecting unrelated subtrees.
+    /// The index includes every output binding, including plain (non-animation-channel) states.
+    func frameMounts(states: [Int32: HostStateValue], properties: [UInt64: Set<Prop>]) -> Set<UInt64> {
+        var direct = Set(properties.keys)
+        for state in states.keys { direct.formUnion(stateMounts[state] ?? []) }
+        var affected: Set<UInt64> = []
+        for mount in direct {
+            var element = mounted[mount]?.element
+            while let each = element, affected.insert(each.mount).inserted { element = each.parent }
+        }
+        return affected
     }
 
     /// Drops the animations of an element that leaves: its properties' and its place's.

@@ -155,6 +155,7 @@ class GTKLayoutView: GTKPanelView {
 
     /// Forgets the sizes this layout keeps.
     func forgetMeasurements() {
+        measurementRevision &+= 1
         measurements.invalidate()
     }
 
