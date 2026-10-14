@@ -306,7 +306,13 @@ class WinUILazyView: WinUITravellingLayout {
             if self.viewport == nil, self.isAttached, let scroll = self.watching {
                 var raw = [Double](repeating: 0, count: 6)
                 swiftomniui_winui_scroller_viewport(scroll.scroller.handle, self.handle, &raw)
-                let rect = Rect(raw[0], raw[1], raw[2], raw[3])
+                // A newly attached ScrollViewer can report a zero effective
+                // viewport before its presenter runs. Its own allocated room
+                // is already known; realize that first window without waiting
+                // for a resize or a second native viewport event.
+                let nativeRoom = scroll.scroller.laidOutFrame
+                let rect = Rect(raw[0], raw[1], raw[2] > 0 ? raw[2] : nativeRoom.width,
+                                raw[3] > 0 ? raw[3] : nativeRoom.height)
                 if rect.width > 0, rect.height > 0,
                    rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite {
                     self.announcedRect = rect

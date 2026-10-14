@@ -144,13 +144,18 @@ final class WinUIScrollView: WinUILayoutView {
 
     override func safeAreaChanged() {
         if let context = safeAreaContext { _ = resolve(in: context.layout) }
+        super.safeAreaChanged()
     }
 
     private func resolve(in bounds: Rect) -> Rect {
         let context = layoutSafeArea(in: bounds)
         let viewport = box.clips ? bounds : context.viewport(in: bounds, axes: orientation)
         let insets = SafeAreaContext.insets(of: context.safe, in: viewport)
-        document.consumedInsets = context.consumed + insets
+        let consumed = context.consumed + insets
+        if document.consumedInsets != consumed {
+            document.consumedInsets = consumed
+            document.invalidateArrange()
+        }
         let padding = SafeAreaArithmetic.physicalInsets(writtenPadding, direction: direction) + insets
         if document.layoutPadding != padding {
             document.layoutPadding = padding

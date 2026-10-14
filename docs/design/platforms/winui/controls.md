@@ -308,4 +308,5 @@ the file decoded to premultiplied RGBA by the platform's imaging component,
 or an SVG's ready Direct2D raster at its intrinsic size. Both share the
 synchronous decoding caches with native Image. Toolbar and inline pictures
 use the same ready sources. Inherited font changes leave a file image's
-source in place; symbol font changes still update the native `FontIcon`.
+source in place; symbol font and foreground changes update a native
+`TextBlock` using the system's Segoe Fluent Icons font inside the Viewbox.

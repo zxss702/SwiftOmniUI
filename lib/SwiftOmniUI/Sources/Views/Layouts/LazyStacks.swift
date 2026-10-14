@@ -318,18 +318,19 @@ struct LazyHStackElement: StackBase {
             }
         }
         let boundaries = starts
-        let positions = source.positions
+        let positions = source.sequence
+        let rowSpacing = node.props[.spacing]?.number
         let rowStack: PropValue? = node.type == .lazyVStack || node.type == .lazyHStack
-            ? .numbers([node.type == .lazyHStack ? 1 : 0, node.props[.spacing]?.number ?? 0]) : nil
+            ? .numbers([node.type == .lazyHStack ? 1 : 0] + (rowSpacing.map { [$0] } ?? [])) : nil
         node.lazyWindow = realized.lender.map(ObjectIdentifier.init)
         let readings = LazyRowReadings()
         node.lazyRowReadings = readings
         let make: ([String: String]) -> [Node] = { retained in
             var nextReads: [String: Set<ObjectIdentifier>] = [:]
-            let nodes: [Node] = realized.wrappedValue.filter { positions[$0] != nil }
-                .sorted { positions[$0]! < positions[$1]! }
+            let nodes: [Node] = realized.wrappedValue.filter { positions.position(of: $0) != nil }
+                .sorted { positions.position(of: $0)! < positions.position(of: $1)! }
                 .compactMap { identity in
-                    guard let place = positions[identity] else { return nil }
+                    guard let place = positions.position(of: identity) else { return nil }
                     var low = 0, high = boundaries.count
                     while low < high {
                         let middle = low + (high - low) / 2

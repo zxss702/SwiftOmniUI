@@ -151,6 +151,48 @@ final class WinUIImageViewTests: XCTestCase {
         }
     }
 
+    func testSystemGlyphsPaintAtDisclosureAndButtonSizesAfterPageReplacement() throws {
+        try onUIThread {
+            let alternate = State(wrappedValue: false)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                HStack(spacing: 12) {
+                    if alternate.wrappedValue {
+                        Text("Replacement")
+                    } else {
+                        Image(systemName: "\u{E70D}")
+                            .foregroundStyle(.black)
+                            .id("disclosure")
+                            .frame(width: 8, height: 8)
+                        Image(systemName: "\u{E723}")
+                            .foregroundStyle(.black)
+                            .id("attachment")
+                            .frame(width: 40, height: 40)
+                    }
+                }
+                .frame(width: 180, height: 64)
+            }
+            func visible(_ id: String, width: Int, height: Int) throws {
+                let image = try XCTUnwrap(host.view(id: .manual(id)) as? WinUIImageView)
+                let points = (0..<height).flatMap { y in
+                    (0..<width).map { x in (Double(x) + 0.5, Double(y) + 0.5) }
+                }
+                XCTAssertTrue(image.pixels(at: points).contains { ($0 >> 24) != 0 },
+                              "the native glyph must paint pixels in the allocated image")
+            }
+            host.settle { (host.view(id: .manual("attachment"))?.laidOutFrame.width ?? 0) > 0 }
+            host.layOut()
+            try visible("disclosure", width: 8, height: 8)
+            try visible("attachment", width: 40, height: 40)
+            alternate.wrappedValue = true
+            host.settle { host.view(id: .manual("attachment")) == nil }
+            alternate.wrappedValue = false
+            host.settle { (host.view(id: .manual("attachment"))?.laidOutFrame.width ?? 0) > 0 }
+            host.layOut()
+            try visible("disclosure", width: 8, height: 8)
+            try visible("attachment", width: 40, height: 40)
+        }
+    }
+
     /// A new file is decoded before apply returns, without pumping the UI queue or relying on its metadata.
     func testABitmapIsDecodedBeforeApplyReturns() throws {
         try onUIThread {

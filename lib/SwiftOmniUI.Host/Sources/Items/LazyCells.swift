@@ -113,12 +113,12 @@
                 let follows = source.map { next.predecessor == ObjectIdentifier($0) } ?? false
                 if wasKnown {
                     if follows { inserting.formUnion(next.inserted) }
-                    else { inserting.formUnion(next.identities.filter { positions[$0] == nil }) }
+                    else { inserting.formUnion(next.identities.filter { position(of: $0) == nil }) }
                 }
-                inserting = inserting.filter { next.positions[$0] != nil }
+                inserting = inserting.filter { next.position(of: $0) != nil }
                 extents.adopt(next)
                 source = next
-                positions = next.positions
+                positions = [:]
                 identities = next.identities
                 runs.adopt(next, perRun: lastPerRun)
                 built = 0..<0
@@ -129,7 +129,7 @@
                 let now = element.value(.items)?.strings ?? []
                 if now != identities {
                     let next = Dictionary(now.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
-                    if wasKnown { inserting.formUnion(next.keys.filter { positions[$0] == nil }) }
+                    if wasKnown { inserting.formUnion(next.keys.filter { position(of: $0) == nil }) }
                     inserting = inserting.filter { next[$0] != nil }
                     extents.keep(identities: Set(next.keys))
                     positions = next
@@ -153,7 +153,7 @@
 
     /// The place `identity` shows at; nil where it is none of them.
     public func position(of identity: String) -> Int? {
-        positions[identity]
+        source?.position(of: identity) ?? positions[identity]
     }
 
     /// The mounted subtree of `identity`, where there is one.
@@ -170,7 +170,7 @@
         guard let element else { return [] }
         return element.children.compactMap { child in
             guard case .manual(let identity) = child.id,
-                  let place = positions[child.lazyIdentity ?? identity] else { return nil }
+                  let place = position(of: child.lazyIdentity ?? identity) else { return nil }
             return (place, child)
         }
         .sorted { $0.0 < $1.0 }
@@ -204,7 +204,7 @@
         if grid { runs.group(perRun: perRun, items: identities.count) }
         let revision = grid ? runs.revision : extents.revision
         let realize = realize ?? span
-        let keeping = keeping.filter { positions[$0] != nil }
+        let keeping = keeping.filter { position(of: $0) != nil }
         guard window?.span != span || window?.revision != revision || window?.perRun != perRun
             || window?.realize != realize || needsMeasurement || retained != keeping
             || prefetch && prefetchInvalidated else { return }
@@ -259,7 +259,7 @@
             // evict a focused control and recreate it on the following fill.
             for child in element.children {
                 guard case .manual(let identity) = child.id,
-                      let place = positions[child.lazyIdentity ?? identity],
+                      let place = position(of: child.lazyIdentity ?? identity),
                       place >= lower, place < requestedUpper else { continue }
                 upper = max(upper, min(requestedUpper, (place / perRun + 1) * perRun))
             }
@@ -336,7 +336,7 @@
         Self.realizing = true
         // Retain actual moving rows, not all unbuilt rows between their old
         // and new positions. This keeps the window lazy during a large insertion.
-        let extra = keeping.compactMap { positions[$0] }.filter { !within.contains($0) }
+        let extra = keeping.compactMap { position(of: $0) }.filter { !within.contains($0) }
         let requested = (Array(within) + extra).sorted().map { identities[$0] }
         element.send(.realizedChanged, [.strings(requested)], in: runtime)
     }
@@ -346,7 +346,7 @@
     /// because their native scroller may already have clamped a shrinking document.
     public func correctedOrigin(perRun: Int = 1, grid: Bool = false) -> Double? {
         guard let held = anchor, !identities.isEmpty else { return nil }
-        let place = positions[held.identity] ?? min(held.place, identities.count - 1)
+        let place = position(of: held.identity) ?? min(held.place, identities.count - 1)
         let start = grid
             ? runs.offset(of: place / perRun, count: (identities.count + perRun - 1) / perRun)
             : extents.offset(of: place, in: identities)
@@ -381,7 +381,7 @@
 /// The host invalidates measurements when the source or its cross-axis size changes.
 @_spi(Host) public struct LazyExtents: Sendable {
     /// The spacing between adjacent children or runs.
-    public var spacing: Double? = 0 {
+    public var spacing: Double? = nil {
         didSet { if spacing != oldValue { revision += 1 } }
     }
     /// Space before the first and after the last child or run.
@@ -409,7 +409,7 @@
         let before = measured[identity]
         let previous = before ?? estimate
         measured[identity] = extent
-        if let place = index[identity] { sums.measure(place, extent: extent) }
+        if let place = source?.position(of: identity) ?? index[identity] { sums.measure(place, extent: extent) }
         if extent != previous { revision += 1 }
     }
 
@@ -450,19 +450,19 @@
             }
             for identity in next.removed { measured[identity] = nil }
         } else {
-            measured = measured.filter { next.positions[$0.key] != nil }
+            measured = measured.filter { next.position(of: $0.key) != nil }
             sums = measured.isEmpty ? LazyExtentTree(count: next.identities.count)
                 : LazyExtentTree(next.identities) { measured[$0] }
         }
         source = next
-        index = next.positions
+        index = [:]
         revision += 1
     }
 
     /// Forget sizes that were measured under a different layout proposal.
     public mutating func reset() {
         measured = [:]
-        sums = LazyExtentTree(count: index.count)
+        sums = LazyExtentTree(count: source?.identities.count ?? index.count)
         revision += 1
     }
 
@@ -477,6 +477,7 @@
     private var gap: Double { spacing ?? StackArithmetic.automaticSpacing }
 
     private mutating func sync(_ identities: [String]) {
+        if let source, source.identities.count == identities.count { return }
         guard index.count != identities.count else { return }
         adopt(positions: Dictionary(identities.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first }))
     }

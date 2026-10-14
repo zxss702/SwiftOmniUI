@@ -32,6 +32,8 @@ final class WinUIImageView: WinUIView {
         var folder: UInt64
     }
     private var loaded: Load?
+    private var writtenTint: UInt32?
+    private var hasWrittenTint = false
 
     init() {
         super.init { _ in swiftomniui_winui_image_make() }
@@ -53,7 +55,10 @@ final class WinUIImageView: WinUIView {
                         folder: symbol ? 0 : swiftomniui_winui_pictures_revision())
         // Inherited font changes do not reload a file image. A real source,
         // aspect or asset-folder change still takes effect synchronously.
-        guard load != loaded || !found else { return }
+        if load == loaded && found {
+            writeTint(font.color?.argb)
+            return
+        }
         loaded = load
         self.symbol = symbol
         file = source?.file ?? ""
@@ -71,9 +76,18 @@ final class WinUIImageView: WinUIView {
             if !found { WinUIRenderer.log.error("no picture \(file) among the application's pictures") }
         }
         declared = size[0] > 0 && size[1] > 0 ? LayoutSize(width: size[0], height: size[1]) : nil
+        hasWrittenTint = false
+        writeTint(font.color?.argb)
         picturePlace = nil
         if let placed { draw(in: placed) }
         placingLayout?.invalidateMeasurements()
+    }
+
+    private func writeTint(_ tint: UInt32?) {
+        guard symbol, !hasWrittenTint || tint != writtenTint else { return }
+        swiftomniui_winui_image_set_tint(handle, tint != nil, tint ?? 0)
+        writtenTint = tint
+        hasWrittenTint = true
     }
 
     /// The picture's own size, whatever the room offered: an SVG's declared, a bitmap's once read - and a
@@ -89,7 +103,7 @@ final class WinUIImageView: WinUIView {
             swiftomniui_winui_image_size(handle, &size)
             intrinsic = LayoutSize(width: size[0], height: size[1])
         }
-        // Preparing a Viewbox/FontIcon at zero clips its native content even
+        // Preparing a Viewbox/system glyph at zero clips its native content even
         // though Swift's intrinsic result is nonzero. Prepare the same box
         // the arithmetic reports, before its first native arrangement.
         _ = super.measure(width: intrinsic.width, height: intrinsic.height)

@@ -306,7 +306,7 @@ import CRT
             let recycling: Bool
             if case .manual(let identity) = child.id, virtualized {
                 let key = child.lazyIdentity ?? identity
-                recycling = lazyRows.map { $0.positions[key] != nil } ?? lazyIdentities.contains(key)
+                recycling = lazyRows.map { $0.position(of: key) != nil } ?? lazyIdentities.contains(key)
             } else {
                 recycling = false
             }

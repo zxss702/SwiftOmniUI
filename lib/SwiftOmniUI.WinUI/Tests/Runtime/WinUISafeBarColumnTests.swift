@@ -47,4 +47,61 @@ final class WinUISafeBarColumnTests: XCTestCase {
             XCTAssertEqual(WinUILayoutView.sizings, sizings, "stable proposals must not keep invalidating their ancestors")
         }
     }
+
+    func testSidebarPageSwitchReappliesTopAndBottomSafeInsetsWithoutResize() throws {
+        try onUIThread {
+            let visible = State(wrappedValue: true)
+            let page = State(wrappedValue: 0)
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(visible.projectedValue) {
+                    VStack {
+                        if page.wrappedValue == 0 {
+                            ScrollView {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(0..<100, id: \.self) { row in
+                                        Text("File \(row)").frame(height: 30).id("file-\(row)")
+                                    }
+                                }
+                            }
+                            .id("files-scroll")
+                            .safeAreaInset(edge: .bottom, spacing: 0) {
+                                Text("Search").frame(height: 40).id("search")
+                            }
+                            .transition(.opacity)
+                        } else {
+                            ScrollView { Text("Other page") }
+                                .transition(.opacity)
+                        }
+                    }
+                    .frame(maxHeight: .infinity)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Text("Tabs").frame(maxWidth: .infinity).frame(height: 44).id("tabs")
+                    }
+                    .navigationSplitViewColumnWidth(220)
+                } detail: {
+                    Text("Detail")
+                }
+            }
+            let tabs = try XCTUnwrap(host.view(id: .manual("tabs")))
+            func checkInsets() throws {
+                let first = try XCTUnwrap(host.view(id: .manual("file-0")))
+                let search = try XCTUnwrap(host.view(id: .manual("search")))
+                let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+                XCTAssertGreaterThanOrEqual(first.origin.y, tabs.origin.y + tabs.frame.height - 1)
+                scroll.scroller.move(to: Point(0, scroll.scroller.standing.reach.y))
+                host.settle { host.view(id: .manual("file-99")) != nil }
+                let last = try XCTUnwrap(host.view(id: .manual("file-99")))
+                XCTAssertLessThanOrEqual(last.origin.y + last.frame.height, search.origin.y + 1)
+                scroll.scroller.move(to: .zero)
+                host.settle { host.view(id: .manual("file-0")) != nil }
+            }
+            host.settle { host.view(id: .manual("file-0")) != nil }
+            try checkInsets()
+            page.wrappedValue = 1
+            host.settle { host.view(id: .manual("file-0")) == nil }
+            page.wrappedValue = 0
+            host.settle { host.view(id: .manual("file-0")) != nil }
+            try checkInsets()
+        }
+    }
 }

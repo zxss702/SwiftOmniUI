@@ -435,7 +435,7 @@ namespace {
     };
 
     /// The element `handle` made by `swiftomniui_winui_image_make` holds: a panel
-    /// with the picture at [0] and a Viewbox with a FontIcon at [1], one
+    /// with the picture at [0] and a Viewbox with a system glyph at [1], one
     /// visible at a time.
     controls::Panel imageGrid(SwiftOmniUIObjectRef handle) {
         return borrow<controls::Panel>(handle);
@@ -459,10 +459,11 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_image_make(void) {
         auto grid = winrt::make<PicturePanel>().as<controls::Panel>();
         grid.Children().Append(controls::Image());
         controls::Viewbox box;
-        controls::FontIcon icon;
-        icon.FontFamily(xaml::Media::FontFamily(L"Segoe Fluent Icons"));
-        icon.FontSize(16);
-        box.Child(icon);
+        controls::TextBlock glyph;
+        glyph.FontFamily(xaml::Media::FontFamily(L"Segoe Fluent Icons, Segoe MDL2 Assets"));
+        glyph.FontSize(16);
+        glyph.TextAlignment(xaml::TextAlignment::Center);
+        box.Child(glyph);
         box.Stretch(xaml::Media::Stretch::None);
         box.Visibility(xaml::Visibility::Collapsed);
         grid.Children().Append(box);
@@ -489,13 +490,13 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
         auto box = symbolBox(grid);
         image.Source(nullptr);
         image.Visibility(xaml::Visibility::Collapsed);
-        auto icon = box.Child().as<controls::FontIcon>();
+        auto symbol = box.Child().as<controls::TextBlock>();
         auto font = textFontDefaults(textStyle);
-        icon.FontSize(fontSize > 0 ? fontSize : textStyle >= 0 ? font.size : 16);
-        icon.FontWeight(fontWeight > 0 ? winrt::Windows::UI::Text::FontWeight{
+        symbol.FontSize(fontSize > 0 ? fontSize : textStyle >= 0 ? font.size : 16);
+        symbol.FontWeight(fontWeight > 0 ? winrt::Windows::UI::Text::FontWeight{
             static_cast<uint16_t>(std::clamp(fontWeight, 1.0, 1000.0))} : winrt::Windows::UI::Text::FontWeight{font.weight});
-        icon.Glyph(winrt::to_hstring(glyph));
-        size[0] = size[1] = icon.FontSize();
+        symbol.Text(winrt::to_hstring(glyph));
+        size[0] = size[1] = symbol.FontSize();
         auto centred = aspect == 3;
         box.Stretch(aspect == 2 ? xaml::Media::Stretch::Fill
                     : centred ? xaml::Media::Stretch::None : xaml::Media::Stretch::Uniform);
@@ -508,6 +509,16 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
     } catch (...) {
         report("showing a symbol");
         return false;
+    }
+}
+
+extern "C" void swiftomniui_winui_image_set_tint(SwiftOmniUIObjectRef handle, bool has, uint32_t argb) {
+    try {
+        auto glyph = symbolBox(imageGrid(handle)).Child().as<controls::TextBlock>();
+        if (has) glyph.Foreground(xaml::Media::SolidColorBrush(color(argb)));
+        else glyph.ClearValue(controls::TextBlock::ForegroundProperty());
+    } catch (...) {
+        report("tinting a symbol");
     }
 }
 

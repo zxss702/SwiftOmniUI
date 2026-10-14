@@ -95,6 +95,7 @@ final class LazyGeometryTests: XCTestCase {
     func testMeasurementsReplaceOnlyTheirOwnProvisionalExtents() {
         let identities = ["hero", "file", "unseen"]
         var extents = LazyExtents()
+        extents.spacing = 0
         XCTAssertEqual(extents.total(in: identities), 132)
         extents.measure("hero", extent: 720)
         XCTAssertEqual(extents.extent(of: "unseen"), 44)
@@ -113,6 +114,21 @@ final class LazyGeometryTests: XCTestCase {
         XCTAssertEqual(runs.total(count: 3), 784)
         runs.reset()
         XCTAssertEqual(runs.total(count: 3), 132)
+    }
+
+    func testUnspecifiedLazyStackSpacingUsesEightButExplicitZeroDoesNot() {
+        let rows = ["first", "second", "third"]
+        var extents = LazyExtents()
+        XCTAssertNil(extents.spacing)
+        XCTAssertEqual(extents.offset(of: 1, in: rows), 52)
+        XCTAssertEqual(extents.total(in: rows), 148)
+        extents.spacing = 0
+        XCTAssertEqual(extents.offset(of: 1, in: rows), 44)
+        XCTAssertEqual(extents.total(in: rows), 132)
+        extents.spacing = 12
+        XCTAssertEqual(extents.total(in: rows), 156)
+        extents.spacing = nil
+        XCTAssertEqual(extents.total(in: rows), 148)
     }
 
     func testZeroMeasurementsKeepProvisionalRoomForUnseenRows() {
@@ -235,6 +251,7 @@ final class LazyGeometryTests: XCTestCase {
     func testEstimatedLengthAndExactIntersections() {
         let identities = (0..<10_000).map(String.init)
         var extents = LazyExtents()
+        extents.spacing = 0
         extents.measure("0", extent: 40)
         XCTAssertEqual(extents.total(in: identities), 439_996, accuracy: 0.001)
         XCTAssertEqual(extents.places(in: 876..<1_140, overscan: 0, in: identities), 20..<26)

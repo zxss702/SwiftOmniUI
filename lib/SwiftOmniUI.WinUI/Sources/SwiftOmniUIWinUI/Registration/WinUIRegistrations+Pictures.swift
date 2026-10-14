@@ -12,6 +12,7 @@ extension WinUIRegistrations {
                 ImageContract.source, ImageElementContract.aspect, ImageContract.isResizable,
                 FontElementContract.fontSize, FontElementContract.fontTextStyle,
                 FontElementContract.fontWeight, FontElementContract.fontAttributes,
+                TextStyleElementContract.foregroundStyle,
             ]) { view, values in
                 view.apply(source: values[ImageContract.source], aspect: values[ImageElementContract.aspect] ?? .stretch,
                            resizable: values[ImageContract.isResizable] ?? false, font: TextMembers.look(of: values))

@@ -398,6 +398,26 @@ class WinUILayoutView: WinUIView {
 
     func backgroundBounds(in bounds: Rect) -> Rect { bounds }
 
+    private struct SafeAreaInput: Equatable {
+        let safe: Rect
+        let layout: Rect
+        let consumed: EdgeInsets
+    }
+    private var lastSafeAreaInput: SafeAreaInput?
+
+    override func safeAreaChanged() {
+        // Safe-area context is Swift layout input, invisible to XAML's cached
+        // Arrange rectangle. A page swap can change it at the same size. Ask
+        // this panel to propagate the new region even when no resize occurs.
+        // Do not invalidate ancestors: the parent has already supplied it.
+        let context = layoutSafeArea(in: allocatedBounds)
+        let input = SafeAreaInput(safe: context.safe, layout: context.layout, consumed: context.consumed)
+        guard input != lastSafeAreaInput else { return }
+        lastSafeAreaInput = input
+        forgetMeasurements()
+        invalidateArrange()
+    }
+
     /// Context inherited by a placed child. Special modifiers override this;
     /// ordinary overlays only inherit the region and reserve no space.
     func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {

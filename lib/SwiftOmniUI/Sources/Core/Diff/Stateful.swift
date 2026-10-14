@@ -31,6 +31,11 @@ protocol BorrowedState {
     var lends: (lender: AnyObject?, lent: AnyHashable?) { get }
 }
 
+/// A lazy row source owns its models, not child view state. Its current row
+/// closure is retained by the lazy container and each requested row is scanned
+/// when built; recursively reflecting every offscreen model here is wasted work.
+protocol LazyRowStateBoundary {}
+
 /// One stored property of a composed view, as the differ can compare it - what
 /// decides, beside its reads, whether the view is built again or carried.
 /// Design: docs/design/core/identity-and-diffing.md#what-a-view-was-built-with
@@ -183,6 +188,11 @@ enum Input {
         return
     }
 
+    if value is any LazyRowStateBoundary {
+        inputs.append((path: path, input: .opaque))
+        return
+    }
+
     // A keyed element carries its builder branch, which tells the arms of an `if`
     // apart, and the type of the view inside.
     if let keyed = value as? Keyed {
@@ -297,11 +307,11 @@ extension Node {
             var node = build()
             if node.type == .fragment { node.materialize() }
             if node.type == .fragment, node.children.count > 1, written.lazyIdentity != nil,
-               let stack = written.props[.lazyRowStack]?.numbers, stack.count == 2 {
+               let stack = written.props[.lazyRowStack]?.numbers, !stack.isEmpty {
                 let children = node.asChildren
                 node.type = stack[0] == 1 ? .hStack : .vStack
                 node.children = children
-                node.write(StackBaseContract.spacing, stack[1])
+                if stack.count > 1 { node.write(StackBaseContract.spacing, stack[1]) }
             }
             for (property, member) in written.inheritedMembers {
                 node.inherit(property, member: member)

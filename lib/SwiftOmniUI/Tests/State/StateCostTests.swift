@@ -170,6 +170,14 @@ import XCTest
         XCTAssertEqual(
             run(carrying, \Carrying.name), run(plain, \Plain.name),
             "GalleryView holds its items behind a reference")
+
+        let lazy = stateParts(in: ForEach(carrying, id: \Carrying.name) { item in
+            Text(item.name)
+        })
+        XCTAssertTrue(lazy.boxes.isEmpty,
+                      "ForEach owns its data, while each requested row owns its own State")
+        XCTAssertEqual(lazy.inputs.count, 1,
+                       "offscreen models must not be reflected into the parent's input snapshot")
     }
 
     /// A binding reads through to the same storage, so borrowing state is one

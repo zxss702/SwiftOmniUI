@@ -16,7 +16,7 @@ class WinUIZStackView: WinUITravellingLayout {
 
             // A run moving on asks only for an arrangement: its places need no room, so nothing around is measured.
             if let placements = placement?.placements, !placements.isEmpty, oldValue?.placements.isEmpty == false {
-                apply(placements)
+                apply(placements, in: allocatedBounds)
             } else {
                 invalidateMeasurements()
             }
@@ -55,7 +55,7 @@ class WinUIZStackView: WinUITravellingLayout {
 
     override func arrange(in bounds: Rect) {
         if let placements = placement?.placements, !placements.isEmpty {
-            return apply(placements)
+            return apply(placements, in: bounds)
         }
 
         beginArrangement(width: bounds.width)
@@ -63,20 +63,7 @@ class WinUIZStackView: WinUITravellingLayout {
         insetContext = nil
         insetBase = nil
         let current = items.filter { !$0.departing }
-        if let edge = sourceElement?.safeAreaInsetEdge, current.count == 2 {
-            let context = layoutSafeArea(in: bounds)
-            let physicalEdge = SafeAreaArithmetic.physicalEdge(edge, direction: direction)
-            let bar = current[1]
-            let barPlace = bar.isShown
-                ? SafeAreaArithmetic.bar(of: bar, edge: physicalEdge, in: context, direction: direction) : Rect(0, 0, 0, 0)
-            let extent = edge == .top || edge == .bottom
-                ? barPlace.height + bar.values.margin.top + bar.values.margin.bottom
-                : barPlace.width + bar.values.margin.left + bar.values.margin.right
-            let next = bar.isShown
-                ? context.inset(edge: physicalEdge, extent: extent, spacing: sourceElement?.number(.spacing) ?? 0) : context
-            insetContext = next
-            let base = current[0]
-            insetBase = base.view
+        if let (base, bar, barPlace, next) = resolveInset(in: bounds, items: current) {
             let basePlace = SafeAreaArithmetic.base(of: base, boundary: base.element?.preservesSafeAreaProposal == true,
                                                    ignores: base.element?.ignoresSafeArea,
                                                    in: next, direction: direction)
@@ -97,6 +84,28 @@ class WinUIZStackView: WinUITravellingLayout {
         }
     }
 
+    /// An animated placement still needs the current inset as layout input.
+    /// Its frames come from the animation, while descendants read this context.
+    private func resolveInset(in bounds: Rect, items current: [WinUILayoutItem])
+        -> (WinUILayoutItem, WinUILayoutItem, Rect, SafeAreaContext)? {
+        guard let edge = sourceElement?.safeAreaInsetEdge, current.count == 2 else { return nil }
+        let context = layoutSafeArea(in: bounds)
+        let physicalEdge = SafeAreaArithmetic.physicalEdge(edge, direction: direction)
+        let base = current[0], bar = current[1]
+        let barPlace = bar.isShown
+            ? SafeAreaArithmetic.bar(of: bar, edge: physicalEdge, in: context, direction: direction)
+            : Rect(0, 0, 0, 0)
+        let extent = edge == .top || edge == .bottom
+            ? barPlace.height + bar.values.margin.top + bar.values.margin.bottom
+            : barPlace.width + bar.values.margin.left + bar.values.margin.right
+        let next = bar.isShown
+            ? context.inset(edge: physicalEdge, extent: extent, spacing: sourceElement?.number(.spacing) ?? 0)
+            : context
+        insetBase = base.view
+        insetContext = next
+        return (base, bar, barPlace, next)
+    }
+
     /// Draws the children back to front as the run ranks them, or in their order without one - the order a click
     /// reaches them in too, with nothing moved and nothing laid out again.
     private func holdInDrawingOrder() {
@@ -108,7 +117,10 @@ class WinUIZStackView: WinUITravellingLayout {
 
     /// Stands each child where the run says, drawn as it says: at once inside a pass, and between passes in the
     /// arrangement each place asks for.
-    private func apply(_ placements: [HostPlacement]) {
+    private func apply(_ placements: [HostPlacement], in bounds: Rect) {
+        insetContext = nil
+        insetBase = nil
+        _ = resolveInset(in: bounds, items: items.filter { !$0.departing })
         let count = min(items.count, placements.count)
         for index in 0..<count {
             let placement = placements[index]

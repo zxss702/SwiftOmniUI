@@ -5,7 +5,20 @@
 /// View closures stay in the renderer; reading this source never builds a row.
 @_spi(Host) public final class HostLazySource: Sendable {
     public let identities: [String]
-    public let positions: [String: Int]
+    /// The ordered identities and their persistent position links. Unchanged
+    /// leaves and links are shared with the preceding source after a local edit.
+    public let sequence: HostLazyIdentitySequence
+    /// Compatibility for callers that explicitly need a complete table. Lazy
+    /// layouts use `position(of:)` and never materialize this dictionary.
+    public var positions: [String: Int] {
+        var result: [String: Int] = [:]
+        result.reserveCapacity(identities.count)
+        for (place, identity) in identities.enumerated() where result[identity] == nil {
+            result[identity] = place
+        }
+        return result
+    }
+    public func position(of identity: String) -> Int? { sequence.position(of: identity) }
     /// The snapshot these edits follow. A host that skipped it rebuilds once.
     public let predecessor: ObjectIdentifier?
     public let edit: Edit
@@ -22,12 +35,6 @@
 
     public init(_ identities: [String], following previous: HostLazySource? = nil) {
         self.identities = identities
-        var positions: [String: Int] = [:]
-        positions.reserveCapacity(identities.count)
-        for (place, identity) in identities.enumerated() where positions[identity] == nil {
-            positions[identity] = place
-        }
-        self.positions = positions
         predecessor = previous.map(ObjectIdentifier.init)
         let old = previous?.identities ?? []
         var head = 0
@@ -38,18 +45,32 @@
             newEnd -= 1
         }
         let before = head..<oldEnd, after = head..<newEnd
-        inserted = previous == nil ? [] : Set(identities[after].filter { previous?.positions[$0] == nil })
-        removed = old[before].filter { positions[$0] == nil }
-
         // A rotation of the changed interval is a block move. No measurement
         // in either block needs to be copied or looked up again.
+        let detectedEdit: Edit
         if before.count == after.count, !before.isEmpty,
-           let pivot = previous?.positions[identities[head]], pivot > head, pivot < oldEnd,
+           let pivot = previous?.position(of: identities[head]), pivot > head, pivot < oldEnd,
            old[pivot..<oldEnd].elementsEqual(identities[head..<(head + oldEnd - pivot)]),
            old[head..<pivot].elementsEqual(identities[(head + oldEnd - pivot)..<newEnd]) {
-            edit = .move(head..<pivot, to: head + oldEnd - pivot)
+            detectedEdit = .move(head..<pivot, to: head + oldEnd - pivot)
         } else {
-            edit = .replace(before, with: after)
+            detectedEdit = .replace(before, with: after)
         }
+        var ordered = previous?.sequence ?? HostLazyIdentitySequence()
+        switch detectedEdit {
+        case .replace(let before, let after):
+            ordered.replace(before, with: identities[after])
+        case .move(let range, let destination):
+            ordered.move(range, to: destination)
+        }
+        // The renderer interns unique names. Direct SPI clients may supply
+        // duplicates; rebuilding those preserves the first-occurrence contract.
+        if ordered.uniqueCount != identities.count {
+            ordered = HostLazyIdentitySequence(identities)
+        }
+        edit = detectedEdit
+        sequence = ordered
+        inserted = previous == nil ? [] : Set(identities[after].filter { previous?.position(of: $0) == nil })
+        removed = old[before].filter { ordered.position(of: $0) == nil }
     }
 }

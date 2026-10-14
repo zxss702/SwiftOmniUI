@@ -1125,6 +1125,8 @@ bool swiftomniui_winui_image_set(SwiftOmniUIObjectRef image, char const *const *
 /// for a missing element or an empty glyph.
 bool swiftomniui_winui_image_set_symbol(SwiftOmniUIObjectRef image, char const *glyph, int32_t aspect,
                                        double fontSize, double fontWeight, int32_t textStyle, double *size);
+/// Tint the native system glyph, or clear the local foreground to follow the theme.
+void swiftomniui_winui_image_set_tint(SwiftOmniUIObjectRef image, bool has, uint32_t argb);
 
 /// The synchronously decoded bitmap size, or an SVG's declared intrinsic size, in DIPs.
 void swiftomniui_winui_image_size(SwiftOmniUIObjectRef image, double *size);

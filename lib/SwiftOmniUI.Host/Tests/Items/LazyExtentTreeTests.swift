@@ -59,6 +59,7 @@ final class LazyExtentTreeTests: XCTestCase {
     func testSourceSplicesAndSkippedVersionsPreserveMeasuredIdentities() {
         let source = HostLazySource((0..<10_000).map(String.init))
         var extents = LazyExtents()
+        extents.spacing = 0
         extents.adopt(source)
         for id in source.identities { extents.measure(id, extent: 28) }
         let before = extents.total(in: source.identities)

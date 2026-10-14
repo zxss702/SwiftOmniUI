@@ -119,6 +119,12 @@ road of its own for it.
 Managed lazy containers share one immutable `HostLazySource` between the core
 and mounted layout. It contains identity order, the position index, a predecessor
 token and a range replacement or block move. View closures remain in the core.
+The position index is a persistent identity map into an order-statistic
+sequence: a local splice copies only its boundary paths and inserted rows.
+The ordered array remains the boundary input, while mounted rows, extent
+measurements and recycling query the shared index rather than rebuilding a
+dictionary of every position. A direct caller needing a complete table may
+still request one explicitly.
 The direct host SPI still accepts `.items` as a fallback. Viewport patches carry
 neither the full property nor another index. The source does not retain earlier
 snapshots; a host skipping a version rebuilds its geometry once.
@@ -127,6 +133,10 @@ snapshots; a host skipping a version rebuilds its geometry once.
 Only new identities allocate descriptive host tokens; equal descriptions do not
 merge unequal IDs. Ordinary collection replacements still need an ID scan to
 discover edits, without comparing complete models or building offscreen rows.
+An unchanged `Array` buffer, like an unchanged integer range, proves that its
+identity sequence can be reused without reading any row IDs on a parent update.
+The state walk stops at `ForEach`: its models are source data, while dynamic
+properties of visible row views are discovered when those rows are built.
 The latest collection and closures always provide requested rows, including
 content changes at an unchanged identity.
 
@@ -137,6 +147,8 @@ estimates of unseen rows. An immutable AVL sequence compresses uniform runs
 and caches subtree counts and measured sums. Range edits change boundary paths
 and inserted runs, without re-summing the complete measurement history. Aligned
 grid edits retain unaffected runs; regrouping invalidates the affected suffix.
+An unspecified lazy stack gap resolves to the stack default of eight points;
+an explicit zero stays zero, including between a composed row's children.
 Cross-axis proposal changes still invalidate measurements.
 
 GTK and WinUI request a bounded viewport window
@@ -163,9 +175,9 @@ their source identity independently of the ids mounted by the host.
 WinUI records scroll and effective-viewport notices immediately and coalesces
 their realization outside the native callback/layout stack. Program jumps can
 still prepare their destination synchronously when measurement is allowed;
-a jump deferred by a native pass keeps its target until the pass completes.
-If the first effective-viewport event preceded attachment, layout seeds the
-window directly from the native scroller rather than waiting for a user scroll.
+before the first effective-viewport notice, an attached scroller's allocated
+room seeds the initial window even if WinUI reports a zero viewport. A jump
+deferred by a native pass keeps its target until the pass completes.
 It does not replace rows inside native measure or arrange. Pending work keeps
 the frame clock held and can resume on the next composed frame as well as a
 dispatcher turn.

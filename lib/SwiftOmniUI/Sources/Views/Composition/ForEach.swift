@@ -83,6 +83,8 @@ public struct ForEach<Items: RandomAccessCollection, Id: Hashable, Content: View
     }
 }
 
+extension ForEach: LazyRowStateBoundary {}
+
 extension ForEach where Items.Element: Identifiable, Items.Element.ID == Id {
     /// One view per item, each wearing its own `id` - the `Identifiable`
     /// spelling:
@@ -118,9 +120,17 @@ extension ForEach: LazyRows {
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
         guard let other = other as? Self, identity == other.identity else { return false }
         // Comparing whole models is both unnecessary and potentially expensive.
-        // Ranges have an O(1) proof; other collections scan only their IDs once.
+        // Ranges and an unchanged Array buffer have an O(1) proof. Swift's
+        // value semantics give a modified Array a different backing buffer.
         if let range = items as? Range<Int>, let old = other.items as? Range<Int> { return range == old }
         if let range = items as? ClosedRange<Int>, let old = other.items as? ClosedRange<Int> { return range == old }
+        if let current = items as? [Items.Element], let previous = other.items as? [Items.Element] {
+            return current.withUnsafeBufferPointer { now in
+                previous.withUnsafeBufferPointer { before in
+                    now.count == before.count && now.baseAddress == before.baseAddress
+                }
+            }
+        }
         return false
     }
 

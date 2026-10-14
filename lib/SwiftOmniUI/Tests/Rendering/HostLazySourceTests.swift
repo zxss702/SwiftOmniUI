@@ -16,6 +16,9 @@ final class HostLazySourceTests: XCTestCase {
         XCTAssertTrue(expanded.removed.isEmpty)
         XCTAssertEqual(expanded.predecessor, ObjectIdentifier(original))
         XCTAssertEqual(expanded.positions["9999"], 10_002)
+        XCTAssertEqual(expanded.position(of: "9999"), 10_002)
+        XCTAssertLessThan(expanded.sequence.indexedIdentities, 512,
+                          "expansion must reuse the IDs and positions after the inserted folder")
 
         let collapsed = HostLazySource(original.identities, following: expanded)
         guard case .replace(let removed, let replacement) = collapsed.edit else { return XCTFail("expected deletion") }
@@ -23,6 +26,8 @@ final class HostLazySourceTests: XCTestCase {
         XCTAssertEqual(replacement, 6..<6)
         XCTAssertEqual(collapsed.removed, ["a", "b", "c"])
         XCTAssertTrue(collapsed.inserted.isEmpty)
+        XCTAssertEqual(collapsed.position(of: "9999"), 9_999)
+        XCTAssertLessThan(collapsed.sequence.indexedIdentities, 512)
     }
 
     func testBlockReorderingIsAMoveAndDoesNotInsertOrDeleteIdentity() {
@@ -33,6 +38,8 @@ final class HostLazySourceTests: XCTestCase {
         XCTAssertEqual(destination, 3)
         XCTAssertTrue(moved.inserted.isEmpty)
         XCTAssertTrue(moved.removed.isEmpty)
+        XCTAssertEqual(moved.position(of: "b"), 3)
+        XCTAssertEqual(moved.position(of: "e"), 2)
     }
 
     func testSnapshotDoesNotRetainItsPredecessors() {

@@ -422,6 +422,26 @@ private struct LazyPage: View {
         XCTAssertNil(shown.subtree.first { $0.props["lazyRowStack"] != nil })
     }
 
+    func testACompositeRowKeepsUnspecifiedAndExplicitStackSpacing() throws {
+        let spacings: [Double?] = [nil, 0, 12]
+        for spacing in spacings {
+            let renders = Renders()
+            let stack = try lazy(.lazyVStack, in: renders.render(LazyPage {
+                LazyVStack(spacing: spacing) {
+                    ForEach(0..<2) { row in
+                        Text("name \(row)")
+                        Text("detail \(row)")
+                    }
+                }
+            }.node))
+            let identity = try XCTUnwrap(stack.lazyRows?.identities.first)
+            let shown = try lazy(.lazyVStack, in: realize([identity], in: renders, lazy: stack))
+            let row = try XCTUnwrap(shown.subtree.first { $0.type == .vStack })
+            XCTAssertEqual(row.props[.spacing]?.number, spacing)
+            XCTAssertEqual(row.children.filter { $0.type == .text }.count, 2)
+        }
+    }
+
     func testScrollingReusesThePreparedSourceAndDataChangesRebuildIt() throws {
         let built = Built()
         let renders = Renders()
@@ -477,6 +497,20 @@ private struct LazyPage: View {
                                Set(source.identities[first..<first + 8].map { .manual($0) }))
             }
         }
+    }
+
+    func testRepeatedArrayDescriptionReusesItsIdentityBufferWithoutReadingRows() {
+        let built = Built()
+        let items = (0..<10_000).map { ReadCountedLazyItem(value: $0, built: built) }
+        let before = ForEach(items) { item in Text("Row \(item.value)") }
+        let again = ForEach(items) { item in Text("Updated \(item.value)") }
+        XCTAssertTrue(again.hasSameLazyIdentities(as: before))
+        XCTAssertEqual(built.identityReads, 0)
+
+        var changed = items
+        changed.insert(ReadCountedLazyItem(value: -1, built: built), at: 5)
+        let expanded = ForEach(changed) { item in Text("Row \(item.value)") }
+        XCTAssertFalse(expanded.hasSameLazyIdentities(as: before))
     }
 
     func testParentUpdatesReuseIdentitiesAndKeepFreshRowBuilders() throws {
