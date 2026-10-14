@@ -63,9 +63,16 @@ element. A write to a state no live element reads cannot change the screen, so
 it asks for nothing - no dirty tree, no wake - and is counted in the tally's
 `refused` column.
 
-An element's reads are fixed for its life, because the count must be taken
-back exactly as it was given. A build that read something else makes a new
-element.
+An element's reads are counted exactly as they stand. A full build makes a
+new rendered element; a viewport-only lazy update replaces just its row-read
+set and adjusts the added and removed reader counts. Container/body reads are
+kept separately from row-closure reads. Leaving the viewport drops a row's
+dependencies, while retained rows keep theirs without running their builders
+again. A window update does not arm another container observation token.
+
+Observation callbacks hold their token weakly. The renderer owns that token
+while a live element reads it, so a model cannot keep an abandoned observation
+alive through its callback.
 
 A state's own `readAtBuild` flag spares even the call to the renderer: a state
 no build ever read has no reader to find. The flag is sticky - a state read

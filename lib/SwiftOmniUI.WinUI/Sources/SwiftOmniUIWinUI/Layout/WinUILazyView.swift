@@ -76,7 +76,7 @@ class WinUILazyView: WinUITravellingLayout {
         }) else { return }
         for (identity, previous) in mounted {
             if now[identity]?.view !== previous.view {
-                swiftomniui_winui_scroller_anchor(previous.view.handle, false)
+                swiftomniui_winui_scroller_anchor(previous.view.presentationHandle, false)
             }
             if now[identity]?.view !== previous.view || now[identity]?.values != previous.values {
                 measured.removeValue(forKey: identity)
@@ -88,7 +88,7 @@ class WinUILazyView: WinUITravellingLayout {
             item.item.view.placingLayout = self
             if mounted[item.identity]?.view !== item.item.view
                 || mounted[item.identity]?.departing != item.item.departing {
-                swiftomniui_winui_scroller_anchor(item.item.view.handle, !item.item.departing)
+                swiftomniui_winui_scroller_anchor(item.item.view.presentationHandle, !item.item.departing)
             }
         }
         mounted = now
@@ -181,6 +181,12 @@ class WinUILazyView: WinUITravellingLayout {
             || measuredRevision != measurementRevision || geometryChanged
             || cells.retained != keeping
         else { return }
+        // Never replace native rows during a pass that cannot measure their
+        // replacements. The frame clock resumes this whole update after the pass.
+        guard WinUIView.arranging == 0, WinUIView.measuring == 0 else {
+            retell()
+            return
+        }
         let previous = lastTargetViewport
         lastTargetViewport = target
         if !cells.needsMeasurement, !geometryChanged, !cells.animatesChanges,

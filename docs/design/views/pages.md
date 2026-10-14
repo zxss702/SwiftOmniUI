@@ -22,6 +22,14 @@ arrangement. The sessions are objects in the environment of everything under
 them, written like any state - usually from the `.onAppear` of what is shown -
 so the tree is steered by `@State` and `@Environment` alone.
 
+## Popovers
+
+A popover keeps an anchored native slot, but its content closure is evaluated
+only while its presentation binding is true. Closing removes that content
+subtree and ends its lifecycle. A closed popover in a lazy row builds no hidden
+controls and runs no content appearance handlers; recycling rows must not
+initialize their unopened detail pages.
+
 ## Scenes
 
 A scene is one session of the application: a main window, the windows that

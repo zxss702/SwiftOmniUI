@@ -19,6 +19,10 @@ extension WinUIElement: FrameReporter {
         // Retained navigation pages have no current layout. Their temporary
         // empty attachment must not replace a reader's last real proposal.
         if element.isGeometryReader, frame.width <= 0 || frame.height <= 0 { return }
+        if element.readsOnlyDrawingSize {
+            element.reportDrawingSize(Size(frame.width, frame.height), in: host.runtime)
+            return
+        }
         let named = element.namedSpaceFrames { ancestor in
             guard let ancestorView = (ancestor.native as? WinUIElement)?.view else { return nil }
             let origin = ancestorView.origin

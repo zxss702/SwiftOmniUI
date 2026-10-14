@@ -205,15 +205,23 @@ final class Differ {
         if windowOnly, var source = rendered.lazySource {
             // Scrolling changes only the selected identities. Keep the prepared
             // ForEach source and its index; new row reads still join this element.
-            var reads = rendered.reads
+            var reads = rendered.lazySourceReads
+            let retained = Dictionary(rendered.children.compactMap { child -> (String, String)? in
+                guard case .manual(let id) = child.id else { return nil }
+                return (child.lazyIdentity ?? id, id)
+            }, uniquingKeysWith: { first, _ in first })
             let frame = BuildScope.Frame(
                 view: rendered.view ?? rendered.type.name,
                 builds: rendered.builds + 1,
                 read: reads, changed: changed, names: named, everything: false)
-            ReadScope.observed(into: &reads) {
-                BuildScope.within(frame) { source.materialize() }
+            // The source was already observed when it was described. New row
+            // closures arm their own observations; a window must not accumulate
+            // another container observation token on every scroll notice.
+            ReadScope.collect(into: &reads) {
+                BuildScope.within(frame) { source.materialize(reusing: retained) }
             }
-            rendered.reads = reads
+            rendered.lazySourceReads = reads
+            rendered.reads = reads.union(source.lazyRowReadings?.states ?? [])
             rendered.builds += 1
             rendered.children = reconcileChildren(
                 of: rendered, node: source, into: &patch, sizesArrive: rendered.sizesArrive,

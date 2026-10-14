@@ -22,6 +22,25 @@ struct CounterPage: View {
 }
 
 final class WinUIRendererTests: XCTestCase {
+    func testPendingLayoutWorkRunsOnAFrameWithoutWaitingForADispatcherTurn() {
+        onUIThread {
+            let host = WinUIRenderer.running { Text("Page") }
+            let count = State(wrappedValue: 0)
+            WinUIDoorbell.afterPass { count.wrappedValue += 1 }
+            XCTAssertTrue(host.wantsFrames)
+            do {
+                let previous = WinUIView.arranging
+                WinUIView.arranging += 1
+                defer { WinUIView.arranging = previous }
+                WinUIDoorbell.commitPending()
+                XCTAssertEqual(count.wrappedValue, 0, "work remains deferred inside native arrangement")
+            }
+            host.commitUserReports(now: 0)
+            XCTAssertEqual(count.wrappedValue, 1, "the frame commits work before presenting its viewport")
+            WinUIDoorbell.turn()
+            XCTAssertEqual(count.wrappedValue, 1, "the queued turn must not run it twice")
+        }
+    }
     /// A page's controls are WinUI's, shown in a window: the words it describes are the words WinUI holds.
     func testThePageShowsItsControlsInAWindow() {
         onUIThread {

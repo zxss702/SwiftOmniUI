@@ -84,6 +84,9 @@ final class RenderedNode {
     /// A data or environment rebuild replaces this with a fresh description.
     var lazySource: Node?
 
+    /// Container/body dependencies kept separately from the current window's row reads.
+    var lazySourceReads: Set<ObjectIdentifier> = []
+
     /// How many times this element has been described, for `debugInfo()`.
     var builds: Int
 

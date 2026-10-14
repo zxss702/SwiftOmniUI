@@ -296,45 +296,63 @@ struct LazyHStackElement: StackBase {
         let rowStack: PropValue? = node.type == .lazyVStack || node.type == .lazyHStack
             ? .numbers([node.type == .lazyHStack ? 1 : 0, node.props[.spacing]?.number ?? 0]) : nil
         node.lazyWindow = realized.lender.map(ObjectIdentifier.init)
-        node.producer = {
-            realized.wrappedValue.filter { positions[$0] != nil }
+        let readings = LazyRowReadings()
+        node.lazyRowReadings = readings
+        let make: ([String: String]) -> [Node] = { retained in
+            var nextReads: [String: Set<ObjectIdentifier>] = [:]
+            let nodes: [Node] = realized.wrappedValue.filter { positions[$0] != nil }
                 .sorted { positions[$0]! < positions[$1]! }
                 .compactMap { identity in
-                guard let owner = owned[identity] else { return nil }
-                var child: Node
-                switch segments[owner.segment] {
-                case .nodes(let nodes):
-                    child = nodes[owner.local]
-                case .rows(let rows):
-                    child = rows.lazyRow(at: owner.local).node
-                }
-                if child.type == .fragment { child.materialize() }
-                // A builder fragment has no box. Apply the container's defaults to its actual
-                // children, where explicit alignment and flexible frame modifiers are visible.
-                if child.type == .fragment, child.children.count == 1 {
-                    child.children[0].lazyIdentity = identity
-                } else if child.type != .fragment {
-                    child.lazyIdentity = identity
-                }
-                if child.type == .fragment {
-                    for index in child.children.indices { prepare(&child.children[index], owner.place) }
-                } else {
-                    prepare(&child, owner.place)
-                }
-                if child.type != .fragment { child.props[.lazyRowStack] = rowStack }
-                // A fragment is retained by the differ even though only
-                // its children mount. Its identity must survive window shifts too.
-                if child.id == nil { child.id = identity }
-                if child.type == .fragment {
-                    var variant = 0
-                    for index in child.children.indices where child.children[index].id == nil {
-                        child.children[index].id = variant == 0 ? identity : "\(identity)\u{0}\(variant)"
-                        variant += 1
+                    guard let owner = owned[identity] else { return nil }
+                    if let id = retained[identity] {
+                        // reconcileChildren keeps the existing rendered subtree. Do
+                        // not construct a view just to discard its description there.
+                        var kept = Node(type: .fragment, id: id)
+                        kept.lazyIdentity = identity
+                        nextReads[identity] = readings.rows[identity] ?? []
+                        return kept
                     }
+                    let (made, rowReads) = ReadScope.observed { () -> Node in
+                        var child: Node
+                        switch segments[owner.segment] {
+                        case .nodes(let nodes):
+                            child = nodes[owner.local]
+                        case .rows(let rows):
+                            child = rows.lazyRow(at: owner.local).node
+                        }
+                        if child.type == .fragment { child.materialize() }
+                        // A builder fragment has no box. Apply the container's defaults to its actual
+                        // children, where explicit alignment and flexible frame modifiers are visible.
+                        if child.type == .fragment, child.children.count == 1 {
+                            child.children[0].lazyIdentity = identity
+                        }
+                        child.lazyIdentity = identity
+                        if child.type == .fragment {
+                            for index in child.children.indices { prepare(&child.children[index], owner.place) }
+                        } else {
+                            prepare(&child, owner.place)
+                        }
+                        if child.type != .fragment { child.props[.lazyRowStack] = rowStack }
+                        // A fragment is retained by the differ even though only
+                        // its children mount. Its identity must survive window shifts too.
+                        if child.id == nil { child.id = identity }
+                        if child.type == .fragment {
+                            var variant = 0
+                            for index in child.children.indices where child.children[index].id == nil {
+                                child.children[index].id = variant == 0 ? identity : "\(identity)\u{0}\(variant)"
+                                variant += 1
+                            }
+                        }
+                        return child
+                    }
+                    nextReads[identity] = rowReads
+                    return made
                 }
-                return child
-            }
+            readings.rows = nextReads
+            return nodes
         }
+        node.lazyProducer = make
+        node.producer = { make([:]) }
         return identities
     }
 

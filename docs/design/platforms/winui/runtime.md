@@ -103,7 +103,12 @@ executor until the host drains them. A thread of the host's own parks until
 the core has work, and posts one turn to the UI thread's `DispatcherQueue`
 through the relay; the turn runs on the UI thread among WinUI's own work.
 What a layout pass decides - a split view's first room - waits in the doorbell
-until the pass is over, and runs as the next turn it posts begins.
+until the pass is over. It runs at the start of either the next posted turn
+or the next composed frame, before that frame's user reports. The shared
+queue is taken once, so the other callback cannot execute the same work
+again. Pending work holds the frame clock; lazy realization and deferred
+measurement therefore do not depend exclusively on dispatcher progress
+during continuous input.
 
 The thread is started from a nonisolated function: a closure written inside a
 `MainActor` function is `MainActor`'s, and the runtime reports it as a data

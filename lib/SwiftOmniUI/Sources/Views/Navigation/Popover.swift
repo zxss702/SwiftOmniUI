@@ -10,14 +10,17 @@ struct Popover<Content: View>: View {
 
     /// What the modifier keeps.
     var node: Node
+    private let content: () -> Content
 
     /// - Parameters:
     ///   - isPresented: whether the popover shows, both ways.
     ///   - arrowEdge: the edge of the anchor its arrow prefers to stand on.
     ///   - content: the popover's view.
     init(isPresented: Binding<Bool>, arrowEdge: Edge,
-         @ViewBuilder content: () -> Content) {
-        var node = Node(contract: PopoverContract.self, children: content().node.asChildren)
+         @ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+        var node = Node(contract: PopoverContract.self)
+        node.producer = { isPresented.wrappedValue ? content().node.asChildren : [] }
         node.props[.arrowEdge] = arrowEdge.propValue
         node.drivePlain(PopoverContract.isOpen, by: isPresented)
         node.environmentValues[keyPath: \.dismiss] = DismissAction { [isPresented] in
@@ -36,12 +39,23 @@ extension Popover: PropertyContainer {
 
     /// Whether the popover shows, by what the value says.
     @_spi(Host) public func isOpen(_ value: Bool) -> Popover {
-        setValue(PopoverContract.isOpen, value)
+        let content = content
+        return modified {
+            $0.driven[.isOpen] = nil
+            $0.write(PopoverContract.isOpen, value)
+            $0.producer = { value ? content().node.asChildren : [] }
+        }
     }
 
     /// Whether the popover shows, by what the binding says.
     @_spi(Host) public func isOpen(_ binding: Binding<Bool>) -> Popover {
-        modified { $0.drivePlain(PopoverContract.isOpen, by: binding) }
+        let content = content
+        return modified {
+            $0.drivePlain(PopoverContract.isOpen, by: binding)
+            $0.producer = { binding.wrappedValue ? content().node.asChildren : [] }
+            $0.environmentValues[keyPath: \.dismiss] = DismissAction { binding.wrappedValue = false }
+            $0.events[.dismissed] = { binding.wrappedValue = false }
+        }
     }
 
     /// The edge of the anchor the popover's arrow prefers to stand on.

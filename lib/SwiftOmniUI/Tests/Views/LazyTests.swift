@@ -5,6 +5,7 @@
 // order, and only the rows a host's window asks for built - each on its own.
 
 import XCTest
+import Observation
 
 @_spi(Host) @testable import SwiftOmniUICore
 
@@ -21,6 +22,10 @@ private final class Built {
 private final class LazyRowContext {
     let prefix: String
     init(_ prefix: String) { self.prefix = prefix }
+}
+
+@Observable private final class ObservedLazyItem {
+    var value = 0
 }
 
 private struct OwnedLazyRow: View {
@@ -460,7 +465,103 @@ private struct LazyPage: View {
         XCTAssertEqual(moved.children.map(\.id), [.manual("0.4"), .manual("0.500")])
         XCTAssertNil(moved.child("0.3"), "the row the window left is let go")
         XCTAssertEqual(built.numbers[500], 1, "the new row was built once")
+        XCTAssertEqual(built.numbers[4], 1, "a retained row must be reused before executing its builder")
         XCTAssertEqual(built.numbers[3], 1, "the row let go was never rebuilt")
+    }
+
+    func testScrollingDropsDepartedRowClosureDependencies() throws {
+        let states = (0..<1_000).map { State(wrappedValue: $0) }
+        let renders = Renders()
+        let stack = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack {
+                ForEach(0..<1_000) { number in
+                    Text("\(states[number].wrappedValue)")
+                }
+            }
+        }.node))
+        _ = try realize(["0.3", "0.4"], in: renders, lazy: stack)
+        XCTAssertTrue(Renderer.shared.isRead(states[3].storage))
+        XCTAssertTrue(Renderer.shared.isRead(states[4].storage))
+        _ = try realize(["0.4", "0.500"], in: renders, lazy: stack)
+        XCTAssertFalse(Renderer.shared.isRead(states[3].storage), "a departed closure is no longer a live reader")
+        XCTAssertTrue(Renderer.shared.isRead(states[4].storage), "reuse preserves the retained closure's reads")
+        XCTAssertTrue(Renderer.shared.isRead(states[500].storage))
+        Renderer.shared.clearInvalidation()
+        states[3].wrappedValue = 30
+        XCTAssertFalse(Renderer.shared.needsRender, "offscreen rows must not accumulate invalidations")
+        states[4].wrappedValue = 40
+        let changed = try lazy(.lazyVStack, in: renders.revisit(changed: Renderer.shared.pendingChanges))
+        XCTAssertEqual(changed.child("0.4")?.props[.text], .string("40"))
+    }
+
+    func testViewportReuseKeepsExplicitIdsAndFragmentRowsWithoutBuildingThemAgain() throws {
+        let built = Built()
+        let renders = Renders()
+        let stack = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack {
+                ForEach(0..<1_000) { number in
+                    built.numbers[number, default: 0] += 1
+                    return Group {
+                        Text("Row \(number)").id("label-\(number)")
+                        Text("Kind")
+                    }
+                    .id("entry-\(number)")
+                    .transition(.opacity)
+                }
+            }
+        }.node))
+        _ = try realize(["0.3", "0.4"], in: renders, lazy: stack)
+        let moved = try lazy(.lazyVStack, in: realize(["0.4", "0.5"], in: renders, lazy: stack))
+        XCTAssertEqual(built.numbers, [3: 1, 4: 1, 5: 1])
+        XCTAssertNotNil(moved.child("label-4"))
+        XCTAssertNotNil(moved.child("label-5"))
+    }
+
+    func testWindowObservationsStayBoundedWhileTraversingTheWholeSource() throws {
+        let differ = Differ()
+        var root = differ.reconcile(nil, with: LazyPage {
+            LazyVStack {
+                ForEach(0..<10_000) { Text("Row \($0)") }
+            }
+        }.node).node
+        func find(_ node: RenderedNode) -> RenderedNode? {
+            if node.lazySource != nil { return node }
+            return node.children.lazy.compactMap(find).first
+        }
+        let list = try XCTUnwrap(find(root))
+        let sourceReads = list.lazySourceReads.count
+        let window = try XCTUnwrap(list.lazySource?.lazyWindow)
+        for first in stride(from: 0, through: 9_990, by: 90) {
+            let id = try XCTUnwrap(list.events[.realizedChanged])
+            let callback = try XCTUnwrap(differ.handler(id))
+            EventBuffer.current = [.strings((first..<first + 8).map { "0.\($0)" })]
+            Renderer.shared.start(callback)
+            root = differ.revisit(root, changed: [window]).node
+            XCTAssertEqual(list.lazySourceReads.count, sourceReads, "scrolling does not append source observation tokens")
+            XCTAssertLessThanOrEqual(list.reads.count, sourceReads + 8, "only current row observations remain live")
+            XCTAssertEqual(list.children.count, 8)
+        }
+    }
+
+    func testAnOffscreenObservableItemNoLongerInvalidatesTheContainer() throws {
+        let items = (0..<1_000).map { _ in ObservedLazyItem() }
+        let renders = Renders()
+        let stack = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack {
+                ForEach(items.indices) { number in
+                    Text("\(items[number].value)")
+                }
+            }
+        }.node))
+        _ = try realize(["0.3", "0.4"], in: renders, lazy: stack)
+        _ = try realize(["0.4", "0.500"], in: renders, lazy: stack)
+        Renderer.shared.clearInvalidation()
+        items[3].value = 30
+        XCTAssertFalse(Renderer.shared.needsRender)
+        items[4].value = 40
+        XCTAssertTrue(Renderer.shared.needsRender)
+        let changed = try lazy(.lazyVStack, in: renders.revisit(changed: Renderer.shared.pendingChanges))
+        XCTAssertEqual(changed.child("0.4")?.props[.text], .string("40"))
     }
 
     /// A row's own `.id()` names it - the window's asking follows it rather

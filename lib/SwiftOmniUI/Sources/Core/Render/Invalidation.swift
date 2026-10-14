@@ -82,7 +82,8 @@ enum ReadScope {
 
         let value = withObservationTracking {
             collect(into: &reads, build)
-        } onChange: {
+        } onChange: { [weak token] in
+            guard let token else { return }
             Renderer.shared.stateChanged(token)
         }
 

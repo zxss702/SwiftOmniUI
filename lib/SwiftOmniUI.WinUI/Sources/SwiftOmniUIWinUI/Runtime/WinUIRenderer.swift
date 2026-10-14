@@ -204,10 +204,11 @@ extension WinUIRenderer: TurnPresenter {
 
 extension WinUIRenderer: FramePresenter {
     var wantsFrames: Bool {
-        runtime.frames.wantsFrames
+        runtime.frames.wantsFrames || WinUIDoorbell.hasPendingWork
     }
 
     func commitUserReports(now: Double) {
+        WinUIDoorbell.commitPending()
         runtime.frames.commit(now: now)
     }
 

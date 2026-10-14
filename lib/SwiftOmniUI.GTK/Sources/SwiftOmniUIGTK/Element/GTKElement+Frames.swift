@@ -15,6 +15,11 @@ extension GTKElement: FrameReporter {
     /// Says where the element stands, where that changed (`MountedElement.reportFrame`); nothing while it stands
     /// nowhere yet.
     func reportFrame() {
+        if element.readsOnlyDrawingSize {
+            guard let host, let size = view?.drawingSize() else { return }
+            element.reportDrawingSize(size, in: host.runtime)
+            return
+        }
         guard let host, let numbers = view?.frameReport() else { return }
         let named = element.namedSpaceFrames { ($0.native as? GTKElement)?.view?.windowRect() }
         element.reportFrame(numbers, named: named, in: host.runtime,

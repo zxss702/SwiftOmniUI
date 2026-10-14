@@ -127,8 +127,17 @@ a growing render and native arrangement for each unknown row. Look-ahead
 and neighbour policy still bound realization; nothing requests the entire
 source merely because its rows have no measurements yet.
 
+Viewport-only reconciliation names retained source identities before
+materializing content. Those rows reuse their rendered subtrees without
+executing the row closure or constructing another view description. New
+rows alone run their builders. Explicit ids and transparent fragments retain
+their source identity independently of the ids mounted by the host.
+
 WinUI completes the fill in the viewport callback when measurement is
 allowed; a callback within another layout or patch resumes after that pass.
+It does not replace rows inside native measure or arrange. Pending work keeps
+the frame clock held and can resume on the next composed frame as well as a
+dispatcher turn.
 It waits for requested fragments to commit before interpreting missing
 native children as empty content, then arranges the resulting window once.
 GTK and WinUI source changes keep surviving rows'

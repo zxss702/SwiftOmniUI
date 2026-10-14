@@ -300,10 +300,19 @@ public struct Node {
     /// Only this state changing can reuse a lazy container's prepared source.
     var lazyWindow: ObjectIdentifier?
 
+    /// A viewport-only materialization can name retained rows before calling
+    /// their builders. Values are their existing manual ids, including explicit ids.
+    var lazyProducer: (([String: String]) -> [Node])?
+    var lazyRowReadings: LazyRowReadings?
+
     /// Runs the producer, if pending, filing its nodes ahead of the slots. Idempotent.
-    mutating func materialize() {
+    mutating func materialize(reusing rows: [String: String] = [:]) {
         lazyContent = nil
-        if let make = producer {
+        if let make = lazyProducer {
+            lazyProducer = nil
+            producer = nil
+            children = make(rows) + children
+        } else if let make = producer {
             producer = nil
             children = make() + children
         }

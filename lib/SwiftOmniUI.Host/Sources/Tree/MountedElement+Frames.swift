@@ -51,6 +51,20 @@ extension MountedElement {
             || events[.textFrameChanged] != nil || events[.drawingSizeChanged] != nil
     }
 
+    /// Canvas and Shape need local allocation sizes, not window coordinates or named spaces.
+    public var readsOnlyDrawingSize: Bool {
+        events[.drawingSizeChanged] != nil && driven[.frame] == nil
+            && events[.frameChanged] == nil && events[.namedFramesChanged] == nil
+            && events[.safeAreaInsetsChanged] == nil && events[.textFrameChanged] == nil
+    }
+
+    /// Commits a changed local allocation size, leaving full coordinate reports untouched.
+    public func reportDrawingSize(_ size: Size, in runtime: HostRuntime) {
+        guard size != reportedDrawingSize, let handler = handler(.drawingSizeChanged) else { return }
+        reportedDrawingSize = size
+        runtime.dispatch(handler, payload: [.numbers([size.width, size.height])])
+    }
+
     /// Says where the element stands - `numbers`, a frame report's ten, and the named spaces enclosing it -
     /// where that changed since it last said: its place in its parent onto the state its frame drives, the
     /// named spaces ahead of the numbers so one pass hears them together, and the whole report to its handler.
@@ -81,13 +95,7 @@ extension MountedElement {
                 runtime.dispatch(handler, payload: [geometryInsets.propValue])
             }
         }
-        if numbers.count >= 4, let handler = handler(.drawingSizeChanged) {
-            let size = Size(numbers[2], numbers[3])
-            if size != reportedDrawingSize {
-                reportedDrawingSize = size
-                runtime.dispatch(handler, payload: [.numbers([size.width, size.height])])
-            }
-        }
+        if numbers.count >= 4 { reportDrawingSize(Size(numbers[2], numbers[3]), in: runtime) }
         guard numbers != reportedFrame || insetsChanged else { return }
         reportedFrame = numbers
         if let binding = driven[.frame] {

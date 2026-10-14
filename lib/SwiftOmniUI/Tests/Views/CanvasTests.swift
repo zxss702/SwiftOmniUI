@@ -114,8 +114,9 @@ import XCTest
         let renders = Renders()
         let first = renders.render(canvas.node)
         XCTAssertFalse(first.subtree.contains { $0.type == CanvasContract.nodeType }, "no invented zero-size drawing")
-        let frame = try XCTUnwrap(first.events?[ViewContract.frameChanged.token])
-        renders.fire(frame, with: [.numbers([0, 0, 120, 80, 0, 0, 0, 0, 120, 80])])
+        XCTAssertNil(first.events?[ViewContract.frameChanged.token], "drawing has no dependency on window coordinates")
+        let frame = try XCTUnwrap(first.events?[ViewContract.drawingSizeChanged.token])
+        renders.fire(frame, with: [.numbers([120, 80])])
         let second = renders.render(canvas.node, changed: Renderer.shared.pendingChanges)
         let leaf = try XCTUnwrap(second.subtree.first { $0.type == CanvasContract.nodeType })
         let commands = try XCTUnwrap(leaf.props["drawable"]?.values?.compactMap(DrawCommand.init(propValue:)))
@@ -124,5 +125,7 @@ import XCTest
             Draw.fillGeometry(Path(roundedRect: Rect(0, 0, 120, 40), cornerRadius: 8)),
         ])
         Renderer.shared.clearInvalidation()
+        renders.fire(frame, with: [.numbers([120, 80])])
+        XCTAssertFalse(Renderer.shared.needsRender, "an unchanged local drawing size needs no new drawing")
     }
 }

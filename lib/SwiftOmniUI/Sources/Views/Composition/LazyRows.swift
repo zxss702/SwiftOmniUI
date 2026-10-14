@@ -26,6 +26,15 @@ protocol LazyRows: Element {
     func lazyRow(at index: Int) -> any Element
 }
 
+/// UI-thread-owned dependencies of the currently requested row closures.
+/// Dropping a row drops these reads as well as its rendered subtree.
+final class LazyRowReadings {
+    var rows: [String: Set<ObjectIdentifier>] = [:]
+    var states: Set<ObjectIdentifier> {
+        rows.values.reduce(into: Set<ObjectIdentifier>()) { $0.formUnion($1) }
+    }
+}
+
 extension Node {
     /// Opens transparent composition without expanding a row source. The fragment's
     /// writes are retained on each piece, including content added as a slot.

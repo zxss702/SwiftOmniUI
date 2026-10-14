@@ -42,6 +42,8 @@ class GTKView {
 
     func clearSafeBarDrawing() {
         safeBarDrawing = nil
+        inheritedBlur = 0
+        writeBlur()
         setPlacedDrawing(nil, opacity: 1)
     }
 
@@ -51,6 +53,7 @@ class GTKView {
         (nativeSafeBarOwner as? GTKView)?.setEnabled(sourceElement?.safeBarIsEnabled ?? true)
         var matrix = HostMatrix.identity
         var opacity = 1.0
+        var blurVariance = 0.0
         var x = placedFrame.x, y = placedFrame.y
         var totalX = 0.0, totalY = 0.0
         var next = sourceElement?.parent
@@ -64,6 +67,7 @@ class GTKView {
                 totalY += y
                 matrix = matrix * moved * view.transform.under(view.placedDrawing).matrix(width: frame.width, height: frame.height)
                 opacity *= view.opacity * view.placedOpacity
+                blurVariance += view.blur * view.blur
                 x = frame.x
                 y = frame.y
                 if element.type == .page { break }
@@ -76,6 +80,8 @@ class GTKView {
         let drawing = matrix * unmoved
         let changed = safeBarDrawing != drawing
         safeBarDrawing = drawing
+        inheritedBlur = blurVariance.squareRoot()
+        writeBlur()
         setPlacedDrawing(placedDrawing, opacity: opacity)
         if changed, Self.allocating == 0, let host = nativeSafeBarOwner as? GTKLayoutView {
             gtk_widget_queue_allocate(host.widget)
@@ -119,6 +125,13 @@ class GTKView {
     /// How opaque the view's own property draws it, and whether it shows, as the host last wrote them.
     private(set) var opacity = 1.0
     private(set) var isShown = true
+
+    /// Blur is drawing, in logical pixels. A local provider changes only this
+    /// widget's filter; animated radii never grow the display-wide style sheet.
+    private(set) var blur = 0.0
+    private var inheritedBlur = 0.0
+    private var writtenBlur = 0.0
+    private var blurProvider: UnsafeMutablePointer<GtkCssProvider>?
 
     /// What assistive technology meets of the view, as the host last wrote it; nil before the element said any.
     var accessibility: AccessibilityWords?
@@ -165,6 +178,7 @@ class GTKView {
     isolated deinit {
         Self.live.release(number)
         contextMenu?.remove()
+        if let blurProvider { g_object_unref(blurProvider) }
         if let parent = gtk_widget_get_parent(widget), GTKPanel.holds(parent) { gtk_widget_unparent(widget) }
         g_object_unref(widget)
     }
@@ -209,6 +223,41 @@ class GTKView {
         self.opacity = opacity
         gtk_widget_set_opacity(widget, opacity * placedOpacity)
         refreshNativeSafeBarDrawing()
+    }
+
+    func setBlur(_ radius: Double) {
+        let radius = radius.isFinite ? max(0, radius) : 0
+        guard radius != blur else { return }
+        blur = radius
+        writeBlur()
+        refreshNativeSafeBarDrawing()
+    }
+
+    private func writeBlur() {
+        // Successive Gaussian filters add their variances. A promoted bar has
+        // left its native ancestors, so reproduce their filter on its own root.
+        let radius = (blur * blur + inheritedBlur * inheritedBlur).squareRoot()
+        guard radius != writtenBlur else { return }
+        writtenBlur = radius
+        let context = gtk_widget_get_style_context(widget)!
+        if radius == 0 {
+            if let blurProvider {
+                gtk_style_context_remove_provider(context, blurProvider.opaque)
+                g_object_unref(blurProvider)
+                self.blurProvider = nil
+            }
+            gtk_widget_queue_draw(widget)
+            return
+        }
+        let provider = blurProvider ?? gtk_css_provider_new()!
+        // GTK implements CSS blur as a GSK blur node around the entire widget
+        // snapshot, including native controls and the custom panel's children.
+        gtk_css_provider_load_from_string(provider, "* { filter: blur(\(radius)px); }")
+        if blurProvider == nil {
+            gtk_style_context_add_provider(context, provider.opaque, guint(GTK_STYLE_PROVIDER_PRIORITY_APPLICATION + 1))
+            blurProvider = provider
+        }
+        gtk_widget_queue_draw(widget)
     }
 
     /// How a placing layout's run draws the view, and how opaque, over its own; nil draws it as its own say.
@@ -275,6 +324,12 @@ class GTKView {
 
         gtk_widget_measure(widget, GTK_ORIENTATION_VERTICAL, Int32(measuredWidth), &least, &natural, nil, nil)
         return LayoutSize(width: measuredWidth, height: Double(natural))
+    }
+
+    /// Local allocated dimensions, without ancestor traversal or coordinate transforms.
+    func drawingSize() -> Size? {
+        guard gtk_widget_get_root(widget) != nil, isLaidOut else { return nil }
+        return Size(Double(gtk_widget_get_width(widget)), Double(gtk_widget_get_height(widget)))
     }
 
     /// Where the view stands, in logical pixels: its frame in its parent, its place in the window, and the frame

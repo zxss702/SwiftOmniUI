@@ -30,10 +30,17 @@ enum WinUIDoorbell {
 
     /// A turn the relay posted: the work a layout pass left, then the turn.
     @MainActor static func turn() {
+        commitPending()
+        WinUIRenderer.shared?.runtime.pump.turn()
+    }
+
+    /// Also drained by CompositionTarget.Rendering: realization and measurement
+    /// must not wait for the ordinary dispatcher turn while input keeps arriving.
+    @MainActor static func commitPending() {
+        guard WinUIView.arranging == 0, WinUIView.measuring == 0 else { return }
         let works = pending
         pending = []
         for work in works { work() }
-        WinUIRenderer.shared?.runtime.pump.turn()
     }
 }
 
@@ -44,7 +51,10 @@ extension WinUIDoorbell {
         let needsTurn = pending.isEmpty
         pending.append(work)
         if needsTurn { swiftomniui_winui_post_turn() }
+        WinUIRenderer.shared?.runtime.displayCycle.hold()
     }
+
+    @MainActor static var hasPendingWork: Bool { !pending.isEmpty }
 
     /// Work waiting for the pass under way to end.
     @MainActor private static var pending: [@MainActor () -> Void] = []

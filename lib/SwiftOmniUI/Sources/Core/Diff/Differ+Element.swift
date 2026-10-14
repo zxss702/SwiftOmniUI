@@ -289,7 +289,7 @@ extension Differ {
         }
 
         let lazySource = node.lazyWindow != nil ? node : nil
-        node = ReadScope.observed(into: &reads) {
+        let materialize = { () -> Node in
             let shallow = { () -> Node in
                 var made = node
                 made.materialize()
@@ -299,6 +299,14 @@ extension Differ {
             guard let within else { return shallow() }
 
             return BuildScope.within(within, shallow)
+        }
+        // Each lazy row observes its own closure. Observing the complete
+        // materialization here would also subscribe the container to every
+        // row's models, keeping those subscriptions after the rows leave.
+        node = if lazySource?.lazyProducer != nil {
+            ReadScope.collect(into: &reads, materialize)
+        } else {
+            ReadScope.observed(into: &reads, materialize)
         }
 
         // An aim on the root of a composed view's content is the same element.
@@ -348,6 +356,7 @@ extension Differ {
                 seen: seen,
                 children: children)
             result.environmentValues = node.environmentValues
+            result.lazyIdentity = node.lazyIdentity
             // Its writes and listeners fanned out into the children above; what
             // a parent's fold reads of it is theirs alone.
             result.preferenceValues = foldedPreferences(seeds: [], transforms: [], children: children)
@@ -662,6 +671,8 @@ extension Differ {
                 return PreferenceWatch(box: observer.box, last: answer, run: observer.run)
             }
 
+        let sourceReads = reads
+        reads.formUnion(lazySource?.lazyRowReadings?.states ?? [])
         let result = RenderedNode(
             id: id,
             type: node.type,
@@ -686,6 +697,7 @@ extension Differ {
         )
         result.environmentValues = node.environmentValues
         result.lazySource = lazySource
+        result.lazySourceReads = sourceReads
         result.lazyIdentity = node.lazyIdentity
         result.sizesArrive = sizesArrive
         result.visualInput = visualInput

@@ -67,6 +67,59 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on GTK answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class GTKLazyTests: XCTestCase {
+    func testGraphRowsReleaseOffscreenViewsAndNeverBuildClosedDetails() throws {
+        try onUIThread {
+            let builds = ModifiedLazyBuilds()
+            let host = GTKRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<10_000) { number in
+                            HStack(spacing: 0) {
+                                Canvas { context, size in
+                                    context.fill(Path(Rect(0, 0, size.width, size.height)), with: .color(Color("#FF0000")))
+                                    var path = Path()
+                                    path.move(to: Point(16, 0))
+                                    path.addCurve(to: Point(48, size.height),
+                                                  control1: Point(16, 16), control2: Point(48, 16))
+                                    context.stroke(path, with: .color(.white), lineWidth: 2)
+                                }
+                                .frame(width: 100, height: 32)
+                                Text("Commit \(number)")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 32)
+                            .popover(isPresented: Binding(get: { false }, set: { _ in })) {
+                                builds.calls += 1
+                                return Text("Hidden detail")
+                                    .onAppear { builds.numbers.insert(number) }
+                            }
+                        }
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
+            let scroll = try XCTUnwrap(host.views(GTKScrollView.self).first)
+            let baseline = GTKView.liveCount
+            weak var departed: GTKView? = lazy.mounted.values.first?.view
+            XCTAssertNotNil(departed)
+            for offset in stride(from: 4_000.0, through: 24_000.0, by: 4_000) {
+                scroll.scroller.move(to: Point(0, offset))
+                for _ in 0..<12 { host.step(); host.frame() }
+                XCTAssertNil(departed, "offscreen native rows must be released rather than retained by scroll history")
+                XCTAssertLessThan(lazy.mounted.count, 80)
+                XCTAssertLessThan(GTKView.liveCount, baseline + 300, "the live tree stays bounded by the viewport")
+                XCTAssertEqual(builds.calls, 0, "closed details must not build during initialization or recycling")
+                XCTAssertTrue(builds.numbers.isEmpty, "closed details must not start their onAppear work")
+                XCTAssertEqual(host.views(GTKCanvasView.self).count, lazy.mounted.count)
+                let canvas = try XCTUnwrap(host.views(GTKCanvasView.self).first)
+                let pixels = GTKTestHost.pixels(of: canvas.widget, at: [(8, 16)])
+                XCTAssertEqual(pixels, [0xFFFF0000], "newly realized graph rows have painted their native surface")
+            }
+        }
+    }
+
     func testFolderExpansionRetainsSurvivingRowMeasurements() throws {
         try onUIThread {
             let original = Array(0..<1_000)

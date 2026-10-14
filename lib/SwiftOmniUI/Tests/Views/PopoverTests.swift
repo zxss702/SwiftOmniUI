@@ -20,6 +20,35 @@ import XCTest
 
     @State private var shown = true
 
+    func testClosedPopoverDoesNotBuildOrStartItsContent() throws {
+        shown = false
+        var builds = 0
+        var appearances = 0
+        var disappearances = 0
+        let renders = Renders()
+        let node = Text("anchor").popover(isPresented: $shown) {
+            builds += 1
+            return Text("card")
+                .onAppear { appearances += 1 }
+                .onDisappear { disappearances += 1 }
+        }.node
+        let initial = renders.render(node)
+        let id = try XCTUnwrap(initial.subtree.first { $0.type == .popover }?.id)
+        XCTAssertEqual(builds, 0)
+        XCTAssertEqual(appearances, 0)
+        for visit in 1...2 {
+            shown = true
+            _ = renders.revisit(changed: [ObjectIdentifier(_shown.storage)])
+            XCTAssertEqual(builds, visit)
+            XCTAssertEqual(appearances, visit)
+            shown = false
+            let closed = renders.revisit(changed: [ObjectIdentifier(_shown.storage)])
+            XCTAssertEqual(disappearances, visit)
+            XCTAssertEqual(builds, visit)
+            XCTAssertEqual(closed.subtree.first { $0.id == id }?.children.count, 0)
+        }
+    }
+
     private func popover(_ view: some View) -> Node? {
         view.node.built.children.first { $0.type == "Popover" }
     }
@@ -49,6 +78,8 @@ import XCTest
     func testTheMembersWriteAndDriveIsOpen() throws {
         let closed = Popover(isPresented: $shown, arrowEdge: .top) { Text("card") }.isOpen(false)
         XCTAssertEqual(closed.node.props[.isOpen], Bool(false).propValue)
+        XCTAssertNil(closed.node.driven[.isOpen])
+        XCTAssertTrue(closed.node.built.children.isEmpty)
 
         let driven = Popover(isPresented: $shown, arrowEdge: .top) { Text("card") }.isOpen($shown)
         XCTAssertNotNil(driven.node.driven[.isOpen])
