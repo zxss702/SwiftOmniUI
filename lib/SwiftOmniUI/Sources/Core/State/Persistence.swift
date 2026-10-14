@@ -187,7 +187,7 @@ final class PersistentStore: @unchecked Sendable {
 
     /// The storage standing for each key, with the typed write that lands a restored
     /// value in it - the first state to claim a key puts its own here.
-    private var storages: [String: (storage: AnyObject, land: (PropValue) -> Void)] = [:]
+    private var storages: [String: (key: PersistentKey, storage: AnyObject, land: (PropValue) -> Void)] = [:]
 
     /// The keys written since the last take, each with its last value.
     private var waiting: [String: PropValue] = [:]
@@ -195,6 +195,33 @@ final class PersistentStore: @unchecked Sendable {
     /// Every key a state has claimed, manifest aside - what `listed` answers and
     /// the manifest is written from.
     private var registered: Set<PersistentKey> = []
+    private var defaultsKeys: Set<String> = []
+
+    func useDefaults(for key: PersistentKey) { guarded.withLock { _ = defaultsKeys.insert(key.name) } }
+    func usesDefaults(_ name: String) -> Bool { guarded.withLock { defaultsKeys.contains(name) } }
+
+    private var readStore: (@Sendable (PersistentKey) -> PropValue?)?
+    private var writeStore: (@Sendable (PersistentKey, PropValue) -> Void)?
+
+    /// The desktop host uses the same preferences store as Foundation clients.
+    func useStore(read: @escaping @Sendable (PersistentKey) -> PropValue?,
+                  write: @escaping @Sendable (PersistentKey, PropValue) -> Void) {
+        let standing = guarded.withLock {
+            readStore = read
+            writeStore = write
+            return storages.values.filter { defaultsKeys.contains($0.key.name) }
+        }
+        for entry in standing {
+            let pending = guarded.withLock { waiting[entry.key.name] }
+            if let pending { write(entry.key, pending) }
+            else if let value = read(entry.key) { entry.land(value) }
+        }
+    }
+
+    func stored(_ key: PersistentKey) -> PropValue? {
+        let read = guarded.withLock { defaultsKeys.contains(key.name) ? readStore : nil }
+        return read?(key)
+    }
 
     /// The key the kept keys are themselves listed under, always read: it is how
     /// a key claimed at build - `@AppStorage`'s, which nothing else declares -
@@ -215,6 +242,12 @@ final class PersistentStore: @unchecked Sendable {
     /// claimed earlier takes its value now. The manifest's arrival names the keys a
     /// claimed state kept under last launch, which the host then reads too.
     func hydrate(_ values: [(name: String, value: PropValue)]) {
+        let backend = guarded.withLock { (readStore, storages) }
+        let values = values.map { pair in
+            let entry = backend.1[pair.name]
+            let value = entry.flatMap { usesDefaults($0.key.name) ? backend.0?($0.key) : nil }
+            return (name: pair.name, value: value ?? pair.value)
+        }
         let landings: [((PropValue) -> Void, PropValue)] = guarded.withLock {
             var landings: [((PropValue) -> Void, PropValue)] = []
 
@@ -250,13 +283,14 @@ final class PersistentStore: @unchecked Sendable {
         orAdopt storage: AnyObject,
         landing land: @escaping (PropValue) -> Void
     ) -> AnyObject {
+        let stored = stored(key)
         let (owner, held, fresh): (AnyObject, PropValue?, Bool) = guarded.withLock {
             if let standing = storages[key.name] {
                 return (standing.storage, nil, false)
             }
 
-            storages[key.name] = (storage, land)
-            return (storage, hydrated[key.name], registered.insert(key).inserted)
+            storages[key.name] = (key, storage, land)
+            return (storage, stored ?? hydrated[key.name], registered.insert(key).inserted)
         }
 
         // A key nobody listed is written into the manifest as it is claimed, so
@@ -286,7 +320,13 @@ final class PersistentStore: @unchecked Sendable {
     /// Marks a key for saving with its value. Runs under the state's lock, so it only
     /// records; the write wakes the host.
     func record(_ key: PersistentKey, _ value: PropValue) {
-        guarded.withLock { waiting[key.name] = value }
+        let write = guarded.withLock {
+            waiting[key.name] = value
+            return defaultsKeys.contains(key.name) ? writeStore : nil
+        }
+        // A client reading UserDefaults immediately after an AppStorage write
+        // must see it before the host drains the persistence acts.
+        write?(key, value)
     }
 
     /// How many keys are waiting - work the host takes whether or not a render was
@@ -309,6 +349,9 @@ final class PersistentStore: @unchecked Sendable {
             storages.removeAll()
             waiting.removeAll()
             registered.removeAll()
+            defaultsKeys.removeAll()
+            readStore = nil
+            writeStore = nil
         }
     }
 }

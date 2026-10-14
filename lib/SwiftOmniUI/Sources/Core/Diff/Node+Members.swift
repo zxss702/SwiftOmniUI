@@ -23,6 +23,16 @@ extension [Prop: PropValue] {
 }
 
 extension Node {
+    /// Button styles are a branch environment, including native menu triggers.
+    mutating func resolveControlStyle(in scope: [(key: ObjectIdentifier, object: AnyObject)]) {
+        guard type == .button || type == .menuButton,
+              props[.buttonStyle] == nil, driven[.buttonStyle] == nil,
+              let style = scope.last(where: { $0.key == ObjectIdentifier(ButtonStyle.self) })?.object as? ButtonStyle,
+              style.kind != .automatic
+        else { return }
+        props[.buttonStyle] = style.kind.propValue
+    }
+
     var controlContent: Node { isFrameWrapper ? children[0].controlContent : self }
 
     mutating func modifyControl(_ change: (inout Node) -> Void) {

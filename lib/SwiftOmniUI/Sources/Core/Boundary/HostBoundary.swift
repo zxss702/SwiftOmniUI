@@ -127,6 +127,18 @@
             values.sorted { $0.key < $1.key }.map { (name: $0.key, value: $0.value) })
     }
 
+    /// Installs the desktop preferences backend without making the core depend on Foundation.
+    public static func usePersistentStore(
+        read: @escaping @Sendable (PersistentKey) -> PropValue?,
+        write: @escaping @Sendable (PersistentKey, PropValue) -> Void
+    ) {
+        PersistentStore.shared.useStore(read: read, write: write)
+    }
+
+    public static func persistentUsesDefaults(_ name: String) -> Bool {
+        PersistentStore.shared.usesDefaults(name)
+    }
+
     /// Decodes a complete property-state image for a native animation channel.
     ///
     /// Returns nil for text, plain values, feeds, placement runs and malformed

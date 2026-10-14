@@ -12,12 +12,15 @@ extension WinUIRegistrations {
             menu.property(VisualElementContract.isEnabled) { view, enabled in
                 view.setEnabled(enabled ?? true)
             }
-            menu.property(MenuButtonContract.menuStyle) { view, style in
-                view.setBorderless(style == "borderlessButton")
+            menu.applies([MenuButtonContract.menuStyle, MenuButtonContract.buttonStyle]) { view, values in
+                let style = values[MenuButtonContract.buttonStyle] ?? .automatic
+                view.setBorderless(style == .plain || style == .borderless
+                    || (style == .automatic && values[MenuButtonContract.menuStyle] == "borderlessButton"))
             }
             menu.property(MenuButtonContract.menuIndicator) { view, indicator in
                 view.setIndicator((indicator ?? .automatic) != .hidden)
             }
+            menu.raises(MenuButtonContract.contentRequested)
         }
 
         registry.add(ButtonContract.self, create: { reports in

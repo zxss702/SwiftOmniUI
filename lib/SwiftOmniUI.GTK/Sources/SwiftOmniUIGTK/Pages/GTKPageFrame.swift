@@ -40,7 +40,6 @@ final class GTKPageFrame {
     private var tabsBar: GTKWidget?
 
     private var safeBars: [GTKSafeAreaBarHost] = []
-    private var refreshingSafeBars = false
     private var scrollEdges: [(scroller: GTKScrollerView, ear: GTKScrollEar)] = []
     private var scrollEdgePending = false
 
@@ -75,15 +74,14 @@ final class GTKPageFrame {
         page.safeAreaContext = nil
         page.rootSafeAreaContext = { [weak self] bounds in
             guard let self else { return SafeAreaContext(bounds: bounds) }
-            self.requestSafeBars()
             let headerHeight = self.chrome.showsBar ? Double(gtk_widget_get_height(self.header)) : 0
             let tabsHeight = self.tabsBar.map { Double(gtk_widget_get_height($0)) } ?? 0
             let top = headerHeight + tabsHeight
             if self.safeBars.isEmpty {
                 // Native row layout already excluded chrome from this
                 // allocation, but did not consume its safe-area environment.
-                return SafeAreaContext(bounds: Rect(bounds.x, bounds.y - top, bounds.width, bounds.height + top),
-                                       layout: bounds, container: bounds)
+                return SafeAreaContext(bounds: bounds,
+                                       consumed: EdgeInsets(top: top, leading: 0, bottom: 0, trailing: 0))
             }
             // The content extends below all top bars. Reserve the native
             // header here; source inset modifiers reserve their own bars.
@@ -137,16 +135,6 @@ final class GTKPageFrame {
         refreshSafeBars()
     }
 
-    private func requestSafeBars() {
-        guard !refreshingSafeBars else { return }
-        refreshingSafeBars = true
-        GTKDoorbell.afterLayout { [weak self] in
-            guard let self else { return }
-            self.refreshingSafeBars = false
-            self.refreshSafeBars()
-        }
-    }
-
     private func refreshSafeBars() {
         let bars = page.sourceElement?.pageTopSafeAreaBars.compactMap { $0.gtk.view } ?? []
         guard bars.count != safeBars.count || !zip(bars, safeBars).allSatisfy({ $0 === $1.bar }) else {
@@ -183,7 +171,7 @@ final class GTKPageFrame {
                 for child in children { collect(child) }
             }
         }
-        if !safeBars.isEmpty, let source = page.sourceElement { collect(source) }
+        if chrome.showsBar || !safeBars.isEmpty, let source = page.sourceElement { collect(source) }
         for watched in scrollEdges where !scrollers.contains(where: { $0 === watched.scroller }) {
             watched.ear.owner = nil
             gtk_widget_remove_css_class(watched.scroller.widget, GTKStyleSheet.mergedTopBarScroll)
@@ -380,7 +368,10 @@ extension GTKPageFrame {
     /// The menus at the bar's very end, as GNOME's applications hold theirs: a main menu holding each as a submenu.
     /// Design: docs/design/platforms/gtk/pages.md#menus
     private func showMainMenu(_ menu: GTKMenu?) {
-        if let mainMenu, let menu, menu.stands(like: mainMenu.menu) { return }
+        if let mainMenu, let menu, !menu.isEmpty {
+            mainMenu.menu.replace(with: menu)
+            return
+        }
         if let mainMenu { gtk_box_remove(menuBox.of(GtkBox.self), mainMenu.button) }
         mainMenu = nil
         guard let menu, !menu.isEmpty else { return }

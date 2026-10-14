@@ -16,6 +16,15 @@ final class GTKMenuButtonView: GTKView {
     /// A menu button, face a chevron until a label child's widget lands.
     init() {
         super.init { _ in gtk_menu_button_new() }
+        connectSignal(UnsafeMutableRawPointer(widget), "notify::active", number: number) {
+            (_: UnsafeMutableRawPointer?, _: UnsafeMutableRawPointer?, data: gpointer?) in
+            MainActor.assumeIsolated {
+                guard let view = GTKView.find(viewNumber(data)) as? GTKMenuButtonView,
+                      gtk_menu_button_get_active(view.widget.opaque) != 0 else { return }
+                view.sourceElement?.children.first { $0.type == .contextMenu }?.gtk.send(
+                    ContextMenuContract.contentRequested.token, [])
+            }
+        }
     }
 
     /// The widget the button's face draws; GTK keeps its own arrow beside it.
@@ -32,7 +41,11 @@ final class GTKMenuButtonView: GTKView {
     /// button frame around it.
     private var flatClass: String?
     var borderless = false {
-        didSet { swapClass(&flatClass, to: borderless ? "flat" : nil) }
+        didSet {
+            guard borderless != oldValue else { return }
+            gtk_menu_button_set_has_frame(widget.opaque, borderless ? 0 : 1)
+            swapClass(&flatClass, to: borderless ? "flat" : nil)
+        }
     }
 
     /// Whether the trigger shows the arrow that says it opens a menu.
@@ -44,18 +57,16 @@ final class GTKMenuButtonView: GTKView {
         }
     }
 
-    /// Rebuilds the menu model and its actions from `entries`; a chosen item
+    /// Updates the live menu model and its actions from `entries`; a chosen item
     /// sends `clicked` to its element through `GTKMenu`.
     func setEntries(_ entries: [MenuEntry]) {
-        gtk_menu_button_set_menu_model(widget.opaque, nil)
-        gtk_widget_insert_action_group(widget, GTKMenu.actionGroup, nil)
-        menu = nil
-        guard !entries.isEmpty else { return }
+        if let menu {
+            menu.replace(entries)
+            return
+        }
         let menu = GTKMenu(entries)
         gtk_widget_insert_action_group(widget, GTKMenu.actionGroup, OpaquePointer(menu.actions))
         gtk_menu_button_set_menu_model(widget.opaque, g_menu_model(menu.model))
         self.menu = menu
     }
-
-
 }

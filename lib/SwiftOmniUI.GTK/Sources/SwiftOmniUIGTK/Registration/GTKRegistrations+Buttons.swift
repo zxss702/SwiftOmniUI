@@ -13,12 +13,15 @@ extension GTKRegistrations {
             menu.property(VisualElementContract.isEnabled) { view, enabled in
                 view.opensMenu = enabled ?? true
             }
-            menu.property(MenuButtonContract.menuStyle) { view, style in
-                view.borderless = style == "borderlessButton"
+            menu.applies([MenuButtonContract.menuStyle, MenuButtonContract.buttonStyle]) { view, values in
+                let style = values[MenuButtonContract.buttonStyle] ?? .automatic
+                view.borderless = style == .plain || style == .borderless
+                    || (style == .automatic && values[MenuButtonContract.menuStyle] == "borderlessButton")
             }
             menu.property(MenuButtonContract.menuIndicator) { view, indicator in
                 view.showsArrow = (indicator ?? .automatic) != .hidden
             }
+            menu.raises(MenuButtonContract.contentRequested)
         }
 
         registry.add(ButtonContract.self, create: { reports in

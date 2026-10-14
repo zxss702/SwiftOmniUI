@@ -238,6 +238,13 @@ enum WinUICallbacks {
             },
             activated: {
                 MainActor.assumeIsolated { WinUIRenderer.shared?.activateInitialWindow() }
+            },
+            menuContentRequested: { view, mount in
+                MainActor.assumeIsolated {
+                    guard let host = WinUIRenderer.shared,
+                          let source = WinUIView.find(view)?.sourceElement ?? host.runtime.tree.root else { return }
+                    source.requestMenuContent(mount: mount == 0 ? nil : mount, in: host.runtime)
+                }
             })
     }
 }

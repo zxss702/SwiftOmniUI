@@ -25,6 +25,13 @@ native raised bar style while scrolled; its shadow lands below the complete
 top region. Only their displaced top scroller effects are suppressed. Bottom,
 side and local insets remain transparent layouts, with independent edge effects.
 
+Without a promoted top inset, AdwToolbarView already allocates content below
+the native header and tabs. The root safe-area context records those strips
+as consumed instead of extending the ScrollView back through them. Scroll
+offsets drive the native top surface with or without a promoted inset. Reading
+the root context schedules no further tree walk, and unchanged content padding
+and indicator insets schedule no further native inset commit.
+
 A promoted authored widget has one native parent. Its logical source and
 placing layout remain unchanged, retaining ancestor animation matrices,
 opacity, hit-testing scope, named spaces and parent-coordinate reports. Native
@@ -140,6 +147,16 @@ something.
 A view's context menu is a `GtkPopoverMenu` on the view's widget, opened
 where the user clicks with the secondary button or holds a finger, at that
 point; a panel presents it as it lays out. A menu of no entries is none.
+
+A view-labeled Menu requests its root content when GtkMenuButton becomes
+active. A submenu's stateful GSimpleAction requests that submenu when GTK
+opens it. Unopened submenus do not mount their contents or run appearance
+handlers. Updates retain the root GMenu, its action group and unchanged
+submenu models, so asynchronous content can update an open menu in place.
+Action and submenu identities use mounted element numbers; removed entries
+release their signal bookkeeping. `.buttonStyle(.plain)` removes the native
+button frame and uses its flat appearance, including when inherited from a
+container; returning to automatic restores the menu style's frame choice.
 
 A desktop of header bars has no menu bar: the menus a page declares stand in
 the main menu at the very end of its header bar - GNOME's

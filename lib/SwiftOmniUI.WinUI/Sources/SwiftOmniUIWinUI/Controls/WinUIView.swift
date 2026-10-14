@@ -500,7 +500,7 @@ class WinUIView {
                     menu.enabled.withUnsafeBufferPointer { enabled in
                         swiftomniui_winui_set_context_menu(
                             handle, number, kinds.baseAddress, titles, enabled.baseAddress, identifiers,
-                            Int32(kinds.count))
+                            menu.mounts, Int32(kinds.count))
                     }
                 }
             }

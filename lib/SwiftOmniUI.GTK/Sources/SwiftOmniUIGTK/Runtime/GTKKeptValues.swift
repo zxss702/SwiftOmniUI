@@ -21,24 +21,20 @@ enum GTKKeptValues {
     /// Hands the core every kept value there is, before the first render reads one. The
     /// manifest a claimed key is listed under names keys the first pass did not - read after it.
     static func restore(into core: CoreLink, applicationID: String) {
-        let kept = read(file(for: applicationID))
-        var read: Set<String> = []
-
-        while true {
-            let keys = core.persistentKeys.filter { read.insert($0.name).inserted }
-            guard !keys.isEmpty else { return }
-            core.restorePersistent(kept.restored(for: keys))
-        }
+        AppStorageDefaults.restore(into: core, legacy: read(file(for: applicationID)))
     }
 
     /// Keeps a key's new value, as the act `persistValue` carries it: the whole file written aside, then moved into
     /// place, so a failed write leaves the old.
     static func keep(_ call: HostActCall, core: CoreLink, applicationID: String) {
-        let file = file(for: applicationID)
-        var kept = read(file)
-        guard kept.keep(call.arguments, keys: core.persistentKeys) else { return }
-
-        if !write(kept, to: file) { GTKRenderer.log.error("the kept values could not be written") }
+        if let name = call.arguments.first?.name, HostBoundary.persistentUsesDefaults(name) {
+            if !AppStorageDefaults.flush() { GTKRenderer.log.error("the defaults could not be written") }
+        } else {
+            let file = file(for: applicationID)
+            var kept = read(file)
+            guard kept.keep(call.arguments, keys: core.persistentKeys) else { return }
+            if !write(kept, to: file) { GTKRenderer.log.error("the kept values could not be written") }
+        }
     }
 
     /// Writes `kept` whole to `file`, aside and then in its place; whether it was written.

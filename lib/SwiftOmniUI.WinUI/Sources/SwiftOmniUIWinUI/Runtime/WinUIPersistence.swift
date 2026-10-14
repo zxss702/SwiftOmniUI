@@ -14,21 +14,18 @@ enum WinUIPersistence {
     /// Hands the core every kept value there is, before the first render reads one. The
     /// manifest a claimed key is listed under names keys the first pass did not - read after it.
     static func restore(into core: CoreLink) {
-        let kept = read()
-        var read: Set<String> = []
-
-        while true {
-            let keys = core.persistentKeys.filter { read.insert($0.name).inserted }
-            guard !keys.isEmpty else { return }
-            core.restorePersistent(kept.restored(for: keys))
-        }
+        AppStorageDefaults.restore(into: core, legacy: read())
     }
 
     /// Keeps a key's new value, as the act `persistValue` carries it.
     static func keep(_ call: HostActCall, core: CoreLink) {
-        var kept = read()
-        guard kept.keep(call.arguments, keys: core.persistentKeys) else { return }
-        write(kept)
+        if let name = call.arguments.first?.name, HostBoundary.persistentUsesDefaults(name) {
+            if !AppStorageDefaults.flush() { WinUIRenderer.log.error("the defaults could not be written") }
+        } else {
+            var kept = read()
+            guard kept.keep(call.arguments, keys: core.persistentKeys) else { return }
+            write(kept)
+        }
     }
 
     /// The file the kept values stand in, and the one the scenes do.

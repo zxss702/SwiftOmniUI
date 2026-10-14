@@ -26,6 +26,9 @@ final class WinUIWindow {
     private var requestedSafeBars: [MountedElement] = []
     private var safeBarCommitPending = false
     private var safeBarBackground: UInt32??
+    private weak var safeBarPage: MountedElement?
+    private var safeBarFrame: Rect?
+    private var safeBarFramePending = false
 
     /// The window's chrome, its menu bar, and the row a window's tabs stand in.
     let titleBar = WinUITitleBarView()
@@ -65,7 +68,9 @@ final class WinUIWindow {
         swiftomniui_winui_release(handle)
     }
 
-    func showTopSafeAreaBars(_ bars: [MountedElement]) {
+    func showTopSafeAreaBars(_ bars: [MountedElement], in page: MountedElement?) {
+        safeBarPage = page
+        requestSafeBarFrame()
         requestedSafeBars = bars
         let views = bars.compactMap { $0.winUI.view }
         let background = titleBar.chrome.background?.argb
@@ -82,13 +87,41 @@ final class WinUIWindow {
                 swiftomniui_winui_window_set_safe_area_bars(self.handle, nil, 0, false, 0)
                 for host in self.safeBars { host.releaseBar() }
                 self.safeBars = views.map { WinUISafeAreaBarHost(bar: $0) }
+                for host in self.safeBars {
+                    host.onSourcePlaced = { [weak self] in self?.requestSafeBarFrame() }
+                }
+                self.safeBarFrame = nil
             }
             let handles: [SwiftOmniUIObjectRef?] = self.safeBars.map(\.handle)
             let background = self.titleBar.chrome.background?.argb
             self.safeBarBackground = .some(background)
             swiftomniui_winui_window_set_safe_area_bars(
                 self.handle, handles, Int32(handles.count), background != nil, background ?? 0)
+            self.updateSafeBarFrame()
         }
+    }
+
+    private func requestSafeBarFrame() {
+        guard !safeBarFramePending else { return }
+        safeBarFramePending = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.safeBarFramePending = false
+            self.updateSafeBarFrame()
+        }
+    }
+
+    /// Native split/navigation templates own the page's actual origin. Scope the promoted surface to that page,
+    /// rather than proposing the complete window width to a bar still measured by its logical detail column.
+    private func updateSafeBarFrame() {
+        guard !isClosed, !safeBars.isEmpty, let page = safeBarPage?.winUI.view, let content else { return }
+        let size = page.laidOutFrame
+        guard size.width > 0, size.height > 0 else { return }
+        let origin = page.origin, root = content.origin
+        let frame = Rect(origin.x - root.x, origin.y - root.y, size.width, 0)
+        guard frame != safeBarFrame else { return }
+        safeBarFrame = frame
+        swiftomniui_winui_window_set_safe_area_bar_frame(handle, frame.x, frame.y, frame.width)
     }
 
     /// The window's name, which the system shows for it; nil for none.

@@ -125,6 +125,12 @@ it accepts.
 
 ## Kept values
 
+`@AppStorage` shares Foundation's `UserDefaults.standard` with application/model
+code. Its writes update defaults immediately; the persistence act synchronizes
+them to disk. Older kept-file values migrate only for missing defaults keys.
+Already-claimed keys restore before the first render; later declarations read
+defaults when claimed. `@State(persistentKey:)` retains the native kept-file store.
+
 The desktop keeps no store an application can use without a schema
 installed, so the host keeps one of its own: `kept values.txt` in the user's
 state folder, in a folder named by the application's ID, in the host

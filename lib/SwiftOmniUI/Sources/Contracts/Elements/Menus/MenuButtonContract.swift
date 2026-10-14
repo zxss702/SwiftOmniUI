@@ -16,11 +16,14 @@ public enum MenuButtonContract: ElementContract {
     /// `.menuStyle` writes it.
     public static let menuStyle = ElementProperty<Self, String>("menuStyle", layer: .native)
 
+    public static let buttonStyle = ElementProperty<Self, ButtonStyleKind>("buttonStyle", layer: .native)
+    @_spi(Host) public static let contentRequested = ElementEvent<Self, Void>("menuContentRequested", layer: .native)
+
     /// Whether the trigger shows the mark that says it opens a menu;
     /// `.menuIndicator` writes it.
     public static let menuIndicator = ElementProperty<Self, MenuIndicatorVisibility>(
         "menuIndicator", layer: .native)
 
     /// The element's own members.
-    public static let members: [any ContractMember] = [menuIndicator, menuStyle]
+    public static let members: [any ContractMember] = [menuIndicator, menuStyle, buttonStyle, contentRequested]
 }

@@ -27,7 +27,7 @@ final class WinUIMenuBarView: WinUIView {
                     menu.enabled.withUnsafeBufferPointer { enabled in
                         swiftomniui_winui_menu_bar_set(
                             handle, number, kinds.baseAddress, titles, enabled.baseAddress, identifiers,
-                            Int32(kinds.count))
+                            menu.mounts, Int32(kinds.count))
                     }
                 }
             }

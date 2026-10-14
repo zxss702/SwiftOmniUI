@@ -131,6 +131,19 @@ slot children so a submenu cannot borrow its first command's title. Descendant
 changes mark each menu owner dirty; the native menu is refreshed after that
 owner's children have been patched.
 
+On hosts declaring `MenuButton.menuContentRequested`, a view-labeled Menu
+retains its content closure without describing it until the native trigger
+requests that level. The request reaches its ContextMenu slot; only that
+level mounts and runs appearance handlers. Nested triggers retain their own
+unrequested closures. Once requested, the level remains mounted and keeps
+its state across reopening. Hosts without this native capability keep eager
+description. A Text in menu content becomes a disabled entry, including the
+temporary entry that lets an unrequested native menu open.
+
+The button-style environment reaches both Buttons and menu triggers. An
+explicit style or binding on a trigger takes precedence over an inherited
+style; `.automatic` restores the platform's menu-style choice.
+
 Split-column width vectors retain all three positions. An omitted bound is
 encoded as -1; legacy single-width vectors still mean a fixed width.
 SplitColumnWidth normalizes the bounds for native hosts. The visible column

@@ -14,15 +14,15 @@ extension GTKElement {
         let declared = element.children.first { $0.type == .contextMenu }
         guard contextMenuChanged || (view.contextMenu != nil && declared == nil) else { return }
         contextMenuChanged = false
-        let menu = declared.map { GTKMenu(MenuEntry.entries(of: $0)) }
-        guard let menu, !menu.isEmpty else {
+        let entries = declared.map { MenuEntry.entries(of: $0) } ?? []
+        guard !entries.isEmpty else {
             view.contextMenu = nil
             return
         }
         if let shown = view.contextMenu {
-            if !menu.stands(like: shown.menu) { shown.show(menu) }
+            shown.menu.replace(entries)
         } else {
-            view.contextMenu = GTKContextMenu(menu, on: view.widget)
+            view.contextMenu = GTKContextMenu(GTKMenu(entries), on: view.widget)
         }
     }
 }

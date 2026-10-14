@@ -373,6 +373,7 @@ extension Differ {
             }
         }
 
+        node.resolveControlStyle(in: scope)
         node.resolveShapeFill()
 
         // Inside a publishing branch any element may be the one holding the

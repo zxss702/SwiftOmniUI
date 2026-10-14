@@ -251,8 +251,14 @@ through the existing launch ticket mechanism.
 
 ## Kept values
 
+`@AppStorage` reads and writes Foundation's `UserDefaults.standard`, the same
+store application/model code reads directly. Writes update memory immediately;
+the persistence act calls corelibs `synchronize` to commit to disk. Old kept-file
+values migrate only where defaults has no value. Declared defaults keys load
+before the first render, and keys first declared later read defaults when claimed.
+
 Windows keeps no store for an application that is no package, so the host
-keeps one of its own: a file in the user's local data, in a folder named
+keeps one of its own for `@State(persistentKey:)`: a file in the user's local data, in a folder named
 after the executable, holding the host layer's text ([kept
 values](../../host/runtime.md#kept-values)). Every key the
 application lists is read before the first scene connects and handed to the

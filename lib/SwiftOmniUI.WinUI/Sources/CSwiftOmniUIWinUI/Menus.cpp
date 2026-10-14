@@ -14,8 +14,10 @@
 
 #include <algorithm>
 #include <functional>
+#include <initializer_list>
 #include <cstring>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using namespace swiftomniui;
@@ -24,9 +26,7 @@ using Entries = winrt::Windows::Foundation::Collections::IVector<controls::MenuF
 namespace {
     /// Gives `entry` the identifier whatever drives the application finds it by; none for an empty one.
     void identify(xaml::UIElement const &entry, char const *identifier) {
-        if (identifier && *identifier) {
-            xaml::Automation::AutomationProperties::SetAutomationId(entry, text(identifier));
-        }
+        xaml::Automation::AutomationProperties::SetAutomationId(entry, text(identifier ? identifier : ""));
     }
 
     /// Writes a menu's flat entries into the lists they belong to: an item (0), a separator (1), a submenu opening
@@ -35,25 +35,88 @@ namespace {
         int64_t view;
         controls::MenuBar bar{nullptr};
         std::vector<Entries> levels;
+        std::vector<uint64_t> owners;
+        std::vector<std::unordered_map<uint64_t, controls::MenuFlyoutSubItem>> previous;
+        std::vector<uint32_t> positions;
+        std::unordered_map<uint64_t, controls::MenuBarItem> previousBar;
+        uint32_t barPosition = 0;
         int32_t chosen = 0;
 
-        void write(int32_t kind, char const *title, bool enabled, char const *identifier) {
+        Writer(int64_t view, controls::MenuBar const &bar, std::initializer_list<Entries> initial)
+            : view(view), bar(bar) {
+            if (bar) for (auto const &item : bar.Items()) {
+                auto mount = winrt::unbox_value_or<uint64_t>(item.Tag(), 0);
+                if (mount) previousBar.emplace(mount, item);
+            }
+            for (auto const &entries : initial) enter(entries);
+        }
+
+        void enter(Entries const &entries, uint64_t owner = 0) {
+            std::unordered_map<uint64_t, controls::MenuFlyoutSubItem> old;
+            for (auto const &entry : entries) if (auto sub = entry.try_as<controls::MenuFlyoutSubItem>()) {
+                auto mount = winrt::unbox_value_or<uint64_t>(sub.Tag(), 0);
+                if (mount) old.emplace(mount, sub);
+            }
+            previous.push_back(std::move(old));
+            levels.push_back(entries);
+            owners.push_back(owner);
+            positions.push_back(0);
+        }
+
+        void put(controls::MenuFlyoutItemBase const &item, bool reusing = false) {
+            auto entries = levels.back();
+            auto &index = positions.back();
+            if (index < entries.Size() && entries.GetAt(index) == item) { ++index; return; }
+            uint32_t previousIndex;
+            if (reusing && entries.IndexOf(item, previousIndex)) {
+                entries.RemoveAt(previousIndex);
+                entries.InsertAt(index, item);
+            } else if (index < entries.Size()) entries.SetAt(index, item);
+            else entries.Append(item);
+            ++index;
+        }
+
+        void leave() {
+            auto entries = levels.back();
+            while (entries.Size() > positions.back()) entries.RemoveAtEnd();
+            levels.pop_back(); owners.pop_back(); previous.pop_back(); positions.pop_back();
+        }
+
+        void finish() {
+            while (!levels.empty()) leave();
+            if (bar) while (bar.Items().Size() > barPosition) bar.Items().RemoveAtEnd();
+        }
+
+        void write(int32_t kind, char const *title, bool enabled, char const *identifier, uint64_t mount) {
             if (kind == 3) {
-                if (levels.size() > (bar ? 0u : 1u)) levels.pop_back();
+                if (levels.size() > (bar ? 0u : 1u)) leave();
                 return;
             }
             if (bar && levels.empty()) {
                 if (kind != 2) return;
-                controls::MenuBarItem menu;
+                controls::MenuBarItem menu{nullptr};
+                if (auto found = previousBar.find(mount); found != previousBar.end()) menu = found->second;
+                if (!menu) menu = controls::MenuBarItem();
+                menu.Tag(winrt::box_value(mount));
                 menu.Title(text(title));
                 menu.IsEnabled(enabled);
                 identify(menu, identifier);
-                bar.Items().Append(menu);
-                levels.push_back(menu.Items());
+                auto items = bar.Items();
+                if (barPosition >= items.Size() || items.GetAt(barPosition) != menu) {
+                    uint32_t previousIndex;
+                    if (items.IndexOf(menu, previousIndex)) {
+                        items.RemoveAt(previousIndex);
+                        items.InsertAt(barPosition, menu);
+                    } else if (barPosition < items.Size()) items.SetAt(barPosition, menu);
+                    else items.Append(menu);
+                }
+                ++barPosition;
+                enter(menu.Items(), mount);
                 return;
             }
             switch (kind) {
-            case 0: {
+            case 0:
+            case 4: { // A disabled Text entry, including an unrequested level's placeholder.
                 controls::MenuFlyoutItem item;
                 item.Text(text(title));
                 item.IsEnabled(enabled);
@@ -62,19 +125,32 @@ namespace {
                     [view = view, place = chosen++](IInspectable const &, xaml::RoutedEventArgs const &) {
                     callbacks.menuChosen(view, place);
                 }));
-                levels.back().Append(item);
+                // Submenu presenters are created only when WinUI expands them.
+                // Their placeholder's native Loaded event also covers keyboard and UI Automation expansion,
+                // without confusing the main menu's initial focus with opening a submenu.
+                if (kind == 4 && owners.back()) {
+                    item.Loaded(guarded("requesting visible submenu contents",
+                        [view = view, mount = owners.back()](auto const &, auto const &) {
+                            if (callbacks.menuContentRequested) callbacks.menuContentRequested(view, mount);
+                        }));
+                }
+                put(item);
                 break;
             }
             case 1:
-                levels.back().Append(controls::MenuFlyoutSeparator());
+                put(controls::MenuFlyoutSeparator());
                 break;
             case 2: {
-                controls::MenuFlyoutSubItem sub;
+                controls::MenuFlyoutSubItem sub{nullptr};
+                if (auto found = previous.back().find(mount); found != previous.back().end()) sub = found->second;
+                bool reusing = static_cast<bool>(sub);
+                if (!sub) sub = controls::MenuFlyoutSubItem();
+                sub.Tag(winrt::box_value(mount));
                 sub.Text(text(title));
                 sub.IsEnabled(enabled);
                 identify(sub, identifier);
-                levels.back().Append(sub);
-                levels.push_back(sub.Items());
+                put(sub, reusing);
+                enter(sub.Items(), mount);
                 break;
             }
             }
@@ -129,19 +205,26 @@ namespace {
 
 extern "C" void swiftomniui_winui_set_context_menu(
     SwiftOmniUIObjectRef handle, int64_t view, int32_t const *kinds, char const *const *titles, bool const *enabled,
-    char const *const *identifiers, int32_t count
+    char const *const *identifiers, uint64_t const *mounts, int32_t count
 ) {
     try {
         auto element = as<xaml::UIElement>(handle);
         if (count == 0) {
             element.ContextFlyout(nullptr);
         } else {
-            controls::MenuFlyout flyout;
+            auto flyout = element.ContextFlyout().try_as<controls::MenuFlyout>();
+            if (!flyout) {
+                flyout = controls::MenuFlyout();
+                flyout.Opening(guarded("requesting context menu contents", [view](auto const &, auto const &) {
+                    if (callbacks.menuContentRequested) callbacks.menuContentRequested(view, 0);
+                }));
+                element.ContextFlyout(flyout);
+            }
             Writer writer{view, nullptr, {flyout.Items()}};
             for (int32_t index = 0; index < count; ++index) {
-                writer.write(kinds[index], titles[index], enabled[index], identifiers[index]);
+                writer.write(kinds[index], titles[index], enabled[index], identifiers[index], mounts[index]);
             }
-            element.ContextFlyout(flyout);
+            writer.finish();
         }
         holdHitArea(element, view);
     } catch (...) {
@@ -195,8 +278,10 @@ extern "C" void swiftomniui_winui_menu_button_set_face(SwiftOmniUIObjectRef hand
     try {
         auto face = borrow<controls::Button>(handle).Content().as<controls::StackPanel>();
         auto children = face.Children();
+        auto replacement = content ? as<xaml::UIElement>(content) : xaml::UIElement{nullptr};
+        if ((children.Size() > 1 ? children.GetAt(0) : xaml::UIElement{nullptr}) == replacement) return;
         if (children.Size() > 1) children.RemoveAt(0);
-        if (content) children.InsertAt(0, as<xaml::UIElement>(content));
+        if (replacement) children.InsertAt(0, replacement);
     } catch (...) {
         report("giving a menu button its face");
     }
@@ -239,19 +324,26 @@ extern "C" void swiftomniui_winui_menu_button_set_borderless(SwiftOmniUIObjectRe
 
 extern "C" void swiftomniui_winui_menu_button_set_menu(
     SwiftOmniUIObjectRef handle, int64_t view, int32_t const *kinds, char const *const *titles, bool const *enabled,
-    char const *const *identifiers, int32_t count
+    char const *const *identifiers, uint64_t const *mounts, int32_t count
 ) {
     try {
         auto button = borrow<controls::Button>(handle);
         if (count == 0) {
             button.Flyout(nullptr);
         } else {
-            controls::MenuFlyout flyout;
+            auto flyout = button.Flyout().try_as<controls::MenuFlyout>();
+            if (!flyout) {
+                flyout = controls::MenuFlyout();
+                flyout.Opening(guarded("requesting menu contents", [view](auto const &, auto const &) {
+                    if (callbacks.menuContentRequested) callbacks.menuContentRequested(view, 0);
+                }));
+                button.Flyout(flyout);
+            }
             Writer writer{view, nullptr, {flyout.Items()}};
             for (int32_t index = 0; index < count; ++index) {
-                writer.write(kinds[index], titles[index], enabled[index], identifiers[index]);
+                writer.write(kinds[index], titles[index], enabled[index], identifiers[index], mounts[index]);
             }
-            button.Flyout(flyout);
+            writer.finish();
         }
     } catch (...) {
         report("writing a menu button's menu");
@@ -272,6 +364,39 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_app_menu_make(int64_t view) {
     }
 }
 
+extern "C" void swiftomniui_winui_menu_open_for_testing(SwiftOmniUIObjectRef handle) {
+    try {
+        auto button = as<controls::Button>(handle);
+        if (auto flyout = button.Flyout()) flyout.ShowAt(button);
+    } catch (...) { report("opening a menu for testing"); }
+}
+
+extern "C" uint64_t swiftomniui_winui_menu_identity_for_testing(SwiftOmniUIObjectRef handle) {
+    try {
+        auto flyout = as<controls::Button>(handle).Flyout();
+        return reinterpret_cast<uint64_t>(winrt::get_abi(flyout));
+    } catch (...) { report("reading a menu identity for testing"); return 0; }
+}
+
+extern "C" bool swiftomniui_winui_menu_open_submenu_for_testing(SwiftOmniUIObjectRef handle, uint64_t mount) {
+    try {
+        auto flyout = as<controls::Button>(handle).Flyout().as<controls::MenuFlyout>();
+        std::function<controls::MenuFlyoutSubItem(Entries const &)> find = [&](Entries const &entries) {
+            for (auto const &entry : entries) {
+                if (auto sub = entry.try_as<controls::MenuFlyoutSubItem>()) {
+                    if (winrt::unbox_value_or<uint64_t>(sub.Tag(), 0) == mount) return sub;
+                    if (auto found = find(sub.Items())) return found;
+                }
+            }
+            return controls::MenuFlyoutSubItem{nullptr};
+        };
+        auto sub = find(flyout.Items());
+        if (!sub) return false;
+        pattern<provider::IExpandCollapseProvider>(sub, PatternInterface::ExpandCollapse).Expand();
+        return true;
+    } catch (...) { report("opening a submenu for testing"); return false; }
+}
+
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_menu_bar_make(int64_t) {
     try {
         return detach(controls::MenuBar());
@@ -283,15 +408,15 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_menu_bar_make(int64_t) {
 
 extern "C" void swiftomniui_winui_menu_bar_set(
     SwiftOmniUIObjectRef handle, int64_t view, int32_t const *kinds, char const *const *titles, bool const *enabled,
-    char const *const *identifiers, int32_t count
+    char const *const *identifiers, uint64_t const *mounts, int32_t count
 ) {
     try {
         auto bar = borrow<controls::MenuBar>(handle);
-        bar.Items().Clear();
         Writer writer{view, bar, {}};
         for (int32_t index = 0; index < count; ++index) {
-            writer.write(kinds[index], titles[index], enabled[index], identifiers[index]);
+            writer.write(kinds[index], titles[index], enabled[index], identifiers[index], mounts[index]);
         }
+        writer.finish();
     } catch (...) {
         report("writing a menu bar");
     }

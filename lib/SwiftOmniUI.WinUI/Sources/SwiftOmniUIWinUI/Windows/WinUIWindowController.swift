@@ -39,7 +39,8 @@ final class WinUIWindowController {
         showSheets(presentation.sheets)
         if let overlay = changes.overlay { window.showOverlay(overlay?.winUI.view) }
         if runtime.tree.chromeMayChange || changes.arrangement != nil || changes.traits != nil { refreshChrome(in: runtime) }
-        window.showTopSafeAreaBars(presentation.arrangement?.visiblePage?.pageTopSafeAreaBars ?? [])
+        let page = presentation.arrangement?.visiblePage
+        window.showTopSafeAreaBars(page?.pageTopSafeAreaBars ?? [], in: page)
         boundContent(element, requested: changes.frame, quiet: changes.arrangement == nil && changes.traits == nil, keepingSizing: keepingSizing)
         let asked = WindowFrame(of: element)
         if asked.x == nil, asked.y == nil, let anchor = element.value(.defaultPosition)?.numbers {

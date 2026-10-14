@@ -65,6 +65,7 @@ public final class State<Value>: @unchecked Sendable {
     /// changing one state at once use `_counter.update { $0 + 1 }`.
     public var wrappedValue: Value {
         get {
+            storage.refreshPersistent?()
             if Renderer.shared.stateRead(storage) { storage.readAtBuild = true }
             return storage.value
         }
@@ -230,6 +231,14 @@ extension State where Value: PersistentValue {
         }
 
         storage.keep = { PersistentStore.shared.record(key, $0.persistentValue) }
+        storage.refreshPersistent = { [weak storage] in
+            guard PersistentStore.shared.usesDefaults(key.name) else { return }
+            guard let storage, let stored = PersistentStore.shared.stored(key),
+                  let value = Value(persisted: stored),
+                  storage.value.persistentValue != value.persistentValue else { return }
+            storage.value = value
+            storage.askForRender()
+        }
     }
 
     /// State a scene keeps: the same state, under a name, handed back with its scene

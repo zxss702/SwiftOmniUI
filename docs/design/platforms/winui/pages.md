@@ -16,6 +16,13 @@ TitleBar background and uses a native theme brush for the lower scroll edge;
 sheets and authored window overlays remain above it. Explicit bar backgrounds
 stay on their original views.
 
+The overlay's origin and width follow the visible page's native allocation,
+including the NavigationSplitView detail column. Its page-sized proposal must
+match the source inset's logical proposal: measuring a detail bar at full
+window width would both cover the sidebar and alternate layout proposals.
+Source placement queues a coalesced geometry update; unchanged geometry
+does not write XAML layout properties again.
+
 Only the uninterrupted page-root modifier chain is promoted. Local layouts,
 finite frames, clipping, side boundaries and negative spacing retain ordinary
 local hosting. The mounted source keeps geometry, animation and coordinate
@@ -202,6 +209,21 @@ caption - and hears a choice by the item's place among the items, submenus'
 included; the item's own handler runs. A bar's menus are written the same
 way. Any entry the tree changes, adds or
 removes gives the view its menu again, and a menu with no entries is none.
+
+A view-labeled Menu requests its root content through the native flyout's
+Opening event. MenuFlyoutSubItem has no separate public Opening event; WinUI
+creates its submenu presenter during expansion. The disabled Text placeholder's
+native Loaded event requests that visible level, including keyboard and UI
+Automation expansion. Initial focus in the main menu does not request unopened
+descendants. Each request mounts only that level, and repeated requests keep its existing state.
+Updates reuse the MenuFlyout and match submenu controls by mounted element
+number, retaining an expanded parent while its contents arrive. The relay
+receives these numbers alongside the existing flat menu entries.
+
+`.buttonStyle(.plain)` reaches Menu triggers directly or through a container.
+It clears the native background, border and padding and supplies transparent
+hover, pressed and disabled resources; switching to automatic restores the
+native menu-style choice.
 
 A stack with a menu is hit across its bounds, as a listening one is
 ([listening](input.md#listening)): a right click anywhere across it opens the

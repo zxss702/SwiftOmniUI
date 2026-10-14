@@ -57,7 +57,7 @@
     public static func entries(of container: MountedElement) -> [MenuEntry] {
         container.children.filter { !$0.isDeparting && $0.value(.isVisible)?.bool != false }.flatMap { entry -> [MenuEntry] in
             switch entry.type {
-            case .menuItem, .button: [MenuEntry(entry, kind: .item, entries: [])]
+            case .menuItem, .button, .text: [MenuEntry(entry, kind: .item, entries: [])]
             case .divider: [MenuEntry(nil, kind: .separator, entries: [])]
             case .menu: [MenuEntry(entry, kind: .submenu, entries: entries(of: entry))]
             case .menuButton:
@@ -92,7 +92,7 @@
             ?? (element?.type == .button || element?.type == .menuButton ? element.flatMap(Self.picture) : nil)
         shortcut = element?.value(.shortcut).flatMap(KeyboardShortcut.init(propValue:))
         placement = element?.value(.placement).flatMap(CommandGroupPlacement.init(propValue:))
-        isEnabled = element?.value(.isEnabled)?.bool ?? true
+        isEnabled = element?.type != .text && (element?.value(.isEnabled)?.bool ?? true)
         isDestructive = element?.value(.isDestructive)?.bool == true
             || element?.value(.role)?.enumeration == ButtonRole.destructive.rawValue
         identifier = element?.value(.accessibilityIdentifier)?.string

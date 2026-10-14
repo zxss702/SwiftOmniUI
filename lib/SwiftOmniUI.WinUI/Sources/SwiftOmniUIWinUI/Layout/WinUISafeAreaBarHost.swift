@@ -12,6 +12,7 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     private var contribution: [Double] = []
     private var measurePending = false
     private var released = false
+    var onSourcePlaced: (() -> Void)?
     var spacing: Double {
         max(0, bar.sourceElement?.parent?.number(.spacing) ?? 0)
     }
@@ -27,6 +28,7 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
 
     /// Logical contribution changes are committed outside native layout.
     func sourcePlaced(_ frame: Rect) {
+        onSourcePlaced?()
         let metric = [frame.width, frame.height, spacing]
         guard metric != contribution else { return }
         contribution = metric
@@ -59,6 +61,7 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     /// logical panel. Never insert one control into two native parents.
     func releaseBar() {
         released = true
+        onSourcePlaced = nil
         setChildren([])
         bar.nativeSafeBarOwner = nil
         bar.clearSafeBarDrawing()

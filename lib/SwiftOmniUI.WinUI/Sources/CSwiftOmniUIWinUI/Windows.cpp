@@ -247,6 +247,22 @@ extern "C" void swiftomniui_winui_window_set_safe_area_bars(
     } catch (...) { report("hosting a page's safe area bars"); }
 }
 
+extern "C" void swiftomniui_winui_window_set_safe_area_bar_frame(
+    SwiftOmniUIObjectRef handle, double x, double y, double width
+) {
+    try {
+        for (auto const &child : root(borrow<xaml::Window>(handle)).Children()) {
+            auto layer = child.try_as<controls::Grid>();
+            if (!layer || winrt::unbox_value_or<winrt::hstring>(layer.Tag(), L"") != L"safeAreaBars") continue;
+            layer.HorizontalAlignment(xaml::HorizontalAlignment::Left);
+            auto margin = xaml::Thickness{x, y, 0, 0};
+            if (layer.Margin() != margin) layer.Margin(margin);
+            if (layer.Width() != width) layer.Width(width);
+            return;
+        }
+    } catch (...) { report("placing the page's safe area bars"); }
+}
+
 void swiftomniui::refreshSafeAreaScrollEdge(controls::ScrollView const &scroller) {
     // A nested document has its own edge effects; it cannot change the
     // page-level chrome. Walk native ancestors, never unrelated windows.

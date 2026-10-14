@@ -10,6 +10,9 @@ public enum ContextMenuContract: ElementContract {
     /// It carries structure, not a platform control of its own.
     public static let layer: ElementLayer = .structure
 
+    /// A native menu is about to expose this level. Internal content construction waits for this request.
+    @_spi(Host) public static let contentRequested = ElementEvent<Self, Void>("menuContentRequested", layer: .native)
+
     /// The element's own members.
-    public static let members: [any ContractMember] = []
+    public static let members: [any ContractMember] = [contentRequested]
 }

@@ -11,7 +11,7 @@ import CSwiftOmniUIGTK
 @MainActor
 final class GTKContextMenu {
     /// The menu the popover shows now.
-    private(set) var menu: GTKMenu
+    let menu: GTKMenu
 
     /// The popover, a child of the view's widget.
     let popover: GTKWidget
@@ -35,13 +35,6 @@ final class GTKContextMenu {
         gtk_widget_insert_action_group(widget, GTKMenu.actionGroup, OpaquePointer(menu.actions))
         Self.shown[number] = self
         listen()
-    }
-
-    /// Shows `menu` in place of the one shown.
-    func show(_ menu: GTKMenu) {
-        self.menu = menu
-        gtk_popover_menu_set_menu_model(popover.opaque, g_menu_model(menu.model))
-        gtk_widget_insert_action_group(widget, GTKMenu.actionGroup, OpaquePointer(menu.actions))
     }
 
     /// Opens the menu at `x`, `y` in the widget.

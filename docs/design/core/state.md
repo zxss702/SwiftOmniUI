@@ -102,6 +102,22 @@ ordered list of live model instances is not published again. Membership,
 ordering and replacement instances do publish, while each observable model's
 own property dependencies continue to update the views that read them.
 
+The retained result follows the current descriptor as well as the context;
+changing a predicate, sort or limit cancels the old observation. A canceled
+observation cannot publish into the new query. JsonData's UI observation fetches
+database row snapshots on its queue and merges changed rows into existing model
+instances on MainActor. Its GRDB scheduler retains commit order and cancellation
+checks; it does not insert an unstructured task between notification and merge.
+Fetch revisions shared by a context also stop an older overlapping query from
+overwriting a model another query has already brought up to date.
+Unchanged snapshots skip hydration, and unsaved local edits are kept. Field
+changes notify model readers without replacing every result or refreshing the
+whole application. Membership/order changes use the query's animation.
+Models being saved remain protected until the commit finishes; a failed save
+restores pending inserts, edits and deletions instead of losing them. Equal
+field assignments skip Observation notifications and autosave, so merging a
+snapshot does not turn unchanged fields into new edits.
+
 A `@State` declared inside a class is reached through the wrapper's
 enclosing-instance subscript: Swift routes the property through the wrapper's
 type with the instance in hand. The value is the storage's, read and written as
@@ -222,8 +238,17 @@ label `persistentKey:` is the argument's own type, lowercased, as `animation:` a
 `sceneKey:` are: there is one kind of state, and the brackets say only what else
 is true of one. The unlabelled position already means the initial value.
 
-`@AppStorage("key")` is the same kept state spelled the SwiftUI way - a state
-whose key is its name - and it asks for nothing to be declared. The application
+On GTK and WinUI, `@AppStorage("key")` is backed by Foundation's
+`UserDefaults.standard`. A write updates defaults synchronously before a model
+consumer reads the key, and the queued persistence act synchronizes it to disk.
+Reading a kept state samples direct defaults writes and invalidates its readers
+only when the value changed. Native `@State(persistentKey:)` continues to use the
+host's original store. The desktop host installs the preferences adapter before
+the first render and imports older SOUI values only for absent defaults keys;
+current defaults take precedence. Other hosts retain their native kept-state
+backend.
+
+The application
 listing `persistentKeys` is how the host knows what to read, and a key nobody
 listed would survive one launch and be lost: the store keeps a manifest of its
 own under `__swiftomniui.keys`, every claimed key written into it as it is claimed,

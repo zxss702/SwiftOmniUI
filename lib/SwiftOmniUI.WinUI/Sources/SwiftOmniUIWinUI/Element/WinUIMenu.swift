@@ -14,6 +14,7 @@ struct WinUIMenu {
     private(set) var titles: [String] = []
     private(set) var enabled: [Bool] = []
     private(set) var identifiers: [String] = []
+    private(set) var mounts: [UInt64] = []
     private(set) var actions: [() -> Void] = []
 
     /// The entries `container` holds, as the host layer walks them; none for no container.
@@ -41,30 +42,33 @@ struct WinUIMenu {
 
     /// Whether the menu draws as `other` does: the same entries, captions and choosable ones.
     func draws(like other: WinUIMenu) -> Bool {
-        kinds == other.kinds && titles == other.titles && enabled == other.enabled && identifiers == other.identifiers
+        kinds == other.kinds && titles == other.titles && enabled == other.enabled
+            && identifiers == other.identifiers && mounts == other.mounts
     }
 
-    /// The relay's kinds: an item 0, a separator 1, a submenu opening 2 and closing 3.
+    /// The relay's kinds: an item 0, a separator 1, a submenu opening 2 and closing 3, a disabled Text 4.
     private mutating func add(_ entries: [MenuEntry]) {
         for entry in entries {
             switch entry.kind {
             case .item:
-                append(0, entry.title, entry.isEnabled, entry.identifier)
+                append(entry.element?.type == .text ? 4 : 0, entry.title, entry.isEnabled, entry.identifier,
+                       mount: entry.element?.mount ?? 0)
                 actions.append { [weak element = entry.element] in element?.winUI.send(.clicked, []) }
             case .separator:
                 append(1, "", true, nil)
             case .submenu:
-                append(2, entry.title, entry.isEnabled, entry.identifier)
+                append(2, entry.title, entry.isEnabled, entry.identifier, mount: entry.element?.mount ?? 0)
                 add(entry.entries)
                 append(3, "", true, nil)
             }
         }
     }
 
-    private mutating func append(_ kind: Int32, _ title: String, _ isEnabled: Bool, _ identifier: String?) {
+    private mutating func append(_ kind: Int32, _ title: String, _ isEnabled: Bool, _ identifier: String?, mount: UInt64 = 0) {
         kinds.append(kind)
         titles.append(title)
         enabled.append(isEnabled)
         identifiers.append(identifier ?? "")
+        mounts.append(mount)
     }
 }

@@ -323,6 +323,23 @@ final class PagesTests: XCTestCase {
         XCTAssertEqual(file.last?.entries.map(\.isEnabled), [false])
     }
 
+    func testMenuPlaceholdersAreDisabledAndSubmenuCaptionsComeFromTheTrigger() throws {
+        let runtime = runtime(node("menu", .contextMenu, children: [
+            node("loading", .text, [.text: .string("Loading…")]),
+            node("branch", .menuButton, children: [
+                node("caption", .text, [.text: .string("Directory")]),
+                node("content", .contextMenu, children: [
+                    node("empty", .text, [.text: .string("Empty")]),
+                ]),
+            ]),
+        ])) { _ in }
+        let entries = MenuEntry.entries(of: try XCTUnwrap(runtime.tree.root))
+        XCTAssertEqual(entries.map(\.title), ["Loading…", "Directory"])
+        XCTAssertEqual(entries.map(\.isEnabled), [false, true])
+        XCTAssertEqual(entries.last?.entries.map(\.title), ["Empty"])
+        XCTAssertEqual(entries.last?.entries.map(\.isEnabled), [false])
+    }
+
     /// A button is a menu item too: its caption on its own `text` where the
     /// button says one, else read off the first words its label's views carry,
     /// its icon off the first picture - the way a command's button reads.

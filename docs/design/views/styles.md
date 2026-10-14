@@ -6,6 +6,11 @@ leaves.
 
 ## Styles are resolved before the patch
 
+The SwiftUI-shaped `.buttonStyle` environment is also resolved before the
+patch. Its nearest value applies to Button and Menu triggers in the branch,
+unless a control writes its own style or binds one. `.plain` therefore makes
+a native Menu trigger frameless; `.automatic` defers to its menu style.
+
 ```text
   application.styles = StyleSheet {             a value in the application session
       Style<Text>().fontSize(14)               implicit: every Text

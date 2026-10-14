@@ -80,11 +80,10 @@ public struct Menu: View, ModifiableElement {
     /// - Parameters:
     ///   - content: the entries, in the order they are shown.
     ///   - label: the trigger shown in the view.
-    public init(@ViewBuilder content: () -> any View, @ViewBuilder label: () -> any View) {
+    public init(@ViewBuilder content: @escaping () -> any View, @ViewBuilder label: () -> any View) {
         node = Node(contract: MenuButtonContract.self)
         node.children = label().node.asChildren
-        node.children.append(
-            Node(contract: ContextMenuContract.self, children: content().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren))
+        node.children.append(RequestedMenuContent(content: content).node)
     }
 
     /// A menu button captioned `text`.
@@ -92,13 +91,37 @@ public struct Menu: View, ModifiableElement {
     /// The label is spelled out rather than inferred: `Menu("x") { ... }`
     /// alone names the menu-bar menu, so the button form keeps its own
     /// signature.
-    @_disfavoredOverload public init<S: StringProtocol>(title text: S, @ViewBuilder content: () -> any View) {
+    @_disfavoredOverload public init<S: StringProtocol>(title text: S, @ViewBuilder content: @escaping () -> any View) {
         self.init(content: content) { Text(text) }
     }
 
     /// The same, the trigger's words looked up.
-    public init(title key: LocalizedStringKey, @ViewBuilder content: () -> any View) {
+    public init(title key: LocalizedStringKey, @ViewBuilder content: @escaping () -> any View) {
         self.init(content: content) { Text(key) }
+    }
+}
+
+/// Retain a menu level after its first native request, while unopened submenus remain unbuilt.
+/// A closed trigger must not start the content's onAppear/tasks (for example, recursive directory listings).
+private struct RequestedMenuContent: View {
+    @State private var requested = false
+    let content: () -> any View
+
+    var body: some View {
+        let supported = HostRealizations.current.members.contains {
+            $0.owner == MenuButtonContract.name && $0.member == MenuButtonContract.contentRequested.name
+        }
+        var slot = Node(contract: ContextMenuContract.self)
+        if supported {
+            let request = _requested
+            slot.addHandler(ContextMenuContract.contentRequested.token) {
+                if !request.wrappedValue { request.wrappedValue = true }
+            }
+        }
+        slot.children = requested || !supported
+            ? content().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren
+            : Text("…").node.asChildren
+        return slot
     }
 }
 

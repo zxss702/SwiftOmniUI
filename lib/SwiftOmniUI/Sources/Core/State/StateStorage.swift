@@ -182,6 +182,9 @@ extension State {
         /// Design: docs/design/core/state.md#kept-state
         nonisolated(unsafe) var keep: ((Value) -> Void)?
 
+        /// Samples external preferences writes before a kept state is read.
+        nonisolated(unsafe) var refreshPersistent: (() -> Void)?
+
         /// Writes the value and keeps it under one hold, so a kept state's save never
         /// comes apart from its write. `keep` runs under the lock.
         /// Design: docs/design/core/state.md#writes-from-any-thread

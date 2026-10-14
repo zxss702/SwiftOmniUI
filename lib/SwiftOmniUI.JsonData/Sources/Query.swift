@@ -34,6 +34,33 @@ private func sendable<Root, Value>(
     unsafeBitCast(keyPath, to: (KeyPath<Root, Value> & Sendable).self)
 }
 
+/// Comparable query inputs keep captured predicate/comparator closures out of view diffing.
+private struct QueryRequest<Element: PersistentModel>: Equatable {
+    let descriptor: FetchDescriptor<Element>
+
+    static func == (left: Self, right: Self) -> Bool {
+        let descriptor = left.descriptor, other = right.descriptor
+        guard descriptor.fetchLimit == other.fetchLimit, descriptor.fetchOffset == other.fetchOffset,
+              descriptor.includePendingChanges == other.includePendingChanges,
+              descriptor.propertiesToFetch == other.propertiesToFetch,
+              descriptor.relationshipKeyPathsForPrefetching == other.relationshipKeyPathsForPrefetching,
+              descriptor.sortBy.count == other.sortBy.count,
+              zip(descriptor.sortBy, other.sortBy).allSatisfy({ $0.keyPath == $1.keyPath && $0.order == $1.order })
+        else { return false }
+        switch (descriptor.predicate, other.predicate) {
+        case (nil, nil): return true
+        case let (left?, right?):
+            return left.sql == right.sql && NSArray(array: left.arguments).isEqual(to: right.arguments)
+                && left.joinConditions.count == right.joinConditions.count
+                && zip(left.joinConditions, right.joinConditions).allSatisfy {
+                    $0.localColumn == $1.localColumn && $0.targetColumn == $1.targetColumn && $0.op == $1.op
+                        && NSArray(array: [$0.argument]).isEqual(to: [$1.argument])
+                }
+        default: return false
+        }
+    }
+}
+
 /// The rows a `Query` holds: what was last fetched, refetched when the store
 /// reports a change. Reading `items` during a build records the dependency.
 @MainActor
@@ -43,11 +70,10 @@ final class QueryResult<Element: PersistentModel> {
     private(set) var items: [Element] = []
 
     /// What the query asks for.
-    let descriptor: FetchDescriptor<Element>
+    @ObservationIgnored private var descriptor: FetchDescriptor<Element>
 
-    /// The animation `Query(..., animation:)` carried - kept for when a
-    /// host learns to animate row changes.
-    let animation: Animation?
+    /// The transaction applied when membership or order changes.
+    @ObservationIgnored private var animation: Animation?
 
     /// The context the query follows, once the environment answers.
     @ObservationIgnored private(set) weak var context: ModelContext?
@@ -56,23 +82,38 @@ final class QueryResult<Element: PersistentModel> {
     /// released with the object.
     @ObservationIgnored private var observation: Any?
     @ObservationIgnored private var instances: [ObjectIdentifier] = []
+    @ObservationIgnored private var generation = 0
 
     nonisolated init(descriptor: FetchDescriptor<Element>, animation: Animation? = nil) {
         self.descriptor = descriptor
         self.animation = animation
     }
 
-    /// Binds the context the environment resolved; idempotent for one context.
     func attach(to context: ModelContext) {
-        guard self.context !== context else { return }
+        attach(to: context, descriptor: descriptor, animation: animation)
+    }
+
+    /// Follows the current context and descriptor without restarting an unchanged query.
+    func attach(to context: ModelContext, descriptor: FetchDescriptor<Element>, animation: Animation?) {
+        self.animation = animation
+        guard self.context !== context || !sameRequest(descriptor) else { return }
+        observation = nil
+        generation += 1
+        let generation = self.generation
         self.context = context
+        self.descriptor = descriptor
         refetch()
 
         observation = context.startObservation(
             descriptor,
             onChange: { [weak self] newItems in
-                self?.accept(newItems)
+                guard let self, self.generation == generation else { return }
+                self.accept(newItems)
             })
+    }
+
+    private func sameRequest(_ other: FetchDescriptor<Element>) -> Bool {
+        QueryRequest(descriptor: descriptor) == QueryRequest(descriptor: other)
     }
 
     /// Fetches again and reports the rows.
@@ -88,7 +129,7 @@ final class QueryResult<Element: PersistentModel> {
         let identities = newItems.map(ObjectIdentifier.init)
         guard instances != identities else { return }
         instances = identities
-        items = newItems
+        withAnimation(animation) { items = newItems }
     }
 }
 
@@ -110,9 +151,12 @@ public struct Query<Element: PersistentModel> {
     /// The rows, kept across rebuilds.
     @State private var result: QueryResult<Element>
 
+    private let request: QueryRequest<Element>
+    private let animation: Animation?
+
     /// Every row of the type, unordered.
     public init() {
-        _result = State(wrappedValue: QueryResult(descriptor: FetchDescriptor<Element>()))
+        self.init(FetchDescriptor<Element>())
     }
 
     /// The rows ordered by one key.
@@ -120,17 +164,17 @@ public struct Query<Element: PersistentModel> {
         sort keyPath: KeyPath<Element, Value>,
         order: SortOrder = .forward
     ) {
-        _result = State(wrappedValue: QueryResult(
-            descriptor: FetchDescriptor(sortBy: [SortDescriptor(sendable(keyPath), order: order)])))
+        self.init(FetchDescriptor(sortBy: [SortDescriptor(sendable(keyPath), order: order)]))
     }
 
     /// A descriptor of your own - the full SwiftData spelling:
     ///
     ///     _events = Query(descriptor, animation: .snappy)
     ///
-    /// `animation` is kept on the result for when the host learns to animate
-    /// row changes; today the store's change simply refetches.
+    /// `animation` applies to result membership and order changes.
     public init(_ descriptor: FetchDescriptor<Element>, animation: Animation? = nil) {
+        self.request = QueryRequest(descriptor: descriptor)
+        self.animation = animation
         _result = State(wrappedValue: QueryResult(descriptor: descriptor, animation: animation))
     }
 
@@ -166,8 +210,7 @@ public struct Query<Element: PersistentModel> {
 
     /// The rows ordered by descriptors.
     public init(sort descriptors: [JsonDataCore.SortDescriptor<Element>], animation: Animation? = nil) {
-        _result = State(wrappedValue: QueryResult(
-            descriptor: FetchDescriptor(sortBy: descriptors), animation: animation))
+        self.init(FetchDescriptor(sortBy: descriptors), animation: animation)
     }
 
     /// The matching rows.
@@ -175,7 +218,7 @@ public struct Query<Element: PersistentModel> {
         // Builds run on the UI thread, which is the main actor for every host.
         let context = _context, result = _result
         return MainActor.assumeIsolated {
-            result.wrappedValue.attach(to: context.wrappedValue)
+            result.wrappedValue.attach(to: context.wrappedValue, descriptor: request.descriptor, animation: animation)
             return OnMain(result.wrappedValue.items)
         }.value
     }

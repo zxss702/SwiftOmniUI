@@ -215,6 +215,8 @@ typedef struct {
 
     /// A plain launch or reactivation: show the first declared window, reusing it where it is open.
     void (*activated)(void);
+    /// One native menu level is requested; mount 0 is the trigger's root level.
+    void (*menuContentRequested)(int64_t view, uint64_t mount);
 } SwiftOmniUIWinUICallbacks;
 
 /// What the environment is, in groups, each read at once.
@@ -269,6 +271,8 @@ void swiftomniui_winui_window_set_content(SwiftOmniUIObjectRef window, SwiftOmni
 /// ScrollView. It never creates another auto row or reduces the viewport.
 void swiftomniui_winui_window_set_safe_area_bars(SwiftOmniUIObjectRef window,
     SwiftOmniUIObjectRef const *bars, int32_t count, bool hasBackground, uint32_t background);
+/// Place the merged surface in its owning page's coordinates within the existing content row.
+void swiftomniui_winui_window_set_safe_area_bar_frame(SwiftOmniUIObjectRef window, double x, double y, double width);
 
 /// The window's chrome across its top, its menu bar and the row of tabs beneath it; null for none. The first chrome
 /// given also takes the window's way back: the mouse's back button, Alt+Left and the Back key choose its way back
@@ -562,7 +566,7 @@ bool swiftomniui_winui_popover_is_open(SwiftOmniUIObjectRef popover);
 /// choice told through `menuChosen` by its place among the items. None takes the menu away.
 void swiftomniui_winui_set_context_menu(SwiftOmniUIObjectRef element, int64_t view, int32_t const *kinds,
                                     char const *const *titles, bool const *enabled, char const *const *identifiers,
-                                    int32_t count);
+                                    uint64_t const *mounts, int32_t count);
 
 /// A menu living in the view: a `Button` whose `Flyout` a press opens, its face a row - the label child before a
 /// chevron the indicator setting shows or hides.
@@ -580,11 +584,16 @@ void swiftomniui_winui_menu_button_set_indicator(SwiftOmniUIObjectRef button, in
 /// Whether the button draws the platform's frameless look - `.borderlessButton`'s.
 void swiftomniui_winui_menu_button_set_borderless(SwiftOmniUIObjectRef button, int32_t borderless);
 
+/// Native menu interaction and identity used by regression tests.
+void swiftomniui_winui_menu_open_for_testing(SwiftOmniUIObjectRef button);
+uint64_t swiftomniui_winui_menu_identity_for_testing(SwiftOmniUIObjectRef button);
+bool swiftomniui_winui_menu_open_submenu_for_testing(SwiftOmniUIObjectRef button, uint64_t mount);
+
 /// The entries the press opens, written as a context menu's are, the flyout the button's `Flyout`. None takes it
 /// away.
 void swiftomniui_winui_menu_button_set_menu(SwiftOmniUIObjectRef button, int64_t view, int32_t const *kinds,
                                         char const *const *titles, bool const *enabled,
-                                        char const *const *identifiers, int32_t count);
+                                        char const *const *identifiers, uint64_t const *mounts, int32_t count);
 
 /// The scene's commands' button at the title bar's leading edge: a `Button` whose face is the platform's
 /// navigation glyph and whose `Flyout` - `menu_button_set_menu` writes it - the press opens.
@@ -593,7 +602,7 @@ SwiftOmniUIObjectRef swiftomniui_winui_app_menu_make(int64_t view);
 /// A window's menu bar: WinUI's MenuBar, written as a context menu is, each menu at the top one of the bar's own.
 SwiftOmniUIObjectRef swiftomniui_winui_menu_bar_make(int64_t view);
 void swiftomniui_winui_menu_bar_set(SwiftOmniUIObjectRef bar, int64_t view, int32_t const *kinds, char const *const *titles,
-                                bool const *enabled, char const *const *identifiers, int32_t count);
+                                bool const *enabled, char const *const *identifiers, uint64_t const *mounts, int32_t count);
 
 /// A view's context menu, or a bar's menus, as a test reads them: items by caption, "!" before one that cannot be
 /// chosen, "-" a separator, a submenu's entries - and a bar's menu's - in brackets after its caption, ";" between -
