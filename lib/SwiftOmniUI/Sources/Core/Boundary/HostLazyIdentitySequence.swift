@@ -31,7 +31,7 @@ import Synchronization
             self.left = left; self.right = right
             values = []
             count = left.count + right.count
-            height = max(left.height, right.height) + 1
+            height = Swift.max(left.height, right.height) + 1
         }
     }
 
