@@ -183,6 +183,7 @@ case "WinUI"?:
             name: "SwiftOmniUIWinUITests",
             dependencies: [
                 "SwiftOmniUIWinUI", "CSwiftOmniUIWinUI", "SwiftOmniUICore",
+                "SwiftOmniUIWebViewWinUI",
                 "SwiftOmniUIHost",
                 "SwiftOmniUIConformance",
             ],

@@ -27,6 +27,34 @@ executor's queue, which rings the doorbell. The WinUI element goes with it.
 
 ## Starting
 
+The host pins Windows App SDK **2.5.1** (stable) in
+`.scripts/WinUI/tools.ps1`. Component versions are independent: WinUI **2.3.9**,
+Foundation **2.3.12**, InteractiveExperiences **2.1.9**, and Base **2.0.4** are
+the aggregate release's dependency graph. Only the native components used by
+the host are deployed; the aggregate's AI, ML and other optional engines are
+not required. C++/WinRT inputs, the DirectX interop header and the generated
+servicing version header share one projection stamp, invalidated by either
+an aggregate or component version change.
+
+SwiftPM does not run the Windows App SDK's MSBuild initializers. After loading
+the runtime, the relay applies `RuntimeCompatibilityOptions.PatchLevel1` for
+the pinned release before AppLifecycle can lock compatibility. Before either
+`Application.Start` or embedded XAML initialization it enables the stable
+`XamlOptionalChanges`: `DefaultStyleOptimizations`, `IconNoGridOptimization`,
+`OptimizeApplyStyles`, and `DeferContextFlyoutInit`. They reduce default style
+resolution, icon template nodes, redundant style application and eager text
+context-menu creation. Both startup paths configure them once per process.
+An unsupported change is an initialization error, rather than silently using
+an older runtime with a new projection. The limited-access CompositionEngine
+is not enabled. See [Microsoft's stable release notes](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/release-notes/windows-app-sdk-2-0)
+and [XAML change identifiers](https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.settings.xamlchangeid?view=windows-app-sdk-2.0).
+
+With deferred style application, a detached `TextBlock` is not a reliable
+reader of a semantic font's applied dependency properties. The font reader
+uses the native Style's resolved FontSize/FontWeight setters, traversing
+BasedOn before derived setters, cached by the sealed Style identity. No
+hidden visual tree is needed for measuring text or sizing symbols.
+
 The head hands the thread to `SwiftOmniUIWinUI.run(applicationID:initializing:)`.
 The relay loads the Windows App SDK, then uses `AppInstance.FindOrRegisterForKey`
 to select one process for the application ID, or the executable's full path
@@ -282,6 +310,29 @@ manifest registering every class each component declares - the registrations
 the SDK's own build writes - and `resources.pri`, where WinUI's controls find
 their resources. `.scripts/WinUI/tools.ps1` lays them out after each build,
 the test runner's included, and owns the versions.
+
+SDK payloads overwrite previous DLLs even when NuGet's file timestamps are
+older or equal. Keeping the older files by timestamp could leave 1.8 DLLs
+beside a 2.x manifest and projection. The resource index is refreshed from
+the same WinUI package. `.scripts/WinUI/tests/self-contained.tests.ps1`
+contains deployment-only regression fixtures for x64 and ARM64, including
+incremental upgrades and optional WebView payloads.
+
+The optional WebView backend pins WebView2 SDK **1.0.4258.31**. It deploys the
+matching native WinRT component and loader only when linked. It continues to
+use the system's Evergreen WebView2 Runtime; updating the SDK does not install
+or update that browser engine. Microsoft's release requires runtime
+**154.0.4258.31** or later for its full API surface
+([WebView2 SDK release](https://learn.microsoft.com/en-us/microsoft-edge/webview2/release-notes/sdk/1-0-4258-31)).
+In-memory HTML uses the request-source-aware `AddWebResourceRequestedFilter`
+overload for document requests. Replacing a document at the same address
+updates its contents without registering another filter. Shared/service
+worker interception and experimental shared-cluster environments are not
+enabled.
+
+The SDK upgrade, font metrics and deployment have regression test code.
+Native rendering and performance still require verification on Windows;
+the upgrade was prepared without compiling or running tests.
 
 The manifest stands beside the executable as `<name>.exe.manifest`, which
 Windows reads for an executable carrying none of its own. It is not written

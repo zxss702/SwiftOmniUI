@@ -24,10 +24,13 @@
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Xaml.Settings.h>
 #include <winrt/Microsoft.UI.Xaml.XamlTypeInfo.h>
 #include <winrt/Microsoft.Windows.AppLifecycle.h>
+#include <winrt/Microsoft.Windows.ApplicationModel.WindowsAppRuntime.h>
 #include <winrt/Windows.ApplicationModel.Activation.h>
 #include <winrt/Windows.Storage.h>
+#include "SwiftOmniUIWinUIVersion.h"
 
 namespace swiftomniui {
     SwiftOmniUIWinUICallbacks callbacks{};
@@ -270,6 +273,37 @@ namespace swiftomniui {
             if (ensure) winrt::check_hresult(ensure());
         }
 
+        /// SwiftPM does not run the SDK's MSBuild compatibility initializer.
+        /// Select the pinned servicing behavior before AppLifecycle or XAML can
+        /// lock it. The component package versions are intentionally different.
+        void configureRuntimeCompatibility() {
+            static std::once_flag configured;
+            std::call_once(configured, [] {
+                namespace runtime = winrt::Microsoft::Windows::ApplicationModel::WindowsAppRuntime;
+                runtime::RuntimeCompatibilityOptions options;
+                options.PatchLevel1({SWIFTOMNIUI_WINDOWS_APP_SDK_MAJOR, SWIFTOMNIUI_WINDOWS_APP_SDK_MINOR,
+                                     SWIFTOMNIUI_WINDOWS_APP_SDK_PATCH});
+                options.Apply();
+            });
+        }
+
+        /// These stable 2.x optimizations are opt-in, and process-wide. Both
+        /// startup paths configure them before constructing any XAML objects;
+        /// Application.Start/WindowsXamlManager then lock the selections.
+        void configureXaml() {
+            static std::once_flag configured;
+            std::call_once(configured, [] {
+                namespace settings = winrt::Microsoft::UI::Xaml::Settings;
+                for (auto change : {settings::XamlChangeId::DefaultStyleOptimizations,
+                                    settings::XamlChangeId::IconNoGridOptimization,
+                                    settings::XamlChangeId::OptimizeApplyStyles,
+                                    settings::XamlChangeId::DeferContextFlyoutInit}) {
+                    if (!settings::XamlOptionalChanges::EnableChange(change))
+                        winrt::throw_hresult(E_NOTIMPL, L"The deployed WinUI runtime does not support the pinned XAML optimizations.");
+                }
+            });
+        }
+
         /// Whether the process was given no handle for the stream: a windowed application started with its output
         /// left where it was.
         bool unhanded(DWORD stream) {
@@ -327,6 +361,7 @@ extern "C" int32_t swiftomniui_winui_run_single_instance(
     try {
         loadRuntime();
         winrt::init_apartment(winrt::apartment_type::single_threaded);
+        configureRuntimeCompatibility();
         {
             std::lock_guard lock(activationLock);
             shuttingDown = false;
@@ -347,6 +382,7 @@ extern "C" int32_t swiftomniui_winui_run_single_instance(
         }
         registeredPrimary = true;
         receiveActivation(args);
+        configureXaml();
         xaml::Application::Start([](auto &&) { winrt::make<SwiftOmniUIApplication>(false); });
         releaseInstance();
         ownsMessageLoop = false;
@@ -366,6 +402,8 @@ extern "C" int32_t swiftomniui_winui_embed(SwiftOmniUIWinUICallbacks const *give
         if (embedded) return 0;
         loadRuntime();
         winrt::init_apartment(winrt::apartment_type::single_threaded);
+        configureRuntimeCompatibility();
+        configureXaml();
         // The thread's WinUI itself: destroyed as the process exits, in the reverse of the order it stood up in,
         // which is WinUI's own shutdown - kept past it, the process ends in an access violation.
         static auto controller = winrt::Microsoft::UI::Dispatching::DispatcherQueueController::CreateOnCurrentThread();

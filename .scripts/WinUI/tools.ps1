@@ -26,13 +26,17 @@ $ErrorActionPreference = 'Continue'
 $SwiftOmniUIRepository = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $SwiftOmniUIWinUIHost = Join-Path $SwiftOmniUIRepository 'lib\SwiftOmniUI.WinUI'
 
-# The packages, pinned: the WebView2 is the one WinUI's nuspec names.
+# Stable Windows App SDK aggregate release. Its components have independent
+# versions; these pins are the 2.5.1 dependency graph, with a newer stable
+# WebView2 SDK than WinUI's minimum (1.0.3719.77).
+$SwiftOmniUIWindowsAppSDKVersion = '2.5.1'
 $SwiftOmniUIPackages = [ordered]@{
     'microsoft.windows.cppwinrt'                   = '3.0.260818.1'
-    'microsoft.windowsappsdk.winui'                = '1.8.260528001'
-    'microsoft.windowsappsdk.foundation'           = '1.8.260527000'
-    'microsoft.windowsappsdk.interactiveexperiences' = '1.8.260525001'
-    'microsoft.web.webview2'                       = '1.0.3179.45'
+    'microsoft.windowsappsdk.base'                 = '2.0.4'
+    'microsoft.windowsappsdk.winui'                = '2.3.9'
+    'microsoft.windowsappsdk.foundation'           = '2.3.12'
+    'microsoft.windowsappsdk.interactiveexperiences' = '2.1.9'
+    'microsoft.web.webview2'                       = '1.0.4258.31'
 }
 
 $SwiftOmniUIPackageRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
@@ -70,9 +74,14 @@ function Initialize-SwiftOmniUIProjection {
     $projection = Join-Path $SwiftOmniUIWinUIHost '.projection'
     $stamp = Join-Path $projection 'versions.txt'
     $interop = 'microsoft.ui.xaml.media.dxinterop.h'
-    $versions = ($SwiftOmniUIPackages.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join "`n"
+    $versionHeader = 'SwiftOmniUIWinUIVersion.h'
+    $versions = "windowsappsdk $SwiftOmniUIWindowsAppSDKVersion`n" +
+        (($SwiftOmniUIPackages.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join "`n")
     if ((Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq $versions.Trim()) -and
-        (Test-Path (Join-Path $projection $interop))) { return }
+        (Test-Path (Join-Path $projection $interop)) -and
+        (Test-Path (Join-Path $projection $versionHeader)) -and
+        (Test-Path (Join-Path $projection 'winrt\Microsoft.UI.Xaml.Settings.h')) -and
+        (Test-Path (Join-Path $projection 'winrt\Microsoft.Windows.ApplicationModel.WindowsAppRuntime.h'))) { return }
 
     $cppwinrt = Join-Path (Get-SwiftOmniUIPackage 'microsoft.windows.cppwinrt') 'bin\cppwinrt.exe'
     $winui = Get-SwiftOmniUIPackage 'microsoft.windowsappsdk.winui'
@@ -87,6 +96,14 @@ function Initialize-SwiftOmniUIProjection {
         -output $projection
     if ($LASTEXITCODE) { throw 'cppwinrt could not generate the projection' }
     Copy-Item (Join-Path $winui "include\$interop") $projection
+    $release = [version]$SwiftOmniUIWindowsAppSDKVersion
+    Set-Content -Path (Join-Path $projection $versionHeader) -Encoding ascii -Value @"
+// Generated from .scripts/WinUI/tools.ps1. Never edit the projected copy.
+#pragma once
+#define SWIFTOMNIUI_WINDOWS_APP_SDK_MAJOR $($release.Major)
+#define SWIFTOMNIUI_WINDOWS_APP_SDK_MINOR $($release.Minor)
+#define SWIFTOMNIUI_WINDOWS_APP_SDK_PATCH $($release.Build)
+"@
     Set-Content -Path $stamp -Value $versions -Encoding ascii
 }
 
@@ -155,7 +172,9 @@ function Set-SwiftOmniUISelfContained([string]$Directory, [string[]]$Executables
 
     foreach ($component in $components) {
         $native = Join-Path $component "runtimes-framework\win-$Architecture\native"
-        robocopy $native $Directory /E /XO /NFL /NDL /NJH /NJS /NP | Out-Null
+        # NuGet DLL timestamps are not release ordering. Replace equal/older
+        # timestamps too, or an incremental 1.8 -> 2.x build can mix runtimes.
+        robocopy $native $Directory /E /IS /IT /NFL /NDL /NJH /NJS /NP | Out-Null
         if ($LASTEXITCODE -ge 8) { throw "the Windows App SDK could not be copied from $native" }
     }
     # What a backend's engine needs beside an application linking it, each backend lays itself.

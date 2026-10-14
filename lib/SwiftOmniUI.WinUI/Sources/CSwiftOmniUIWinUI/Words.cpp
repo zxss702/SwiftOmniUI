@@ -43,17 +43,42 @@ namespace {
         if (auto text = wordsOf(object)) block(text);
         else if (auto other = object.try_as<controls::Control>()) control(other);
     }
+
+    // OptimizeApplyStyles defers applying a Style until an element enters the
+    // live tree. Font lookup also serves off-tree measurement and symbol sizing:
+    // read the native setters instead of depending on a detached probe's Style.
+    // BasedOn is applied first, as it is by XAML; StaticResource values have
+    // already been resolved by the native resource dictionary.
+    void fontSetters(xaml::Style const &style, TextFontDefaults &font) {
+        if (!style) return;
+        fontSetters(style.BasedOn(), font);
+        for (auto const &item : style.Setters()) {
+            auto setter = item.try_as<xaml::Setter>();
+            if (!setter) continue;
+            if (setter.Property() == controls::TextBlock::FontSizeProperty())
+                font.size = winrt::unbox_value<double>(setter.Value());
+            else if (setter.Property() == controls::TextBlock::FontWeightProperty())
+                font.weight = winrt::unbox_value<winrt::Windows::UI::Text::FontWeight>(setter.Value()).Weight;
+        }
+    }
 }
 
 swiftomniui::TextFontDefaults swiftomniui::textFontDefaults(int32_t textStyle) {
     struct Probe {
         controls::TextBlock block{nullptr};
         xaml::Style style{nullptr};
+        TextFontDefaults defaults{};
+        TextFontDefaults font{};
     };
     static Probe probes[12];
     auto valid = textStyle >= 0 && textStyle < 11;
     auto &probe = probes[valid ? textStyle + 1 : 0];
-    if (!probe.block) { probe.block = controls::TextBlock(); ++fontProbes; }
+    if (!probe.block) {
+        probe.block = controls::TextBlock();
+        probe.defaults = {probe.block.FontSize(), probe.block.FontWeight().Weight};
+        probe.font = probe.defaults;
+        ++fontProbes;
+    }
     xaml::Style style{nullptr};
     if (valid) {
         wchar_t const *styles[] = {L"TitleLargeTextBlockStyle", L"TitleTextBlockStyle", L"SubtitleTextBlockStyle",
@@ -62,14 +87,20 @@ swiftomniui::TextFontDefaults swiftomniui::textFontDefaults(int32_t textStyle) {
         if (auto application = xaml::Application::Current())
             style = application.Resources().TryLookup(winrt::box_value(styles[textStyle])).try_as<xaml::Style>();
     }
-    // Resources can be replaced while the application runs. Reuse the native
-    // reader, while still taking the current system/application Style object.
-    if (style != probe.style) {
-        if (style) probe.block.Style(style);
-        else probe.block.ClearValue(xaml::FrameworkElement::StyleProperty());
+    // Styles can be replaced while the application runs. Resolve sealed styles
+    // once per native identity. A still-editable application style must reflect
+    // setter changes too, even before it has entered a tree.
+    if (style != probe.style || (style && !style.IsSealed())) {
+        if (style != probe.style) {
+            if (style) probe.block.Style(style);
+            else probe.block.ClearValue(xaml::FrameworkElement::StyleProperty());
+        }
+        auto font = probe.defaults;
+        fontSetters(style, font);
+        probe.font = font;
         probe.style = style;
     }
-    return {probe.block.FontSize(), probe.block.FontWeight().Weight};
+    return probe.font;
 }
 
 extern "C" uint64_t swiftomniui_winui_font_probes(void) { return fontProbes; }

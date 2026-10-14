@@ -115,8 +115,17 @@ namespace {
             std::shared_ptr<std::string> const &document, winrt::hstring const &agent) {
         name(page, view, agent);
         if (document) {
-            served[view][std::wstring(address)] = document;
-            page.AddWebResourceRequestedFilter(address, core::CoreWebView2WebResourceContext::Document);
+            auto &documents = served[view];
+            auto key = std::wstring(address);
+            if (!documents.contains(key)) {
+                // The two-argument SDK overload is deprecated and mishandles
+                // iframe requests. Serve document requests only, not workers.
+                // Replacing/reloading HTML at one URL must not accumulate
+                // duplicate native filters.
+                page.AddWebResourceRequestedFilter(address, core::CoreWebView2WebResourceContext::Document,
+                    core::CoreWebView2WebResourceRequestSourceKinds::Document);
+            }
+            documents[key] = document;
         }
         page.Navigate(address);
     }

@@ -24,6 +24,7 @@
 #include <winrt/Microsoft.UI.Xaml.Documents.h>
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
+#include <winrt/Microsoft.UI.Xaml.Settings.h>
 #include <winrt/Microsoft.UI.Xaml.Shapes.h>
 
 using namespace swiftomniui;
@@ -298,6 +299,15 @@ namespace {
     }
 
     std::optional<std::string> read(IInspectable const &object, std::string_view what) {
+        namespace settings = winrt::Microsoft::UI::Xaml::Settings;
+        if (what == "xaml.defaultStyleOptimizations")
+            return flag(settings::XamlOptionalChanges::IsChangeEnabled(settings::XamlChangeId::DefaultStyleOptimizations));
+        if (what == "xaml.iconNoGridOptimization")
+            return flag(settings::XamlOptionalChanges::IsChangeEnabled(settings::XamlChangeId::IconNoGridOptimization));
+        if (what == "xaml.optimizeApplyStyles")
+            return flag(settings::XamlOptionalChanges::IsChangeEnabled(settings::XamlChangeId::OptimizeApplyStyles));
+        if (what == "xaml.deferContextFlyoutInit")
+            return flag(settings::XamlOptionalChanges::IsChangeEnabled(settings::XamlChangeId::DeferContextFlyoutInit));
         if (what == "tint") return tint(object);
         if (what == "scope") return scope(object);
         if (auto bar = object.try_as<controls::TitleBar>()) return chrome(bar, what);
