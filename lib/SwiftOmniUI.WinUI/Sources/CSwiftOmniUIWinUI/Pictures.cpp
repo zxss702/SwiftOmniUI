@@ -28,6 +28,7 @@
 
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Storage.Streams.h>
+#include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Text.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 
@@ -515,7 +516,9 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
 extern "C" void swiftomniui_winui_image_set_tint(SwiftOmniUIObjectRef handle, bool has, uint32_t argb) {
     try {
         auto glyph = symbolBox(imageGrid(handle)).Child().as<controls::TextBlock>();
-        if (has) glyph.Foreground(xaml::Media::SolidColorBrush(color(argb)));
+        if (has) glyph.Foreground(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{
+            static_cast<uint8_t>(argb >> 24), static_cast<uint8_t>(argb >> 16),
+            static_cast<uint8_t>(argb >> 8), static_cast<uint8_t>(argb)}));
         else glyph.ClearValue(controls::TextBlock::ForegroundProperty());
     } catch (...) {
         report("tinting a symbol");
