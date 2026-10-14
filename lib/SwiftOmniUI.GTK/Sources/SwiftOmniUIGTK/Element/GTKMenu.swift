@@ -140,7 +140,7 @@ final class GTKMenu {
             // A submenu out of reach is one whose action - the one GTK tracks it open by - cannot run.
             let name = "s\(mount)"
             let existing = g_action_map_lookup_action(OpaquePointer(actions), name)
-            let opens = existing.map { UnsafeMutableRawPointer($0).assumingMemoryBound(to: GSimpleAction.self) }
+            let opens: OpaquePointer = existing
                 ?? g_simple_action_new_stateful(name, nil, g_variant_new_boolean(0))!
             usedActions.insert(name)
             if existing == nil {
@@ -148,10 +148,9 @@ final class GTKMenu {
                 Self.nextNumber += 1
                 numbers[name] = number
                 Self.requested[number] = { [weak element = entry.element] in element }
-                connectSignal(UnsafeMutableRawPointer(opens), "change-state", number: number) {
-                    (action: UnsafeMutableRawPointer?, state: UnsafeMutableRawPointer?, data: gpointer?) in
+                let onStateChanged: GTKArgumentHandler = { action, state, data in
                     guard let action, let state else { return }
-                    g_simple_action_set_state(action.assumingMemoryBound(to: GSimpleAction.self), OpaquePointer(state))
+                    g_simple_action_set_state(OpaquePointer(action), OpaquePointer(state))
                     guard g_variant_get_boolean(OpaquePointer(state)) != 0 else { return }
                     let number = viewNumber(data)
                     MainActor.assumeIsolated {
@@ -159,6 +158,7 @@ final class GTKMenu {
                         element.requestMenuContent(in: host.runtime)
                     }
                 }
+                connectSignal(UnsafeMutableRawPointer(opens), "change-state", number: number, onStateChanged)
                 g_action_map_add_action(OpaquePointer(actions), opens)
             }
             g_simple_action_set_enabled(opens, entry.isEnabled ? 1 : 0)
@@ -172,8 +172,7 @@ final class GTKMenu {
         let name = "e\(entry.element?.mount ?? 0)"
         usedActions.insert(name)
         let existing = g_action_map_lookup_action(OpaquePointer(actions), name)
-        let action = existing.map { UnsafeMutableRawPointer($0).assumingMemoryBound(to: GSimpleAction.self) }
-            ?? g_simple_action_new(name, nil)!
+        let action: OpaquePointer = existing ?? g_simple_action_new(name, nil)!
         g_simple_action_set_enabled(action, entry.isEnabled ? 1 : 0)
         let element = entry.element
         items[name] = { [weak element] in element }
