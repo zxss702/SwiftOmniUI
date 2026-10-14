@@ -238,11 +238,12 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_blur_make(SwiftOmniUIObjectRef
         auto slot = slotOf(element);
         auto made = winrt::make_self<BlurPresenter>();
         auto shown = made.as<xaml::UIElement>();
+        auto placed = element.as<xaml::FrameworkElement>();
         // Copy parent-owned placement and move shared drawing to the new root.
-        controls::Grid::SetRow(shown, controls::Grid::GetRow(element));
-        controls::Grid::SetColumn(shown, controls::Grid::GetColumn(element));
-        controls::Grid::SetRowSpan(shown, controls::Grid::GetRowSpan(element));
-        controls::Grid::SetColumnSpan(shown, controls::Grid::GetColumnSpan(element));
+        controls::Grid::SetRow(shown, controls::Grid::GetRow(placed));
+        controls::Grid::SetColumn(shown, controls::Grid::GetColumn(placed));
+        controls::Grid::SetRowSpan(shown, controls::Grid::GetRowSpan(placed));
+        controls::Grid::SetColumnSpan(shown, controls::Grid::GetColumnSpan(placed));
         controls::Canvas::SetZIndex(shown, controls::Canvas::GetZIndex(element));
         shown.CanBeScrollAnchor(element.CanBeScrollAnchor());
         shown.Visibility(element.Visibility());

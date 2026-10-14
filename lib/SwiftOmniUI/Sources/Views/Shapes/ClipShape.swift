@@ -183,7 +183,7 @@ extension View {
             return ModifiedContent(node: wrapper)
         }
         return ModifiedContent(node: SizedPathShape(
-            content: self, shape: shape, style: FillStyle(eoFill: eoFill), role: .interaction).node)
+            content: self, shape: shape, style: FillStyle(eoFill: eoFill, antialiased: true), role: .interaction).node)
     }
 
     /// Draws the view only where `mask`'s alpha allows: where the mask paints
