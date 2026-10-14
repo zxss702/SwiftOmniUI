@@ -5,6 +5,24 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class DeferredMenuTests: XCTestCase {
+    func testNodeBackedContentKeepsItsSlotWithoutAddingAContainer() throws {
+        let previous = HostRealizations.current
+        HostRealizations.current = HostRealization(elements: ["MenuButton", "ContextMenu", "Text", "MenuItem"])
+        defer { HostRealizations.current = previous }
+
+        let node = Menu {
+            MenuItem("Leaf")
+        } label: {
+            Text("Trigger")
+        }.node.built
+
+        XCTAssertEqual(node.type, .menuButton)
+        XCTAssertEqual(node.children.map(\.type), [.text, .contextMenu])
+        let slot = try XCTUnwrap(node.children.first { $0.type == .contextMenu })
+        XCTAssertEqual(slot.children.map(\.type), [.menuItem])
+        XCTAssertEqual(slot.children.first?.props[.text], .string("Leaf"))
+    }
+
     func testUnopenedLevelsDoNotBuildOrRunTheirAppearanceHandlers() throws {
         let previous = HostRealizations.current
         HostRealizations.current = HostRealization(

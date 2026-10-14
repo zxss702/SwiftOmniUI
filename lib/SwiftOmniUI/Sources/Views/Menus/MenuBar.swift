@@ -121,7 +121,7 @@ private struct RequestedMenuContent: View {
         slot.children = requested || !supported
             ? content().environment(\.isMenuContent, true).labelStyle(.titleAndIcon).node.asChildren
             : Text("…").node.asChildren
-        return slot
+        return ModifiedContent(node: slot)
     }
 }
 
