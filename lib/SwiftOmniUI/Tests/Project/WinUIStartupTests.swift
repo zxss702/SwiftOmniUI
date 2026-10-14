@@ -5,6 +5,23 @@ import Foundation
 import XCTest
 
 @MainActor final class WinUIStartupTests: XCTestCase {
+    func testHresultThrowerNeverReceivesAnErrorMessageAsItsSourceLocation() throws {
+        // throw_hresult's second argument is slim_source_location. Messages
+        // belong to hresult_error; check all relay call sites even on hosts
+        // where the Windows projection is unavailable to the compiler.
+        let invalid = try NSRegularExpression(
+            pattern: #"winrt::throw_hresult\s*\([^;\n]*,\s*(?:L|u8|u|U)?\x22"#)
+        for folder in ["lib/SwiftOmniUI.WinUI/Sources/CSwiftOmniUIWinUI", "lib/Backends/WebView.WinUI/Relay"] {
+            let root = SourceTree.repository.appendingPathComponent(folder)
+            let files = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+            for file in files where file.pathExtension == "cpp" {
+                let source = try String(contentsOf: file, encoding: .utf8)
+                XCTAssertEqual(invalid.numberOfMatches(in: source, range: NSRange(source.startIndex..., in: source)), 0,
+                               "\(file.lastPathComponent): use hresult_error when supplying an error message")
+            }
+        }
+    }
+
     func testServicingAndXamlConfigurationPrecedeBothStartupPaths() throws {
         let source = try String(contentsOf: SourceTree.repository.appendingPathComponent(
             "lib/SwiftOmniUI.WinUI/Sources/CSwiftOmniUIWinUI/Application.cpp"), encoding: .utf8)

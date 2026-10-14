@@ -299,7 +299,7 @@ namespace swiftomniui {
                                     settings::XamlChangeId::OptimizeApplyStyles,
                                     settings::XamlChangeId::DeferContextFlyoutInit}) {
                     if (!settings::XamlOptionalChanges::EnableChange(change))
-                        winrt::throw_hresult(E_NOTIMPL, L"The deployed WinUI runtime does not support the pinned XAML optimizations.");
+                        throw winrt::hresult_error(E_NOTIMPL, L"The deployed WinUI runtime does not support the pinned XAML optimizations.");
                 }
             });
         }

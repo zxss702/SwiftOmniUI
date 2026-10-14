@@ -13,10 +13,22 @@ import Observation
 /// into it is not walked for state.
 private final class Built {
     var count = 0
+    var identityReads = 0
     var numbers: [Int: Int] = [:]
     var appeared: [Int] = []
     var disappeared: [Int] = []
     var rows: [Int: OwnedLazyRow] = [:]
+}
+
+/// Count actual identity reads, rather than only String conversions. Reusing
+/// interned names can otherwise conceal a scan of the whole collection.
+private struct ReadCountedLazyItem: Identifiable {
+    let value: Int
+    let built: Built
+    var id: Int {
+        built.identityReads += 1
+        return value
+    }
 }
 
 private final class LazyRowContext {
@@ -431,6 +443,40 @@ private struct LazyPage: View {
             }
         }.node)
         XCTAssertEqual(built.count, 2, "a fresh source replaces the cached content")
+    }
+
+    func testArrayViewportUpdatesReadOnlyRequestedIdsAtDifferentDataScales() throws {
+        for count in [1_000, 10_000, 100_000] {
+            Renderer.shared.clearInvalidation()
+            Renderer.shared.clearStates()
+            let built = Built()
+            let items = (0..<count).map { ReadCountedLazyItem(value: $0, built: built) }
+            let renders = Renders()
+            let stack = try lazy(.lazyVStack, in: renders.render(LazyPage {
+                LazyVStack {
+                    ForEach(items) { item in
+                        built.count += 1
+                        return Text("Row \(item.value)")
+                    }
+                }
+            }.node))
+            let source = try XCTUnwrap(stack.lazyRows)
+            XCTAssertEqual(built.identityReads, count, "initial source identification reads each ID once")
+            XCTAssertEqual(built.count, 0, "identifying the source must not build rows")
+
+            for first in [0, 4, count / 2, count - 8] {
+                let before = built.identityReads, made = built.count
+                let shown = try lazy(.lazyVStack, in: realize(
+                    Array(source.identities[first..<first + 8]), in: renders, lazy: stack))
+                XCTAssertLessThanOrEqual(built.identityReads - before, 8,
+                                         "scrolling an array of \(count) items must not enumerate every ID")
+                XCTAssertLessThanOrEqual(built.count - made, 8)
+                XCTAssertNil(shown.lazyRows, "viewport changes retain the existing identity source")
+                XCTAssertEqual(shown.children.count, 8, "rows outside the requested window leave the tree")
+                XCTAssertEqual(Set(shown.children.map(\.id)),
+                               Set(source.identities[first..<first + 8].map { .manual($0) }))
+            }
+        }
     }
 
     func testParentUpdatesReuseIdentitiesAndKeepFreshRowBuilders() throws {
