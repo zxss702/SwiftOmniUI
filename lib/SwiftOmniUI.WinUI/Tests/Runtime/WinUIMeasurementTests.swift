@@ -5,12 +5,16 @@
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
 import XCTest
+import CSwiftOmniUIWinUI
 
 /// Counts actual arithmetic work, including work re-entered through XAML's MeasureOverride.
 private final class CountedMeasureLayout: WinUILayoutView {
     override var hasNativeProposals: Bool { true }
     var extent = 40.0
     var calls: [Double?: Int] = [:]
+    var arrangements = 0
+
+    override func arrange(in bounds: Rect) { arrangements += 1 }
 
     override func contentSize(width: Double?) -> LayoutSize {
         calls[width, default: 0] += 1
@@ -38,6 +42,24 @@ private func nest(_ depth: Int, _ words: String) -> Node {
 }
 
 final class WinUIMeasurementTests: XCTestCase {
+    func testExistingBackgroundColourChangesDoNotRearrangeContent() {
+        onUIThread {
+            let panel = CountedMeasureLayout()
+            panel.setBackground(Color.clear.propValue)
+            WinUITestHost.window.show(panel)
+            defer { WinUITestHost.window.show(nil) }
+            swiftomniui_winui_update_layout(panel.handle)
+            let arrangements = panel.arrangements
+            let revision = panel.measurementRevision
+            let box = panel.boxView
+            panel.setBackground(Color.black.opacity(0.1).propValue)
+            swiftomniui_winui_update_layout(panel.handle)
+            XCTAssertEqual(panel.arrangements, arrangements)
+            XCTAssertEqual(panel.measurementRevision, revision)
+            XCTAssertTrue(panel.boxView === box)
+        }
+    }
+
     func testOnePatchInvalidatesSharedAncestorsOnceAcrossDifferentElements() throws {
         try onUIThread {
             let host = WinUIRenderer.running {

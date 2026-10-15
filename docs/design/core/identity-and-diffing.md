@@ -271,6 +271,14 @@ its own animation once. The lanes say which parts of a child's place animate: a
 layout told `.animation(.none, .size)` moves children to new places but gives them
 new sizes at once, and a measured layout's children take their sizes at once.
 
+`HostPatch.layoutTransition` resolves the current write independently of that
+standing mask. An application's idle `.none` can leave all standing lanes
+closed; `withAnimation` or an armed value gate computes fresh lanes from its
+own timing, still respecting measured child sizes and geometry feedback.
+The clean walk keeps the unresolved plan and child-size rule, so a transaction
+on a descendant has the same placement semantics as a rebuilt layout. A later
+ordinary write does not inherit the preceding transaction.
+
 ## Themes
 
 A value with a half for each color scheme (`Color(light:dark:)`) stays whole in the

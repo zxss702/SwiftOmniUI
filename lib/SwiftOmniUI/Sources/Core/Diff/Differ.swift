@@ -307,11 +307,21 @@ final class Differ {
         // it. The write's transaction must reach that placement as well.
         if NodeType.saysMotion.contains(rendered.type), rendered.type != .app,
            patch.layoutTransition == nil, let transaction, patch.children.hasChange {
-            var law = rendered.animation ?? .inherited
-            if transaction.disablesAnimations { law = .none }
-            else if let override = transaction.animation, !law.isCustom { law = override }
-            let lanes: AnimationLanes = transaction.isGeometryFeedback ? [] : rendered.lanes
-            patch.layoutTransition = HostLayoutMotion(animation: law, lanes: lanes)
+            let plan = rendered.placementPlan
+            let write = plan?.transaction(under: transaction) ?? transaction
+            func law(for values: AnimationValues) -> Animation {
+                if write.disablesAnimations { return .none }
+                let resolved = (plan?.animation(for: values) ?? .inherited).resolved(against: animation)
+                if let override = write.animation, !resolved.isCustom { return override }
+                return resolved
+            }
+            var lanes = AnimationLanes.all
+            if law(for: .place).isNothing { lanes.subtract(.place) }
+            if law(for: .width).isNothing { lanes.subtract(.width) }
+            if law(for: .height).isNothing { lanes.subtract(.height) }
+            if rendered.childSizesArrive { lanes.subtract([.width, .height]) }
+            if write.isGeometryFeedback { lanes = [] }
+            patch.layoutTransition = HostLayoutMotion(animation: law(for: .place), lanes: lanes)
         }
 
         // A kept element folds its subtree's preference answers again - a

@@ -526,10 +526,13 @@ extension Differ {
                 patch.animation = HostLayoutMotion(animation: mine, lanes: lanes)
             }
             if node.type != .app, transacting != nil || !armed.isEmpty {
-                var moving = lanes
+                // Resolve this write independently of the standing mask. An
+                // idle application's .none must not disable withAnimation.
+                var moving = AnimationLanes.all
                 if animating(.place).isNothing { moving.subtract(.place) }
                 if animating(.width).isNothing { moving.subtract(.width) }
                 if animating(.height).isNothing { moving.subtract(.height) }
+                if node.childSizesArrive { moving.subtract([.width, .height]) }
                 if transacting?.isGeometryFeedback == true { moving = [] }
                 patch.layoutTransition = HostLayoutMotion(animation: animating(.place), lanes: moving)
             }
@@ -728,6 +731,8 @@ extension Differ {
             children: children
         )
         result.environmentValues = node.environmentValues
+        result.placementPlan = node.animation
+        result.childSizesArrive = node.childSizesArrive
         result.lazySource = lazySource
         result.lazySourceReads = sourceReads
         result.lazyIdentity = node.lazyIdentity

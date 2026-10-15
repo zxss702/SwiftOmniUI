@@ -15,6 +15,41 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class MotionTests: XCTestCase {
+    func testExplicitTransactionReopensIdleLayoutLanesOnAFullDescription() {
+        let differ = Differ()
+        func stack(_ width: Double) -> Node {
+            VStack { Text("Row").frame(width: width) }.node
+        }
+        let initial = differ.reconcile(nil, with: stack(80))
+        XCTAssertEqual(initial.node.lanes, [])
+        let law = Animation.eased(200, .linear)
+        differ.transaction = Transaction(animation: law)
+        let changed = differ.reconcile(initial.node, with: stack(120))
+        XCTAssertEqual(changed.patch.layoutTransition?.animation, law)
+        XCTAssertEqual(changed.patch.layoutTransition?.lanes, .all,
+                       "idle .none is not a permanent prohibition on explicit animation")
+        var disabled = Transaction(animation: law)
+        disabled.disablesAnimations = true
+        differ.transaction = disabled
+        let stopped = differ.reconcile(changed.node, with: stack(160))
+        XCTAssertEqual(stopped.patch.layoutTransition?.lanes, [])
+    }
+
+    func testValueGateReopensIdlePlacementLanesOnlyWhenItsValueChanges() {
+        let differ = Differ()
+        let law = Animation.eased(200, .linear)
+        func stack(_ expanded: Bool, text: String) -> Node {
+            VStack { Text(text).frame(height: expanded ? 80 : 40) }
+                .animation(law, value: expanded).node
+        }
+        let initial = differ.reconcile(nil, with: stack(false, text: "one"))
+        let changed = differ.reconcile(initial.node, with: stack(true, text: "one"))
+        XCTAssertEqual(changed.patch.layoutTransition?.lanes, .all)
+        XCTAssertEqual(changed.patch.layoutTransition?.animation, law)
+        let ordinary = differ.reconcile(changed.node, with: stack(true, text: "two"))
+        XCTAssertNil(ordinary.patch.layoutTransition)
+    }
+
     func testWithAnimationHasPlacementTimingWithoutChangingStandingConfiguration() throws {
         let rows = State(wrappedValue: [0, 1])
         let differ = Differ()

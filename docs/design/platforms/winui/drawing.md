@@ -15,6 +15,12 @@ it over the layout's whole size in each arrangement. A box that paints nothing
 is let go of, and one whose outline turns from a rectangle into an ellipse is
 made again, the two being different elements.
 
+Changing only an existing box's brush does not request another arrangement of
+its content. Native child changes still arrange a new or removed shape, and a
+changed clip is applied at the current allocation. This keeps ordinary hover
+background updates on the painting path; explicit animation still updates the
+brush through the normal presentation frames.
+
 A brush crosses as its parts ([brushes](../../types/brushes.md)) and becomes
 WinUI's own: a `SolidColorBrush`, or a `LinearGradientBrush` or
 `RadialGradientBrush` whose points are fractions of the painted box, as

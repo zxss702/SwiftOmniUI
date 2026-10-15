@@ -9,6 +9,45 @@ import XCTest
 
 /// A stack's children travel to the places a patch gives them; one that joins fades in, one hidden fades out first.
 final class WinUILayoutMotionTests: XCTestCase {
+    func testLazyFirstPlacementArrivesAndExplicitReorderTravels() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let order = State(wrappedValue: [0, 1])
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(order.wrappedValue) { number in
+                            Text("Row \(number)").frame(height: 40).id("row-\(number)")
+                        }
+                    }
+                }
+                .frame(width: 200, height: 120)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let row = try XCTUnwrap(host.view(id: .manual("row-1")))
+            XCTAssertEqual(row.frame.y, 40, accuracy: 0.5)
+            XCTAssertFalse(host.runtime.animator.isMoving)
+
+            withAnimation(.eased(200, .linear)) { order.wrappedValue = [1, 0] }
+            host.runtime.pump.turn()
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertEqual(row.frame.y, 40, accuracy: 0.5, "explicit motion starts from the existing place")
+            clock.now = 100
+            host.frame()
+            XCTAssertEqual(row.frame.y, 20, accuracy: 1)
+            clock.now = 200
+            host.frame()
+            XCTAssertEqual(row.frame.y, 0, accuracy: 0.5)
+            XCTAssertTrue(host.view(id: .manual("row-1")) === row)
+
+            order.wrappedValue = [0, 1]
+            host.runtime.pump.turn()
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertEqual(row.frame.y, 40, accuracy: 0.5)
+            XCTAssertFalse(host.runtime.animator.isMoving, "the prior withAnimation must not leak into later writes")
+        }
+    }
+
     /// A vertical stack of 100 x 40 labels in `order`, travelling on a 200 ms linear law; `hidden` fade out in 100 ms.
     private static func stack(_ order: [String], hidden: Set<String> = []) -> HostPatch {
         var stack = HostPatch(id: .manual("stack"), type: .vStack)

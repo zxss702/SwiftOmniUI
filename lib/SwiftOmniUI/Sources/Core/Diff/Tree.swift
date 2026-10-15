@@ -187,6 +187,11 @@ final class RenderedNode {
     /// And which parts of a child's place animated.
     var lanes: AnimationLanes = .all
 
+    /// Keep the unresolved rules for a descendant-only transaction. The last
+    /// standing lane mask may be empty merely because the application is idle.
+    var placementPlan: AnimationPlan?
+    var childSizesArrive = false
+
     /// The values `.animation(_:value:)` watched last render, for arming.
     var gates: [AnyEquatableValue] = []
 

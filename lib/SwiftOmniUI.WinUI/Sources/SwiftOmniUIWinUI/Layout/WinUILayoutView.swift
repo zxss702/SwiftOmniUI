@@ -178,6 +178,7 @@ class WinUILayoutView: WinUIView {
 
     /// What fills the box: a colour or a brush; nil for nothing.
     func setBackground(_ value: HostValue?) {
+        guard box.fill != value else { return }
         box.fill = value
         paintBox()
     }
@@ -189,10 +190,11 @@ class WinUILayoutView: WinUIView {
         box.shape = shape
         box.clips = clips
         paintBox()
+        writeCut(width: allocatedBounds.width, height: allocatedBounds.height)
     }
 
-    /// Paints the box behind the children, made, remade for another outline, or let go of, and asks for an
-    /// arrangement to place it and its cut.
+    /// Paint-only changes update the existing shape. Adding or replacing the
+    /// shape changes the native children and requests an arrangement there.
     /// Design: docs/design/platforms/winui/drawing.md#a-box-and-its-brush
     private func paintBox() {
         let outline = BoxArithmetic.outline(box.shape)
@@ -208,7 +210,6 @@ class WinUILayoutView: WinUIView {
             boxView?.paint(radius: outline.relay.radius, fill: fill, stroke: stroke, width: width)
         }
         setChildren(held)
-        invalidateArrange()
     }
 
     /// Asks WinUI to arrange the children again: a place in the air lands in the pass it asks for.

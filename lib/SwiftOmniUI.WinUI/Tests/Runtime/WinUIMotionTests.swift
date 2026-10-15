@@ -30,6 +30,31 @@ private struct CutPage: View {
 }
 
 final class WinUIMotionTests: XCTestCase {
+    func testOrdinaryHoverUpdatesTheBackgroundWithoutWaitingForAnimationTime() throws {
+        try onUIThread {
+            let hovered = State(wrappedValue: false)
+            let host = WinUIRenderer.running(clock: TestClock()) {
+                ZStack { Text("Row") }
+                    .frame(width: 200, height: 40)
+                    .background(hovered.wrappedValue ? Color.black : Color.clear)
+                    .onHover { hovered.wrappedValue = $0 }
+                    .id("hover-row")
+            }
+            let element = try XCTUnwrap(host.runtime.tree.root?.first(id: .manual("hover-row")))
+            let row = try XCTUnwrap(host.view(id: element.id) as? WinUILayoutView)
+            let revision = row.measurementRevision
+            let box = row.boxView
+            row.heard(.pointer(.pointerEntered, .zero))
+            XCTAssertEqual(element.value(.background), Color.black.propValue)
+            XCTAssertFalse(host.runtime.animator.isMoving)
+            XCTAssertEqual(row.measurementRevision, revision)
+            XCTAssertTrue(row.boxView === box)
+            row.heard(.pointer(.pointerExited, .zero))
+            XCTAssertEqual(element.value(.background), Color.clear.propValue)
+            XCTAssertFalse(host.runtime.animator.isMoving)
+        }
+    }
+
     /// A colour box whose colour and width change under a animation stands halfway at half its time, and lands - the
     /// Gallery's Animation sample: what travels is the host layer's list.
     func testAColourAndAWidthTravelHalfwayAndLand() throws {
