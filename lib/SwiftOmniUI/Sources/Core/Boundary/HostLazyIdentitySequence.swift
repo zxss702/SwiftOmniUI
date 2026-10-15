@@ -60,8 +60,38 @@ import Synchronization
     }
 
     public init(_ values: [String] = []) {
-        root = nil
-        root = build(values[...])
+        guard !values.isEmpty else { return }
+        root = Self.initialTree(values[...])
+        var locations: [(String, Location)] = []
+        var parents: [(UInt64, Parent)] = []
+        locations.reserveCapacity(values.count)
+        func collect(_ node: Node, parent: Parent?) {
+            if let parent { parents.append((node.serial, parent)) }
+            if let left = node.left, let right = node.right {
+                collect(left, parent: Parent(node: node.serial, before: 0))
+                collect(right, parent: Parent(node: node.serial, before: left.count))
+            } else {
+                for (offset, value) in node.values.enumerated() {
+                    locations.append((value, Location(leaf: node.serial, offset: offset)))
+                }
+            }
+        }
+        if let root { collect(root, parent: nil) }
+        // Repeated identities retain their first place, matching the
+        // incremental leaf builder's first-occurrence rule.
+        var first: [String: Location] = [:]
+        first.reserveCapacity(locations.count)
+        for (identity, location) in locations where first[identity] == nil {
+            first[identity] = location
+        }
+        self.locations = PersistentIndex(first.map { ($0.key, $0.value) })
+        self.parents = PersistentIndex(parents)
+    }
+
+    private static func initialTree(_ values: ArraySlice<String>) -> Node {
+        if values.count <= 64 { return Node(Array(values)) }
+        let mid = values.startIndex + values.count / 2
+        return Node(initialTree(values[..<mid]), initialTree(values[mid...]))
     }
 
     public var startIndex: Int { 0 }

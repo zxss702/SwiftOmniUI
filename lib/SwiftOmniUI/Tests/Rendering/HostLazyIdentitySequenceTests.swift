@@ -5,6 +5,16 @@
 import XCTest
 
 final class HostLazyIdentitySequenceTests: XCTestCase {
+    func testInitialIndexFindsEveryRowAndKeepsFirstDuplicate() {
+        let names = (0..<10_000).map { "file-\($0)" }
+        let ordered = HostLazyIdentitySequence(names + ["file-37"])
+        XCTAssertEqual(ordered.count, 10_001)
+        XCTAssertEqual(ordered.position(of: "file-0"), 0)
+        XCTAssertEqual(ordered.position(of: "file-37"), 37)
+        XCTAssertEqual(ordered.position(of: "file-9999"), 9_999)
+        XCTAssertEqual(ordered.parentEntries, ordered.storageNodes - 1)
+    }
+
     func testFolderInsertionAndRemovalShareTheUnchangedIdentityIndex() {
         let original = HostLazyIdentitySequence((0..<10_000).map { "file-\($0)" })
         var expanded = original
@@ -74,5 +84,24 @@ final class HostLazyIdentitySequenceTests: XCTestCase {
         XCTAssertNil(edited[Key(value: 20)])
         XCTAssertEqual(original[Key(value: 50)], 50)
         XCTAssertEqual(edited[Key(value: 50)], 500)
+    }
+
+    func testBulkHashIndexPreservesCollisionLookupsAcrossSnapshotEdits() {
+        struct Key: Hashable, Sendable {
+            let value: Int
+            func hash(into hasher: inout Hasher) { hasher.combine(value % 17) }
+        }
+        let initial = PersistentIndex((0..<10_000).map { (Key(value: $0), $0) })
+        XCTAssertEqual(initial.count, 10_000)
+        for number in stride(from: 0, to: 10_000, by: 97) {
+            XCTAssertEqual(initial[Key(value: number)], number)
+        }
+        var edited = initial
+        edited[Key(value: 8_000)] = nil
+        edited[Key(value: 20_000)] = 20_000
+        XCTAssertEqual(initial[Key(value: 8_000)], 8_000)
+        XCTAssertNil(edited[Key(value: 8_000)])
+        XCTAssertEqual(edited[Key(value: 20_000)], 20_000)
+        XCTAssertEqual(edited.count, 10_000)
     }
 }

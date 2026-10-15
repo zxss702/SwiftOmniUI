@@ -104,4 +104,57 @@ final class WinUISafeBarColumnTests: XCTestCase {
             try checkInsets()
         }
     }
+
+    func testNativeSplitRearrangesNestedSafeBarsWhenSidebarContentChangesAtTheSameSize() throws {
+        try onUIThread {
+            let shown = State(wrappedValue: true)
+            let page = State(wrappedValue: 0)
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(shown.projectedValue) {
+                    VStack {
+                        if page.wrappedValue == 0 {
+                            ScrollView { Text("Files") }
+                                .id("files")
+                                .safeAreaInset(edge: .bottom, spacing: 0) {
+                                    Text("Search").frame(height: 40).id("search-bar")
+                                }
+                        } else {
+                            ScrollView { Text("Git") }
+                                .id("git")
+                                .safeAreaInset(edge: .bottom, spacing: 0) {
+                                    Text("Graph").frame(height: 96).id("graph-bar")
+                                }
+                        }
+                    }
+                    .frame(maxHeight: .infinity)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Text("Tabs").frame(height: 44).id("sidebar-tabs")
+                    }
+                    .navigationSplitViewColumnWidth(220)
+                } detail: { Text("Detail") }
+            }
+            let tabs = try XCTUnwrap(host.view(id: .manual("sidebar-tabs")))
+            let split = try XCTUnwrap(host.views(WinUISplitView.self).first)
+            let originalSize = split.laidOutFrame
+            for index in [1, 0, 1, 0] {
+                page.wrappedValue = index
+                let contentID = index == 0 ? "files" : "git"
+                let bottomID = index == 0 ? "search-bar" : "graph-bar"
+                host.settle {
+                    guard let content = host.view(id: .manual(contentID)),
+                          let bottom = host.view(id: .manual(bottomID)) else { return false }
+                    return content.origin.y >= tabs.origin.y + tabs.frame.height - 1
+                        && content.origin.y + content.frame.height <= bottom.origin.y + 1
+                }
+                host.layOut()
+                let content = try XCTUnwrap(host.view(id: .manual(contentID)))
+                let bottom = try XCTUnwrap(host.view(id: .manual(bottomID)))
+                XCTAssertEqual(split.laidOutFrame.width, originalSize.width, accuracy: 1)
+                XCTAssertEqual(split.laidOutFrame.height, originalSize.height, accuracy: 1)
+                XCTAssertGreaterThanOrEqual(content.origin.y, tabs.origin.y + tabs.frame.height - 1)
+                XCTAssertLessThanOrEqual(content.origin.y + content.frame.height,
+                                         bottom.origin.y + 1)
+            }
+        }
+    }
 }

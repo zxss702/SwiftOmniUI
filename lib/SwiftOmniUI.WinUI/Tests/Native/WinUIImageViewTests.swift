@@ -193,6 +193,29 @@ final class WinUIImageViewTests: XCTestCase {
         }
     }
 
+    func testSystemGlyphUsesThemeFontAndPaintsWithoutAnExplicitForeground() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                HStack {
+                    Image(systemName: "\u{E8D5}").id("folder").frame(width: 16, height: 16)
+                    Image(systemName: "\u{E721}").foregroundStyle(.black)
+                        .id("search").frame(width: 20, height: 20)
+                }
+                .frame(width: 100, height: 40)
+            }
+            host.settle { host.view(id: .manual("search"))?.laidOutFrame.width == 20 }
+            host.layOut()
+            for (id, size) in [("folder", 16), ("search", 20)] {
+                let image = try XCTUnwrap(host.view(id: .manual(id)) as? WinUIImageView)
+                let points = (0..<size).flatMap { y in
+                    (0..<size).map { x in (Double(x) + 0.5, Double(y) + 0.5) }
+                }
+                XCTAssertTrue(image.pixels(at: points).contains { ($0 >> 24) != 0 },
+                              "the system FontIcon must paint both theme and explicit tint")
+            }
+        }
+    }
+
     /// A new file is decoded before apply returns, without pumping the UI queue or relying on its metadata.
     func testABitmapIsDecodedBeforeApplyReturns() throws {
         try onUIThread {

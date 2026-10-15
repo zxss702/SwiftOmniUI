@@ -56,12 +56,17 @@
         } else {
             detectedEdit = .replace(before, with: after)
         }
-        var ordered = previous?.sequence ?? HostLazyIdentitySequence()
-        switch detectedEdit {
-        case .replace(let before, let after):
-            ordered.replace(before, with: identities[after])
-        case .move(let range, let destination):
-            ordered.move(range, to: destination)
+        var ordered: HostLazyIdentitySequence
+        if let previous {
+            ordered = previous.sequence
+            switch detectedEdit {
+            case .replace(let before, let after):
+                ordered.replace(before, with: identities[after])
+            case .move(let range, let destination):
+                ordered.move(range, to: destination)
+            }
+        } else {
+            ordered = HostLazyIdentitySequence(identities)
         }
         // The renderer interns unique names. Direct SPI clients may supply
         // duplicates; rebuilding those preserves the first-occurrence contract.

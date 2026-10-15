@@ -14,10 +14,27 @@ import Observation
 private final class Built {
     var count = 0
     var identityReads = 0
+    var identityHashes = 0
     var numbers: [Int: Int] = [:]
     var appeared: [Int] = []
     var disappeared: [Int] = []
     var rows: [Int: OwnedLazyRow] = [:]
+}
+
+private struct HashedLazyItem: Identifiable, Hashable, CustomStringConvertible {
+    let value: Int
+    let built: Built
+    var id: Self { self }
+    var description: String { String(value) }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.value == rhs.value && lhs.built === rhs.built
+    }
+
+    func hash(into hasher: inout Hasher) {
+        built.identityHashes += 1
+        hasher.combine(value)
+    }
 }
 
 /// Count actual identity reads, rather than only String conversions. Reusing
@@ -140,6 +157,52 @@ private struct LazyPage: View {
         XCTAssertEqual(collapsed.lazyRows?.removed.count, 100)
         XCTAssertEqual(collapsed.lazyRows?.identities, source.identities)
         XCTAssertEqual(Set(built.numbers.keys), [3, 4])
+    }
+
+    func testFolderSpliceHashesOnlyChangedIdentitiesAndKeepsAStaticTail() throws {
+        let built = Built()
+        let renders = Renders()
+        let original = (0..<10_000).map { HashedLazyItem(value: $0, built: built) }
+        func page(_ items: [HashedLazyItem]) -> LazyPage {
+            LazyPage {
+                LazyVStack {
+                    ForEach(items) { item in
+                        built.numbers[item.value, default: 0] += 1
+                        return Text("Row \(item.value)")
+                    }
+                    .transition(.opacity)
+                    Text("Tail")
+                }
+            }
+        }
+        let first = try lazy(.lazyVStack, in: renders.render(page(original).node))
+        let source = try XCTUnwrap(first.lazyRows)
+        let beforeSame = built.identityHashes
+        let same = renders.render(page(original.map { $0 }).node)
+        XCTAssertTrue(same.isEmpty, "a copied Array with the same IDs retains its source")
+        XCTAssertLessThan(built.identityHashes - beforeSame, 1_000)
+        let before = built.identityHashes
+        let inserted = (10_000..<10_040).map { HashedLazyItem(value: $0, built: built) }
+        let expanded = Array(original[..<4]) + inserted + Array(original[4...])
+        let change = try lazy(.lazyVStack, in: renders.render(page(expanded).node))
+        let next = try XCTUnwrap(change.lazyRows)
+        XCTAssertEqual(next.inserted.count, 40)
+        XCTAssertTrue(next.inserted.contains(next.identities[4]))
+        XCTAssertEqual(next.identities.last, source.identities.last)
+        if case .replace(let before, let after) = next.edit {
+            XCTAssertEqual(before, 4..<4)
+            XCTAssertEqual(after, 4..<44)
+        } else {
+            XCTFail("a folder expansion should retain the unchanged suffix")
+        }
+        XCTAssertTrue(built.numbers.isEmpty, "identifying the splice must not build offscreen rows")
+        XCTAssertLessThan(built.identityHashes - before, 1_000,
+                          "retained rows should be compared, not rehashed and interned")
+        let collapsed = try lazy(.lazyVStack, in: renders.render(page(original).node))
+        let restored = try XCTUnwrap(collapsed.lazyRows)
+        XCTAssertEqual(restored.removed.count, 40)
+        XCTAssertEqual(restored.identities, source.identities)
+        XCTAssertEqual(restored.identities.last, source.identities.last)
     }
 
     func testHashableIdentityDoesNotCollapseRowsWithTheSameDescription() throws {

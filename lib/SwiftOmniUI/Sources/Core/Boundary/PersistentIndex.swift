@@ -30,6 +30,31 @@ struct PersistentIndex<Key: Hashable & Sendable, Value: Equatable & Sendable>: S
     private var root: Node?
     var count: Int { root?.count ?? 0 }
 
+    init() {}
+
+    /// Build an initial snapshot in one pass through each hash bucket. Later
+    /// edits still copy only the affected trie path.
+    init(_ values: [(Key, Value)]) {
+        var unique: [Key: Value] = [:]
+        unique.reserveCapacity(values.count)
+        for (key, value) in values { unique[key] = value }
+        root = Self.build(unique.map { Entry(key: $0.key, hash: UInt(bitPattern: $0.key.hashValue), value: $0.value) }, depth: 0)
+    }
+
+    private static func build(_ entries: [Entry], depth: Int) -> Node? {
+        guard !entries.isEmpty else { return nil }
+        let node = Node()
+        node.count = entries.count
+        guard entries.count > 8, (depth + 1) * 4 < UInt.bitWidth else {
+            node.entries = entries
+            return node
+        }
+        var buckets = [[Entry]](repeating: [], count: 16)
+        for entry in entries { buckets[slot(entry.hash, depth)].append(entry) }
+        node.children = buckets.map { build($0, depth: depth + 1) }
+        return node
+    }
+
     subscript(key: Key) -> Value? {
         get {
             let hash = UInt(bitPattern: key.hashValue)

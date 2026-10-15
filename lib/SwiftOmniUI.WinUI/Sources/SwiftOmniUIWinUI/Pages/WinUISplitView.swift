@@ -94,8 +94,14 @@ final class WinUISplitView: WinUILayoutView {
     override func setItems(_ items: [WinUILayoutItem]) -> Bool {
         guard items.count != pages.count || !zip(items, pages).allSatisfy({ $0.arranges(like: $1) }) else { return false }
 
+        for page in pages where !items.contains(where: { $0.view === page.view }) {
+            page.view.nativeLayoutOwner = nil
+        }
         pages = items
-        for page in items { page.view.placingLayout = nil }
+        for page in items {
+            page.view.placingLayout = nil
+            page.view.nativeLayoutOwner = self
+        }
         configure()
         invalidateMeasurements()
         return true
@@ -219,6 +225,7 @@ final class WinUISplitView: WinUILayoutView {
     }
 
     override func detach() {
+        for page in pages { page.view.nativeLayoutOwner = nil }
         sidebar.clear()
         middle.clear()
         ownedPages = []

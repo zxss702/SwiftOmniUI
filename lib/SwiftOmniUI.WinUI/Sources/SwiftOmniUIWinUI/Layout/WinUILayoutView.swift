@@ -106,6 +106,9 @@ class WinUILayoutView: WinUIView {
         for item in items { item.view.placingLayout = self }
         holdChildren()
         invalidateMeasurements()
+        var root: WinUIView = self
+        while let parent = root.placingLayout { root = parent }
+        root.nativeLayoutOwner?.invalidateArrange()
         return true
     }
 
