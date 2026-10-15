@@ -433,6 +433,8 @@ namespace {
 
     /// A canvas: a panel with no size of its own, painted with the surface its drawing is replayed on.
     struct SwiftOmniUICanvas : controls::PanelT<SwiftOmniUICanvas> {
+        // Internal regression inspection, alongside the native lifetime count.
+        uint64_t paints = 0;
         explicit SwiftOmniUICanvas(int64_t view) : view(view) {
             canvases += 1;
             // A clear background: the whole canvas is hit, drawn on or not.
@@ -463,21 +465,20 @@ namespace {
         Size ArrangeOverride(Size final) {
             if (final != size) {
                 size = final;
-                // The room is known in this pass: a drawing that waited for it is replayed here, not a frame
-                // later - a row realized into view is painted by the pass that placed it.
-                if (!paint()) invalidate();
+                // Rendering follows layout. Several arrangements and command
+                // updates in this turn publish only their final surface.
+                invalidate();
             }
             return final;
         }
 
-        /// The drawing to replay from now on: at once where the canvas is sized and in a tree, else on the
-        /// frame the room or the root arrives.
+        /// Keep the latest commands until the rendering phase knows their room.
         void show(Drawing next) {
             if (drawing.ints == next.ints && drawing.numbers == next.numbers && drawing.words == next.words) return;
             drawing = std::move(next);
             resources.clear();
             stale = true;
-            if (!paint()) invalidate();
+            invalidate();
         }
 
     private:
@@ -543,6 +544,7 @@ namespace {
                         drawnScale = scale;
                         made = devices.made;
                         stale = false;
+                        ++paints;
                         return true;
                     }
                     // Windows took the device away: a new one, a new surface, and the drawing again.
@@ -734,4 +736,8 @@ extern "C" int32_t swiftomniui_winui_canvases(void) {
         report("counting the canvases");
         return 0;
     }
+}
+
+extern "C" uint64_t swiftomniui_winui_canvas_paints(SwiftOmniUIObjectRef handle) {
+    try { return canvas(handle)->paints; } catch (...) { return 0; }
 }

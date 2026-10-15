@@ -259,6 +259,10 @@ extension LayoutChild {
     /// A cache holding nothing yet.
     public init() {}
 
+    public func cachedSize(offering width: Double?) -> LayoutSize? {
+        sizes.first { $0.width == width }?.size
+    }
+
     /// The size measured for `width`, measuring only when none is kept.
     public func size(offering width: Double?, measure: () -> LayoutSize) -> LayoutSize {
         if let kept = sizes.first(where: { $0.width == width }) { return kept.size }
@@ -277,6 +281,18 @@ extension LayoutChild {
     public func invalidate() {
         sizes.removeAll(keepingCapacity: true)
         revision += 1
+    }
+
+    /// Publish a completed native preparation without recomputing its arithmetic.
+    /// A changed answer invalidates speculative answers at other proposals.
+    @discardableResult
+    public func store(_ size: LayoutSize, offering width: Double?) -> Bool {
+        let changed = sizes.contains { $0.width == width && $0.size != size }
+        if changed { invalidate() }
+        sizes.removeAll { $0.width == width }
+        if sizes.count == Self.capacity { sizes.removeFirst() }
+        sizes.append((width, size))
+        return changed
     }
 
     /// A parent offers a view one or two widths in a pass: its natural width and the width it lays it out in.

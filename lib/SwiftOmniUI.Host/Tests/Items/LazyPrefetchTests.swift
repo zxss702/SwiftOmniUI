@@ -7,6 +7,59 @@ import XCTest
 @MainActor final class LazyPrefetchTests: XCTestCase {
     private final class Owner {}
 
+    func testReadyRunsShareTheBudgetAndStopAfterAnExpensiveRun() {
+        let queue = LazyPrefetchQueue()
+        let owner = Owner()
+        let start = ContinuousClock.now
+        var time = start
+        queue.now = { time }
+        var calls = 0
+        queue.schedule(owner: owner, ready: { true }) {
+            calls += 1
+            time = time.advanced(by: .milliseconds(calls == 2 ? 5 : 1))
+            return true
+        }
+        queue.drain(until: start.advanced(by: .milliseconds(4)))
+        XCTAssertEqual(calls, 2, "check after each run, not after a sixteen-row batch")
+        XCTAssertTrue(queue.isPending)
+        queue.cancel(owner: owner)
+    }
+
+    func testNativeMeasurementReadinessPausesWithoutSpinning() {
+        let queue = LazyPrefetchQueue()
+        let owner = Owner()
+        var ready = true
+        var calls = 0
+        queue.schedule(owner: owner, ready: { ready }) {
+            calls += 1
+            ready = false
+            return true
+        }
+        queue.drain(until: .now.advanced(by: .seconds(1)))
+        XCTAssertEqual(calls, 1)
+        queue.drain(until: .now.advanced(by: .seconds(1)))
+        XCTAssertEqual(calls, 1)
+        ready = true
+        queue.drain(until: .now.advanced(by: .seconds(1)))
+        XCTAssertEqual(calls, 2)
+        queue.cancel(owner: owner)
+    }
+
+    func testDirectionChangeDefersReplacementInsteadOfContinuingOldWork() {
+        let queue = LazyPrefetchQueue()
+        let owner = Owner()
+        var calls: [Int] = []
+        queue.schedule(owner: owner, ready: { true }) {
+            calls.append(1)
+            queue.schedule(owner: owner, ready: { true }) { calls.append(-1); return false }
+            return true
+        }
+        queue.drain(until: .now.advanced(by: .seconds(1)))
+        XCTAssertEqual(calls, [1])
+        queue.drain(until: .now.advanced(by: .seconds(1)))
+        XCTAssertEqual(calls, [1, -1])
+    }
+
     func testDeadlineStopsOptionalWorkAndEachOwnerGetsOneTurnPerFrame() {
         let queue = LazyPrefetchQueue()
         let first = Owner(), second = Owner()

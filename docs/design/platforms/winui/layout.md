@@ -44,6 +44,23 @@ places prepare native leaves as well as panels before arrangement.
 They read the resulting sizes again before answering, so an initially
 estimated lazy extent is not retained as the parent's completed size.
 
+Stacks, grids, layers and single-child containers cache the selected child
+proposals beside their width-keyed arithmetic. Native preparation replays those
+proposals without running `contentSize` again. If preparing a child changes an
+answer to the same proposal, the enclosing arithmetic is recomputed. Specialized
+layouts that commit geometry while measuring, including Lazy, retain one
+`contentSize` pass. Preparation records are bounded and hold children weakly.
+
+`ProgramWrite` ends each patch/frame's native invalidation batch. Swift caches
+are cleared immediately, shared ancestors once until a measurement consumes
+them; another write after that measurement invalidates them again. Native
+measure/arrange requests are coalesced until the batch ends. Row invalidations
+stop at the Lazy panel. Only changes to its returned extent propagate to the
+scroll document; changing the widest visible row in a fixed-width vertical
+stack is not such a change. The first measurement also reports its replacement
+of the estimated scroll extent. Window content constraints reuse their sizing
+while the queried views' measurement revisions and window constraints agree.
+
 Preparation restores native child proposals even when their arithmetic
 answers are cached. Changing the native proposal preserves the other
 width-keyed answers; only changed content, a changed answer or provisional

@@ -41,7 +41,9 @@ final class WinUIWindowController {
         if runtime.tree.chromeMayChange || changes.arrangement != nil || changes.traits != nil { refreshChrome(in: runtime) }
         let page = presentation.arrangement?.visiblePage
         window.showTopSafeAreaBars(page?.pageTopSafeAreaBars ?? [], in: page)
-        boundContent(element, requested: changes.frame, quiet: changes.arrangement == nil && changes.traits == nil, keepingSizing: keepingSizing)
+        boundContent(element, requested: changes.frame,
+                     quiet: changes.arrangement == nil && changes.traits == nil && changes.bounds == nil,
+                     keepingSizing: keepingSizing)
         let asked = WindowFrame(of: element)
         if asked.x == nil, asked.y == nil, let anchor = element.value(.defaultPosition)?.numbers {
             window.place(anchor)
@@ -62,11 +64,20 @@ final class WinUIWindowController {
     /// The sizing last made: the window's content bounds, which neither an animation's frame nor a lazy
     /// window moving changes - measuring the whole page for them each frame is what a frame must not do.
     private var sized: WindowContentSizing?
+    private struct SizingDependency {
+        weak var view: WinUIView?
+        let revision: Int
+    }
+    private var sizingDependencies: [SizingDependency] = []
+    private var sizedResizability: Int32?
 
     private func boundContent(_ element: MountedElement, requested: WindowFrame?, quiet: Bool, keepingSizing: Bool) {
         let sizing: WindowContentSizing
-        if quiet, keepingSizing || LazyCells.realizing, let sized { sizing = sized } else {
+        let resizability = element.value(.resizability)?.enumeration
+        let unchanged = sizingDependencies.allSatisfy { $0.view?.measurementRevision == $0.revision }
+        if quiet, resizability == sizedResizability, keepingSizing || unchanged, let sized { sizing = sized } else {
             var asked: [Double?: [ObjectIdentifier: LayoutSize]] = [:]
+            var dependencies: [Int64: SizingDependency] = [:]
             sizing = WindowContentSizing(of: element, content: presentation.arrangement) { node, width in
                 guard let item = node.winUI.layoutItem else { return nil }
                 if let known = asked[width]?[ObjectIdentifier(node)] { return known }
@@ -74,9 +85,12 @@ final class WinUIWindowController {
                     SingleChildArithmetic.size(of: item, padding: EdgeInsets(0), width: width)
                 }
                 asked[width, default: [:]][ObjectIdentifier(node)] = size
+                dependencies[item.view.number] = SizingDependency(view: item.view, revision: item.view.measurementRevision)
                 return size
             }
             sized = sizing
+            sizedResizability = resizability
+            sizingDependencies = Array(dependencies.values)
         }
         if let traits { window.apply(traits, isResizable: sizing.isResizable) }
         let chromeHeight = window.chromeHeight

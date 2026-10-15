@@ -114,6 +114,33 @@ final class WinUICanvasViewTests: XCTestCase {
         }
     }
 
+    func testCommandsAndResizePublishOneFinalSurfacePerRenderingPhase() throws {
+        try onUIThread {
+            let version = State(wrappedValue: 0)
+            let host = WinUIRenderer.running {
+                Canvas {
+                    Draw.fillColor(Color(version.wrappedValue == 2 ? "#0000FF" : "#FF0000"))
+                    Draw.fillRectangle(x: 0, y: 0, width: 200, height: 40)
+                }
+                .frame(width: 100 + Double(version.wrappedValue) * 20, height: 40)
+            }
+            let canvas = try XCTUnwrap(host.views(WinUICanvasView.self).first)
+            host.settle { canvas.pixels(at: [(10, 10)]) == [Self.red] }
+            let before = swiftomniui_winui_canvas_paints(canvas.handle)
+            for value in [1, 2] {
+                version.wrappedValue = value
+                host.runtime.pump.turn()
+                host.layOut()
+            }
+            XCTAssertEqual(swiftomniui_winui_canvas_paints(canvas.handle), before,
+                           "command submission and arrangement do not synchronously replay obsolete surfaces")
+            host.settle { canvas.pixels(at: [(10, 10), (130, 10)]) == [Self.blue, Self.blue] }
+            XCTAssertEqual(canvas.pixels(at: [(10, 10), (130, 10)]), [Self.blue, Self.blue])
+            XCTAssertEqual(swiftomniui_winui_canvas_paints(canvas.handle), before + 1)
+            XCTAssertTrue(host.views(WinUICanvasView.self).first === canvas)
+        }
+    }
+
     /// The instructions run in order: a colour holds until the next, and a later shape paints over an earlier one.
     func testInstructionsRunInOrder() throws {
         let colours = try drawn(width: 100, height: 40, at: [(10, 20), (60, 20), (95, 20)]) {

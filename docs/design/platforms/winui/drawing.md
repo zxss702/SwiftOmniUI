@@ -211,6 +211,13 @@ surfaces lose what they held; a device Windows takes away is made again, and
 the drawing with it. One Direct2D device, and one DirectWrite factory, serve
 every canvas.
 
+Command submission and `ArrangeOverride` mark the canvas dirty without drawing
+at an intermediate size. One `CompositionTarget.Rendering` callback submits the
+latest commands at the final allocated size, including the first allocation.
+The previous completed surface stays published until a replacement has finished
+`EndDraw`. This coalesces updates on the UI thread; no drawing closure or image
+loading is moved to a background task.
+
 The canvas hears its loading, which asks for a drawing, and never its
 unloading. WinUI tells an element taken out and put back before it loaded -
 a tabbed view holding its page again as the window takes its tabs - that it

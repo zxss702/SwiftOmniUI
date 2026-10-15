@@ -81,6 +81,77 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testLazyOwnFrameStillInvalidatesItsParentWithoutAChangeToRowExtent() throws {
+        try onUIThread {
+            let height = State(wrappedValue: 120.0)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<4) { number in Text("Row \(number)").frame(height: 28) }
+                    }
+                    .frame(height: height.wrappedValue)
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<16 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            let document = try XCTUnwrap(host.views(WinUIScrollDocument.self).first)
+            let extent = lazy.cells.total
+            let revision = document.measurementRevision
+
+            height.wrappedValue = 180
+            host.runtime.pump.turn()
+            XCTAssertGreaterThan(document.measurementRevision, revision,
+                                 "the Lazy boundary must not hide its own frame changes")
+            XCTAssertEqual(lazy.cells.total, extent)
+            XCTAssertTrue(host.views(WinUILazyStackView.self).first === lazy)
+        }
+    }
+
+    func testFixedWidthRowTextChangesStopAtLazyUntilTheExtentActuallyChanges() throws {
+        try onUIThread {
+            let words = State(wrappedValue: "short")
+            let height = State(wrappedValue: 28.0)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<8) { number in
+                            Text(number == 0 ? words.wrappedValue : "File \(number)")
+                                .frame(height: number == 0 ? height.wrappedValue : 28)
+                                .id("row-\(number)")
+                        }
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<16 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            let document = try XCTUnwrap(host.views(WinUIScrollDocument.self).first)
+            let row = try XCTUnwrap(host.view(id: .manual("row-0")))
+            let extent = lazy.cells.total
+            let revision = document.measurementRevision
+
+            words.wrappedValue = "A different and substantially wider file name"
+            host.runtime.pump.turn()
+            XCTAssertEqual(document.measurementRevision, revision,
+                           "a row's state patch cannot eagerly invalidate the scroll document")
+            _ = lazy.contentSize(width: 320)
+            WinUIDoorbell.commitPending()
+            XCTAssertEqual(lazy.cells.total, extent)
+            XCTAssertEqual(document.measurementRevision, revision,
+                           "a fixed-width stack's visible widest row does not change its returned size")
+            XCTAssertTrue(host.view(id: .manual("row-0")) === row)
+
+            height.wrappedValue = 76
+            host.runtime.pump.turn()
+            _ = lazy.contentSize(width: 320)
+            WinUIDoorbell.commitPending()
+            XCTAssertEqual(lazy.cells.total, extent + 48, accuracy: 0.01)
+            XCTAssertGreaterThan(document.measurementRevision, revision,
+                                 "a real extent change must still update the scroll document")
+        }
+    }
+
     func testBlurTransitionAllocatesPresentationOnlyForAnimatedLazyInsertions() throws {
         try onUIThread {
             let rows = State(wrappedValue: Array(0..<5))

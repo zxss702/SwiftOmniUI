@@ -159,10 +159,12 @@ a growing render and native arrangement for each unknown row. Look-ahead
 and neighbour policy still bound realization; nothing requests the entire
 source merely because its rows have no measurements yet. The actual window (or
 a program jump's destination) is synchronous demand. A viewport of optional
-neighbours on either side is prefetched on the UI thread, one run per owner per
-frame, only while time remains in the frame's four millisecond work budget after
-visible rendering. A builder cannot be preempted; the deadline is checked before
-each run. New sources, direction changes, jumps and detach cancel or replace
+neighbours on either side is prefetched on the UI thread in single-row (or
+single-grid-run) units, only while time remains in the frame's four millisecond
+work budget after visible rendering. A builder cannot be preempted; the deadline
+is checked between units. Ready owners rotate within the same frame. A WinUI
+owner waiting for its mounted rows' native measurements yields rather than
+building more estimated rows. New sources, direction changes, jumps and detach cancel or replace
 stale work. Native layout and paint retain the rest of the frame. Images still
 load synchronously when their row is requested.
 

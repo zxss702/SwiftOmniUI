@@ -160,6 +160,9 @@ class WinUIView {
     static var provisionalMeasureRevision = 0
     /// Changes when properties or a native size change invalidate this view, not on a repeated Measure query.
     var measurementRevision = 0
+    /// Native preparation can discover a changed answer to a previously queried
+    /// proposal. Enclosing arithmetic must then discard that answer as well.
+    static var nativeSizeRevision = 0
 
     private static let live = LiveViews<WinUIView>()
 
@@ -333,8 +336,18 @@ class WinUIView {
 
     /// Asks WinUI to measure this element again, and every panel above it.
     func invalidateMeasure() {
+        guard WinUILayoutUpdates.invalidate(self) else { return }
+        discardMeasurementResults()
+        guard !WinUILayoutUpdates.enqueue(self, measure: true) else { return }
+        requestNativeMeasure()
+    }
+
+    func discardMeasurementResults() {
         measurementRevision &+= 1
         measuredSizes.removeAll(keepingCapacity: true)
+    }
+
+    func requestNativeMeasure() {
         guard Self.arranging == 0, Self.measuring == 0 else {
             guard !nativeMeasurePending else { return }
             nativeMeasurePending = true
@@ -383,6 +396,7 @@ class WinUIView {
     /// The element's size for the room offered, in DIPs; nil offers any.
     /// Design: docs/design/platforms/winui/layout.md#measured-every-pass
     func measure(width: Double?, height: Double?) -> LayoutSize {
+        WinUILayoutUpdates.measured(self)
         // An arrangement asking a child's size reads what this proposal measured: measuring an element
         // while WinUI arranges marks it, and the marked element is measured and arranged again for ever -
         // XAML aborts the eighth such pass with a layout cycle.
@@ -435,6 +449,10 @@ class WinUIView {
         defer { Self.measuring -= 1 }
         swiftomniui_winui_measure(presentationHandle, width ?? .infinity, height ?? .infinity, &size)
         let measured = LayoutSize(width: size[0], height: size[1])
+        if let previous = measuredSizes.first(where: { $0.width == width && $0.height == height }),
+           previous.size != measured {
+            Self.nativeSizeRevision &+= 1
+        }
         if WinUILayoutView.queryingSize > 0 {
             // A new intrinsic proposal changed XAML's last measurement. Only
             // native preparation is stale; arithmetic answers by width remain valid.

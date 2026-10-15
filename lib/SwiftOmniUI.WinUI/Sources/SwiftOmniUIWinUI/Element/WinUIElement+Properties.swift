@@ -130,20 +130,19 @@ extension WinUIElement {
         if let layers = view as? WinUIZStackView { layers.placement = element.placement }
 
         if !changed.subtracting(element.ownPlacementRun).isSubset(of: MountedElement.unmeasuredProperties) {
-            invalidateMeasurements()
+            invalidateMeasurements(ownPlacementChanged: !changed.isDisjoint(with: MountedElement.arrangedProperties))
         }
     }
 
-    /// Forgets the sizes kept by this element's layout and every one above it, and asks WinUI to measure again.
-    func invalidateMeasurements() {
+    /// Forgets affected sizes up to the nearest Lazy boundary. A change to
+    /// that container's own placement still belongs to its parent layout.
+    func invalidateMeasurements(ownPlacementChanged: Bool = false) {
         var invalidated: Set<ObjectIdentifier> = []
         func invalidate(_ view: WinUIView?) {
             guard let view, invalidated.insert(ObjectIdentifier(view)).inserted else { return }
             if let layout = view as? WinUILayoutView {
-                layout.forgetMeasurements()
-                layout.invalidateArrange()
-            }
-            view.invalidateMeasure()
+                layout.invalidateOwnMeasurements()
+            } else { view.invalidateMeasure() }
         }
         var element: WinUIElement? = self
         while let each = element {
@@ -153,6 +152,10 @@ extension WinUIElement {
                 break
             }
             invalidate(each.view)
+            // The lazy panel measures its dirty rows and reports only an actual
+            // change to its returned extent. Mounting a new visible Text must
+            // not invalidate the whole window before that comparison.
+            if each.view is WinUILazyView, each !== self || !ownPlacementChanged { break }
             // A popover's card is its own room: nothing its content asks reaches the layout its anchor stands in.
             if each.type == .popover { break }
             element = each.parent
@@ -160,11 +163,13 @@ extension WinUIElement {
 
         // Native panels report zero DesiredSize; marking only a changed descendant can skip the
         // placing parents even after their Swift arithmetic was discarded.
+        if view is WinUILazyView, !ownPlacementChanged { return }
         var layout = (view ?? parent?.nearestView)?.placingLayout
         while let parent = layout {
             // Most placing parents are also mounted ancestors. Only the extra
             // native layouts (notably scroll documents) need another invalidation.
             invalidate(parent)
+            if parent is WinUILazyView { break }
             layout = (parent as? WinUIScrollDocument)?.scrollView ?? parent.placingLayout
         }
     }

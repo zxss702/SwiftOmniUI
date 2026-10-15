@@ -43,16 +43,16 @@ final class WinUIGridView: WinUITravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        let size = Self.querySize { queriedSize(width: width) }
-        if WinUIView.arranging == 0, Self.queryingSize == 0 {
-            let bounds = Rect(0, 0, width ?? size.width, size.height)
-            let places = Self.querySize { childPlaces(in: bounds) }
-            for (item, place) in zip(items, places) {
-                if let place { item.view.prepareMeasure(width: place.width) }
-            }
-            return Self.querySize { queriedSize(width: width) }
+        Self.querySize { queriedSize(width: width) }
+    }
+
+    override var hasNativeProposals: Bool { true }
+    override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
+        let bounds = Rect(0, 0, width ?? size.width, size.height)
+        let places = childPlaces(in: bounds)
+        return zip(items, places).compactMap { item, place in
+            place.map { NativeProposal(view: item.view, width: $0.width) }
         }
-        return size
     }
 
     private func queriedSize(width: Double?) -> LayoutSize {

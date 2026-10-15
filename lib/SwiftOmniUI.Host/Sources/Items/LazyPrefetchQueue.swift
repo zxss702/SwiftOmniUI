@@ -7,6 +7,7 @@
     private struct Job {
         weak var owner: AnyObject?
         let serial: UInt64
+        let ready: (() -> Bool)?
         let step: () -> Bool
     }
     private var jobs: [ObjectIdentifier: Job] = [:]
@@ -20,28 +21,35 @@
 
     /// `step` performs at most one bounded run and returns whether more remains.
     /// It must capture its owner weakly.
-    public func schedule(owner: AnyObject, step: @escaping () -> Bool) {
+    public func schedule(owner: AnyObject, ready: (() -> Bool)? = nil, step: @escaping () -> Bool) {
         serial &+= 1
-        jobs[ObjectIdentifier(owner)] = Job(owner: owner, serial: serial, step: step)
+        jobs[ObjectIdentifier(owner)] = Job(owner: owner, serial: serial, ready: ready, step: step)
         onPending?()
     }
 
     public func cancel(owner: AnyObject) { jobs[ObjectIdentifier(owner)] = nil }
 
-    /// A job gets one turn per frame. Builders cannot be preempted, so check
-    /// the deadline before each turn and never drain an idle loop to exhaustion.
+    /// Ready jobs may take another bounded step in this frame. A host still
+    /// waiting for native layout yields until a later frame; it never busy-waits.
+    /// Jobs without a readiness signal retain their one-step-per-frame contract.
     public func drain(until deadline: ContinuousClock.Instant) {
-        let pending = jobs.sorted { $0.value.serial < $1.value.serial }
-        for (id, job) in pending {
+        var pending = jobs.sorted { $0.value.serial < $1.value.serial }
+        var index = 0
+        while index < pending.count {
             guard now() < deadline else { break }
+            let (id, job) = pending[index]
+            index += 1
             guard jobs[id]?.serial == job.serial else { continue }
             guard job.owner != nil else { jobs[id] = nil; continue }
+            guard job.ready?() != false else { continue }
             let more = job.step()
             // A synchronous render can replace or cancel this very job.
             if jobs[id]?.serial == job.serial {
                 if more {
                     serial &+= 1
-                    jobs[id] = Job(owner: job.owner, serial: serial, step: job.step)
+                    let next = Job(owner: job.owner, serial: serial, ready: job.ready, step: job.step)
+                    jobs[id] = next
+                    if job.ready != nil { pending.append((id, next)) }
                 } else { jobs[id] = nil }
             }
         }

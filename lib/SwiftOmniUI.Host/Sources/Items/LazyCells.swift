@@ -40,6 +40,9 @@
     private var prefetchInvalidated = false
     private var lastDemand: Range<Double>?
     private var lastPerRun = 1
+    /// Native hosts can hold optional work until the requested rows have been
+    /// measured. The callback must not keep the native layout alive.
+    public var prefetchReady: (() -> Bool)?
     /// Echoed by this lazy element's own render, independently of unrelated
     /// work still waiting elsewhere in the scene.
     private var requestedGeneration: Int?
@@ -310,7 +313,10 @@
         request(within, keeping: keeping)
         // The visible request is always dispatched before optional neighbours.
         if prefetchPlan != nil {
-            runtime?.lazyPrefetch.schedule(owner: self) { [weak self] in self?.prefetchOne() ?? false }
+            runtime?.lazyPrefetch.schedule(owner: self, ready: { [weak self] in
+                guard let self, self.requestedItemsAreCurrent else { return false }
+                return self.prefetchReady?() ?? true
+            }) { [weak self] in self?.prefetchOne() ?? false }
         }
     }
 
@@ -339,10 +345,9 @@
         var lower = max(built.lowerBound, target.lowerBound)
         var upper = min(built.upperBound, target.upperBound)
         guard lower < upper else { prefetchPlan = nil; return false }
-        // Optional work is a screenful at most, capped for expensive rows.
-        // One row per frame leaves the upcoming window bare during a fling.
-        let visible = requestedRange(in: plan.demand, perRun: plan.perRun, grid: plan.grid)
-        let batch = max(plan.perRun, min(visible.count, 16 * plan.perRun))
+        // One indivisible run, not one run per frame: the queue checks its
+        // deadline and native readiness again before adding the next run.
+        let batch = plan.perRun
         if prefetchForward, upper < target.upperBound || lower == target.lowerBound {
             upper = min(target.upperBound, upper + batch)
         } else if lower > target.lowerBound {

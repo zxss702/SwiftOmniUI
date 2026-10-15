@@ -39,18 +39,16 @@ class WinUIZStackView: WinUITravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        let size = Self.querySize { ZStackArithmetic.size(of: items, padding: padding, width: width) }
-        if WinUIView.arranging == 0, Self.queryingSize == 0 {
-            let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
-            let places = Self.querySize {
-                ZStackArithmetic.places(of: items, in: room, padding: padding, direction: direction)
-            }
-            for (item, place) in zip(items, places) {
-                if let place { item.view.prepareMeasure(width: place.width) }
-            }
-            return Self.querySize { ZStackArithmetic.size(of: items, padding: padding, width: width) }
+        Self.querySize { ZStackArithmetic.size(of: items, padding: padding, width: width) }
+    }
+
+    override var hasNativeProposals: Bool { true }
+    override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
+        let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
+        let places = ZStackArithmetic.places(of: items, in: room, padding: padding, direction: direction)
+        return zip(items, places).compactMap { item, place in
+            place.map { NativeProposal(view: item.view, width: $0.width) }
         }
-        return size
     }
 
     override func arrange(in bounds: Rect) {

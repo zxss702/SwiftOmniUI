@@ -27,7 +27,6 @@ class WinUILazyView: WinUITravellingLayout {
     private var hasMountedSource = false
     private var lastAcknowledgedGeneration = 0
     private var ancestorMeasureQueued = false
-    private var hasCommittedContentExtent = false
 
     /// The scroller whose window the run answers, and the ear it hears it by.
     private weak var watching: WinUIScrollView?
@@ -72,6 +71,13 @@ class WinUILazyView: WinUITravellingLayout {
         self.axis = axis
         self.cells = cells
         super.init()
+        cells.prefetchReady = { [weak self] in
+            guard let self else { return false }
+            return !self.geometryChanged && self.measuredRevision == self.measurementRevision
+                && self.mounted.allSatisfy { identity, item in
+                    item.departing || self.measuredRevisions[identity] == item.view.measurementRevision
+                }
+        }
         swiftomniui_winui_panel_watch_viewport(handle, true)
     }
 
@@ -139,7 +145,9 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     func commitChangedContentExtent() {
-        guard hasCommittedContentExtent, !ancestorMeasureQueued else { return }
+        // The first measured extent also replaces the 44-point estimates
+        // already read by the scroll document during its arithmetic query.
+        guard !ancestorMeasureQueued else { return }
         ancestorMeasureQueued = true
         WinUIDoorbell.afterPass { [weak self] in
             guard let self else { return }
@@ -148,8 +156,6 @@ class WinUILazyView: WinUITravellingLayout {
             self.placingLayout?.invalidateMeasurements()
         }
     }
-
-    func didCommitContentExtent() { hasCommittedContentExtent = true }
 
     /// The nearest scroller clipping this run on its own axis, found up the
     /// placing layouts through the document it holds, or none: a scroller
@@ -338,7 +344,9 @@ class WinUILazyView: WinUITravellingLayout {
             self.watchClip()
             if self.geometryChanged {
                 self.geometryChanged = false
-                self.invalidateMeasurements()
+                // Extent changes have their own coalesced upward report. A
+                // new visible range or internal placement only dirties this panel.
+                self.invalidateOwnMeasurements()
                 self.measuredRevision = self.measurementRevision
             }
             // No clip to narrow by means all of it stands in view - a lazy
@@ -494,7 +502,6 @@ class WinUILazyView: WinUITravellingLayout {
         preparedViewport = nil
         watching = nil
         scrollEar = nil
-        hasCommittedContentExtent = false
         ancestorMeasureQueued = false
     }
 }
@@ -566,8 +573,10 @@ final class WinUILazyStackView: WinUILazyView {
                     ? size.width + margin.left + margin.right : size.height + margin.top + margin.bottom
             }.max() ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
             if naturalAcross != natural {
-                geometryChanged = true
-                if axis != .vertical || measuredAcross == nil { commitChangedContentExtent() }
+                if axis != .vertical || width == nil {
+                    geometryChanged = true
+                    commitChangedContentExtent()
+                }
             }
             naturalAcross = natural
             commitAnchor()
@@ -577,7 +586,6 @@ final class WinUILazyStackView: WinUILazyView {
                 if total != measuredExtent { commitChangedContentExtent() }
             }
             measuredExtent = total
-            didCommitContentExtent()
             measuredRevision = measurementRevision
         }
         let total = cells.total
@@ -750,7 +758,6 @@ final class WinUILazyGridView: WinUILazyView {
                 if total != measuredExtent { commitChangedContentExtent() }
             }
             measuredExtent = total
-            didCommitContentExtent()
             measuredRevision = measurementRevision
         }
         let count = (cells.orderedIdentities.count + max(1, proposed.count) - 1) / max(1, proposed.count)

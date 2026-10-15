@@ -8,6 +8,7 @@ import XCTest
 
 /// Counts actual arithmetic work, including work re-entered through XAML's MeasureOverride.
 private final class CountedMeasureLayout: WinUILayoutView {
+    override var hasNativeProposals: Bool { true }
     var extent = 40.0
     var calls: [Double?: Int] = [:]
 
@@ -37,6 +38,69 @@ private func nest(_ depth: Int, _ words: String) -> Node {
 }
 
 final class WinUIMeasurementTests: XCTestCase {
+    func testOnePatchInvalidatesSharedAncestorsOnceAcrossDifferentElements() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                VStack { Text("First").id("first"); Text("Second").id("second") }
+            }
+            host.layOut()
+            let first = try XCTUnwrap(host.runtime.tree.root?.first(id: .manual("first")))
+            let second = try XCTUnwrap(host.runtime.tree.root?.first(id: .manual("second")))
+            let stack = try XCTUnwrap(host.views(WinUIStackView.self).first)
+            let revision = stack.measurementRevision
+            ProgramWrite.perform {
+                first.winUI.invalidateMeasurements()
+                second.winUI.invalidateMeasurements()
+                XCTAssertEqual(stack.measurementRevision, revision + 1)
+            }
+            XCTAssertEqual(stack.measurementRevision, revision + 1)
+        }
+    }
+
+    func testMeasurementBetweenWritesRearmsInvalidationInTheSameBatch() {
+        onUIThread {
+            let child = CountedMeasureLayout()
+            let parent = WinUIStackView(axis: .vertical)
+            parent.setItems([WinUILayoutItem(view: child)])
+            XCTAssertEqual(parent.naturalSize(width: 320).height, 40)
+            let revision = parent.measurementRevision
+            ProgramWrite.perform {
+                child.extent = 60
+                child.invalidateMeasurements()
+                child.invalidateMeasurements()
+                XCTAssertEqual(parent.measurementRevision, revision + 1)
+                XCTAssertEqual(parent.naturalSize(width: 320).height, 60)
+                child.extent = 90
+                child.invalidateMeasurements()
+                XCTAssertEqual(parent.measurementRevision, revision + 2)
+                XCTAssertEqual(parent.naturalSize(width: 320).height, 90)
+            }
+        }
+    }
+
+    func testNativePreparationDoesNotRepeatNestedContentArithmetic() {
+        onUIThread {
+            let child = CountedMeasureLayout()
+            var root: WinUILayoutView = child
+            for _ in 0..<8 {
+                let stack = WinUIStackView(axis: .vertical)
+                stack.setItems([WinUILayoutItem(view: root)])
+                root = stack
+            }
+            for width in [320.0, 120, 320, 120, 320] {
+                XCTAssertEqual(root.naturalSize(width: width).height, 40)
+                root.prepareMeasure(width: width)
+            }
+            XCTAssertEqual(child.calls[320], 1)
+            XCTAssertEqual(child.calls[120], 1)
+            child.extent = 80
+            child.invalidateMeasurements()
+            XCTAssertEqual(root.naturalSize(width: 320).height, 80)
+            root.prepareMeasure(width: 320)
+            XCTAssertEqual(child.calls[320], 2)
+        }
+    }
+
     func testLoadedTextRefreshesNativeProposalsWithoutInvalidatingAnUnchangedView() {
         onUIThread {
             let label = WinUILabelView()

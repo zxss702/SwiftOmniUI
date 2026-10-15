@@ -13,17 +13,15 @@ class WinUISingleChildView: WinUILayoutView {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        let size = Self.querySize { SingleChildArithmetic.size(of: items.first, padding: padding, width: width) }
-        if WinUIView.arranging == 0, Self.queryingSize == 0,
-           let item = items.first, item.isShown {
-            let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
-            let place = Self.querySize {
-                SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction)
-            }
-            item.view.prepareMeasure(width: place.width)
-            return Self.querySize { SingleChildArithmetic.size(of: items.first, padding: padding, width: width) }
-        }
-        return size
+        Self.querySize { SingleChildArithmetic.size(of: items.first, padding: padding, width: width) }
+    }
+
+    override var hasNativeProposals: Bool { true }
+    override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
+        guard let item = items.first, item.isShown else { return [] }
+        let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
+        let place = SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction)
+        return [NativeProposal(view: item.view, width: place.width)]
     }
 
     override func arrange(in bounds: Rect) {

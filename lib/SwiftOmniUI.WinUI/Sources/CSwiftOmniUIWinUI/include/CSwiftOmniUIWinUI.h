@@ -1033,6 +1033,8 @@ void swiftomniui_winui_automation_facts(SwiftOmniUIObjectRef element, int32_t *f
 
 /// How many canvases WinUI holds - what a test counts to see every one let go.
 int32_t swiftomniui_winui_canvases(void);
+/// Successful surface submissions for regression checks; no logging or switches.
+uint64_t swiftomniui_winui_canvas_paints(SwiftOmniUIObjectRef canvas);
 
 /// The local time of day: hour, minute, second and millisecond, into `time`.
 void swiftomniui_winui_clock(int32_t *time);
