@@ -13,6 +13,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <d2d1_1.h>
@@ -90,6 +91,30 @@ namespace {
         std::vector<int32_t> ints;
         std::vector<double> numbers;
         std::vector<std::wstring> words;
+    };
+
+    // These objects describe commands, not a surface. Keep one of each per
+    // command while the drawing is unchanged; a different drawing, device, or
+    // rasterization scale discards them together.
+    struct PathResource {
+        winrt::com_ptr<ID2D1PathGeometry> geometry;
+        size_t numbers = 0;
+    };
+
+    struct TextResource {
+        winrt::com_ptr<IDWriteTextFormat> format;
+        winrt::com_ptr<IDWriteTextLayout> layout;
+        winrt::com_ptr<ID2D1RectangleGeometry> edges;
+    };
+
+    struct ReplayResources {
+        std::vector<PathResource> paths;
+        std::vector<TextResource> texts;
+
+        void clear() {
+            paths.clear();
+            texts.clear();
+        }
     };
 
     /// Reads a drawing's lists in order, and stops for good at a record either list cannot finish.
@@ -222,34 +247,36 @@ namespace {
 
     /// `text` wrapped in the box `at`, set across it and down it as `across` and `down` say, cut at its edges.
     void write(ID2D1DeviceContext *context, ID2D1Brush *brush, float size, double const *at, int32_t across,
-               int32_t down, std::wstring const &text) {
-        winrt::com_ptr<IDWriteTextFormat> format;
-        if (size <= 0
-            || FAILED(devices.words->CreateTextFormat(devices.family.c_str(), nullptr, DWRITE_FONT_WEIGHT_NORMAL,
-                                                      DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size,
-                                                      devices.language, format.put())))
-            return;
-        format->SetTextAlignment(across == 1   ? DWRITE_TEXT_ALIGNMENT_CENTER
-                                 : across == 2 ? DWRITE_TEXT_ALIGNMENT_TRAILING
-                                               : DWRITE_TEXT_ALIGNMENT_LEADING);
-        format->SetParagraphAlignment(down == 1   ? DWRITE_PARAGRAPH_ALIGNMENT_CENTER
-                                      : down == 2 ? DWRITE_PARAGRAPH_ALIGNMENT_FAR
-                                                  : DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-        winrt::com_ptr<IDWriteTextLayout> layout;
-        winrt::com_ptr<ID2D1RectangleGeometry> edges;
-        if (FAILED(devices.words->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.size()), format.get(),
-                                                   static_cast<float>(std::max(0.0, at[2])),
-                                                   static_cast<float>(std::max(0.0, at[3])), layout.put()))
-            || FAILED(devices.factory->CreateRectangleGeometry(box(at), edges.put())))
-            return;
+               int32_t down, std::wstring const &text, TextResource &resource) {
+        if (size <= 0) return;
+        if (!resource.layout) {
+            TextResource next;
+            if (FAILED(devices.words->CreateTextFormat(devices.family.c_str(), nullptr, DWRITE_FONT_WEIGHT_NORMAL,
+                                                       DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size,
+                                                       devices.language, next.format.put())))
+                return;
+            next.format->SetTextAlignment(across == 1   ? DWRITE_TEXT_ALIGNMENT_CENTER
+                                          : across == 2 ? DWRITE_TEXT_ALIGNMENT_TRAILING
+                                                        : DWRITE_TEXT_ALIGNMENT_LEADING);
+            next.format->SetParagraphAlignment(down == 1   ? DWRITE_PARAGRAPH_ALIGNMENT_CENTER
+                                               : down == 2 ? DWRITE_PARAGRAPH_ALIGNMENT_FAR
+                                                           : DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+            if (FAILED(devices.words->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.size()), next.format.get(),
+                                                       static_cast<float>(std::max(0.0, at[2])),
+                                                       static_cast<float>(std::max(0.0, at[3])), next.layout.put()))
+                || FAILED(devices.factory->CreateRectangleGeometry(box(at), next.edges.put())))
+                return;
+            resource = std::move(next);
+        }
         // A layer cut by the box, where a clip would take the box's bounds once the canvas is turned.
-        context->PushLayer(D2D1::LayerParameters1(D2D1::InfiniteRect(), edges.get()), nullptr);
-        context->DrawTextLayout(point(at[0], at[1]), layout.get(), brush);
+        context->PushLayer(D2D1::LayerParameters1(D2D1::InfiniteRect(), resource.edges.get()), nullptr);
+        context->DrawTextLayout(point(at[0], at[1]), resource.layout.get(), brush);
         context->PopLayer();
     }
 
     /// Replays `drawing` on `context`, over `base`, which places the canvas on its surface.
-    void replay(ID2D1DeviceContext *context, D2D1::Matrix3x2F const &base, Drawing const &drawing) {
+    void replay(ID2D1DeviceContext *context, D2D1::Matrix3x2F const &base, Drawing const &drawing,
+                ReplayResources &resources) {
         winrt::com_ptr<ID2D1SolidColorBrush> brush;
         winrt::check_hresult(context->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), brush.put()));
         Pen pen;
@@ -267,6 +294,7 @@ namespace {
         };
 
         Reader reader{drawing};
+        size_t pathIndex = 0, textIndex = 0;
         while (reader.more()) {
             auto kind = reader.integer();
             double const *at = nullptr;
@@ -315,13 +343,26 @@ namespace {
                 break;
             }
             case DrawPath:
-            case FillPath:
-                shape(curves(reader, reader.integer(), kind == FillPath && pen.evenOdd).get(), kind == FillPath);
+            case FillPath: {
+                auto count = reader.integer();
+                if (resources.paths.size() <= pathIndex) resources.paths.resize(pathIndex + 1);
+                auto &resource = resources.paths[pathIndex++];
+                if (!resource.geometry) {
+                    auto before = reader.number;
+                    resource.geometry = curves(reader, count, kind == FillPath && pen.evenOdd);
+                    if (resource.geometry) resource.numbers = reader.number - before;
+                } else if (resource.numbers > 0) {
+                    reader.numbers(resource.numbers);
+                }
+                shape(resource.geometry.get(), kind == FillPath);
                 break;
+            }
             case DrawText: {
                 auto across = reader.integer(), down = reader.integer(), word = reader.integer();
                 if (!(at = reader.numbers(4)) || word < 0 || static_cast<size_t>(word) >= drawing.words.size()) return;
-                write(context, paint(pen.text), pen.size, at, across, down, drawing.words[word]);
+                if (resources.texts.size() <= textIndex) resources.texts.resize(textIndex + 1);
+                write(context, paint(pen.text), pen.size, at, across, down, drawing.words[word],
+                      resources.texts[textIndex++]);
                 break;
             }
             case Translate:
@@ -434,6 +475,7 @@ namespace {
         void show(Drawing next) {
             if (drawing.ints == next.ints && drawing.numbers == next.numbers && drawing.words == next.words) return;
             drawing = std::move(next);
+            resources.clear();
             stale = true;
             if (!paint()) invalidate();
         }
@@ -458,9 +500,13 @@ namespace {
             auto scale = static_cast<float>(root.RasterizationScale());
             auto across = static_cast<int32_t>(std::ceil(size.Width * scale));
             auto down = static_cast<int32_t>(std::ceil(size.Height * scale));
-            if (!stale && across == drawnAcross && down == drawnDown && scale == drawnScale) return true;
+            if (!stale && across == drawnAcross && down == drawnDown && scale == drawnScale
+                && made == devices.made) return true;
 
             try {
+                // Clear even when the new room is empty: a later nonempty
+                // surface at this scale must not reuse the old scale's data.
+                if (scale != drawnScale || made != devices.made) resources.clear();
                 if (across <= 0 || down <= 0) {
                     surface = nullptr;
                     drawnAcross = drawnDown = 0;
@@ -471,6 +517,7 @@ namespace {
                 }
                 for (int attempt = 0; attempt < 2; ++attempt) {
                     prepare();
+                    if (made != devices.made) resources.clear();
                     auto target = surface;
                     bool replacement = false;
                     if (!surface || across != drawnAcross || down != drawnDown || made != devices.made) {
@@ -499,6 +546,7 @@ namespace {
                         return true;
                     }
                     // Windows took the device away: a new one, a new surface, and the drawing again.
+                    resources.clear();
                     devices.device = nullptr;
                 }
             } catch (...) {
@@ -525,7 +573,7 @@ namespace {
             context->Clear(D2D1::ColorF(0, 0, 0, 0));
             HRESULT replayed = S_OK;
             try {
-                replay(context.get(), base, drawing);
+                replay(context.get(), base, drawing, resources);
             } catch (...) {
                 replayed = winrt::to_hresult();
                 report("replaying a drawing");
@@ -595,6 +643,7 @@ namespace {
 
         int64_t view;
         Drawing drawing;
+        ReplayResources resources;
         Size size{};
         bool stale = false;
 

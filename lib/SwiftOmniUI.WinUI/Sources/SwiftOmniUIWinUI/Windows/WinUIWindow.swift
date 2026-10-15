@@ -69,7 +69,12 @@ final class WinUIWindow {
     }
 
     func showTopSafeAreaBars(_ bars: [MountedElement], in page: MountedElement?) {
-        if safeBarPage !== page { safeBarFrame = nil }
+        if safeBarPage !== page {
+            safeBarFrame = nil
+            // The previous page's column is no longer the new bar's place.
+            // Keep its overlay out of view until the new native page is laid out.
+            if !safeBars.isEmpty { swiftomniui_winui_window_set_safe_area_bar_frame(handle, 0, 0, 0) }
+        }
         safeBarPage = page
         requestSafeBarFrame()
         requestedSafeBars = bars
@@ -80,26 +85,41 @@ final class WinUIWindow {
         guard !safeBarCommitPending else { return }
         safeBarCommitPending = true
         WinUIDoorbell.afterPass { [weak self] in
-            guard let self else { return }
-            self.safeBarCommitPending = false
-            guard !self.isClosed else { return }
-            let views = self.requestedSafeBars.compactMap { $0.winUI.view }
-            if views.count != self.safeBars.count || !zip(views, self.safeBars).allSatisfy({ $0 === $1.bar }) {
-                swiftomniui_winui_window_set_safe_area_bars(self.handle, nil, 0, false, 0)
-                for host in self.safeBars { host.releaseBar() }
-                self.safeBars = views.map { WinUISafeAreaBarHost(bar: $0) }
-                for host in self.safeBars {
-                    host.onSourcePlaced = { [weak self] in self?.requestSafeBarFrame() }
-                }
-                self.safeBarFrame = nil
-            }
-            let handles: [SwiftOmniUIObjectRef?] = self.safeBars.map(\.presentationHandle)
-            let background = self.titleBar.chrome.background?.argb
-            self.safeBarBackground = .some(background)
-            swiftomniui_winui_window_set_safe_area_bars(
-                self.handle, handles, Int32(handles.count), background != nil, background ?? 0)
-            self.updateSafeBarFrame()
+            self?.commitSafeAreaBars()
         }
+    }
+
+    /// Finish the page's initial native composition before the window's first
+    /// frame. Later updates keep their normal after-pass batching.
+    func prepareFirstPresentation(split: WinUISplitView?) {
+        guard !activated, !isClosed else { return }
+        split?.prepareFirstPresentation(width: contentSize.width)
+        if WinUIView.arranging == 0, WinUIView.measuring == 0 { commitSafeAreaBars() }
+    }
+
+    private func commitSafeAreaBars() {
+        guard safeBarCommitPending else { return }
+        safeBarCommitPending = false
+        guard !isClosed else { return }
+        let views = requestedSafeBars.compactMap { $0.winUI.view }
+        if views.count != safeBars.count || !zip(views, safeBars).allSatisfy({ $0 === $1.bar }) {
+            swiftomniui_winui_window_set_safe_area_bars(handle, nil, 0, false, 0)
+            for host in safeBars { host.releaseBar() }
+            safeBars = views.map { WinUISafeAreaBarHost(bar: $0) }
+            for host in safeBars {
+                host.onSourcePlaced = { [weak self] in self?.requestSafeBarFrame() }
+            }
+            safeBarFrame = nil
+        }
+        let handles: [SwiftOmniUIObjectRef?] = safeBars.map(\.presentationHandle)
+        let background = titleBar.chrome.background?.argb
+        safeBarBackground = .some(background)
+        swiftomniui_winui_window_set_safe_area_bars(
+            handle, handles, Int32(handles.count), background != nil, background ?? 0)
+        if safeBarFrame == nil, !safeBars.isEmpty {
+            swiftomniui_winui_window_set_safe_area_bar_frame(handle, 0, 0, 0)
+        }
+        updateSafeBarFrame()
     }
 
     private func requestSafeBarFrame() {
@@ -116,6 +136,7 @@ final class WinUIWindow {
     /// rather than proposing the complete window width to a bar still measured by its logical detail column.
     private func updateSafeBarFrame() {
         guard !isClosed, !safeBars.isEmpty, let page = safeBarPage?.winUI.view, let content else { return }
+        guard page.isAttached, content.isAttached else { return }
         let size = page.laidOutFrame
         guard size.width > 0, size.height > 0 else { return }
         let origin = page.origin, root = content.origin

@@ -407,6 +407,22 @@ extension Differ {
             }
         }
 
+        // A Canvas is mounted before its size is known. On a later rebuild,
+        // reuse only the old allocation, then run the newest renderer at that
+        // size. Its own reads are indexed separately from the view body's.
+        var canvasReads: Set<ObjectIdentifier> = []
+        if let canvas = node.canvas, node.props[.drawable] == nil {
+            canvas.inheritSize(from: rendered?.type == node.type ? rendered?.canvas : nil)
+            if let size = canvas.size {
+                let drawing = canvas.drawing(at: size, force: true)
+                node.props[.drawable] = drawing.commands.propValue
+                canvasReads = drawing.reads ?? []
+            }
+        } else {
+            // An explicitly supplied drawable is the source of the Canvas.
+            node.canvas = nil
+        }
+
         // The engines this element runs, under numbers it keeps; a conversion's engines
         // come first, in property order.
         // Design: docs/design/core/identity-and-diffing.md#engines-on-an-element
@@ -435,6 +451,9 @@ extension Differ {
         patch.fresh = describeAll || previous == nil
         if patch.fresh || node.lazyIdentity != previous?.lazyIdentity {
             patch.lazyIdentity = node.lazyIdentity
+        }
+        if patch.fresh || node.lazyRequestGeneration != previous?.lazyRequestGeneration {
+            patch.lazyRequestGeneration = node.lazyRequestGeneration
         }
 
         // How this element's values animate: its own plan, or the application's.
@@ -635,7 +654,8 @@ extension Differ {
             // counter) does not change the measurements of the retained rows.
             // Keep its fresh builders and handlers, but invalidate sizes only
             // when the source's reads, identities, or retained children changed.
-            let contentReads = (previous?.reads ?? []).subtracting(source.lazyWindow.map { [$0] } ?? [])
+            var contentReads = (previous?.reads ?? []).subtracting(source.lazyWindow.map { [$0] } ?? [])
+            if let request = source.lazyRequestWindow { contentReads.remove(request) }
             let changedChildren: [HostPatch] = switch patch.children {
             case .arranged(let patches), .changed(let patches): patches
             case .unchanged: []
@@ -683,6 +703,8 @@ extension Differ {
 
         let sourceReads = reads
         reads.formUnion(lazySource?.lazyRowReadings?.states ?? [])
+        let canvasBodyReads = reads
+        reads.formUnion(canvasReads)
         let result = RenderedNode(
             id: id,
             type: node.type,
@@ -709,6 +731,11 @@ extension Differ {
         result.lazySource = lazySource
         result.lazySourceReads = sourceReads
         result.lazyIdentity = node.lazyIdentity
+        result.lazyRequestGeneration = node.lazyRequestGeneration
+        result.canvas = node.canvas
+        result.canvasReads = canvasReads
+        result.canvasBodyReads = canvasBodyReads
+        node.canvas?.owner = result
         result.sizesArrive = sizesArrive
         result.visualInput = visualInput
         result.visualState = visualState
@@ -721,8 +748,8 @@ extension Differ {
         result.sceneFocusedValues = node.sceneFocusedValues
 
         // What a host pulls mid-layout: the element's code objects by its id.
-        if node.customLayout != nil || !node.layoutValues.isEmpty {
-            codeObjects[id] = NodeCode(layout: node.customLayout, values: node.layoutValues)
+        if node.customLayout != nil || !node.layoutValues.isEmpty || node.canvas != nil {
+            codeObjects[id] = NodeCode(layout: node.customLayout, values: node.layoutValues, canvas: node.canvas)
         } else {
             codeObjects.removeValue(forKey: id)
         }

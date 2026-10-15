@@ -276,6 +276,9 @@ struct NodeCode {
 
     /// The child's `.layoutValue` tags, by key identity.
     var values: [ObjectIdentifier: Any] = [:]
+
+    /// A Canvas renderer the host asks for at its allocated size.
+    var canvas: CanvasBox?
 }
 
 /// The container a `callAsFunction` on a `Layout` makes: its children stand

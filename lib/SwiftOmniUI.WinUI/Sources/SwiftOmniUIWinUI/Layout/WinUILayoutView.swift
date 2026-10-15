@@ -213,12 +213,35 @@ class WinUILayoutView: WinUIView {
 
     /// Forgets the kept sizes and asks WinUI to measure again.
     func invalidateMeasurements() {
+        invalidateOwnMeasurements()
+        ((self as? WinUIScrollDocument)?.scrollView ?? placingLayout)?.invalidateMeasurements()
+    }
+
+    /// One layout's caches and native pass, without revisiting a shared
+    /// ancestor. A batch of independently loaded labels uses this once per
+    /// affected layout while ordinary changes still recurse as above.
+    func invalidateOwnMeasurements() {
         forgetMeasurements()
         invalidateMeasure()
         // These panels report zero DesiredSize to their placing parents.
         // New content still needs new places when the native size stays zero.
         invalidateArrange()
-        ((self as? WinUIScrollDocument)?.scrollView ?? placingLayout)?.invalidateMeasurements()
+    }
+
+    /// Native TextBlock.Loaded may arrive for many labels in the same pass.
+    /// Refresh only the distinct layouts above labels whose measured sizes
+    /// actually moved; a shared ancestor is invalidated exactly once.
+    static func commitAttachedTextMeasurements(_ starting: [WinUILayoutView]) {
+        var visited: Set<ObjectIdentifier> = []
+        for layout in starting {
+            var next: WinUILayoutView? = layout
+            while let current = next {
+                guard visited.insert(ObjectIdentifier(current)).inserted else { break }
+                let parent = (current as? WinUIScrollDocument)?.scrollView ?? current.placingLayout
+                if !current.isDetached { current.invalidateOwnMeasurements() }
+                next = parent
+            }
+        }
     }
 
     private var measurementCommitPending = false

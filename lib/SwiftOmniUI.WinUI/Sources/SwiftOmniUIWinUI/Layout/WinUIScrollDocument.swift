@@ -29,8 +29,8 @@ final class WinUIScrollDocument: WinUILayoutView {
 
     /// The scroller's own measure stands on this document: a change beneath forgets it too, or the presenter
     /// keeps the extent it read last.
-    override func invalidateMeasurements() {
-        super.invalidateMeasurements()
+    override func invalidateOwnMeasurements() {
+        super.invalidateOwnMeasurements()
         scrollView?.scroller.invalidateMeasure()
     }
 

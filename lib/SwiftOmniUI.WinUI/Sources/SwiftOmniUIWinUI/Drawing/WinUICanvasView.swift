@@ -14,9 +14,25 @@ final class WinUICanvasView: WinUIView {
     var onDragged: ((Point) -> Void)?
     var onReleased: ((Point) -> Void)?
     private var drawnCommands: [DrawCommand]?
+    private var requestedSize: (element: ElementId, size: Size)?
 
     init() {
         super.init { number in swiftomniui_winui_canvas_make(number) }
+    }
+
+    override func layout(_ place: Rect) {
+        if let element = sourceElement,
+           place.width.isFinite, place.height.isFinite,
+           place.width > 0, place.height > 0 {
+            let size = Size(place.width, place.height)
+            if requestedSize?.element != element.id || requestedSize?.size != size {
+                requestedSize = (element.id, size)
+                if let commands = CoreLink().canvasDrawing(for: element.id, size: size) {
+                    draw(commands)
+                }
+            }
+        }
+        super.layout(place)
     }
 
     /// The drawing, its instructions in the order they were written; nil draws nothing.
@@ -65,6 +81,8 @@ final class WinUICanvasView: WinUIView {
 
     override func detach() {
         super.detach()
+        requestedSize = nil
+        drawnCommands = nil
         onPressed = nil
         onDragged = nil
         onReleased = nil

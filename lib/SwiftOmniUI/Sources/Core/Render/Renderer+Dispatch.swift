@@ -32,6 +32,14 @@ extension Renderer {
         differ.codeObjects(for: id)
     }
 
+    /// Runs a size-dependent Canvas renderer at its actual native allocation.
+    /// A nil answer means this is an ordinary property-drawn Canvas. The
+    /// drawing remains in the rendered baseline for the next diff even though
+    /// the host received it directly during layout.
+    @MainActor func canvasDrawing(for id: ElementId, size: Size) -> [DrawCommand]? {
+        differ.canvasDrawing(for: id, size: size)
+    }
+
     /// Starts a dispatched event's handler - the road a test exercises too.
     func start(_ handler: @escaping EventHandler) {
         // Read now: a handler that suspends keeps the payload it started with.

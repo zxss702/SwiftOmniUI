@@ -121,6 +121,46 @@ private struct LazyPage: View {
         return renders.revisit(changed: Renderer.shared.pendingChanges)
     }
 
+    func testLazyWindowAcknowledgesEvenAnUnchangedIdentityPayload() throws {
+        let descriptions = Built()
+        func rows() -> any View {
+            descriptions.count += 1
+            return ForEach(0..<100) { Text("Row \($0)") }
+        }
+        let renders = Renders()
+        let first = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack { rows() }
+        }.node))
+        let firstDescriptions = descriptions.count
+        XCTAssertGreaterThan(firstDescriptions, 0)
+        let handler = try XCTUnwrap(first.events?[.realizedChanged])
+        let identity = try XCTUnwrap(first.lazyRows?.identities.first)
+        renders.fire(handler, with: [.strings([identity]), .number(1)])
+        let realized = try lazy(.lazyVStack, in: renders.revisit(changed: Renderer.shared.pendingChanges))
+        XCTAssertEqual(realized.lazyRequestGeneration, 1)
+        XCTAssertNotNil(realized.child(identity))
+        XCTAssertEqual(descriptions.count, firstDescriptions)
+
+        renders.fire(handler, with: [.strings([identity]), .number(2)])
+        let acknowledged = try lazy(.lazyVStack, in: renders.revisit(changed: Renderer.shared.pendingChanges))
+        XCTAssertEqual(acknowledged.lazyRequestGeneration, 2,
+                       "a repeated visible window still acknowledges its own newer request")
+        XCTAssertEqual(descriptions.count, firstDescriptions,
+                       "viewport receipts reuse the prepared lazy source")
+        if case .unchanged = acknowledged.children {
+            // The acknowledgement carries no rebuilt rows.
+        } else {
+            XCTFail("the acknowledgement must not rebuild an unchanged row")
+        }
+    }
+
+    func testLazyWindowRequestKeepsTheDeclaredPayloadCompatible() {
+        XCTAssertEqual(LazyWindowRequest.decode([.strings(["row"])], by: "realizedChanged")?.identities, ["row"])
+        XCTAssertNil(LazyWindowRequest.decode([.strings(["row"]), .number(-1)], by: "realizedChanged"))
+        XCTAssertNil(LazyWindowRequest.decode([.strings(["row"]), .number(.infinity)], by: "realizedChanged"))
+        XCTAssertNil(LazyWindowRequest.decode([.strings(["row"]), .number(1.5)], by: "realizedChanged"))
+    }
+
     func testFolderEditsInternOnlyNewIDsAndKeepFreshVisibleBuilders() throws {
         let built = Built()
         let renders = Renders()

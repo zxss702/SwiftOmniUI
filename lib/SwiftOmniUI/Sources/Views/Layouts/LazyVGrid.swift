@@ -36,6 +36,7 @@ public struct LazyVGrid: View {
 
     /// The cells the host has asked for.
     @State private var realized: [String] = []
+    @State private var realizedGeneration = 0
 
     /// The identity index survives parent updates; builders stay current.
     @State private var children = LazyChildren()
@@ -98,6 +99,10 @@ public struct LazyVGrid: View {
 
         let count = max(columns.count, 1)
         let held = $realized
+        let heldGeneration = $realizedGeneration
+        element.node.lazyRequestGeneration = realizedGeneration
+        element.node.lazyRequestWindow = heldGeneration.lender.map(ObjectIdentifier.init)
+        element.node.lazyRequestGenerationValue = { heldGeneration.wrappedValue }
         let across = alignment.axis
         element.node.write(ViewContract.horizontalContentAlignment, across)
         children.take(content(), into: &element.node, realized: held) { cell, index in
@@ -112,12 +117,10 @@ public struct LazyVGrid: View {
             }
         }
         element.node.addHandler(LazyVGridContract.realizedChanged.token) {
-            guard let identities = MemberValues.carried(
-                EventBuffer.current, by: LazyVGridContract.realizedChanged.name, as: [String].self),
-                identities != held.wrappedValue
-            else { return }
-
-            held.wrappedValue = identities
+            guard let request = LazyWindowRequest.decode(
+                EventBuffer.current, by: LazyVGridContract.realizedChanged.name) else { return }
+            if request.identities != held.wrappedValue { held.wrappedValue = request.identities }
+            if let generation = request.generation { heldGeneration.wrappedValue = generation }
         }
         return element
     }
@@ -146,6 +149,7 @@ public struct LazyHGrid: View {
 
     /// The cells the host has asked for.
     @State private var realized: [String] = []
+    @State private var realizedGeneration = 0
 
     /// The identity index survives parent updates; builders stay current.
     @State private var children = LazyChildren()
@@ -199,6 +203,10 @@ public struct LazyHGrid: View {
 
         let count = max(rows.count, 1)
         let held = $realized
+        let heldGeneration = $realizedGeneration
+        element.node.lazyRequestGeneration = realizedGeneration
+        element.node.lazyRequestWindow = heldGeneration.lender.map(ObjectIdentifier.init)
+        element.node.lazyRequestGenerationValue = { heldGeneration.wrappedValue }
         let down = alignment.axis
         element.node.write(ViewContract.verticalContentAlignment, down)
         children.take(content(), into: &element.node, realized: held) { cell, index in
@@ -213,12 +221,10 @@ public struct LazyHGrid: View {
             }
         }
         element.node.addHandler(LazyHGridContract.realizedChanged.token) {
-            guard let identities = MemberValues.carried(
-                EventBuffer.current, by: LazyHGridContract.realizedChanged.name, as: [String].self),
-                identities != held.wrappedValue
-            else { return }
-
-            held.wrappedValue = identities
+            guard let request = LazyWindowRequest.decode(
+                EventBuffer.current, by: LazyHGridContract.realizedChanged.name) else { return }
+            if request.identities != held.wrappedValue { held.wrappedValue = request.identities }
+            if let generation = request.generation { heldGeneration.wrappedValue = generation }
         }
         return element
     }

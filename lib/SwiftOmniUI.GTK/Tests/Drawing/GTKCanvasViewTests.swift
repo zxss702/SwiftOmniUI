@@ -61,9 +61,8 @@ final class GTKCanvasViewTests: XCTestCase {
                 .verticalAlignment(.start)
             }
             let canvas = try XCTUnwrap(host.views(GTKCanvasView.self).first)
-            host.settle { canvas.pixels(at: [(50, 30)]) == [Self.red] }
             XCTAssertEqual(canvas.pixels(at: [(50, 30), (0.5, 0.5)]), [Self.red, 0],
-                           "the whole room filled, its corners rounded out")
+                           "the first native layout paints the whole room with rounded corners")
         }
     }
 

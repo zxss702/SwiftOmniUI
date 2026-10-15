@@ -1,6 +1,22 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+/// The host keeps the declared identity payload as the first lane; its private
+/// second lane is echoed by the lazy node so that one list can acknowledge its
+/// own request without waiting for unrelated renders elsewhere in the scene.
+enum LazyWindowRequest {
+    static func decode(_ payload: [PropValue], by name: String) -> (identities: [String], generation: Int?)? {
+        guard (1...2).contains(payload.count),
+              let identities = MemberValues.carried(Array(payload.prefix(1)), by: name, as: [String].self)
+        else { return nil }
+        guard payload.count == 2 else { return (identities, nil) }
+        guard case .number(let value) = payload[1], value.isFinite,
+              value >= 0, value <= 9_007_199_254_740_991, value.rounded() == value
+        else { return nil }
+        return (identities, Int(value))
+    }
+}
+
 /// A `VStack` built as a scroller shows it: a child's subtree is mounted
 /// when the child stands in view or within reach of it, and let go when it
 /// leaves - so a column as long as the data asks for keeps the cost of the
@@ -31,6 +47,7 @@ public struct LazyVStack: View {
 
     /// The children the host has asked for.
     @State private var realized: [String] = []
+    @State private var realizedGeneration = 0
 
     /// The identity index survives parent updates; builders stay current.
     @State private var children = LazyChildren()
@@ -69,6 +86,10 @@ public struct LazyVStack: View {
         var element = LazyVStackElement()
         if let spacing { element.node.write(StackBaseContract.spacing, spacing) }
         let held = $realized
+        let heldGeneration = $realizedGeneration
+        element.node.lazyRequestGeneration = realizedGeneration
+        element.node.lazyRequestWindow = heldGeneration.lender.map(ObjectIdentifier.init)
+        element.node.lazyRequestGenerationValue = { heldGeneration.wrappedValue }
         let axis = alignment.axis
         children.take(content(), into: &element.node, realized: held) { child, _ in
             if child.props[.horizontalAlignment] == nil {
@@ -77,12 +98,10 @@ public struct LazyVStack: View {
             }
         }
         element.node.addHandler(LazyVStackContract.realizedChanged.token) {
-            guard let identities = MemberValues.carried(
-                EventBuffer.current, by: LazyVStackContract.realizedChanged.name, as: [String].self),
-                identities != held.wrappedValue
-            else { return }
-
-            held.wrappedValue = identities
+            guard let request = LazyWindowRequest.decode(
+                EventBuffer.current, by: LazyVStackContract.realizedChanged.name) else { return }
+            if request.identities != held.wrappedValue { held.wrappedValue = request.identities }
+            if let generation = request.generation { heldGeneration.wrappedValue = generation }
         }
         return element
     }
@@ -105,6 +124,7 @@ public struct LazyHStack: View {
 
     /// The children the host has asked for.
     @State private var realized: [String] = []
+    @State private var realizedGeneration = 0
 
     /// The identity index survives parent updates; builders stay current.
     @State private var children = LazyChildren()
@@ -142,6 +162,10 @@ public struct LazyHStack: View {
         var element = LazyHStackElement()
         if let spacing { element.node.write(StackBaseContract.spacing, spacing) }
         let held = $realized
+        let heldGeneration = $realizedGeneration
+        element.node.lazyRequestGeneration = realizedGeneration
+        element.node.lazyRequestWindow = heldGeneration.lender.map(ObjectIdentifier.init)
+        element.node.lazyRequestGenerationValue = { heldGeneration.wrappedValue }
         let axis = alignment.axis
         children.take(content(), into: &element.node, realized: held) { child, _ in
             if child.props[.verticalAlignment] == nil {
@@ -150,12 +174,10 @@ public struct LazyHStack: View {
             }
         }
         element.node.addHandler(LazyHStackContract.realizedChanged.token) {
-            guard let identities = MemberValues.carried(
-                EventBuffer.current, by: LazyHStackContract.realizedChanged.name, as: [String].self),
-                identities != held.wrappedValue
-            else { return }
-
-            held.wrappedValue = identities
+            guard let request = LazyWindowRequest.decode(
+                EventBuffer.current, by: LazyHStackContract.realizedChanged.name) else { return }
+            if request.identities != held.wrappedValue { held.wrappedValue = request.identities }
+            if let generation = request.generation { heldGeneration.wrappedValue = generation }
         }
         return element
     }

@@ -58,9 +58,61 @@ private struct ShowingPage: View {
     }
 }
 
+/// Keeps one native canvas while its drawing changes, then repaints the same
+/// commands into a larger surface.
+private struct ResourcePage: View {
+    @State private var changed = false
+    @State private var wide = false
+
+    var body: some View {
+        VStack {
+            Canvas {
+                Draw.fillColor(Color("#FF0000"))
+                Draw.fillPath(changed
+                    ? "M 30 0 L 50 0 L 50 20 L 30 20 Z"
+                    : "M 0 0 L 20 0 L 20 20 L 0 20 Z")
+                Draw.fillPath("M 70 0 L 90 0 L 90 20 L 70 20 Z")
+                Draw.fillPath("M 110 0 L 130 0 L 130 20 L 110 20 Z")
+                Draw.foregroundStyle(Color("#0000FF"))
+                Draw.fontSize(18)
+                Draw.drawText("MMMM", x: changed ? 55 : 0, y: 28, width: 45, height: 25)
+            }
+            .frame(width: wide ? 140 : 100)
+            .frame(height: 55)
+            .horizontalAlignment(.start)
+            Button("Change").onClicked { changed = true }
+            Button("Widen").onClicked { wide = true }
+        }
+        .frame(width: 160)
+        .horizontalAlignment(.start)
+        .verticalAlignment(.start)
+    }
+}
+
+/// The size-dependent renderer must contribute its first drawing during the
+/// initial native allocation, without a follow-up geometry feedback render.
+private struct FirstFrameCanvasPage: View {
+    var body: some View {
+        Canvas { context, size in
+            context.fill(Path(Rect(0, 0, size.width, size.height)),
+                         with: .color(Color("#FF0000")))
+        }
+        .frame(width: 100, height: 40)
+    }
+}
+
 final class WinUICanvasViewTests: XCTestCase {
     private static let red: UInt32 = 0xFFFF_0000
     private static let blue: UInt32 = 0xFF00_00FF
+
+    func testSizeDependentCanvasDrawsFromItsFirstNativeAllocation() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { FirstFrameCanvasPage() }
+            let canvas = try XCTUnwrap(host.views(WinUICanvasView.self).first)
+            host.settle { canvas.pixels(at: [(10, 10), (90, 30)]) == [Self.red, Self.red] }
+            XCTAssertEqual(canvas.pixels(at: [(10, 10), (90, 30)]), [Self.red, Self.red])
+        }
+    }
 
     /// The instructions run in order: a colour holds until the next, and a later shape paints over an earlier one.
     func testInstructionsRunInOrder() throws {
@@ -148,6 +200,31 @@ final class WinUICanvasViewTests: XCTestCase {
         }
         XCTAssertTrue(wrapped[0..<40].contains { $0 != 0 }, "the first line is written in its box")
         XCTAssertTrue(wrapped[40..<80].allSatisfy { $0 == 0 }, "the lines wrapped past the box are cut")
+    }
+
+    /// A command update must replace both path and text resources. A later
+    /// surface resize replays the unchanged commands from their kept resources.
+    func testPathAndTextResourcesFollowDrawingChangesAndResize() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { ResourcePage() }
+            let canvas = try XCTUnwrap(host.views(WinUICanvasView.self).first)
+            let leftText = (30..<50).flatMap { y in (0..<45).map { x in (Double(x), Double(y)) } }
+            let rightText = (30..<50).flatMap { y in (55..<100).map { x in (Double(x), Double(y)) } }
+
+            host.settle { canvas.pixels(at: [(5, 5), (80, 5)]) == [Self.red, Self.red] }
+            XCTAssertTrue(canvas.pixels(at: leftText).contains { $0 != 0 })
+            XCTAssertTrue(canvas.pixels(at: rightText).allSatisfy { $0 == 0 })
+
+            try XCTUnwrap(host.views(WinUIButtonView.self).first).invoke()
+            host.settle { canvas.pixels(at: [(5, 5), (35, 5), (80, 5)]) == [0, Self.red, Self.red] }
+            XCTAssertTrue(canvas.pixels(at: leftText).allSatisfy { $0 == 0 })
+            XCTAssertTrue(canvas.pixels(at: rightText).contains { $0 != 0 })
+
+            try XCTUnwrap(host.views(WinUIButtonView.self).last).invoke()
+            host.settle { canvas.pixels(at: [(35, 5), (80, 5), (120, 5)]) == [Self.red, Self.red, Self.red] }
+            XCTAssertTrue(canvas.pixels(at: rightText).contains { $0 != 0 })
+            XCTAssertTrue(host.views(WinUICanvasView.self).first === canvas, "the resource owner stays mounted")
+        }
     }
 
     /// A canvas WinUI takes out and puts back before it has loaded - as a tabbed view holds its page again when

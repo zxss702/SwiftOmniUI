@@ -54,6 +54,16 @@ final class RenderedNode {
     /// The source row this element contributes to its lazy parent's geometry.
     var lazyIdentity: String?
 
+    /// The most recent lazy viewport request represented by this element.
+    var lazyRequestGeneration: Int?
+
+    /// A size-dependent canvas's core-side drawing closure and its own state
+    /// reads. Body reads stay separate so replacing a drawing does not discard
+    /// dependencies the rest of the view still owns.
+    var canvas: CanvasBox?
+    var canvasReads: Set<ObjectIdentifier> = []
+    var canvasBodyReads: Set<ObjectIdentifier> = []
+
     /// The composed views this element was built by, outermost first: each one's
     /// type, its state boxes by path, and what it was built with.
     /// Design: docs/design/core/identity-and-diffing.md#state-survives-a-rebuild
@@ -263,6 +273,7 @@ extension HostPatch {
             && !lazyContentChanged
             && lazyRows == nil
             && lazyIdentity == nil
+            && lazyRequestGeneration == nil
             && animation == nil
             && layoutTransition == nil
             && properties.isEmpty
@@ -304,6 +315,7 @@ extension HostPatch {
         merged.lazyContentChanged = lazyContentChanged || later.lazyContentChanged
         merged.lazyRows = later.lazyRows ?? lazyRows
         merged.lazyIdentity = later.lazyIdentity ?? lazyIdentity
+        merged.lazyRequestGeneration = later.lazyRequestGeneration ?? lazyRequestGeneration
         merged.animation = later.animation ?? animation
         merged.layoutTransition = later.layoutTransition ?? layoutTransition
         merged.driven = later.driven ?? driven

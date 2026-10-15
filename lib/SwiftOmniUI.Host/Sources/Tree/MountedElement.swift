@@ -36,6 +36,8 @@ import CRT
     /// A content rebuild updates mounted lazy rows; their own measurement
     /// revisions decide which geometry must be measured again.
     public private(set) var lazyContentRevision = 0
+    /// Echo of this element's last mounted lazy-window request.
+    public private(set) var lazyRequestGeneration = 0
     /// Only a changed identity property advances this. Row and viewport patches
     /// must not make a host read and compare the complete source again.
     public private(set) var lazyItemsRevision = 0
@@ -141,6 +143,7 @@ import CRT
         }
 
         if patch.lazyContentChanged { lazyContentRevision += 1 }
+        if let generation = patch.lazyRequestGeneration { lazyRequestGeneration = generation }
         if let identity = patch.lazyIdentity { lazyIdentity = identity }
         let previouslyShown = isPagePresented ? shownChildren : []
         var changed = Set(patch.clearedProperties)

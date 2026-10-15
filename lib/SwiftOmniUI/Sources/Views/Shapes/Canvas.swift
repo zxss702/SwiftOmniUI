@@ -63,10 +63,12 @@ public struct Canvas: VisualElement, CanvasProperties{
     ///     }
     ///
     /// The calls on `context` gather into the canvas's drawing, and `size` is
-    /// the room its layout gave it: the closure runs again as the size
-    /// settles, so what depends on it is drawn at the size it lands.
+    /// the room its layout gave it. The host asks the core for the drawing
+    /// when that room is allocated, so the first drawing belongs to the
+    /// canvas's first native frame.
     public init(renderer: @escaping (inout GraphicsContext, Size) -> Void) {
-        node = CanvasSizeReader(renderer: renderer).node
+        node = Node(shape: CanvasContract.self)
+        node.canvas = CanvasBox(renderer: renderer)
     }
 
     /// A finger went down, or a mouse button was pressed.
@@ -89,42 +91,50 @@ public struct Canvas: VisualElement, CanvasProperties{
     }
 }
 
-/// A drawing depends on its allocated size, not its position in a scrolling
-/// window. Unlike business GeometryReader feedback, this passive measurement
-/// neither rebuilds on every scroll nor prevents ancestor placement animations.
-private struct CanvasSizeReader: View {
-    @State private var size: Size? = nil
+/// The renderer stays on the core side of the host boundary. Its current
+/// drawing and the states it read belong to the mounted canvas's identity;
+/// neither the closure nor its state crosses the host wire.
+final class CanvasBox {
     let renderer: (inout GraphicsContext, Size) -> Void
+    weak var owner: RenderedNode?
+    private(set) var size: Size?
+    private(set) var commands: [DrawCommand]?
 
     init(renderer: @escaping (inout GraphicsContext, Size) -> Void) {
         self.renderer = renderer
     }
 
-    var body: some View {
-        var container = Grid {
-            if let size {
-                canvas(for: size)
-            }
-        }
-        container.node.props[.isGeometryReader] = true.propValue
-        return container.flex(0)
-            .hearing(ViewContract.drawingSizeChanged) { numbers in
-                guard numbers.count == 2 else { return }
-                let next = Size(numbers[0], numbers[1])
-                guard next != self.size else { return }
-                var transaction = Transaction()
-                transaction.isGeometryFeedback = true
-                withTransaction(transaction) { self.size = next }
-            }
+    func inheritSize(from previous: CanvasBox?) {
+        size = previous?.size
     }
 
-    /// Runs the imperative renderer before handing its commands to the view
-    /// builder, which only accepts view expressions.
-    private func canvas(for size: Size) -> some View {
-        var context = GraphicsContext()
-        renderer(&context, size)
-        return Canvas { context.commands }
-            .frame(width: size.width, height: size.height)
+    /// `nil` reads mean the cached drawing was reused, so the owner's read
+    /// index must stay as it was. A zero allocation has no visible commands.
+    func drawing(at proposed: Size, force: Bool = false) -> (commands: [DrawCommand], reads: Set<ObjectIdentifier>?) {
+        guard proposed.width.isFinite, proposed.height.isFinite else {
+            return (commands ?? [], nil)
+        }
+        let size = Size(max(0, proposed.width), max(0, proposed.height))
+        if !force, self.size == size, let commands { return (commands, nil) }
+        self.size = size
+        guard size.width > 0, size.height > 0 else {
+            commands = []
+            return ([], [])
+        }
+        let (drawn, reads) = ReadScope.observed {
+            var context = GraphicsContext()
+            renderer(&context, size)
+            // Native drawing records cannot carry a themed colour. Resolve it
+            // while the renderer's reads are observed, so a colour-scheme
+            // change invalidates this canvas just like any other state read.
+            return context.commands.map { command in
+                DrawCommand(command.kind, command.arguments.map {
+                    $0.isThemed ? $0.resolvingColorScheme() : $0
+                })
+            }
+        }
+        commands = drawn
+        return (drawn, reads)
     }
 }
 

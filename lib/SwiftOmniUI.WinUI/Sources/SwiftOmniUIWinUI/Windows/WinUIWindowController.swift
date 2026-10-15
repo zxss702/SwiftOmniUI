@@ -46,6 +46,8 @@ final class WinUIWindowController {
         if asked.x == nil, asked.y == nil, let anchor = element.value(.defaultPosition)?.numbers {
             window.place(anchor)
         }
+        let split = presentation.arrangement?.visibleSplitView?.winUI.view as? WinUISplitView
+        window.prepareFirstPresentation(split: split)
         window.presentContent()
     }
 

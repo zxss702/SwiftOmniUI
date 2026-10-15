@@ -25,6 +25,7 @@ class WinUILazyView: WinUITravellingLayout {
     private(set) var mounted: [String: WinUILayoutItem] = [:]
     private var mountedSourceID: ObjectIdentifier?
     private var hasMountedSource = false
+    private var lastAcknowledgedGeneration = 0
     private var ancestorMeasureQueued = false
     private var hasCommittedContentExtent = false
 
@@ -76,6 +77,9 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// The mounted children, held by identity.
     func setItems(_ items: [(identity: String, item: WinUILayoutItem)], contentChanged: Bool = false) {
+        let generation = cells.element?.lazyRequestGeneration ?? 0
+        let requestAcknowledged = generation != lastAcknowledgedGeneration
+        lastAcknowledgedGeneration = generation
         let sourceID = cells.element?.lazyRows.map(ObjectIdentifier.init)
         let sourceChanged = !hasMountedSource || mountedSourceID != sourceID
         mountedSourceID = sourceID
@@ -95,6 +99,8 @@ class WinUILazyView: WinUITravellingLayout {
             }
             if sourceChanged {
                 if cells.total != measuredExtent { commitChangedContentExtent() }
+            }
+            if sourceChanged || requestAcknowledged {
                 retell()
             }
             return
@@ -171,7 +177,8 @@ class WinUILazyView: WinUITravellingLayout {
     /// frame several times. Record them promptly, then reconcile the latest
     /// window once outside the native callback/layout stack.
     func viewportReported(_ rect: Rect) {
-        guard rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite else { return }
+        guard rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite,
+              rect.width > 0, rect.height > 0 else { return }
         watchClip()
         effectiveViewport = rect
         if announcedRect != nil, let scroll = watching {
@@ -192,7 +199,8 @@ class WinUILazyView: WinUITravellingLayout {
         // view stands outside every viewport - a swap under way, a run not yet
         // placed. No window stands in such a rect: the notice is no news, and
         // the last real viewport stands.
-        guard rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite else { return }
+        guard rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite,
+              rect.width > 0, rect.height > 0 else { return }
         watchClip()
         if let override { preparedViewport = override }
         if effective {
@@ -226,6 +234,9 @@ class WinUILazyView: WinUITravellingLayout {
         // Anchor geometry follows the actual native window. Only an explicit
         // program jump selects a different window before that position changes.
         let incoming = windowSpan(in: target)
+        // A finite zero-area panel has not yet received a native allocation.
+        // Preserve the previous window until the scroller can name real room.
+        guard cells.orderedIdentities.isEmpty || incoming != nil else { return }
         let span = self.span ?? incoming
         var realize = incoming
         if let realized = realize {
@@ -270,33 +281,24 @@ class WinUILazyView: WinUITravellingLayout {
                 return
             }
         }
-        invalidateMeasure()
         var needsArrangement = false
         defer {
             if needsArrangement, let placed { arrange(width: placed.width, height: placed.height) }
         }
-        while true {
-            let built = cells.built
-            let before = grid ? cells.runs.revision : cells.extents.revision
-            tellWindow(span ?? 0..<0, realize: realize ?? 0..<0, demand: incoming)
-            // Reconcile the bounded window as one render, then refine its
-            // measured coverage before committing one final arrangement.
-            guard WinUIView.arranging == 0, WinUIView.measuring == 0,
-                  cells.element?.handler(.realizedChanged) == nil || cells.requestedItemsAreCurrent,
-                  let placed else {
-                retell()
-                break
-            }
-            if cells.built != built || measuredRevision != measurementRevision || cells.anchorShift != 0 {
-                _ = contentSize(width: standsAt ?? placed.width)
-                needsArrangement = true
-            }
-            let after = grid ? cells.runs.revision : cells.extents.revision
-            guard cells.needsMeasurement || cells.window?.revision != after else { break }
-            // A handler deferred by a patch cannot mount this run yet. Its
-            // next layout resumes; never spin on rows that are not available.
-            guard cells.built != built || after != before else { break }
+        let built = cells.built
+        tellWindow(span ?? 0..<0, realize: realize ?? 0..<0, demand: incoming)
+        // One request and, if its own patch has landed, one measurement pass.
+        // Further extent corrections continue on the next layout turn rather
+        // than monopolizing the UI thread inside this viewport callback.
+        guard WinUIView.arranging == 0, WinUIView.measuring == 0,
+              cells.element?.handler(.realizedChanged) == nil || cells.requestedItemsAreCurrent,
+              let placed else { return }
+        if cells.built != built || measuredRevision != measurementRevision || cells.anchorShift != 0 {
+            _ = contentSize(width: standsAt ?? placed.width)
+            needsArrangement = true
         }
+        let after = grid ? cells.runs.revision : cells.extents.revision
+        if cells.needsMeasurement || cells.window?.revision != after { retell() }
     }
 
     /// The window `rect` shows of the run, clipped to its document extent.
@@ -425,12 +427,12 @@ class WinUILazyView: WinUITravellingLayout {
         rect.width = effectiveViewport?.width ?? raw[2]
         rect.height = effectiveViewport?.height ?? raw[3]
         if axis == .vertical { rect.y += next.y - standing.y } else { rect.x += next.x - standing.x }
-        announcedRect = rect
         // ViewChanged can precede EffectiveViewportChanged by a frame. Mount
         // a newly exposed window now; movement inside an already mounted
         // window can keep the ordinary coalesced layout notice.
         if rect.width > 0, rect.height > 0,
            rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite {
+            announcedRect = rect
             if hasMountedWindow(at: rect) { retell() }
             else { viewportChanged(rect, effective: false, target: rect) }
         } else { retell() }

@@ -16,6 +16,8 @@ final class GTKCanvasView: GTKPanelView {
     var onReleased: ((Point) -> Void)?
 
     private var instructions: [CanvasInstruction] = []
+    private var drawnCommands: [DrawCommand]?
+    private var requestedSize: (element: ElementId, size: Size)?
 
     override init() {
         super.init()
@@ -57,8 +59,22 @@ final class GTKCanvasView: GTKPanelView {
 
     /// The drawing, as its contract declares it; none draws nothing.
     func apply(_ drawing: [DrawCommand]?) {
-        instructions = CanvasInstruction.instructions(drawing)
+        let commands = drawing ?? []
+        guard commands != drawnCommands else { return }
+        drawnCommands = commands
+        instructions = CanvasInstruction.instructions(commands)
         gtk_widget_queue_draw(widget)
+    }
+
+    override func allocate(width: Double, height: Double) {
+        guard let element = sourceElement,
+              width.isFinite, height.isFinite, width > 0, height > 0 else { return }
+        let size = Size(width, height)
+        guard requestedSize?.element != element.id || requestedSize?.size != size else { return }
+        requestedSize = (element.id, size)
+        if let commands = CoreLink().canvasDrawing(for: element.id, size: size) {
+            apply(commands)
+        }
     }
 
     /// A canvas has no size of its own: it takes the room its layout gives it.
@@ -112,6 +128,12 @@ final class GTKCanvasView: GTKPanelView {
             gtk_snapshot_restore(snapshot)
             saved -= 1
         }
+    }
+
+    override func detach() {
+        super.detach()
+        requestedSize = nil
+        drawnCommands = nil
     }
 
     private func draw(_ instruction: CanvasInstruction, pen: CanvasPen, in snapshot: OpaquePointer) {

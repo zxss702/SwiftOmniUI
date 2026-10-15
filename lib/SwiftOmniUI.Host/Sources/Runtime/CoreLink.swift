@@ -98,6 +98,12 @@
         HostBoundary.layoutValues(for: element)
     }
 
+    /// Draws a closure Canvas at the host's actual allocation. Static Canvas
+    /// commands continue to arrive through the normal property patch.
+    @MainActor public func canvasDrawing(for element: ElementId, size: Size) -> [DrawCommand]? {
+        HostBoundary.canvasDrawing(for: element, size: size)
+    }
+
     /// Moves a one-lane state named by a native gesture.
     @discardableResult
     public func moveGestureValue(_ value: Double, state: Int32) -> Bool {

@@ -355,6 +355,25 @@ class WinUIView {
         swiftomniui_winui_invalidate_measure(presentationHandle)
     }
 
+    /// Loaded can change a TextBlock's resources after it was measured outside
+    /// the XAML tree. Refresh those exact native proposals, without telling the
+    /// enclosing layout that its size changed unless a result actually differs.
+    /// Other cached proposals must also be refreshed: a later resize may return
+    /// to one of them without rebuilding the view.
+    func refreshMeasurementsAfterAttachment() -> Bool {
+        let previous = measuredSizes
+        guard !previous.isEmpty else { return false }
+        measuredSizes.removeAll(keepingCapacity: true)
+        invalidateNativeMeasure()
+        var changed = false
+        for proposal in previous {
+            let current = measure(width: proposal.width, height: proposal.height)
+            if current != proposal.size { changed = true }
+        }
+        if changed { measurementRevision &+= 1 }
+        return changed
+    }
+
     /// Restore the selected native proposal after arithmetic has probed other widths.
     func prepareMeasure(width: Double) {
         guard Self.arranging == 0, WinUILayoutView.queryingSize == 0 else { return }

@@ -7,6 +7,49 @@
 import XCTest
 
 final class WinUISafeBarColumnTests: XCTestCase {
+    func testWideSidebarIsOpenBeforeTheWindowFirstActivates() {
+        onUIThread {
+            let window = WinUIWindow()
+            defer { window.close() }
+            let split = WinUISplitView()
+            let sidebar = WinUISingleChildView()
+            let detail = WinUISingleChildView()
+            split.setItems([WinUILayoutItem(view: sidebar), WinUILayoutItem(view: detail)])
+
+            let pending = sidebar.rootSafeAreaContext?(Rect(0, 0, 256, 600))
+            XCTAssertEqual(pending?.safe.width, 256, "an unattached pane has no native origin yet")
+
+            window.show(split, present: false)
+            window.request(WindowFrame(width: WinUISidebarView.expandsAt + 8, height: 700))
+            window.prepareFirstPresentation(split: split)
+            XCTAssertTrue(split.isPresented)
+            XCTAssertEqual(WinUIStrings.read {
+                swiftomniui_winui_read(split.sidebar.handle, "paneOpen", $0, $1)
+            }, "1", "the pane must already be open before the first native frame")
+
+            window.presentContent()
+            WinUITestHost.pump()
+            XCTAssertTrue(sidebar.isAttached, "the first frame must include the sidebar page")
+        }
+    }
+
+    func testNarrowPreflightDoesNotConsumeTheFirstWideRoom() {
+        onUIThread {
+            let window = WinUIWindow()
+            defer { window.close() }
+            let split = WinUISplitView()
+            split.setItems([WinUILayoutItem(view: WinUISingleChildView()),
+                            WinUILayoutItem(view: WinUISingleChildView())])
+            window.show(split, present: false)
+            window.request(WindowFrame(width: 560, height: 440))
+            window.prepareFirstPresentation(split: split)
+            XCTAssertFalse(split.isPresented)
+            window.request(WindowFrame(width: WinUISidebarView.expandsAt + 8, height: 700))
+            window.prepareFirstPresentation(split: split)
+            XCTAssertTrue(split.isPresented)
+        }
+    }
+
     func testTheFileBarStaysInItsDetailColumnAndIdleLayoutConverges() throws {
         try onUIThread {
             let visible = State(wrappedValue: true)

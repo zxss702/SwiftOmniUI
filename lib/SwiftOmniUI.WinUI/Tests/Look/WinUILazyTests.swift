@@ -182,6 +182,8 @@ final class WinUILazyTests: XCTestCase {
             host.runtime.tree.apply(scrollPatch, complete: true)
             let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
             swiftomniui_winui_panel_watch_viewport(lazy.handle, false)
+            lazy.viewportReported(Rect(0, 0, 0, 0))
+            lazy.viewportChanged(Rect(0, 0, 0, 0))
             let root = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             WinUITestHost.window.show(root)
             for _ in 0..<12 { host.layOut(); WinUIDoorbell.commitPending() }
@@ -190,6 +192,54 @@ final class WinUILazyTests: XCTestCase {
             XCTAssertGreaterThan(window.span.upperBound, window.span.lowerBound)
             XCTAssertFalse(lazy.cells.built.isEmpty, "attachment must request the first window without waiting for a scroll")
             XCTAssertLessThan(lazy.cells.built.count, 80)
+        }
+    }
+
+    func testAListsMountedRequestRemainsReadyWhileAnotherViewNeedsRendering() throws {
+        try onUIThread {
+            let unrelated = State(wrappedValue: 0)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                VStack {
+                    Text("Other \(unrelated.wrappedValue)")
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(0..<10_000) { Text("File \($0)").frame(height: 28) }
+                        }
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            XCTAssertTrue(lazy.cells.requestedItemsAreCurrent)
+            unrelated.wrappedValue += 1
+            XCTAssertTrue(host.runtime.core.needsRender)
+            XCTAssertTrue(lazy.cells.requestedItemsAreCurrent,
+                          "another view's pending render must not stall this lazy window")
+        }
+    }
+
+    func testOneViewportNoticeDoesNotSynchronouslyRefineEveryUnknownRow() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<10_000) { number in
+                            Text("File \(number)").frame(height: number.isMultiple(of: 3) ? 96 : 28)
+                        }
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let before = lazy.cells.requests
+            let target = Rect(0, 4_000, 320, 240)
+            lazy.viewportChanged(target, effective: false, target: target)
+            XCTAssertLessThanOrEqual(lazy.cells.requests - before, 1,
+                                     "extent refinement continues in later layout turns")
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertLessThan(lazy.mounted.count, 80)
         }
     }
 

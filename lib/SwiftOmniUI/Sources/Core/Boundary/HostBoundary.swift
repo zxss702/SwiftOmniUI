@@ -309,6 +309,12 @@
         Renderer.shared.codeObjects(for: element)?.values ?? [:]
     }
 
+    /// The drawing of a closure Canvas at its allocated size, or nil for an
+    /// ordinary Canvas whose commands came through its drawable property.
+    @MainActor public static func canvasDrawing(for element: ElementId, size: Size) -> [DrawCommand]? {
+        Renderer.shared.canvasDrawing(for: element, size: size)
+    }
+
     /// Reports a native event and runs its handler on SwiftOmniUI's UI executor.
     @discardableResult
     public static func dispatch(_ handler: Int32, payload: [HostValue] = []) -> Bool {

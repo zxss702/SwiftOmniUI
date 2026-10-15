@@ -37,6 +37,89 @@ private func nest(_ depth: Int, _ words: String) -> Node {
 }
 
 final class WinUIMeasurementTests: XCTestCase {
+    func testLoadedTextRefreshesNativeProposalsWithoutInvalidatingAnUnchangedView() {
+        onUIThread {
+            let label = WinUILabelView()
+            label.setText("Unchanged words")
+            let wide = label.measure(width: 280, height: nil)
+            let narrow = label.measure(width: 80, height: nil)
+            let revision = label.measurementRevision
+
+            XCTAssertFalse(label.refreshMeasurementsAfterAttachment())
+            XCTAssertEqual(label.measurementRevision, revision)
+            WinUIView.arranging += 1
+            XCTAssertEqual(label.measure(width: 280, height: nil), wide)
+            XCTAssertEqual(label.measure(width: 80, height: nil), narrow)
+            WinUIView.arranging -= 1
+
+            label.setText("Words that now occupy several lines in the narrow proposal")
+            XCTAssertTrue(label.refreshMeasurementsAfterAttachment())
+            XCTAssertEqual(label.measurementRevision, revision + 1)
+            WinUIView.arranging += 1
+            XCTAssertNotEqual(label.measure(width: 80, height: nil), narrow,
+                              "all remembered proposals must be refreshed before a later resize")
+            WinUIView.arranging -= 1
+        }
+    }
+
+    func testLoadedTextInvalidatesSharedLayoutAncestorsOncePerBatch() {
+        onUIThread {
+            let first = WinUIStackView(axis: .vertical)
+            let second = WinUIStackView(axis: .vertical)
+            let root = WinUIStackView(axis: .horizontal)
+            first.setItems([WinUILayoutItem(view: WinUILabelView())])
+            second.setItems([WinUILayoutItem(view: WinUILabelView())])
+            root.setItems([WinUILayoutItem(view: first), WinUILayoutItem(view: second)])
+            let revisions = [first, second, root].map(\.measurementRevision)
+
+            WinUILayoutView.commitAttachedTextMeasurements([first, first, second])
+
+            XCTAssertEqual(first.measurementRevision, revisions[0] + 1)
+            XCTAssertEqual(second.measurementRevision, revisions[1] + 1)
+            XCTAssertEqual(root.measurementRevision, revisions[2] + 1,
+                           "both changed labels share one ancestor invalidation")
+        }
+    }
+
+    func testLoadedTextCallbacksCoalesceAndKeepNativeLabels() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                VStack {
+                    Text("First").id("first")
+                    Text("Second").id("second")
+                }
+                .frame(width: 120)
+            }
+            for _ in 0..<4 { host.step(); host.layOut() }
+            let first = try XCTUnwrap(host.view(id: .manual("first")) as? WinUILabelView)
+            let second = try XCTUnwrap(host.view(id: .manual("second")) as? WinUILabelView)
+            let stack = try XCTUnwrap(host.views(WinUIStackView.self).first)
+            _ = first.measure(width: 120, height: nil)
+            _ = second.measure(width: 120, height: nil)
+            let before = stack.measurementRevision
+
+            for label in [first, second] {
+                label.nativeTextLoaded()
+                label.nativeTextLoaded()
+            }
+            WinUIDoorbell.turn()
+            XCTAssertEqual(stack.measurementRevision, before,
+                           "a repeated Loaded callback cannot invalidate an unchanged row")
+
+            first.setText("First label now wraps into several lines at this width")
+            second.setText("Second label also wraps into several lines at this width")
+            for label in [first, second] {
+                label.nativeTextLoaded()
+                label.nativeTextLoaded()
+            }
+            WinUIDoorbell.turn()
+            XCTAssertEqual(stack.measurementRevision, before + 1,
+                           "two changed labels invalidate their shared stack once")
+            XCTAssertTrue(host.view(id: .manual("first")) === first)
+            XCTAssertTrue(host.view(id: .manual("second")) === second)
+        }
+    }
+
     func testAPropertyInvalidatesEachMountedAndPlacingAncestorOnce() throws {
         try onUIThread {
             let host = WinUIRenderer.running {

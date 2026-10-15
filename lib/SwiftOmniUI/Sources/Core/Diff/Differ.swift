@@ -162,9 +162,15 @@ final class Differ {
         if let affected, !affected.contains(ObjectIdentifier(rendered)) {
             return (rendered, HostPatch(id: rendered.id, type: rendered.type))
         }
-        let windowOnly = rendered.lazySource?.lazyWindow.map {
-            rendered.reads.intersection(changed) == Set([$0])
-        } ?? false
+        let windowOnly: Bool = {
+            guard let source = rendered.lazySource, let window = source.lazyWindow else {
+                return false
+            }
+            let ownChanges = rendered.reads.intersection(changed)
+            var allowed: Set<ObjectIdentifier> = [window]
+            if let request = source.lazyRequestWindow { allowed.insert(request) }
+            return !ownChanges.isEmpty && ownChanges.isSubset(of: allowed)
+        }()
         if let placeholder = rendered.placeholder,
             !rendered.reads.isDisjoint(with: changed), !windowOnly {
             return element(
@@ -189,6 +195,25 @@ final class Differ {
         defer { sceneRecord = outer }
 
         var patch = HostPatch(id: rendered.id, type: rendered.type)
+
+        // A Canvas renderer reads state while drawing at its allocated size,
+        // outside a view body's build. Recompute only that drawing when one of
+        // its own reads changed; ordinary descendants still take the clean
+        // walk below. The read index is replaced with the new observation.
+        if let canvas = rendered.canvas,
+           !rendered.canvasReads.isDisjoint(with: changed),
+           let size = canvas.size {
+            let drawing = canvas.drawing(at: size, force: true)
+            if let reads = drawing.reads {
+                rendered.canvasReads = reads
+                rendered.reads = rendered.canvasBodyReads.union(reads)
+            }
+            let value = drawing.commands.propValue
+            if rendered.props[.drawable] != value {
+                rendered.props[.drawable] = value
+                patch.properties[.drawable] = value
+            }
+        }
 
         // What this element provided stays in scope while its children are walked -
         // its keyed writes overlaid the same way `element` found them.
@@ -226,7 +251,16 @@ final class Differ {
             // closures arm their own observations; a window must not accumulate
             // another container observation token on every scroll notice.
             ReadScope.collect(into: &reads) {
-                BuildScope.within(frame) { source.materialize(reusing: retained) }
+                BuildScope.within(frame) {
+                    if let generation = source.lazyRequestGenerationValue?() {
+                        source.lazyRequestGeneration = generation
+                    }
+                    source.materialize(reusing: retained)
+                }
+            }
+            if rendered.lazyRequestGeneration != source.lazyRequestGeneration {
+                rendered.lazyRequestGeneration = source.lazyRequestGeneration
+                patch.lazyRequestGeneration = source.lazyRequestGeneration
             }
             rendered.lazySourceReads = reads
             rendered.reads = reads.union(source.lazyRowReadings?.states ?? [])
@@ -338,6 +372,21 @@ final class Differ {
     /// The code objects the element of `id` lent its host, or nothing.
     func codeObjects(for id: ElementId) -> NodeCode? {
         codeObjects[id]
+    }
+
+    /// The native canvas asks during allocation, after the first tree patch.
+    /// Keep that first drawing in the diff baseline and index exactly the
+    /// states its renderer read, without rebuilding the enclosing view.
+    func canvasDrawing(for id: ElementId, size: Size) -> [DrawCommand]? {
+        guard let canvas = codeObjects[id]?.canvas,
+              let owner = canvas.owner else { return nil }
+        let drawing = canvas.drawing(at: size)
+        if let reads = drawing.reads {
+            owner.canvasReads = reads
+            owner.reads = owner.canvasBodyReads.union(reads)
+        }
+        owner.props[.drawable] = drawing.commands.propValue
+        return drawing.commands
     }
 
     /// The handlers the last walk found - what left first, then the rest - taken so

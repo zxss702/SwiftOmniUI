@@ -40,6 +40,9 @@
     private var prefetchInvalidated = false
     private var lastDemand: Range<Double>?
     private var lastPerRun = 1
+    /// Echoed by this lazy element's own render, independently of unrelated
+    /// work still waiting elsewhere in the scene.
+    private var requestedGeneration: Int?
 
     /// Content changes waiting for arrangement. Measurement and viewport realization must
     /// not consume this; the host clears it after beginning the changed arrangement.
@@ -65,9 +68,10 @@
     /// Requested rows have finished their render. During a patch or a held
     /// transaction, a missing native row can still be waiting for that render.
     public var requestedItemsAreCurrent: Bool {
-        guard let runtime, element?.handler(.realizedChanged) != nil else { return false }
-        return !runtime.intake.isApplying && !runtime.pump.handlers.inTransaction
-            && !runtime.pump.handlers.hasQueued && !runtime.core.needsRender
+        guard let runtime, let element, element.handler(.realizedChanged) != nil else { return false }
+        if orderedIdentities.isEmpty, requestedGeneration == nil { return true }
+        guard let requestedGeneration else { return false }
+        return !runtime.intake.isApplying && element.lazyRequestGeneration == requestedGeneration
     }
 
     /// Diagnostic counts for the work a lazy window actually performs.
@@ -110,6 +114,7 @@
         // neither; the patched children re-measure on their next layout pass.
         if sourceRevision != itemsRevision {
             cancelPrefetch()
+            requestedGeneration = nil
             let wasKnown = itemsRevision >= 0
             itemsRevision = sourceRevision
             if let next = element.lazyRows {
@@ -298,12 +303,15 @@
             upper = within.upperBound
             if !visible.isEmpty, within != target, element.handler(.realizedChanged) != nil {
                 prefetchPlan = (demand ?? span, realize, perRun, grid)
-                runtime?.lazyPrefetch.schedule(owner: self) { [weak self] in self?.prefetchOne() ?? false }
             } else { cancelPrefetch(invalidate: false) }
         } else { cancelPrefetch(invalidate: false) }
         let within = lower < upper && !wanted.isEmpty ? lower..<upper : 0..<0
         if !needsMeasurement { inserting.formIntersection(identities[within]) }
         request(within, keeping: keeping)
+        // The visible request is always dispatched before optional neighbours.
+        if prefetchPlan != nil {
+            runtime?.lazyPrefetch.schedule(owner: self) { [weak self] in self?.prefetchOne() ?? false }
+        }
     }
 
     private func requestedRange(in span: Range<Double>, perRun: Int, grid: Bool) -> Range<Int> {
@@ -361,7 +369,16 @@
         // and new positions. This keeps the window lazy during a large insertion.
         let extra = keeping.compactMap { position(of: $0) }.filter { !within.contains($0) }
         let requested = (Array(within) + extra).sorted().map { identities[$0] }
-        element.send(.realizedChanged, [.strings(requested)], in: runtime)
+        let generation = nextRequestGeneration(for: element)
+        element.send(.realizedChanged, [.strings(requested), .number(Double(generation))], in: runtime)
+    }
+
+    private func nextRequestGeneration(for element: MountedElement) -> Int {
+        let previous = max(requestedGeneration ?? 0, element.lazyRequestGeneration)
+        // The transport carries this lane as Double, so keep every generation exact.
+        let generation = previous >= 9_007_199_254_740_991 ? 1 : previous + 1
+        requestedGeneration = generation
+        return generation
     }
 
     /// The corrected viewport origin after measurements or data move its anchor.
@@ -397,7 +414,8 @@
         retained = []
         needsMeasurement = false
         requests += 1
-        element.send(.realizedChanged, [.strings(Array(identities))], in: runtime)
+        let generation = nextRequestGeneration(for: element)
+        element.send(.realizedChanged, [.strings(Array(identities)), .number(Double(generation))], in: runtime)
     }
 
 }

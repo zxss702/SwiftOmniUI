@@ -32,6 +32,10 @@
     /// A new shared identity snapshot; nil keeps the mounted source unchanged.
     public var lazyRows: HostLazySource?
 
+    /// The generation of this lazy element's last realized-window request.
+    /// An absent value leaves the host's acknowledgement unchanged.
+    public var lazyRequestGeneration: Int?
+
     /// The source row used by lazy geometry; the element's own `id` still retains its view.
     public var lazyIdentity: String?
 

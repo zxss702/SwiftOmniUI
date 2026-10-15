@@ -183,8 +183,19 @@ final class WinUISplitView: WinUILayoutView {
         sidebar.layout(bounds)
     }
 
+    /// A newly created window already knows its client width before activation.
+    /// Establish a wide window's initial pane while it is still detached, so
+    /// its first native frame has the sidebar content instead of a closed pane.
+    func prepareFirstPresentation(width: Double) {
+        guard width.isFinite, width >= WinUISidebarView.expandsAt else { return }
+        adaptToFirstRoom(width: width)
+    }
+
     private func safeArea(for page: WinUIView, in bounds: Rect) -> SafeAreaContext {
-        guard allocatedBounds.width > 0, allocatedBounds.height > 0 else {
+        // TransformToVisual has no useful coordinate before both native views
+        // are attached. The page will read this closure again when arranged.
+        guard isAttached, page.isAttached,
+              allocatedBounds.width > 0, allocatedBounds.height > 0 else {
             return SafeAreaContext(bounds: bounds)
         }
         let parent = origin, child = page.origin

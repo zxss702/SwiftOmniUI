@@ -102,30 +102,75 @@ import XCTest
         ])
     }
 
-    /// The closure form measures its room first, then draws with the size it
-    /// settled - a GeometryReader's report building the drawing.
-    func testAClosuredCanvasDrawsFromItsSize() throws {
+    /// A closure Canvas is in the first patch. Native allocation asks for its
+    /// drawing in that same pass, and an unchanged allocation does no work.
+    func testAClosuredCanvasDrawsOnItsFirstAllocation() throws {
+        var calls = 0
         let canvas = Canvas { context, size in
+            calls += 1
             context.fill(
                 Path(roundedRect: Rect(0, 0, size.width, 40), cornerRadius: 8),
                 with: .color(.cornflowerBlue))
         }
 
-        let renders = Renders()
-        let first = renders.render(canvas.node)
-        XCTAssertFalse(first.subtree.contains { $0.type == CanvasContract.nodeType }, "no invented zero-size drawing")
-        XCTAssertNil(first.events?[ViewContract.frameChanged.token], "drawing has no dependency on window coordinates")
-        let frame = try XCTUnwrap(first.events?[ViewContract.drawingSizeChanged.token])
-        renders.fire(frame, with: [.numbers([120, 80])])
-        let second = renders.render(canvas.node, changed: Renderer.shared.pendingChanges)
-        let leaf = try XCTUnwrap(second.subtree.first { $0.type == CanvasContract.nodeType })
-        let commands = try XCTUnwrap(leaf.props["drawable"]?.values?.compactMap(DrawCommand.init(propValue:)))
-        XCTAssertEqual(commands, [
+        let differ = Differ()
+        let first = differ.reconcile(nil, with: canvas.node)
+        XCTAssertEqual(first.node.type, CanvasContract.nodeType)
+        XCTAssertNil(first.patch.properties[.drawable], "allocation, not a later geometry render, draws the first frame")
+        XCTAssertEqual(calls, 0)
+
+        let commands = try XCTUnwrap(differ.canvasDrawing(for: first.node.id, size: Size(120, 80)))
+        let expected: [DrawCommand] = [
             Draw.fillColor(.cornflowerBlue), Draw.fillStyle(eoFill: false),
             Draw.fillGeometry(Path(roundedRect: Rect(0, 0, 120, 40), cornerRadius: 8)),
-        ])
+        ]
+        XCTAssertEqual(commands, expected)
+        XCTAssertEqual(first.node.props[.drawable], expected.propValue)
+        XCTAssertEqual(calls, 1)
+
+        _ = differ.canvasDrawing(for: first.node.id, size: Size(120, 80))
+        XCTAssertEqual(calls, 1, "a repeated native Arrange does not rerun the renderer")
+        _ = differ.canvasDrawing(for: first.node.id, size: Size(160, 80))
+        XCTAssertEqual(calls, 2, "a new allocation draws with the new local size")
+        XCTAssertNil(first.node.events[.drawingSizeChanged], "the drawing does not wait for geometry feedback")
+    }
+
+    /// Canvas state reads belong to the drawing, not the surrounding view.
+    /// A changed read updates its drawable and an unrelated state does not.
+    func testAClosuredCanvasTracksOnlyItsDrawingReads() throws {
         Renderer.shared.clearInvalidation()
-        renders.fire(frame, with: [.numbers([120, 80])])
-        XCTAssertFalse(Renderer.shared.needsRender, "an unchanged local drawing size needs no new drawing")
+        let tint = State(wrappedValue: false)
+        let unrelated = State(wrappedValue: false)
+        var calls = 0
+        let canvas = Canvas { context, size in
+            calls += 1
+            context.fill(Path(Rect(0, 0, size.width, size.height)),
+                         with: .color(tint.wrappedValue ? .blue : .red))
+        }
+        let differ = Differ()
+        let first = differ.reconcile(nil, with: canvas.node)
+        let before = try XCTUnwrap(differ.canvasDrawing(for: first.node.id, size: Size(80, 44)))
+        XCTAssertEqual(calls, 1)
+        XCTAssertNotNil(before.first?.arguments.first?.color,
+                        "themed Canvas colours resolve before reaching a native host")
+
+        unrelated.wrappedValue = true
+        let unchanged = differ.revisit(first.node, changed: Renderer.shared.pendingChanges)
+        XCTAssertTrue(unchanged.patch.properties.isEmpty)
+        XCTAssertEqual(calls, 1)
+        Renderer.shared.clearInvalidation()
+
+        tint.wrappedValue = true
+        let changed = differ.revisit(unchanged.node, changed: Renderer.shared.pendingChanges)
+        XCTAssertEqual(calls, 2)
+        XCTAssertNotNil(changed.patch.properties[.drawable])
+        XCTAssertNotEqual(changed.node.props[.drawable], before.propValue)
+        XCTAssertNotNil(changed.node.props[.drawable], "the new drawing remains host-readable")
+        XCTAssertEqual(changed.node.id, first.node.id)
+
+        differ.forget(changed.node)
+        XCTAssertNil(differ.canvasDrawing(for: first.node.id, size: Size(80, 44)),
+                     "an unmounted Canvas cannot keep a drawing request alive")
+        Renderer.shared.clearInvalidation()
     }
 }

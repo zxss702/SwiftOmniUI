@@ -300,11 +300,22 @@ public struct Node {
     /// Only this state changing can reuse a lazy container's prepared source.
     var lazyWindow: ObjectIdentifier?
 
+    /// A host acknowledgement of a viewport request changes only the request
+    /// bookkeeping, not the identity or measured size of any row.
+    var lazyRequestWindow: ObjectIdentifier?
+
+    /// Read the current request generation without rebuilding the lazy view's
+    /// body when its viewport acknowledgement is the only changed state.
+    var lazyRequestGenerationValue: (() -> Int)?
+
     /// A viewport-only materialization can name retained rows before calling
     /// their builders. Values are their existing manual ids, including explicit ids.
     var lazyProducer: (([String: String]) -> [Node])?
     var lazyRowReadings: LazyRowReadings?
     var lazyRows: HostLazySource?
+
+    /// The viewport request this lazy node has represented in a patch.
+    var lazyRequestGeneration: Int?
 
     /// Runs the producer, if pending, filing its nodes ahead of the slots. Idempotent.
     mutating func materialize(reusing rows: [String: String] = [:]) {
@@ -395,6 +406,10 @@ public struct Node {
     /// object like `textRenderer` - registered with the differ so a host can
     /// pull it by the element's id; nothing of it crosses.
     var customLayout: LayoutBox?
+
+    /// A size-dependent Canvas renderer, retained in the core and pulled by
+    /// the host at the control's actual allocation.
+    var canvas: CanvasBox?
 
     /// The `.layoutValue` tags this child carries for a custom `Layout`,
     /// by the key's identity; pulled by a host building `LayoutSubview`s.

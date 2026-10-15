@@ -18,6 +18,10 @@ class WinUITextView: WinUIView {
     /// Where the view's place is bound while it travels; nil where it stands.
     private var bound: Rect?
     private var loadedMeasurePending = false
+    private var attachmentGeneration = 0
+    private var measuredAttachmentGeneration = -1
+    private static var loadedMeasurements: [WinUITextView] = []
+    private static var loadedMeasurementsPending = false
 
     /// The size WinUI draws body text at, in DIPs.
     static let platformFontSize = 14.0
@@ -35,18 +39,32 @@ class WinUITextView: WinUIView {
         }
     }
 
-    /// The pre-attachment measurement does not establish the final native
-    /// text layout. Loaded commits one fresh measurement in the real tree,
-    /// including its XamlRoot scale/resources, before relying on cached sizes.
-    private func nativeTextLoaded() {
+    /// The pre-attachment measurement can differ once XAML has its root's
+    /// resources. Loaded callbacks for one attachment share a pass, while a
+    /// later attachment gets a fresh comparison against its current proposals.
+    func nativeTextLoaded() {
+        attachmentGeneration &+= 1
         guard !loadedMeasurePending else { return }
         loadedMeasurePending = true
-        WinUIDoorbell.afterPass { [weak self] in
-            guard let self else { return }
-            self.loadedMeasurePending = false
-            guard self.sourceElement?.isDeparting != true else { return }
-            self.invalidateMeasure()
-            self.placingLayout?.commitMeasurementChange()
+        Self.loadedMeasurements.append(self)
+        guard !Self.loadedMeasurementsPending else { return }
+        Self.loadedMeasurementsPending = true
+        WinUIDoorbell.afterPass {
+            let labels = Self.loadedMeasurements
+            Self.loadedMeasurements = []
+            Self.loadedMeasurementsPending = false
+            var changedLayouts: [WinUILayoutView] = []
+            for label in labels {
+                label.loadedMeasurePending = false
+                guard !label.isDetached, label.isAttached,
+                      label.sourceElement?.isDeparting != true,
+                      label.measuredAttachmentGeneration != label.attachmentGeneration else { continue }
+                label.measuredAttachmentGeneration = label.attachmentGeneration
+                if label.refreshMeasurementsAfterAttachment(), let layout = label.placingLayout {
+                    changedLayouts.append(layout)
+                }
+            }
+            WinUILayoutView.commitAttachedTextMeasurements(changedLayouts)
         }
     }
 
