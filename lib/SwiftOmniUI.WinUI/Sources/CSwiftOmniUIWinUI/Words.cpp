@@ -13,6 +13,7 @@
 #include <cwchar>
 #include <cwctype>
 #include <string>
+#include <vector>
 
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.UI.h>
@@ -384,6 +385,72 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
         }
     } catch (...) {
         report("setting a label's runs of words");
+    }
+}
+
+extern "C" bool swiftomniui_winui_text_recolor_runs(
+    SwiftOmniUIObjectRef handle, SwiftOmniUIWordsRun const *runs, int32_t count
+) {
+    try {
+        namespace documents = winrt::Microsoft::UI::Xaml::Documents;
+        auto block = labelWords(handle);
+        auto inlines = block.Inlines();
+        if (count < 0 || inlines.Size() != static_cast<uint32_t>(count)) return false;
+        std::vector<documents::Run> pieces;
+        pieces.reserve(count);
+        // Validate before changing anything. Inline images and raised baselines
+        // have another native representation and keep the existing full path.
+        for (int32_t index = 0; index < count; ++index) {
+            auto piece = inlines.GetAt(index).try_as<documents::Run>();
+            auto const &run = runs[index];
+            if (!piece || (run.glyph && *run.glyph) || (run.image && *run.image)
+                || run.baseline != 0 || piece.Text() != text(run.text)) return false;
+            pieces.push_back(piece);
+        }
+        auto highlighters = block.TextHighlighters();
+        uint32_t painted = 0;
+        int32_t at = 0;
+        for (int32_t index = 0; index < count; ++index) {
+            auto const &piece = pieces[index];
+            auto const &run = runs[index];
+            auto property = documents::TextElement::ForegroundProperty();
+            auto local = piece.ReadLocalValue(property) != xaml::DependencyProperty::UnsetValue();
+            if (run.hasColor) {
+                if (!local || argb(piece.Foreground()) != run.color)
+                    piece.Foreground(media::SolidColorBrush(color(run.color)));
+            } else if (local) {
+                piece.ClearValue(property);
+            }
+            auto length = static_cast<int32_t>(piece.Text().size());
+            if (run.hasBackground && length > 0) {
+                auto highlighter = painted < highlighters.Size()
+                    ? highlighters.GetAt(painted) : documents::TextHighlighter();
+                if (!highlighter.Background() || argb(highlighter.Background()) != run.background)
+                    highlighter.Background(media::SolidColorBrush(color(run.background)));
+                if (run.hasColor) {
+                    // An explicit colour must own its brush even if it equals
+                    // the inherited colour, so later parent changes leave it alone.
+                    if (!highlighter.Foreground() || highlighter.Foreground() == block.Foreground()
+                        || argb(highlighter.Foreground()) != run.color)
+                        highlighter.Foreground(media::SolidColorBrush(color(run.color)));
+                } else if (highlighter.Foreground() != block.Foreground()) {
+                    highlighter.Foreground(block.Foreground());
+                }
+                auto ranges = highlighter.Ranges();
+                if (ranges.Size() != 1 || ranges.GetAt(0).StartIndex != at || ranges.GetAt(0).Length != length) {
+                    ranges.Clear();
+                    ranges.Append(documents::TextRange{at, length});
+                }
+                if (painted == highlighters.Size()) highlighters.Append(highlighter);
+                ++painted;
+            }
+            at += length;
+        }
+        while (highlighters.Size() > painted) highlighters.RemoveAtEnd();
+        return true;
+    } catch (...) {
+        // The caller retains a complete description and can restore it.
+        return false;
     }
 }
 

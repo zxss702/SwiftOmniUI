@@ -163,13 +163,20 @@ extension WinUIRegistrations {
     ]
 
     private static func applyBox<Realized: ElementContract>(_ view: WinUILayoutView, _ values: ElementValues<Realized>) {
-        view.setPathClip(values[LayoutContract.clipPath], evenOdd: (values[LayoutContract.clipFillRule] ?? .nonzero) == .evenOdd)
-        view.setBackground(values[VisualElementContract.background]?.propValue)
-        view.setOutline(
-            stroke: values[BorderElementContract.stroke]?.propValue,
-            width: values[BorderElementContract.strokeWidth],
-            shape: values[BorderElementContract.shape]?.propValue,
-            clips: values[LayoutContract.clipsContent] ?? false)
+        if values.changed(LayoutContract.clipPath) || values.changed(LayoutContract.clipFillRule) {
+            view.setPathClip(values[LayoutContract.clipPath], evenOdd: (values[LayoutContract.clipFillRule] ?? .nonzero) == .evenOdd)
+        }
+        if values.changed(VisualElementContract.background) {
+            view.setBackground(values[VisualElementContract.background]?.propValue)
+        }
+        if values.changed(BorderElementContract.stroke) || values.changed(BorderElementContract.strokeWidth)
+            || values.changed(BorderElementContract.shape) || values.changed(LayoutContract.clipsContent) {
+            view.setOutline(
+                stroke: values[BorderElementContract.stroke]?.propValue,
+                width: values[BorderElementContract.strokeWidth],
+                shape: values[BorderElementContract.shape]?.propValue,
+                clips: values[LayoutContract.clipsContent] ?? false)
+        }
     }
 
     /// What both stacks take: the space between their children, and the space inside their own edge.

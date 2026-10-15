@@ -44,14 +44,23 @@ extension WinUIRegistrations {
     /// the font and the colour, and the room around them.
     static func applyText<Realized: ElementContract>(_ view: WinUIView, _ values: ElementValues<Realized>) {
         if let words = TextMembers.words(values) { (view as? WinUIWordsView)?.setText(words) }
-        if let look = TextMembers.look(values) {
+        let fontChanged = values.changed(FontElementContract.fontSize)
+            || values.changed(FontElementContract.fontAttributes)
+            || values.changed(FontElementContract.fontFamily)
+            || values.changed(FontElementContract.fontTextStyle)
+            || values.changed(FontElementContract.fontWeight)
+            || values.changed(FontElementContract.fontDesign)
+        if fontChanged {
+            let look = TextMembers.look(of: values)
             if let text = view as? WinUITextView {
                 text.setTextFont(look)
             } else {
                 view.setFont(size: look.size, attributes: look.attributes, family: look.family,
                              textStyle: look.textStyle, weight: look.weight)
             }
-            view.setForeground(look.color)
+        }
+        if values.changed(TextStyleElementContract.foregroundStyle) {
+            view.setForeground(values[TextStyleElementContract.foregroundStyle]?.propValue)
         }
         if values.changed(PaddingElementContract.contentPadding) {
             view.setPadding(values[PaddingElementContract.contentPadding])

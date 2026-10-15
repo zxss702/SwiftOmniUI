@@ -53,12 +53,21 @@ text block's, and a span's own is not realized. A run's background is a
 `TextHighlighter` over its part of the words - a text block has no background
 per run - keeping the run's colour on them. The runs stand in place of the
 label's own words; a label whose spans are taken away shows its own words
-again. A span that changes has its label apply again, so the runs are laid
-down whole each time. A highlighter without an explicit span colour shares
+again. A span that changes has its label apply again. Unchanged runs skip
+native writes. Ordinary runs whose only changes are foreground or background
+retain their native `Run` objects and measurement; their brushes and highlighter
+ranges update in place. Text, typography, inherited spacing, and inline element
+changes take the full update path. A highlighter without an explicit span colour shares
 the label's foreground brush. When the label's foreground changes, the native
 setter moves those shared highlighters to the new brush; explicit span brushes
 remain their own, even when they have the same colour. Changing the label's
 colour therefore needs no inline rebuild or measurement.
+
+WinUI applies font and foreground patches independently: a colour-only patch
+does not reset typography or read native font metrics. Layout boxes likewise
+apply background, outline, and path-clip member groups independently, so changing
+a hover background does not reapply an unchanged clip or outline. Buttons retain
+their existing native content assignment when the label object is unchanged.
 
 ## Nothing the program writes is heard
 

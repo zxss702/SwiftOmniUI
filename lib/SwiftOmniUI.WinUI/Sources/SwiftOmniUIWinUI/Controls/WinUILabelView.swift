@@ -14,6 +14,8 @@ final class WinUILabelView: WinUITextView {
     /// The label's own words, and the runs shown in their place; nil while it shows its own.
     private var ownText = ""
     private var runs: [TextRun]?
+    private var runsFontSize: Double?
+    private var runsLetterSpacing = 0.0
 
     override func setText(_ text: String) {
         ownText = text
@@ -36,10 +38,19 @@ final class WinUILabelView: WinUITextView {
     /// Runs of words shown in place of the label's own (`MountedElement.textRuns`), each in its own look over the
     /// label's; nil shows its own words again.
     func setRuns(_ runs: [TextRun]?) {
-        defer { invalidateMeasure() }
+        let spacingChanged = runsFontSize != look.size || runsLetterSpacing != look.letterSpacing
+        guard self.runs != runs || (runs != nil && spacingChanged) else { return }
+        let paintOnly = !spacingChanged && Self.onlyRunPaintChanged(from: self.runs, to: runs)
         self.runs = runs
-        guard let runs else { return super.setText(ownText) }
+        runsFontSize = look.size
+        runsLetterSpacing = look.letterSpacing
+        guard let runs else {
+            super.setText(ownText)
+            invalidateMeasure()
+            return
+        }
 
+        var repainted = false
         WinUIStrings.withCStrings(runs.map(\.text)) { texts in
             WinUIStrings.withCStrings(runs.map { $0.look.family ?? "" }) { families in
                 WinUIStrings.withCStrings(runs.map { run in
@@ -65,10 +76,27 @@ final class WinUILabelView: WinUITextView {
                             baseline: look.baselineOffset ?? 0, image: images[index],
                             glyph: glyphs[index])
                     }
-                    swiftomniui_winui_text_set_runs(handle, words, Int32(words.count))
+                    if paintOnly {
+                        repainted = swiftomniui_winui_text_recolor_runs(handle, words, Int32(words.count))
+                    }
+                    if !repainted { swiftomniui_winui_text_set_runs(handle, words, Int32(words.count)) }
                     }
                 }
             }
+        }
+        if !repainted { invalidateMeasure() }
+    }
+
+    /// Native Run objects can retain their text layout when just their paint
+    /// changes. A different image, baseline, font or spacing takes the full path.
+    private static func onlyRunPaintChanged(from previous: [TextRun]?, to next: [TextRun]?) -> Bool {
+        guard let previous, let next, previous.count == next.count else { return false }
+        return zip(previous, next).allSatisfy { before, after in
+            guard before.text == after.text, before.image == after.image else { return false }
+            var old = before.look, new = after.look
+            old.color = nil; new.color = nil
+            old.background = nil; new.background = nil
+            return old == new
         }
     }
 }

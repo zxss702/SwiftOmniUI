@@ -258,7 +258,9 @@ extern "C" void swiftomniui_winui_button_set_look(
 
 extern "C" void swiftomniui_winui_button_set_face(SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef content) {
     try {
-        as<controls::ContentControl>(handle).Content(content ? as<xaml::UIElement>(content) : nullptr);
+        auto control = as<controls::ContentControl>(handle);
+        auto next = content ? as<xaml::UIElement>(content) : xaml::UIElement{nullptr};
+        if (control.Content() != next) control.Content(next);
     } catch (...) { report("giving a button its label view"); }
 }
 

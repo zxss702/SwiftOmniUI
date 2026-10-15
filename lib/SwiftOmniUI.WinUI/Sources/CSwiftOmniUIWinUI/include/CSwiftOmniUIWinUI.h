@@ -487,6 +487,8 @@ typedef struct {
 
 /// Shows `runs`, in order, as the text block's words, each as it says, in place of its words.
 void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef text, SwiftOmniUIWordsRun const *runs, int32_t count);
+/// Repaints ordinary runs without changing their text or typography; false requests a full update.
+bool swiftomniui_winui_text_recolor_runs(SwiftOmniUIObjectRef text, SwiftOmniUIWordsRun const *runs, int32_t count);
 
 /// The runs a text block shows, six values each - its colour as 0xAARRGGBB or 0, its size or 0, its weight, 1 for
 /// italic, its lines (1 under, 2 through), its background or 0 - into `values` as far as `capacity` goes; answers

@@ -24,6 +24,126 @@ private struct SpannedPage: View {
 }
 
 final class WinUILabelViewTests: XCTestCase {
+    func testForegroundPatchDoesNotReadOrResetTypography() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { Text("words") }
+            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
+            label.setTextFont(size: 23, attributes: .bold, family: nil)
+            let revision = label.measurementRevision
+            let foreground = TextStyleElementContract.foregroundStyle.token
+            var reads: Set<Prop> = []
+            let values = ElementValues<TextContract>(changed: [foreground], reading: { key in
+                reads.insert(key)
+                return key == foreground ? Brush.solidColor(Color("#FF0000")).propValue : nil
+            })
+
+            WinUIRegistrations.applyText(label, values)
+
+            XCTAssertEqual(reads, [foreground])
+            XCTAssertEqual(label.wordsStyle.size, 23)
+            XCTAssertEqual(label.wordsStyle.weight, 700)
+            XCTAssertEqual(label.wordsStyle.color, 0xFFFF0000)
+            XCTAssertEqual(label.measurementRevision, revision)
+
+            // Updating a different property group must preserve the installed brush.
+            let font = ElementValues<TextContract>(changed: [FontElementContract.fontSize.token], reading: { key in
+                key == FontElementContract.fontSize.token ? 31.0.propValue : nil
+            })
+            WinUIRegistrations.applyText(label, font)
+            XCTAssertEqual(label.wordsStyle.size, 31)
+            XCTAssertEqual(label.wordsStyle.color, 0xFFFF0000)
+        }
+    }
+
+    func testUnchangedAndRecoloredRunsKeepTheirMeasurement() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { Text("own") }
+            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
+            var look = TextLook()
+            look.color = Color("#FF0000").propValue
+            look.background = Color("#FFFF00").propValue
+            let original = [TextRun(text: "中文🙂", look: look), TextRun(text: " tail", look: TextLook())]
+            label.setRuns(original)
+            let revision = label.measurementRevision
+            label.setRuns(original)
+            XCTAssertEqual(label.measurementRevision, revision)
+
+            look.color = Color("#0000FF").propValue
+            look.background = Color("#00FF00").propValue
+            label.setRuns([TextRun(text: "中文🙂", look: look), original[1]])
+            var native = [Double](repeating: 0, count: 12)
+            XCTAssertEqual(swiftomniui_winui_text_runs(label.handle, &native, 12), 2)
+            XCTAssertEqual(native[0], Double(0xFF0000FF as UInt32))
+            XCTAssertEqual(native[5], Double(0xFF00FF00 as UInt32))
+            XCTAssertEqual(label.text, "中文🙂 tail")
+            XCTAssertEqual(label.measurementRevision, revision)
+
+            look.color = nil
+            look.background = nil
+            label.setRuns([TextRun(text: "中文🙂", look: look), original[1]])
+            _ = swiftomniui_winui_text_runs(label.handle, &native, 12)
+            XCTAssertEqual(native[0], 0, "removing span colour restores inheritance")
+            XCTAssertEqual(native[5], 0, "removing span background removes its highlighter")
+            XCTAssertEqual(label.measurementRevision, revision)
+        }
+    }
+
+    func testRunTextAndFontChangesStillInvalidateMeasurement() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { Text("own") }
+            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
+            label.setRuns([TextRun(text: "short", look: TextLook())])
+            let beforeText = label.measurementRevision
+            label.setRuns([TextRun(text: "a longer line", look: TextLook())])
+            XCTAssertGreaterThan(label.measurementRevision, beforeText)
+            XCTAssertEqual(label.text, "a longer line")
+
+            var look = TextLook()
+            look.size = 28
+            let beforeFont = label.measurementRevision
+            label.setRuns([TextRun(text: "a longer line", look: look)])
+            XCTAssertGreaterThan(label.measurementRevision, beforeFont)
+            var native = [Double](repeating: 0, count: 6)
+            XCTAssertEqual(swiftomniui_winui_text_runs(label.handle, &native, 6), 1)
+            XCTAssertEqual(native[1], 28)
+        }
+    }
+
+    func testInheritedSpacingIsReencodedWhenTheBaseFontChanges() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { Text("own") }
+            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
+            let runs = [TextRun(text: "spaced", look: TextLook())]
+            label.setTextFont(size: 14, attributes: nil, family: nil)
+            label.setRuns(runs)
+            label.setLetterSpacing(2)
+            let beforeSpacing = label.measurementRevision
+            label.setRuns(runs)
+            XCTAssertGreaterThan(label.measurementRevision, beforeSpacing)
+            label.setTextFont(size: 28, attributes: nil, family: nil)
+            let beforeFont = label.measurementRevision
+            label.setRuns(runs)
+            XCTAssertGreaterThan(label.measurementRevision, beforeFont)
+            let complete = label.measurementRevision
+            label.setRuns(runs)
+            XCTAssertEqual(label.measurementRevision, complete)
+        }
+    }
+
+    func testRaisedInlineKeepsItsFullUpdatePath() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { Text("own") }
+            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
+            var look = TextLook()
+            look.baselineOffset = 2
+            label.setRuns([TextRun(text: "raised", look: look)])
+            let revision = label.measurementRevision
+            look.color = Color("#FF0000").propValue
+            label.setRuns([TextRun(text: "raised", look: look)])
+            XCTAssertGreaterThan(label.measurementRevision, revision)
+        }
+    }
+
     /// A label with nothing said stands as WinUI's own body text, in the color scheme's colour.
     func testALabelWithNothingSaidIsWinUIsOwnText() throws {
         try onUIThread {
