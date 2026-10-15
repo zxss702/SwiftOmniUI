@@ -338,7 +338,8 @@ struct LazyHStackElement: StackBase {
                         }
                     }
                     if names != old.identities {
-                        let next = HostLazySource(names, following: old)
+                        let next = HostLazySource(names, following: old,
+                            changedRanges: (before: head..<oldEnd, after: head..<newEnd))
                         for identity in next.removed {
                             if let key = tokenKeys.removeValue(forKey: identity) { tokens[key] = nil }
                         }

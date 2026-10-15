@@ -28,8 +28,22 @@ final class WinUIElement: NativeElement {
         self.host = host
         view = makeView()
         view?.sourceElement = element
+        let hasTransitionBlur = element.transition?.insertion.blur != nil
+            || element.transition?.removal.blur != nil
+        var inLazyContainer = false
+        if hasTransitionBlur {
+            var ancestor = element.parent
+            while let current = ancestor {
+                if current.type == .lazyVStack || current.type == .lazyHStack
+                    || current.type == .lazyVGrid || current.type == .lazyHGrid {
+                    inLazyContainer = true
+                    break
+                }
+                ancestor = current.parent
+            }
+        }
         if element.value(.blur) != nil || element.driven[.blur] != nil
-            || element.transition?.insertion.blur != nil || element.transition?.removal.blur != nil {
+            || (hasTransitionBlur && !inLazyContainer) {
             view?.prepareBlur()
         }
     }
@@ -88,6 +102,9 @@ final class WinUIElement: NativeElement {
     }
 
     func departureChanged() {
+        if element.isDeparting, element.transition?.removal.blur != nil {
+            view?.prepareBlur()
+        }
         view?.setIgnoresInput(element.isDeparting || element.value(.ignoresInput)?.bool == true)
     }
 

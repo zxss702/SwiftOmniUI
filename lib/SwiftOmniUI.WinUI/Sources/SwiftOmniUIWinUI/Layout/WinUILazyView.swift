@@ -23,6 +23,10 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// The children mounted now, by identity.
     private(set) var mounted: [String: WinUILayoutItem] = [:]
+    private var mountedSourceID: ObjectIdentifier?
+    private var hasMountedSource = false
+    private var ancestorMeasureQueued = false
+    private var hasCommittedContentExtent = false
 
     /// The scroller whose window the run answers, and the ear it hears it by.
     private weak var watching: WinUIScrollView?
@@ -71,11 +75,18 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     /// The mounted children, held by identity.
-    func setItems(_ items: [(identity: String, item: WinUILayoutItem)]) {
+    func setItems(_ items: [(identity: String, item: WinUILayoutItem)], contentChanged: Bool = false) {
+        let sourceID = cells.element?.lazyRows.map(ObjectIdentifier.init)
+        let sourceChanged = !hasMountedSource || mountedSourceID != sourceID
+        mountedSourceID = sourceID
+        hasMountedSource = true
         let now = Dictionary(items.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
         guard now.keys != mounted.keys || now.contains(where: {
             mounted[$0.key]?.arranges(like: $0.value) != true
-        }) else { return }
+        }) else {
+            if contentChanged { invalidateMeasurements() }
+            return
+        }
         for (identity, previous) in mounted {
             if now[identity]?.view !== previous.view {
                 swiftomniui_winui_scroller_anchor(previous.view.presentationHandle, false)
@@ -87,6 +98,10 @@ class WinUILazyView: WinUITravellingLayout {
         }
         if !cells.inserting.isDisjoint(with: now.keys) { cells.animatesChanges = true }
         for item in items {
+            if cells.inserting.contains(item.identity),
+               item.item.element?.transition?.insertion.blur != nil {
+                item.item.view.prepareBlur()
+            }
             item.item.view.placingLayout = self
             if mounted[item.identity]?.view !== item.item.view
                 || mounted[item.identity]?.departing != item.item.departing {
@@ -95,9 +110,32 @@ class WinUILazyView: WinUITravellingLayout {
         }
         mounted = now
         setChildren(items.map(\.item.view))
-        invalidateMeasurements()
+        if sourceChanged || contentChanged {
+            hasCommittedContentExtent = false
+            invalidateMeasurements()
+        } else {
+            // Recycling a viewport's native rows does not change the scroll
+            // document's estimate. Measure this panel; propagate to the
+            // document only if their actual sizes change that estimate.
+            forgetMeasurements()
+            invalidateMeasure()
+            invalidateArrange()
+        }
         measuredRevision = measurementRevision
     }
+
+    func commitChangedContentExtent() {
+        guard hasCommittedContentExtent, !ancestorMeasureQueued else { return }
+        ancestorMeasureQueued = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.ancestorMeasureQueued = false
+            guard !self.isDetached else { return }
+            self.placingLayout?.invalidateMeasurements()
+        }
+    }
+
+    func didCommitContentExtent() { hasCommittedContentExtent = true }
 
     /// The nearest scroller clipping this run on its own axis, found up the
     /// placing layouts through the document it holds, or none: a scroller
@@ -426,6 +464,8 @@ class WinUILazyView: WinUITravellingLayout {
         preparedViewport = nil
         watching = nil
         scrollEar = nil
+        hasCommittedContentExtent = false
+        ancestorMeasureQueued = false
     }
 }
 
@@ -495,11 +535,19 @@ final class WinUILazyStackView: WinUILazyView {
                 return axis == .vertical
                     ? size.width + margin.left + margin.right : size.height + margin.top + margin.bottom
             }.max() ?? (cells.identities.isEmpty ? 0 : 44)
-            if naturalAcross != natural { geometryChanged = true }
+            if naturalAcross != natural {
+                geometryChanged = true
+                if axis != .vertical || measuredAcross == nil { commitChangedContentExtent() }
+            }
             naturalAcross = natural
             commitAnchor()
-            if cells.extents.revision != revision || cells.total != measuredExtent { geometryChanged = true }
-            measuredExtent = cells.total
+            let total = cells.total
+            if cells.extents.revision != revision || total != measuredExtent {
+                geometryChanged = true
+                if total != measuredExtent { commitChangedContentExtent() }
+            }
+            measuredExtent = total
+            didCommitContentExtent()
             measuredRevision = measurementRevision
         }
         let total = cells.total
@@ -666,10 +714,13 @@ final class WinUILazyGridView: WinUILazyView {
             }
             for (run, extent) in runExtents { cells.runs.measure(run, extent: extent) }
             commitAnchor(perRun: perRun, grid: true)
-            if cells.runs.revision != revision || cells.runs.total(count: runCount) != measuredExtent {
+            let total = cells.runs.total(count: runCount)
+            if cells.runs.revision != revision || total != measuredExtent {
                 geometryChanged = true
+                if total != measuredExtent { commitChangedContentExtent() }
             }
-            measuredExtent = cells.runs.total(count: runCount)
+            measuredExtent = total
+            didCommitContentExtent()
             measuredRevision = measurementRevision
         }
         let count = (cells.identities.count + max(1, proposed.count) - 1) / max(1, proposed.count)

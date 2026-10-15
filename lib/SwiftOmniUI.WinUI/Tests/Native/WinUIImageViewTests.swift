@@ -193,7 +193,7 @@ final class WinUIImageViewTests: XCTestCase {
         }
     }
 
-    func testSystemGlyphUsesThemeFontAndPaintsWithoutAnExplicitForeground() throws {
+    func testSystemGlyphUsesFluentFontAndPaintsWithoutAnExplicitForeground() throws {
         try onUIThread {
             let host = WinUIRenderer.running(reducesMotion: true) {
                 HStack {
@@ -212,6 +212,20 @@ final class WinUIImageViewTests: XCTestCase {
                 }
                 XCTAssertTrue(image.pixels(at: points).contains { ($0 >> 24) != 0 },
                               "the system FontIcon must paint both theme and explicit tint")
+            }
+        }
+    }
+
+    func testRawFluentGlyphsSurviveRepeatedNativeUpdates() throws {
+        try onUIThread {
+            let image = WinUIImageView()
+            var size = [0.0, 0.0]
+            for glyph in ["\u{E701}", "\u{E70D}", "\u{E723}", "\u{E721}", "\u{E8D5}"] {
+                XCTAssertTrue(swiftomniui_winui_image_set_symbol(
+                    image.handle, glyph, ContentMode.center.rawValue, 16, 700, -1, &size),
+                    "a FontIcon glyph must not fail an interface query")
+                XCTAssertEqual(size, [16, 16])
+                swiftomniui_winui_image_set_tint(image.handle, true, 0xff000000)
             }
         }
     }

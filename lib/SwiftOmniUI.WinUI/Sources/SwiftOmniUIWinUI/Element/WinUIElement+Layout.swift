@@ -17,15 +17,13 @@ extension WinUIElement {
     func arrangeChildren() {
         if let items = view as? WinUIItemsView { return items.childrenChanged() }
         if let lazy = view as? WinUILazyView {
-            if lazy.cells.takeItems() {
-                lazy.invalidateMeasurements()
-            }
+            let contentChanged = lazy.cells.takeItems()
             lazy.direction = element.layoutDirection
             lazy.setItems(element.arrangedChildren.compactMap { child in
                 guard case .manual(let identity) = child.id, let item = child.winUI.layoutItem
                 else { return nil }
                 return (child.lazyIdentity ?? identity, item)
-            })
+            }, contentChanged: contentChanged)
             return
         }
         if let label = view as? WinUILabelView {

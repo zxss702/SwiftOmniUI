@@ -5,7 +5,23 @@
 // once anything hands the state on.
 // Design: docs/design/core/state.md#storage-and-box
 
+import Foundation
 import Synchronization
+
+/// State's modify accessor lends its stored value across a caller's mutation.
+/// It needs an explicit lock lifetime rather than a closure-scoped Mutex hold.
+private final class StateStorageLock: @unchecked Sendable {
+    private let raw = NSLock()
+
+    func lock() { raw.lock() }
+    func unlock() { raw.unlock() }
+
+    func withLock<Result>(_ body: () -> Result) -> Result {
+        lock()
+        defer { unlock() }
+        return body()
+    }
+}
 
 extension State {
     /// Where the value lives, one level below the box: a fresh box adopts its
@@ -13,7 +29,7 @@ extension State {
     /// its lock. Internal, so the tests can hold its invariants.
     /// Design: docs/design/core/state.md#storage-and-box
     final class Storage: @unchecked Sendable, NamedState, AnyStateStorage, FollowedState {
-        private let guarded = Lock()
+        private let guarded = StateStorageLock()
 
         /// How many times this side wrote the value while it lived here - read without
         /// the lock by an engine's `stirred()`.
@@ -173,6 +189,32 @@ extension State {
                     make = nil
                     written.wrappingAdd(1, ordering: .relaxed)
                 }
+            }
+        }
+
+        /// Borrow the stored value for a read-modify-write expression such as
+        /// `rows[index] = row`. Returning a copied Array from `value` would
+        /// trigger a full buffer copy at every element write in a folder diff.
+        var mutableValue: Value {
+            get { value }
+            _modify {
+                // Carried values live in the host's lanes and retain their
+                // existing read/write path. Large collection state is local.
+                if hostRead != nil || hostWrite != nil {
+                    var changed = value
+                    defer { write(changed) }
+                    yield &changed
+                    return
+                }
+
+                guarded.lock()
+                _ = settled()
+                defer {
+                    written.wrappingAdd(1, ordering: .relaxed)
+                    keep?(held!)
+                    guarded.unlock()
+                }
+                yield &held!
             }
         }
 

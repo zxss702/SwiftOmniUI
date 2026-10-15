@@ -42,6 +42,29 @@ final class HostLazySourceTests: XCTestCase {
         XCTAssertEqual(moved.position(of: "e"), 2)
     }
 
+    func testProducerSpliceReusesItsComparedBoundsIncludingAStaticTail() {
+        let original = HostLazySource((0..<10_000).map(String.init) + ["tail"])
+        let names = Array(original.identities[..<4]) + ["new-a", "new-b"]
+            + Array(original.identities[4...])
+        let expanded = HostLazySource(names, following: original,
+            changedRanges: (before: 4..<4, after: 4..<6))
+        guard case .replace(let before, let after) = expanded.edit else {
+            return XCTFail("expected insertion")
+        }
+        XCTAssertEqual(before, 4..<4)
+        XCTAssertEqual(after, 4..<6)
+        XCTAssertEqual(expanded.position(of: "tail"), 10_002)
+        XCTAssertEqual(expanded.identities.last, original.identities.last)
+        XCTAssertEqual(expanded.inserted, ["new-a", "new-b"])
+        XCTAssertLessThan(expanded.sequence.indexedIdentities, 512)
+
+        let restored = HostLazySource(original.identities, following: expanded,
+            changedRanges: (before: 4..<6, after: 4..<4))
+        XCTAssertEqual(restored.identities, original.identities)
+        XCTAssertEqual(restored.removed, ["new-a", "new-b"])
+        XCTAssertEqual(restored.position(of: "tail"), 10_000)
+    }
+
     func testSnapshotDoesNotRetainItsPredecessors() {
         var original: HostLazySource? = HostLazySource(["a", "b"])
         weak var released = original

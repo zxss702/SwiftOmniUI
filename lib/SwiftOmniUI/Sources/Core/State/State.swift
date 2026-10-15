@@ -74,6 +74,15 @@ public final class State<Value>: @unchecked Sendable {
             askForRender()
             wakeForSave()
         }
+        _modify {
+            storage.refreshPersistent?()
+            if Renderer.shared.stateRead(storage) { storage.readAtBuild = true }
+            defer {
+                askForRender()
+                wakeForSave()
+            }
+            yield &storage.mutableValue
+        }
     }
 
     /// Wakes the host to take the save a kept state's write recorded, whether or not

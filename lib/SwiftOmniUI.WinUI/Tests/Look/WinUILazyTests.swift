@@ -81,6 +81,36 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testBlurTransitionAllocatesPresentationOnlyForAnimatedLazyInsertions() throws {
+        try onUIThread {
+            let rows = State(wrappedValue: Array(0..<5))
+            let host = WinUIRenderer.running {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            Text("File \(number)").frame(height: 28)
+                        }
+                        .transition(.blur.combined(with: .offset(y: -48)))
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<8 { host.step() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            XCTAssertFalse(lazy.mounted.isEmpty)
+            for item in lazy.mounted.values {
+                XCTAssertEqual(item.view.presentationHandle, item.view.handle,
+                               "initial rows do not need a native blur presenter")
+            }
+            withAnimation(.eased(200, .linear)) { rows.wrappedValue.insert(99, at: 1) }
+            for _ in 0..<8 { host.step() }
+            let inserted = try XCTUnwrap(lazy.cells.element?.lazyRows?.inserted.first)
+            let view = try XCTUnwrap(lazy.mounted[inserted]?.view)
+            XCTAssertNotEqual(view.presentationHandle, view.handle,
+                              "an inserted row still receives its blur transition")
+        }
+    }
+
     func testFolderChangesShareSourcesAndKeepNativeWorkBoundedAsTheTreeGrows() throws {
         try onUIThread {
             for count in [10_000, 100_000] {
@@ -625,6 +655,8 @@ final class WinUILazyTests: XCTestCase {
                     }
                     XCTAssertEqual(-displayed[horizontal ? 4 : 5], start + 16, accuracy: 1)
                     XCTAssertEqual(lazy.cells.built, built)
+                    let document = try XCTUnwrap(lazy.placingLayout as? WinUIScrollDocument)
+                    let documentMeasure = document.measurementRevision
                     let beforeBoundary = lazy.cells.measurements
                     let next = extent * 21 + 5
                     scroll.scroller.move(to: Point(horizontal ? next : 0, horizontal ? 0 : next))
@@ -633,6 +665,8 @@ final class WinUILazyTests: XCTestCase {
                     XCTAssertEqual(incoming.count, perRun)
                     XCTAssertEqual(lazy.cells.measurements - beforeBoundary, incoming.count,
                                    "measure each incoming row once per proposal: count \(count), kind \(kind)")
+                    XCTAssertEqual(document.measurementRevision, documentMeasure,
+                                   "recycling measured rows must not remeasure the entire scroll document")
                     let idle = [lazy.cells.searches, lazy.cells.requests, lazy.cells.measurements]
                     for _ in 0..<20 { host.step() }
                     XCTAssertEqual([lazy.cells.searches, lazy.cells.requests, lazy.cells.measurements], idle)

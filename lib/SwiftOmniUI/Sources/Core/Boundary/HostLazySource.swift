@@ -33,26 +33,44 @@
         case move(Range<Int>, to: Int)
     }
 
-    public init(_ identities: [String], following previous: HostLazySource? = nil) {
+    public convenience init(_ identities: [String], following previous: HostLazySource? = nil) {
+        self.init(identities, following: previous, changedRanges: nil)
+    }
+
+    /// A producer that has already compared both unchanged ends can pass its
+    /// ranges through. Repeating those comparisons here makes one folder edit
+    /// walk the entire visible identity list twice on the UI thread.
+    init(_ identities: [String], following previous: HostLazySource?,
+         changedRanges: (before: Range<Int>, after: Range<Int>)?) {
         self.identities = identities
         predecessor = previous.map(ObjectIdentifier.init)
         let old = previous?.identities ?? []
-        var head = 0
-        while head < min(old.count, identities.count), old[head] == identities[head] { head += 1 }
-        var oldEnd = old.count, newEnd = identities.count
-        while oldEnd > head, newEnd > head, old[oldEnd - 1] == identities[newEnd - 1] {
-            oldEnd -= 1
-            newEnd -= 1
+        let before: Range<Int>, after: Range<Int>
+        if let changedRanges {
+            before = changedRanges.before
+            after = changedRanges.after
+        } else {
+            var head = 0
+            while head < min(old.count, identities.count), old[head] == identities[head] { head += 1 }
+            var oldEnd = old.count, newEnd = identities.count
+            while oldEnd > head, newEnd > head, old[oldEnd - 1] == identities[newEnd - 1] {
+                oldEnd -= 1
+                newEnd -= 1
+            }
+            before = head..<oldEnd
+            after = head..<newEnd
         }
-        let before = head..<oldEnd, after = head..<newEnd
         // A rotation of the changed interval is a block move. No measurement
         // in either block needs to be copied or looked up again.
         let detectedEdit: Edit
         if before.count == after.count, !before.isEmpty,
-           let pivot = previous?.position(of: identities[head]), pivot > head, pivot < oldEnd,
-           old[pivot..<oldEnd].elementsEqual(identities[head..<(head + oldEnd - pivot)]),
-           old[head..<pivot].elementsEqual(identities[(head + oldEnd - pivot)..<newEnd]) {
-            detectedEdit = .move(head..<pivot, to: head + oldEnd - pivot)
+           let pivot = previous?.position(of: identities[before.lowerBound]),
+           pivot > before.lowerBound, pivot < before.upperBound,
+           old[pivot..<before.upperBound].elementsEqual(
+               identities[before.lowerBound..<(before.lowerBound + before.upperBound - pivot)]),
+           old[before.lowerBound..<pivot].elementsEqual(
+               identities[(before.lowerBound + before.upperBound - pivot)..<after.upperBound]) {
+            detectedEdit = .move(before.lowerBound..<pivot, to: before.lowerBound + before.upperBound - pivot)
         } else {
             detectedEdit = .replace(before, with: after)
         }

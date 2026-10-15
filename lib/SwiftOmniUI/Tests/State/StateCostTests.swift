@@ -113,6 +113,18 @@ import XCTest
         XCTAssertEqual(Self.made, 1, "which had to be worked out to change it")
     }
 
+    func testArrayElementWritesReuseTheStateBuffer() {
+        let rows = State(wrappedValue: Array(0..<10_000))
+        let original = rows.wrappedValue.withUnsafeBufferPointer { $0.baseAddress }
+        for index in 0..<100 {
+            rows.wrappedValue[index] = -index
+        }
+        let updated = rows.wrappedValue.withUnsafeBufferPointer { $0.baseAddress }
+        XCTAssertEqual(updated, original,
+                       "subscript writes must borrow the stored Array instead of copying it each time")
+        XCTAssertEqual(rows.wrappedValue[99], -99)
+    }
+
     /// A RUN OF ITEMS IS DATA, AND THE WALK MUST NOT DESCEND INTO IT.
     ///
     /// The walk that pairs a rebuilt view's `@State` with the storage it had

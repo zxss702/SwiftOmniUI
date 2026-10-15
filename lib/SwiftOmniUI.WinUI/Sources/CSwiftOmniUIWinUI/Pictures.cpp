@@ -414,6 +414,7 @@ namespace {
         bool svg = false;
         int32_t aspect = -1;
         winrt::Windows::Foundation::Size size{};
+        controls::FontIcon glyph{nullptr};
 
         winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size) {
             // Swift owns the image's intrinsic size and its frame. A native
@@ -458,13 +459,14 @@ namespace {
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_image_make(void) {
     try {
         auto grid = winrt::make<PicturePanel>().as<controls::Panel>();
+        auto state = imageState(grid);
         grid.Children().Append(controls::Image());
         controls::Viewbox box;
-        controls::FontIcon glyph;
-        // FontIcon's theme font follows SymbolThemeFontFamily, including the
-        // system fallback on machines without Segoe Fluent Icons.
-        glyph.FontSize(16);
-        box.Child(glyph);
+        state->glyph = controls::FontIcon();
+        // Use the same native glyph path as WinUI's command bar and Gallery.
+        state->glyph.FontFamily(xaml::Media::FontFamily(L"Segoe Fluent Icons"));
+        state->glyph.FontSize(16);
+        box.Child(state->glyph);
         box.Stretch(xaml::Media::Stretch::None);
         box.Visibility(xaml::Visibility::Collapsed);
         grid.Children().Append(box);
@@ -491,13 +493,13 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
         auto box = symbolBox(grid);
         image.Source(nullptr);
         image.Visibility(xaml::Visibility::Collapsed);
-        auto symbol = box.Child().as<controls::FontIcon>();
-        auto font = textFontDefaults(textStyle);
-        symbol.FontSize(fontSize > 0 ? fontSize : textStyle >= 0 ? font.size : 16);
-        symbol.FontWeight(fontWeight > 0 ? winrt::Windows::UI::Text::FontWeight{
-            static_cast<uint16_t>(std::clamp(fontWeight, 1.0, 1000.0))} : winrt::Windows::UI::Text::FontWeight{font.weight});
-        symbol.Glyph(winrt::to_hstring(glyph));
-        size[0] = size[1] = symbol.FontSize();
+        // Fluent glyphs are not weighted text. Avoid a FontWeight interface
+        // query, and resolve a text style only when it supplies the size.
+        (void)fontWeight;
+        auto resolvedSize = fontSize > 0 ? fontSize : textStyle >= 0 ? textFontDefaults(textStyle).size : 16;
+        state->glyph.FontSize(resolvedSize);
+        state->glyph.Glyph(winrt::to_hstring(glyph));
+        size[0] = size[1] = state->glyph.FontSize();
         auto centred = aspect == 3;
         box.Stretch(aspect == 2 ? xaml::Media::Stretch::Fill
                     : centred ? xaml::Media::Stretch::None : xaml::Media::Stretch::Uniform);
@@ -515,7 +517,7 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
 
 extern "C" void swiftomniui_winui_image_set_tint(SwiftOmniUIObjectRef handle, bool has, uint32_t argb) {
     try {
-        auto glyph = symbolBox(imageGrid(handle)).Child().as<controls::FontIcon>();
+        auto glyph = imageState(imageGrid(handle))->glyph;
         if (has) glyph.Foreground(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{
             static_cast<uint8_t>(argb >> 24), static_cast<uint8_t>(argb >> 16),
             static_cast<uint8_t>(argb >> 8), static_cast<uint8_t>(argb)}));
