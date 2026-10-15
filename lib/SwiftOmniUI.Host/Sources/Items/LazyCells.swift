@@ -23,8 +23,13 @@
 
     private weak var runtime: HostRuntime?
 
-    /// Every child's identity in the order it shows, as last taken.
-    public private(set) var identities: [String] = []
+    /// Compatibility for hosts that need a flat table. Lazy layouts use the
+    /// persistent order below, so a local source edit does not copy every ID.
+    public var identities: [String] { source?.identities ?? directIdentities }
+
+    private var directIdentities: [String] = []
+    /// Every child's identity in display order, sharing unchanged source leaves.
+    public private(set) var orderedIdentities = HostLazyIdentitySequence()
 
     private var contentRevision = -1
     private var itemsRevision = -1
@@ -91,35 +96,44 @@
     }
 
     /// Takes a fresh content source. Insertions, removals and moves preserve the
-    /// measured sizes of surviving identities; changed content invalidates them.
+    /// measured sizes of surviving identities; a row's own view revision
+    /// determines whether its content needs a new measurement.
     @discardableResult
     public func takeItems() -> Bool {
         guard let element else { return false }
         let revision = element.lazyContentRevision
         let sourceRevision = element.lazyItemsRevision
         guard sourceRevision != itemsRevision || revision != contentRevision else { return false }
-        if contentRevision >= 0 {
-            animatesChanges = true
-        }
         contentRevision = revision
-        cancelPrefetch()
         // Identities arriving or leaving change what the window mounts and
         // which measurements survive. A content revision bump alone changes
         // neither; the patched children re-measure on their next layout pass.
         if sourceRevision != itemsRevision {
+            cancelPrefetch()
             let wasKnown = itemsRevision >= 0
             itemsRevision = sourceRevision
             if let next = element.lazyRows {
                 let follows = source.map { next.predecessor == ObjectIdentifier($0) } ?? false
                 if wasKnown {
+                    if follows {
+                        switch next.edit {
+                        case .replace(let before, let after):
+                            if !before.isEmpty || !after.isEmpty { animatesChanges = true }
+                        case .move(let range, _):
+                            if !range.isEmpty { animatesChanges = true }
+                        }
+                    } else { animatesChanges = true }
+                }
+                if wasKnown {
                     if follows { inserting.formUnion(next.inserted) }
-                    else { inserting.formUnion(next.identities.filter { position(of: $0) == nil }) }
+                    else { inserting.formUnion(next.sequence.filter { position(of: $0) == nil }) }
                 }
                 inserting = inserting.filter { next.position(of: $0) != nil }
                 extents.adopt(next)
                 source = next
                 positions = [:]
-                identities = next.identities
+                directIdentities = []
+                orderedIdentities = next.sequence
                 runs.adopt(next, perRun: lastPerRun)
                 built = 0..<0
                 window = nil
@@ -127,14 +141,16 @@
             } else {
                 // Direct host SPI users can still provide the .items property.
                 let now = element.value(.items)?.strings ?? []
-                if now != identities {
+                if now != directIdentities || source != nil {
+                    if wasKnown { animatesChanges = true }
                     let next = Dictionary(now.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
                     if wasKnown { inserting.formUnion(next.keys.filter { position(of: $0) == nil }) }
                     inserting = inserting.filter { next[$0] != nil }
                     extents.keep(identities: Set(next.keys))
                     positions = next
                     extents.adopt(positions: positions)
-                    identities = now
+                    directIdentities = now
+                    orderedIdentities = HostLazyIdentitySequence(now)
                     source = nil
                     built = 0..<0
                     window = nil
@@ -143,7 +159,7 @@
                 }
             }
         }
-        if identities.isEmpty {
+        if orderedIdentities.isEmpty {
             anchor = nil
             anchorShift = 0
             retained = []
@@ -178,18 +194,18 @@
 
     /// Where `place`'s child begins on the run, counting the padding head.
     public func offset(of place: Int) -> Double {
-        extents.offset(of: place, in: identities)
+        extents.offset(of: place, in: orderedIdentities)
     }
 
     /// The places standing in `span` - `from` to `to` on the run - widened by
     /// `overscan` at both ends.
     public func places(in span: Range<Double>, overscan: Double) -> Range<Int> {
-        extents.places(in: span, overscan: overscan, in: identities)
+        extents.places(in: span, overscan: overscan, in: orderedIdentities)
     }
 
     /// The whole run's length, both paddings in.
     public var total: Double {
-        extents.total(in: identities)
+        extents.total(in: orderedIdentities)
     }
 
     /// Reads a viewport only when it or the content geometry changed. Shared
@@ -199,6 +215,7 @@
     public func show(_ span: Range<Double>, perRun: Int = 1, grid: Bool = false, realize: Range<Double>? = nil,
                      measureBeforeExpanding: Bool = false, keeping: Set<String> = [],
                      prefetch: Bool = false, demand: Range<Double>? = nil) {
+        let identities = orderedIdentities
         let perRun = max(1, perRun)
         lastPerRun = perRun
         if grid { runs.group(perRun: perRun, items: identities.count) }
@@ -290,6 +307,7 @@
     }
 
     private func requestedRange(in span: Range<Double>, perRun: Int, grid: Bool) -> Range<Int> {
+        let identities = orderedIdentities
         let count = (identities.count + perRun - 1) / perRun
         let places = grid ? runs.places(in: span, overscan: 0, count: count)
             : extents.places(in: span, overscan: 0, in: identities)
@@ -313,12 +331,16 @@
         var lower = max(built.lowerBound, target.lowerBound)
         var upper = min(built.upperBound, target.upperBound)
         guard lower < upper else { prefetchPlan = nil; return false }
+        // Optional work is a screenful at most, capped for expensive rows.
+        // One row per frame leaves the upcoming window bare during a fling.
+        let visible = requestedRange(in: plan.demand, perRun: plan.perRun, grid: plan.grid)
+        let batch = max(plan.perRun, min(visible.count, 16 * plan.perRun))
         if prefetchForward, upper < target.upperBound || lower == target.lowerBound {
-            upper = min(target.upperBound, upper + plan.perRun)
+            upper = min(target.upperBound, upper + batch)
         } else if lower > target.lowerBound {
-            lower = max(target.lowerBound, lower - plan.perRun)
+            lower = max(target.lowerBound, lower - batch)
         } else {
-            upper = min(target.upperBound, upper + plan.perRun)
+            upper = min(target.upperBound, upper + batch)
         }
         let within = lower..<upper
         request(within, keeping: retained)
@@ -328,6 +350,7 @@
     }
 
     private func request(_ within: Range<Int>, keeping: Set<String>) {
+        let identities = orderedIdentities
         guard let element, let runtime, within != built || retained != keeping else { return }
         if !inserting.isDisjoint(with: identities[within]) { animatesChanges = true }
         built = within
@@ -345,6 +368,7 @@
     /// A viewport at the end stays at the end. Hosts apply this absolute origin
     /// because their native scroller may already have clamped a shrinking document.
     public func correctedOrigin(perRun: Int = 1, grid: Bool = false) -> Double? {
+        let identities = orderedIdentities
         guard let held = anchor, !identities.isEmpty else { return nil }
         let place = position(of: held.identity) ?? min(held.place, identities.count - 1)
         let start = grid
@@ -366,13 +390,14 @@
     /// Without a scroller there is no viewport to narrow by.
     public func tellAll() {
         cancelPrefetch()
+        let identities = orderedIdentities
         guard let element, let runtime, built != 0..<identities.count else { return }
         if !inserting.isEmpty { animatesChanges = true }
         built = 0..<identities.count
         retained = []
         needsMeasurement = false
         requests += 1
-        element.send(.realizedChanged, [.strings(identities)], in: runtime)
+        element.send(.realizedChanged, [.strings(Array(identities))], in: runtime)
     }
 
 }
@@ -443,7 +468,7 @@
                 let allNew = after.count == next.inserted.count
                     && next.inserted.allSatisfy { measured[$0] == nil }
                 let replacement = allNew ? LazyExtentTree(count: after.count)
-                    : LazyExtentTree(next.identities[after]) { measured[$0] }
+                    : LazyExtentTree(next.sequence[after], measurement: { measured[$0] })
                 sums.replace(before, with: replacement)
             case .move(let range, let destination):
                 sums.move(range, to: destination)
@@ -451,8 +476,8 @@
             for identity in next.removed { measured[identity] = nil }
         } else {
             measured = measured.filter { next.position(of: $0.key) != nil }
-            sums = measured.isEmpty ? LazyExtentTree(count: next.identities.count)
-                : LazyExtentTree(next.identities) { measured[$0] }
+            sums = measured.isEmpty ? LazyExtentTree(count: next.sequence.count)
+                : LazyExtentTree(next.sequence, measurement: { measured[$0] })
         }
         source = next
         index = [:]
@@ -462,7 +487,7 @@
     /// Forget sizes that were measured under a different layout proposal.
     public mutating func reset() {
         measured = [:]
-        sums = LazyExtentTree(count: source?.identities.count ?? index.count)
+        sums = LazyExtentTree(count: source?.sequence.count ?? index.count)
         revision += 1
     }
 
@@ -476,14 +501,16 @@
 
     private var gap: Double { spacing ?? StackArithmetic.automaticSpacing }
 
-    private mutating func sync(_ identities: [String]) {
-        if let source, source.identities.count == identities.count { return }
+    private mutating func sync<Identities: RandomAccessCollection>(_ identities: Identities)
+        where Identities.Element == String, Identities.Index == Int {
+        if let source, source.sequence.count == identities.count { return }
         guard index.count != identities.count else { return }
         adopt(positions: Dictionary(identities.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first }))
     }
 
     /// Where `place` begins: the extents before it, measured or estimated, and a gap after each. O(log n).
-    public mutating func offset(of place: Int, in identities: [String]) -> Double {
+    public mutating func offset<Identities: RandomAccessCollection>(of place: Int, in identities: Identities) -> Double
+        where Identities.Element == String, Identities.Index == Int {
         sync(identities)
         let count = identities.count, place = max(0, min(place, count))
         let known = sums.before(place)
@@ -492,13 +519,16 @@
     }
 
     /// Estimated length of the entire data source, including both paddings.
-    public mutating func total(in identities: [String]) -> Double {
+    public mutating func total<Identities: RandomAccessCollection>(in identities: Identities) -> Double
+        where Identities.Element == String, Identities.Index == Int {
         guard identities.count > 0 else { return padding.head + padding.tail }
         return offset(of: identities.count, in: identities) + padding.tail
     }
 
     /// Only actual intersections count as visible; spacing is not a child. O(log² n).
-    public mutating func places(in span: Range<Double>, overscan: Double, in identities: [String]) -> Range<Int> {
+    public mutating func places<Identities: RandomAccessCollection>(
+        in span: Range<Double>, overscan: Double, in identities: Identities
+    ) -> Range<Int> where Identities.Element == String, Identities.Index == Int {
         guard identities.count > 0, !span.isEmpty else { return 0..<0 }
         let lo = span.lowerBound - overscan, hi = span.upperBound + overscan
         var lower = 0, upper = identities.count
@@ -580,7 +610,7 @@
     /// group invalidates only the suffix starting at its first affected run.
     public mutating func adopt(_ next: HostLazySource, perRun: Int) {
         let perRun = max(1, perRun)
-        let count = (next.identities.count + perRun - 1) / perRun
+        let count = (next.sequence.count + perRun - 1) / perRun
         if let source, next.predecessor == ObjectIdentifier(source), sourcePerRun == perRun {
             switch next.edit {
             case .replace(let before, let after):

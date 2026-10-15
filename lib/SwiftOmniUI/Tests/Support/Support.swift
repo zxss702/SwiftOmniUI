@@ -131,6 +131,8 @@ final class Renders {
     /// `styles` is the application's sheet, which the differ resolves every
     /// element against - passed on each render, exactly as the renderer reads
     /// it on each build, so a test can move one and watch what follows.
+    /// This helper explicitly selects `.standard` for older motion assertions;
+    /// default-runtime assertions pass `.none` or use `Differ` directly.
     @discardableResult
     func render(
         _ tree: Node,

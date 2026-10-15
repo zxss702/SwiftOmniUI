@@ -65,6 +65,53 @@ final class HostLazySourceTests: XCTestCase {
         XCTAssertEqual(restored.position(of: "tail"), 10_000)
     }
 
+    func testPersistentSpliceSharesTheUnchangedIdentitySequence() {
+        var original: HostLazySource? = HostLazySource((0..<10_000).map(String.init) + ["tail"])
+        weak var released = original
+        let expanded = HostLazySource(splicing: original!, before: 4..<4,
+                                      inserting: ["new-a", "new-b"])
+        original = nil
+        XCTAssertNil(released, "a source edit must not retain an entire predecessor")
+        guard case .replace(let before, let after) = expanded.edit else {
+            return XCTFail("expected insertion")
+        }
+        XCTAssertEqual(before, 4..<4)
+        XCTAssertEqual(after, 4..<6)
+        XCTAssertEqual(expanded.sequence.count, 10_003)
+        XCTAssertEqual(expanded.sequence[4], "new-a")
+        XCTAssertEqual(expanded.sequence[10_002], "tail")
+        XCTAssertEqual(expanded.position(of: "tail"), 10_002)
+        XCTAssertLessThan(expanded.sequence.indexedIdentities, 512)
+
+        let collapsed = HostLazySource(splicing: expanded, before: 4..<6, inserting: [])
+        XCTAssertEqual(collapsed.sequence.count, 10_001)
+        XCTAssertEqual(collapsed.position(of: "tail"), 10_000)
+        XCTAssertEqual(collapsed.removed, ["new-a", "new-b"])
+        XCTAssertLessThan(collapsed.sequence.indexedIdentities, 512)
+    }
+
+    func testPersistentSpliceDetectsBlockMoveWithoutReplacingSurvivingRows() {
+        let original = HostLazySource(["a", "b", "c", "d", "e", "f"])
+        let moved = HostLazySource(splicing: original, before: 1..<5,
+                                   inserting: ["d", "e", "b", "c"])
+        guard case .move(let range, let destination) = moved.edit else {
+            return XCTFail("expected block move")
+        }
+        XCTAssertEqual(range, 1..<3)
+        XCTAssertEqual(destination, 3)
+        XCTAssertEqual(moved.identities, ["a", "d", "e", "b", "c", "f"])
+        XCTAssertTrue(moved.inserted.isEmpty)
+        XCTAssertTrue(moved.removed.isEmpty)
+    }
+
+    func testDirectPersistentSpliceRetainsFirstOccurrenceForDuplicateNames() {
+        let original = HostLazySource(["a", "b"])
+        let repeated = HostLazySource(splicing: original, before: 1..<1, inserting: ["a"])
+        XCTAssertEqual(repeated.identities, ["a", "a", "b"])
+        XCTAssertEqual(repeated.position(of: "a"), 0)
+        XCTAssertEqual(repeated.position(of: "b"), 2)
+    }
+
     func testSnapshotDoesNotRetainItsPredecessors() {
         var original: HostLazySource? = HostLazySource(["a", "b"])
         weak var released = original

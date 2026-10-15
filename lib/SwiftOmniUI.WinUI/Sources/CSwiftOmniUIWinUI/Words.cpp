@@ -9,8 +9,12 @@
 #include "Relay.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cwchar>
+#include <cwctype>
 #include <string>
 
+#include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Text.h>
 #include <winrt/Microsoft.UI.Text.h>
@@ -49,16 +53,96 @@ namespace {
     // read the native setters instead of depending on a detached probe's Style.
     // BasedOn is applied first, as it is by XAML; StaticResource values have
     // already been resolved by the native resource dictionary.
+    bool fontSizeValue(winrt::Windows::Foundation::IInspectable const &value, double &size) {
+        if (!value) return false;
+        try {
+            auto boxed = value.as<winrt::Windows::Foundation::IPropertyValue>();
+            double resolved = 0;
+            switch (boxed.Type()) {
+            case winrt::Windows::Foundation::PropertyType::Double: resolved = boxed.GetDouble(); break;
+            case winrt::Windows::Foundation::PropertyType::Single: resolved = boxed.GetSingle(); break;
+            case winrt::Windows::Foundation::PropertyType::Int32: resolved = boxed.GetInt32(); break;
+            case winrt::Windows::Foundation::PropertyType::UInt32: resolved = boxed.GetUInt32(); break;
+            case winrt::Windows::Foundation::PropertyType::String: {
+                auto string = boxed.GetString();
+                wchar_t *end = nullptr;
+                resolved = std::wcstod(string.c_str(), &end);
+                if (end == string.c_str() || *end != 0) return false;
+                break;
+            }
+            default: return false;
+            }
+            if (!std::isfinite(resolved) || resolved <= 0) return false;
+            size = resolved;
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    bool fontWeightValue(winrt::Windows::Foundation::IInspectable const &value, uint16_t &weight) {
+        if (!value) return false;
+        // XAML styles can expose a boxed FontWeight, a number, or an unresolved
+        // string. Query each representation separately: a mismatched WinRT
+        // interface must not prevent the glyph or text from being shown.
+        try {
+            auto resolved = winrt::unbox_value<winrt::Windows::UI::Text::FontWeight>(value).Weight;
+            if (resolved > 0 && resolved <= 1000) {
+                weight = resolved;
+                return true;
+            }
+        } catch (...) {}
+        try {
+            auto boxed = value.as<winrt::Windows::Foundation::IPropertyValue>();
+            double resolved = 0;
+            switch (boxed.Type()) {
+            case winrt::Windows::Foundation::PropertyType::UInt16: resolved = boxed.GetUInt16(); break;
+            case winrt::Windows::Foundation::PropertyType::Int32: resolved = boxed.GetInt32(); break;
+            case winrt::Windows::Foundation::PropertyType::UInt32: resolved = boxed.GetUInt32(); break;
+            case winrt::Windows::Foundation::PropertyType::String: {
+                auto string = boxed.GetString();
+                std::wstring name(string.c_str());
+                std::transform(name.begin(), name.end(), name.begin(), [](wchar_t c) { return std::towlower(c); });
+                if (name == L"thin") resolved = 100;
+                else if (name == L"extralight" || name == L"ultralight") resolved = 200;
+                else if (name == L"light") resolved = 300;
+                else if (name == L"normal" || name == L"regular") resolved = 400;
+                else if (name == L"medium") resolved = 500;
+                else if (name == L"semibold" || name == L"demibold") resolved = 600;
+                else if (name == L"bold") resolved = 700;
+                else if (name == L"extrabold" || name == L"ultrabold") resolved = 800;
+                else if (name == L"black" || name == L"heavy") resolved = 900;
+                else {
+                    wchar_t *end = nullptr;
+                    resolved = std::wcstod(name.c_str(), &end);
+                    if (end == name.c_str() || *end != 0) return false;
+                }
+                break;
+            }
+            default: return false;
+            }
+            if (!std::isfinite(resolved) || resolved < 1 || resolved > 1000) return false;
+            weight = static_cast<uint16_t>(resolved);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
     void fontSetters(xaml::Style const &style, TextFontDefaults &font) {
         if (!style) return;
         fontSetters(style.BasedOn(), font);
         for (auto const &item : style.Setters()) {
-            auto setter = item.try_as<xaml::Setter>();
-            if (!setter) continue;
-            if (setter.Property() == controls::TextBlock::FontSizeProperty())
-                font.size = winrt::unbox_value<double>(setter.Value());
-            else if (setter.Property() == controls::TextBlock::FontWeightProperty())
-                font.weight = winrt::unbox_value<winrt::Windows::UI::Text::FontWeight>(setter.Value()).Weight;
+            try {
+                auto setter = item.try_as<xaml::Setter>();
+                if (!setter) continue;
+                if (setter.Property() == controls::TextBlock::FontSizeProperty())
+                    fontSizeValue(setter.Value(), font.size);
+                else if (setter.Property() == controls::TextBlock::FontWeightProperty())
+                    fontWeightValue(setter.Value(), font.weight);
+            } catch (...) {
+                // One malformed setter must not discard the rest of the style.
+            }
         }
     }
 }
@@ -84,19 +168,20 @@ swiftomniui::TextFontDefaults swiftomniui::textFontDefaults(int32_t textStyle) {
         wchar_t const *styles[] = {L"TitleLargeTextBlockStyle", L"TitleTextBlockStyle", L"SubtitleTextBlockStyle",
             L"BodyLargeTextBlockStyle", L"BodyStrongTextBlockStyle", L"CaptionTextBlockStyle", L"BodyTextBlockStyle",
             L"BodyTextBlockStyle", L"CaptionTextBlockStyle", L"CaptionTextBlockStyle", L"CaptionTextBlockStyle"};
-        if (auto application = xaml::Application::Current())
-            style = application.Resources().TryLookup(winrt::box_value(styles[textStyle])).try_as<xaml::Style>();
+        try {
+            if (auto application = xaml::Application::Current())
+                style = application.Resources().TryLookup(winrt::box_value(styles[textStyle])).try_as<xaml::Style>();
+        } catch (...) {
+            // An unavailable theme style falls back to the native TextBlock's
+            // defaults; icon rendering must not depend on a resource lookup.
+        }
     }
     // Styles can be replaced while the application runs. Resolve sealed styles
     // once per native identity. A still-editable application style must reflect
     // setter changes too, even before it has entered a tree.
     if (style != probe.style || (style && !style.IsSealed())) {
-        if (style != probe.style) {
-            if (style) probe.block.Style(style);
-            else probe.block.ClearValue(xaml::FrameworkElement::StyleProperty());
-        }
         auto font = probe.defaults;
-        fontSetters(style, font);
+        try { fontSetters(style, font); } catch (...) {}
         probe.font = font;
         probe.style = style;
     }

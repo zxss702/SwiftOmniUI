@@ -86,7 +86,7 @@ class GTKLazyView: GTKTravellingLayout {
     /// The window the run shows - the scroller's room brought into this view,
     /// along the run.
     var span: Range<Double>? {
-        guard !cells.identities.isEmpty, let scroll = clip,
+        guard !cells.orderedIdentities.isEmpty, let scroll = clip,
               let document = scroll.scroller.content else { return nil }
         var bounds = graphene_rect_t()
         guard gtk_widget_compute_bounds(self.widget, document.widget, &bounds) != 0 else { return nil }
@@ -274,7 +274,7 @@ final class GTKLazyStackView: GTKLazyView {
         let cross = mounted.compactMap { identity, item -> Double? in
             guard !item.departing, let size = measured[identity]?.size else { return nil }
             return size.height + item.values.margin.top + item.values.margin.bottom
-        }.max() ?? (cells.identities.isEmpty ? 0 : 44)
+        }.max() ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
         if axis == .horizontal, naturalAcross != cross {
             naturalAcross = cross
             invalidateMeasurements()
@@ -388,7 +388,7 @@ final class GTKLazyGridView: GTKLazyView {
     private var perRun: Int { max(1, columns.count) }
 
     /// The runs the cells make.
-    private var runCount: Int { (cells.identities.count + perRun - 1) / perRun }
+    private var runCount: Int { (cells.orderedIdentities.count + perRun - 1) / perRun }
 
     /// As wide as offered and as long as the runs measure.
     override func contentSize(width: Double?) -> LayoutSize {
@@ -396,7 +396,7 @@ final class GTKLazyGridView: GTKLazyView {
             ? (width.map { $0 - padding.left - padding.right } ?? acrossRoom)
             : acrossRoom)
         let proposed = LazyGridTracks.resolve(tracks, width: room, spacing: trackSpacing)
-        let count = (cells.identities.count + max(1, proposed.count) - 1) / max(1, proposed.count)
+        let count = (cells.orderedIdentities.count + max(1, proposed.count) - 1) / max(1, proposed.count)
         let total = cells.runs.total(count: count)
         return axis == .vertical
             ? LayoutSize(width: width ?? 0, height: total)

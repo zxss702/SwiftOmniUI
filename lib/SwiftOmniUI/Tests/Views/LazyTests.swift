@@ -205,6 +205,68 @@ private struct LazyPage: View {
         XCTAssertEqual(restored.identities.last, source.identities.last)
     }
 
+    func testTypedFolderDiffErasesOnlyTheInsertedIdentities() {
+        let built = Built()
+        let original = (0..<10_000).map { HashedLazyItem(value: $0, built: built) }
+        let first = ForEach(original) { Text("Row \($0.value)") }
+        let expanded = Array(original[..<5])
+            + (10_000..<10_040).map { HashedLazyItem(value: $0, built: built) }
+            + Array(original[5...])
+        let next = ForEach(expanded) { Text("Row \($0.value)") }
+        let hashes = built.identityHashes
+        let ranges = next.changedLazyIdentityRanges(comparedTo: first)
+        XCTAssertEqual(ranges?.before, 5..<5)
+        XCTAssertEqual(ranges?.after, 5..<45)
+        XCTAssertEqual(built.identityHashes, hashes,
+                       "unchanged IDs are compared at their concrete Hashable type")
+    }
+
+    func testRepeatedFrontEditsReuseTheTailWithoutBuildingOffscreenRows() throws {
+        let built = Built()
+        let renders = Renders()
+        func page(_ items: [Int]) -> LazyPage {
+            LazyPage {
+                LazyVStack {
+                    ForEach(items) { number in
+                        built.numbers[number, default: 0] += 1
+                        return Text("Row \(number)")
+                    }
+                    .transition(.opacity)
+                    Text("Tail")
+                }
+            }
+        }
+        var values = Array(0..<10_000)
+        let first = try lazy(.lazyVStack, in: renders.render(page(values).node))
+        let tail = try XCTUnwrap(first.lazyRows?.sequence.last)
+        for edit in 0..<3 {
+            values.insert(10_000 + edit, at: 5)
+            let changed = try lazy(.lazyVStack, in: renders.render(page(values).node))
+            let source = try XCTUnwrap(changed.lazyRows)
+            XCTAssertEqual(source.sequence.count, values.count + 1)
+            XCTAssertEqual(source.sequence.last, tail)
+            XCTAssertEqual(source.position(of: tail), values.count)
+            XCTAssertLessThan(source.sequence.indexedIdentities, 512,
+                              "each edit only indexes its boundary and new row")
+            XCTAssertTrue(built.numbers.isEmpty)
+        }
+    }
+
+    func testDuplicateLeadingRowIDsFallBackToOccurrenceNames() throws {
+        let renders = Renders()
+        func page(_ items: [Int]) -> LazyPage {
+            LazyPage { LazyVStack { ForEach(items) { Text("Row \($0)") } } }
+        }
+        _ = try lazy(.lazyVStack, in: renders.render(page([1, 2, 3]).node))
+        let duplicate = try lazy(.lazyVStack, in: renders.render(page([1, 2, 2, 3]).node))
+        let names = try XCTUnwrap(duplicate.lazyRows?.identities)
+        XCTAssertEqual(names.count, 4)
+        XCTAssertEqual(Set(names).count, 4)
+        let restored = try lazy(.lazyVStack, in: renders.render(page([1, 2, 3]).node))
+        XCTAssertEqual(restored.lazyRows?.identities.count, 3)
+        XCTAssertEqual(Set(restored.lazyRows?.identities ?? []).count, 3)
+    }
+
     func testHashableIdentityDoesNotCollapseRowsWithTheSameDescription() throws {
         let renders = Renders()
         let first = try lazy(.lazyVStack, in: renders.render(LazyPage {

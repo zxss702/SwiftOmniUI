@@ -216,6 +216,28 @@ final class WinUIImageViewTests: XCTestCase {
         }
     }
 
+    func testFootnoteDisclosureGlyphPaintsAfterNativeStyleResolution() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                Image(systemName: "\u{E70D}")
+                    .font(.footnote)
+                    .foregroundStyle(.black)
+                    .id("styledDisclosure")
+                    .frame(width: 24, height: 24)
+            }
+            host.settle { host.view(id: .manual("styledDisclosure"))?.laidOutFrame.width == 24 }
+            host.layOut()
+            let image = try XCTUnwrap(host.view(id: .manual("styledDisclosure")) as? WinUIImageView)
+            XCTAssertTrue(image.found)
+            XCTAssertGreaterThan(image.measure(width: nil, height: nil).width, 0)
+            let points = (0..<24).flatMap { y in
+                (0..<24).map { x in (Double(x) + 0.5, Double(y) + 0.5) }
+            }
+            XCTAssertTrue(image.pixels(at: points).contains { ($0 >> 24) != 0 },
+                          "a .footnote style must keep the native FontIcon visible")
+        }
+    }
+
     func testRawFluentGlyphsSurviveRepeatedNativeUpdates() throws {
         try onUIThread {
             let image = WinUIImageView()

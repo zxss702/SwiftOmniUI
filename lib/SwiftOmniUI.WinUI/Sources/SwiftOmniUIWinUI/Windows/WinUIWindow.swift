@@ -69,6 +69,7 @@ final class WinUIWindow {
     }
 
     func showTopSafeAreaBars(_ bars: [MountedElement], in page: MountedElement?) {
+        if safeBarPage !== page { safeBarFrame = nil }
         safeBarPage = page
         requestSafeBarFrame()
         requestedSafeBars = bars

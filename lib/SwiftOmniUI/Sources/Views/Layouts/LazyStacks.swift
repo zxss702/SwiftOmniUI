@@ -204,11 +204,10 @@ struct LazyHStackElement: StackBase {
     private var tokens: [Key: String] = [:]
     private var tokenKeys: [String: Key] = [:]
     private var source: HostLazySource?
-    /// A leading ForEach's value identities. A changed Array has no edit
-    /// notification, but its unchanged ends can be compared without hashing
-    /// and re-interning every row on each folder expansion.
-    private var leadingIDs: [AnyHashable]?
-    private var leadingIDSet: Set<AnyHashable> = []
+    /// Non-nil only while the leading row source has unique IDs. Its tokens
+    /// already live in `source.sequence`; `tokenKeys` recovers their value IDs
+    /// without maintaining and shifting a second full-length array.
+    private var leadingRowCount: Int?
 
     /// Names the children of `content` - `prepare` dressing each as its
     /// container asks - and sets `node`'s producer to the ones `realized`
@@ -258,6 +257,11 @@ struct LazyHStackElement: StackBase {
                     $0.id == $1.id && $0.key == $1.key
                 }
             }
+        let previousLeadingRows: (any LazyRows)? = {
+            guard let first = previous.first else { return nil }
+            if case .rows(let rows) = first { return rows }
+            return nil
+        }()
         previous = segments
         let leadingRows: (any LazyRows)? = {
             guard let first = segments.first else { return nil }
@@ -269,40 +273,70 @@ struct LazyHStackElement: StackBase {
             return false
         }
         var updatedIncrementally = false
-        if !same, let oldIDs = leadingIDs, let old = source,
-           oldIDs.count <= old.identities.count,
+        if !same, staticTailSame, let oldCount = leadingRowCount, let old = source,
+           oldCount <= old.sequence.count,
            canIncrementLeadingRows, let rows = leadingRows {
-            let newCount = rows.lazyRowCount
-            var head = 0
-            while head < min(oldIDs.count, newCount), rows.lazyRowID(at: head) == oldIDs[head] {
-                head += 1
+            func oldID(for token: String) -> AnyHashable? {
+                guard let key = tokenKeys[token],
+                      case .row(let id, occurrence: 0) = key else { return nil }
+                return id
             }
-            var oldEnd = oldIDs.count, newEnd = newCount
-            while oldEnd > head, newEnd > head, rows.lazyRowID(at: newEnd - 1) == oldIDs[oldEnd - 1] {
-                oldEnd -= 1
-                newEnd -= 1
+            func oldID(at index: Int) -> AnyHashable? { oldID(for: old.sequence[index]) }
+            let newCount = rows.lazyRowCount
+            let head: Int, oldEnd: Int, newEnd: Int
+            if let previousLeadingRows,
+               let compared = rows.changedLazyIdentityRanges(comparedTo: previousLeadingRows),
+               compared.before.lowerBound == compared.after.lowerBound,
+               compared.before.upperBound <= oldCount,
+               compared.after.upperBound <= newCount {
+                head = compared.before.lowerBound
+                oldEnd = compared.before.upperBound
+                newEnd = compared.after.upperBound
+            } else {
+                var common = 0
+                var forwards = old.sequence.makeIterator()
+                while common < Swift.min(oldCount, newCount),
+                      let token = forwards.next(), let held = oldID(for: token),
+                      rows.lazyRowID(at: common) == held {
+                    common += 1
+                }
+                var oldTail = oldCount, newTail = newCount
+                var backwards = old.sequence.backwards()
+                // Skip static children after the leading row source.
+                for _ in oldCount..<old.sequence.count { _ = backwards.next() }
+                while oldTail > common, newTail > common,
+                      let token = backwards.next(), let held = oldID(for: token),
+                      rows.lazyRowID(at: newTail - 1) == held {
+                    oldTail -= 1
+                    newTail -= 1
+                }
+                head = common
+                oldEnd = oldTail
+                newEnd = newTail
             }
             // A fresh Array with identical IDs changes row closures, not the
             // ordered source. Keep the existing index and avoid copying it.
-            if head == oldIDs.count, head == newCount, staticTailSame {
+            if head == oldCount, head == newCount {
                 updatedIncrementally = true
             }
             if !updatedIncrementally {
-                let removedIDs = Set(oldIDs[head..<oldEnd])
+                let removedRange = (head..<oldEnd).compactMap { oldID(at: $0) }
+                let removedIDs = Set(removedRange)
                 var changedIDs: [AnyHashable] = []
                 var changedSet: Set<AnyHashable> = []
-                var unique = true
+                var unique = removedRange.count == oldEnd - head
                 for index in head..<newEnd {
                     guard let id = rows.lazyRowID(at: index),
                           changedSet.insert(id).inserted,
-                          !leadingIDSet.contains(id) || removedIDs.contains(id) else {
+                          tokens[.row(id, occurrence: 0)] == nil || removedIDs.contains(id) else {
                         unique = false
                         break
                     }
                     changedIDs.append(id)
                 }
                 if unique {
-                    var names = Array(old.identities[..<head])
+                    var names: [String] = []
+                    names.reserveCapacity(changedIDs.count)
                     var variants: [String: Int] = [:]
                     func intern(_ key: Key, spelling: () -> String) -> String {
                         if let held = tokens[key] { return held }
@@ -320,34 +354,12 @@ struct LazyHStackElement: StackBase {
                     for id in changedIDs {
                         names.append(intern(.row(id, occurrence: 0)) { String(describing: id) })
                     }
-                    names.append(contentsOf: old.identities[oldEnd..<oldIDs.count])
-                    var nodeOccurrences: [String: Int] = [:]
-                    for (segmentIndex, segment) in segments.enumerated().dropFirst() {
-                        guard case .nodes(let children) = segment else { continue }
-                        for (local, child) in children.enumerated() {
-                            if let base = child.id ?? child.key.map({ "#\($0)" }) {
-                                let occurrence = nodeOccurrences[base, default: 0]
-                                nodeOccurrences[base] = occurrence + 1
-                                names.append(intern(.node(base, occurrence: occurrence)) { base })
-                            } else {
-                                let place = names.count
-                                names.append(intern(.staticPlace(segment: segmentIndex, local: local)) {
-                                    "#\(place)"
-                                })
-                            }
-                        }
+                    let next = HostLazySource(splicing: old, before: head..<oldEnd, inserting: names)
+                    for identity in next.removed {
+                        if let key = tokenKeys.removeValue(forKey: identity) { tokens[key] = nil }
                     }
-                    if names != old.identities {
-                        let next = HostLazySource(names, following: old,
-                            changedRanges: (before: head..<oldEnd, after: head..<newEnd))
-                        for identity in next.removed {
-                            if let key = tokenKeys.removeValue(forKey: identity) { tokens[key] = nil }
-                        }
-                        source = next
-                    }
-                    for id in removedIDs { leadingIDSet.remove(id) }
-                    for id in changedIDs { leadingIDSet.insert(id) }
-                    leadingIDs = Array(oldIDs[..<head]) + changedIDs + Array(oldIDs[oldEnd...])
+                    source = next
+                    leadingRowCount = newCount
                     updatedIncrementally = true
                 }
             }
@@ -357,7 +369,7 @@ struct LazyHStackElement: StackBase {
             var occurrences: [AnyHashable: Int] = [:]
             var nodeOccurrences: [String: Int] = [:]
             var variants: [String: Int] = [:]
-            var newLeadingIDs: [AnyHashable]? = canIncrementLeadingRows ? [] : nil
+            var newLeadingCount: Int? = canIncrementLeadingRows ? 0 : nil
             func append(_ key: Key, spelling: () -> String) {
                 let identity: String
                 if let held = tokens[key] {
@@ -383,12 +395,14 @@ struct LazyHStackElement: StackBase {
                 case .rows(let rows):
                     for local in 0..<rows.lazyRowCount {
                         if let id = rows.lazyRowID(at: local) {
-                            if segmentIndex == 0 { newLeadingIDs?.append(id) }
                             let occurrence = occurrences[id, default: 0]
+                            if segmentIndex == 0, let count = newLeadingCount {
+                                newLeadingCount = occurrence == 0 ? count + 1 : nil
+                            }
                             occurrences[id] = occurrence + 1
                             append(.row(id, occurrence: occurrence)) { String(describing: id) }
                         } else {
-                            if segmentIndex == 0 { newLeadingIDs = nil }
+                            if segmentIndex == 0 { newLeadingCount = nil }
                             let place = names.count
                             append(.place(place)) { "#\(place)" }
                         }
@@ -408,26 +422,15 @@ struct LazyHStackElement: StackBase {
                     }
                 }
             }
-            if source?.identities != names {
+            if source?.sequence.count != names.count
+                || source?.sequence.matches(0..<names.count, names[...]) != true {
                 let next = HostLazySource(names, following: source)
                 for identity in next.removed {
                     if let key = tokenKeys.removeValue(forKey: identity) { tokens[key] = nil }
                 }
                 source = next
             }
-            if let newLeadingIDs, newLeadingIDs.count == leadingRows?.lazyRowCount {
-                let uniqueIDs = Set(newLeadingIDs)
-                if uniqueIDs.count == newLeadingIDs.count {
-                    leadingIDs = newLeadingIDs
-                    leadingIDSet = uniqueIDs
-                } else {
-                    leadingIDs = nil
-                    leadingIDSet = []
-                }
-            } else {
-                leadingIDs = nil
-                leadingIDSet = []
-            }
+            leadingRowCount = newLeadingCount == leadingRows?.lazyRowCount ? newLeadingCount : nil
         }
         guard let source else { return }
         node.lazyRows = source

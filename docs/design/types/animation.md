@@ -1,13 +1,13 @@
 # Animation
 
-A change animates by default: assign a state and the control animates to its
-new value. `Animation` is the whole of what an author says about how, and the
-same vocabulary answers everywhere it is said.
+A plain state assignment updates the control immediately. `Animation` says how
+an explicitly animated change moves, and the same vocabulary answers everywhere
+it is said.
 
 ## One vocabulary in four places
 
 ```text
-  application.animation = ...                  what every value uses by default
+  application.animation = ...                  optional application-wide default
   .animation(nil)                              what this element does instead
   @State(animation: nil) var x                 what this state does instead, wherever it is shown
   $fade.journey.move(to: 0.1, .spring())    what this one write does instead
@@ -50,7 +50,8 @@ the engine wrote, so the host wears each frame as it comes.
 ## Inherited and none
 
 `.inherited` is what a write means when it says nothing about animation: the
-element's own animation, else the application's, else the standard one. It is
+element's own animation, else the application's. The application starts at
+`.none`, so an ordinary change arrives immediately. It is
 what makes `move(to:)` without a animation and a plain assignment agree, so the
 two differ only in being awaited. `.none` applies a change at once, and an
 ordinary property that snaps carries no `HostTransition` beside its value.
@@ -62,9 +63,8 @@ way out.
 
 ## The standard animation
 
-`Animation.standard` is one 200-millisecond eased animation on `.cubicOut`, used
-for ordinary changes and for a scroller's landing unless the application
-says otherwise.
+`Animation.standard` is one 200-millisecond eased animation on `.cubicOut`.
+It can be chosen explicitly with `withAnimation` or as an application default.
 
 ## Spring numbers
 

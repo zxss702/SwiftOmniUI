@@ -25,12 +25,19 @@ protocol LazyRows: Element {
     /// Row builders are always refreshed, even when this answers true.
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool
 
+    /// Compare two sources without erasing every unchanged ID. `nil` means
+    /// the sources cannot use a typed comparison and need the generic path.
+    func changedLazyIdentityRanges(comparedTo other: any LazyRows)
+        -> (before: Range<Int>, after: Range<Int>)?
+
     /// The row at `index`, built only when asked.
     func lazyRow(at index: Int) -> any Element
 }
 
 extension LazyRows {
     func lazyRowID(at index: Int) -> AnyHashable? { lazyRowIdentity(at: index).map(AnyHashable.init) }
+    func changedLazyIdentityRanges(comparedTo other: any LazyRows)
+        -> (before: Range<Int>, after: Range<Int>)? { nil }
 }
 
 /// UI-thread-owned dependencies of the currently requested row closures.
@@ -101,6 +108,12 @@ private struct ModifiedLazyRows: LazyRows {
         return rows.hasSameLazyIdentities(as: other.rows)
     }
 
+    func changedLazyIdentityRanges(comparedTo other: any LazyRows)
+        -> (before: Range<Int>, after: Range<Int>)? {
+        guard let other = other as? Self else { return nil }
+        return rows.changedLazyIdentityRanges(comparedTo: other.rows)
+    }
+
     func lazyRow(at index: Int) -> any Element { dressed(rows.lazyRow(at: index).node) }
 
     private func dressed(_ node: Node) -> Node {
@@ -145,6 +158,12 @@ struct LazyKeyed: LazyRows {
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
         guard let other = other as? Self, segment == other.segment else { return false }
         return rows.hasSameLazyIdentities(as: other.rows)
+    }
+
+    func changedLazyIdentityRanges(comparedTo other: any LazyRows)
+        -> (before: Range<Int>, after: Range<Int>)? {
+        guard let other = other as? Self, segment == other.segment else { return nil }
+        return rows.changedLazyIdentityRanges(comparedTo: other.rows)
     }
 
     /// The row under this segment - the key gains it; a `manual` id is the

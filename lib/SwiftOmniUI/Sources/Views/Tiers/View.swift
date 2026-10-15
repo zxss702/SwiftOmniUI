@@ -563,8 +563,8 @@ extension View {
     ///     VStack { … }.animation(.spring(response: 0.26))
     ///     Text(count).animation(nil)
     ///
-    /// A changed value animates to its new setting by default; `nil` snaps,
-    /// which is what a value rewritten every frame wants. It applies to this
+    /// A changed value arrives immediately by default; `nil` also snaps.
+    /// An explicit animation applies to this
     /// view only, not to the views inside it; `application.animation` sets the
     /// whole application.
     ///

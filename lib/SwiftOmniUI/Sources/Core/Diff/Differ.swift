@@ -27,7 +27,7 @@ final class Differ {
     private(set) var styles: StyleSheet?
 
     /// How a changed value animates where its element says nothing else.
-    var animation: Animation = .standard
+    var animation: Animation = .none
 
     /// The transaction the writes this render answers ran under - what
     /// `withAnimation` and `withTransaction` left for it; nil by default.

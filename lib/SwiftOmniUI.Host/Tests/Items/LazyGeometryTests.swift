@@ -22,7 +22,8 @@ final class LazyGeometryTests: XCTestCase {
         runtime.tree.apply(drawing, complete: false)
         cells.takeItems()
         XCTAssertEqual(cells.window?.span, previous.span)
-        XCTAssertTrue(cells.needsWindowUpdate)
+        XCTAssertFalse(cells.needsWindowUpdate,
+                       "a drawing change keeps the realized window and its optional prefetch work")
         cells.show(11_000..<11_240, realize: 10_760..<11_480, prefetch: true)
         XCTAssertFalse(cells.needsWindowUpdate)
         XCTAssertNil(cells.correctedOrigin(), "a drawing update must not restore the earlier scroll position")

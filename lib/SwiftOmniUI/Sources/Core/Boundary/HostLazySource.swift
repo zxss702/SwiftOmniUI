@@ -1,10 +1,23 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+import Synchronization
+
 /// One immutable identity index shared by the renderer and its native lazy layout.
 /// View closures stay in the renderer; reading this source never builds a row.
 @_spi(Host) public final class HostLazySource: Sendable {
-    public let identities: [String]
+    /// A local edit shares the unchanged leaves of `sequence`. The complete
+    /// array is only made if a caller explicitly needs the compatibility
+    /// representation; native lazy layouts use the shared sequence directly.
+    private let identitiesCache: Mutex<[String]?>
+    public var identities: [String] {
+        identitiesCache.withLock { stored in
+            if let stored { return stored }
+            let values = Array(sequence)
+            stored = values
+            return values
+        }
+    }
     /// The ordered identities and their persistent position links. Unchanged
     /// leaves and links are shared with the preceding source after a local edit.
     public let sequence: HostLazyIdentitySequence
@@ -42,7 +55,7 @@
     /// walk the entire visible identity list twice on the UI thread.
     init(_ identities: [String], following previous: HostLazySource?,
          changedRanges: (before: Range<Int>, after: Range<Int>)?) {
-        self.identities = identities
+        identitiesCache = Mutex<[String]?>(identities)
         predecessor = previous.map(ObjectIdentifier.init)
         let old = previous?.identities ?? []
         let before: Range<Int>, after: Range<Int>
@@ -94,6 +107,45 @@
         edit = detectedEdit
         sequence = ordered
         inserted = previous == nil ? [] : Set(identities[after].filter { previous?.position(of: $0) == nil })
+        removed = old[before].filter { ordered.position(of: $0) == nil }
+    }
+
+    /// The producer has already compared the unchanged ends. Splice its new
+    /// token interval into the persistent sequence; no full next array is
+    /// required to describe this edit or locate any surviving identity.
+    init(splicing previous: HostLazySource, before: Range<Int>, inserting names: [String]) {
+        precondition(before.lowerBound >= 0 && before.upperBound <= previous.sequence.count)
+        let after = before.lowerBound..<(before.lowerBound + names.count)
+        predecessor = ObjectIdentifier(previous)
+        let old = previous.sequence
+        let detectedEdit: Edit
+        if before.count == names.count, !before.isEmpty,
+           let first = names.first,
+           let pivot = previous.position(of: first),
+           pivot > before.lowerBound, pivot < before.upperBound,
+           old.matches(pivot..<before.upperBound,
+                       names[..<(before.upperBound - pivot)]),
+           old.matches(before.lowerBound..<pivot,
+                       names[(before.upperBound - pivot)...]) {
+            detectedEdit = .move(before.lowerBound..<pivot,
+                                 to: before.lowerBound + before.upperBound - pivot)
+        } else {
+            detectedEdit = .replace(before, with: after)
+        }
+        var ordered = old
+        switch detectedEdit {
+        case .replace(let range, _):
+            ordered.replace(range, with: names[...])
+        case .move(let range, let destination):
+            ordered.move(range, to: destination)
+        }
+        if ordered.uniqueCount != old.count - before.count + names.count {
+            ordered = HostLazyIdentitySequence(Array(ordered))
+        }
+        sequence = ordered
+        identitiesCache = Mutex<[String]?>(nil)
+        edit = detectedEdit
+        inserted = Set(names.filter { previous.position(of: $0) == nil })
         removed = old[before].filter { ordered.position(of: $0) == nil }
     }
 }

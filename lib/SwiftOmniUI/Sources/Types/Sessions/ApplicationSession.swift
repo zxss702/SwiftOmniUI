@@ -43,16 +43,16 @@ public final class ApplicationSession {
     /// it follows the color scheme. A sheet written again is the next render's.
     @State public var styles: StyleSheet? = nil
 
-    /// How every value in the application animates when it changes.
+    /// How changes without an explicit animation behave throughout the application.
     ///
     ///     application.animation = .spring(response: 0.26)
     ///
     /// A colour animates to its new colour, a view that grew to its new size.
-    /// `nil` turns animation off everywhere, for an application that draws
-    /// its own. A view overrides it with `.animation(_:)`, a state with
+    /// The default is `.none`, so ordinary state assignments draw immediately.
+    /// A view overrides it with `.animation(_:)`, a state with
     /// `@State(animation:)`, and one write with `$state.journey.snap(to:)` or
     /// `$state.journey.move(to:_:)`.
-    @State public var animation: Animation = .standard
+    @State public var animation: Animation = .none
 
     /// Every key the application keeps between launches. Write it in the
     /// application's `init`: the host reads exactly these keys from the store
@@ -85,7 +85,7 @@ public final class ApplicationSession {
     /// a second one inherits none of the first one's styles or keys.
     func forget() {
         styles = nil
-        animation = .standard
+        animation = .none
         persistentKeys = []
     }
 }

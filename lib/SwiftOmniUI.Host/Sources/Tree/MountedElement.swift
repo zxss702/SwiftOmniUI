@@ -33,7 +33,8 @@ import CRT
     /// Whether the last patch changed this element's children - the first counts.
     public private(set) var childrenChanged = false
 
-    /// A content rebuild invalidates lazy measurements; viewport updates do not.
+    /// A content rebuild updates mounted lazy rows; their own measurement
+    /// revisions decide which geometry must be measured again.
     public private(set) var lazyContentRevision = 0
     /// Only a changed identity property advances this. Row and viewport patches
     /// must not make a host read and compare the complete source again.

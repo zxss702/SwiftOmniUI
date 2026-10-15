@@ -88,7 +88,7 @@ final class GTKLazyTests: XCTestCase {
                 let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
                 let scroll = try XCTUnwrap(host.views(GTKScrollView.self).first)
                 let source = try XCTUnwrap(lazy.cells.element?.lazyRows)
-                let identity = source.identities[3]
+                let identity = source.sequence[3]
                 let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
                 XCTAssertLessThan(builds.numbers.count, 80)
                 withAnimation(.eased(200, .linear)) {
@@ -98,6 +98,8 @@ final class GTKLazyTests: XCTestCase {
                 let expanded = try XCTUnwrap(lazy.cells.element?.lazyRows)
                 XCTAssertEqual(expanded.predecessor, ObjectIdentifier(source))
                 XCTAssertEqual(expanded.inserted.count, 100)
+                XCTAssertEqual(lazy.cells.orderedIdentities.count, count + 100)
+                XCTAssertEqual(lazy.cells.position(of: identity), 3)
                 XCTAssertNil(lazy.cells.element?.value(.items))
                 XCTAssertTrue(lazy.mounted[identity]?.view === retained)
                 XCTAssertLessThan(lazy.mounted.count, 80)
@@ -113,7 +115,7 @@ final class GTKLazyTests: XCTestCase {
                 let visible = lazy.cells.places(in: span, overscan: 0)
                 XCTAssertFalse(visible.isEmpty)
                 for place in visible {
-                    let item = try XCTUnwrap(lazy.mounted[lazy.cells.identities[place]])
+                    let item = try XCTUnwrap(lazy.mounted[lazy.cells.orderedIdentities[place]])
                     XCTAssertGreaterThan(item.view.frame.height, 0)
                     XCTAssertGreaterThan(item.view.frame.width, 0)
                 }
@@ -143,7 +145,7 @@ final class GTKLazyTests: XCTestCase {
             for _ in 0..<12 { host.step(); host.frame() }
             host.runtime.layoutMotion.applicationMotion = .none
             let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
-            let identity = lazy.cells.identities[4]
+            let identity = lazy.cells.orderedIdentities[4]
             let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
             let before = retained.placedFrame.y
             withAnimation(.eased(200, .linear)) { rows.wrappedValue.insert(-1, at: 0) }
@@ -285,7 +287,7 @@ final class GTKLazyTests: XCTestCase {
             let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
             clock.now += 200
             for _ in 0..<12 { host.step(); host.frame() }
-            let identity = lazy.cells.identities[6]
+            let identity = lazy.cells.orderedIdentities[6]
             let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
             let initialY = retained.placedFrame.y
             for expanded in [true, false] {
@@ -328,7 +330,7 @@ final class GTKLazyTests: XCTestCase {
             }
             for _ in 0..<12 { host.step() }
             let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
-            let identity = lazy.cells.identities[0]
+            let identity = lazy.cells.orderedIdentities[0]
             let row = try XCTUnwrap(lazy.mounted[identity]?.view)
             let label = try XCTUnwrap(host.views(GTKTextView.self).first { $0.text == "File 0" })
             let before = lazy.cells.extents.extent(of: identity)
@@ -366,7 +368,7 @@ final class GTKLazyTests: XCTestCase {
                 XCTAssertLessThan(builds.numbers.count, 80, "each visit builds a viewport, not ten thousand rows")
                 XCTAssertEqual(host.views(GTKPickerView.self).count, 2, "ordinary grouped controls still expand")
                 let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
-                XCTAssertEqual(lazy.cells.identities.count, 10_002)
+                XCTAssertEqual(lazy.cells.orderedIdentities.count, 10_002)
                 XCTAssertLessThan(lazy.mounted.count, 80)
                 let work = [lazy.cells.requests, lazy.cells.measurements]
                 for _ in 0..<4 { host.step() }
@@ -472,7 +474,7 @@ final class GTKLazyTests: XCTestCase {
                 let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
                 scroll.scroller.move(to: Point(horizontal ? 400 : 0, horizontal ? 0 : 400))
                 for _ in 0..<8 { host.step() }
-                let identity = lazy.cells.identities[10 * perRun]
+                let identity = lazy.cells.orderedIdentities[10 * perRun]
                 let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
                 for removed in [11, 9, 0] {
                     let relative = (horizontal ? retained.placedFrame.x : retained.placedFrame.y)
@@ -523,19 +525,19 @@ final class GTKLazyTests: XCTestCase {
                 }
                 for _ in 0..<8 { host.step() }
                 let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
-                let identity = lazy.cells.identities[perRun * 2]
+                let identity = lazy.cells.orderedIdentities[perRun * 2]
                 let retained = try XCTUnwrap(lazy.mounted[identity]?.view)
                 for operation in 0..<5 {
                     let before = horizontal ? retained.placedFrame.x : retained.placedFrame.y
                     let began = clock.now
-                    let leaving = lazy.mounted[lazy.cells.identities[perRun]]?.view
+                    let leaving = lazy.mounted[lazy.cells.orderedIdentities[perRun]]?.view
                     if operation == 0 { rows.wrappedValue.removeSubrange(perRun..<perRun * 2) }
                     else if operation == 1 { rows.wrappedValue.insert(contentsOf: 100..<100 + perRun, at: perRun) }
                     else if operation == 2 { rows.wrappedValue.swapAt(perRun * 2, perRun * 3) }
                     else if operation == 3 { extent.wrappedValue = 80 }
                     else { extent.wrappedValue = 40 }
                     for _ in 0..<8 { host.step() }
-                    let joining = operation == 1 ? lazy.mounted[lazy.cells.identities[perRun]]?.view : nil
+                    let joining = operation == 1 ? lazy.mounted[lazy.cells.orderedIdentities[perRun]]?.view : nil
                     if operation == 0 { XCTAssertEqual(try XCTUnwrap(leaving).drawnOpacity, 1, accuracy: 0.01) }
                     if let joining { XCTAssertEqual(joining.drawnOpacity, 0, accuracy: 0.01) }
                     let target = before + (operation == 0 || operation == 4 ? -40 : 40)
@@ -593,7 +595,7 @@ final class GTKLazyTests: XCTestCase {
                     let row = try XCTUnwrap(host.views(GTKLazyStackView.self).first {
                         $0.placingLayout === scroll.scroller.content
                     })
-                    let measured = row.cells.identities.filter { row.cells.extents.hasMeasurement(for: $0) }.count
+                    let measured = row.cells.orderedIdentities.filter { row.cells.extents.hasMeasurement(for: $0) }.count
                     XCTAssertEqual(scroll.scroller.standing.reach.x + scroll.frame.width,
                                    Double(measured) * 96 + Double(40 - measured) * 44 + 39 * 8, accuracy: 1)
                 }
@@ -646,7 +648,7 @@ final class GTKLazyTests: XCTestCase {
                 scroll.scroller.move(to: scroll.scroller.standing.reach)
                 for _ in 0..<30 { host.step() }
                 XCTAssertTrue(host.views(GTKLabelView.self).contains { $0.text == "Cell 499" })
-                let identity = try XCTUnwrap(grid.cells.identities.last)
+                let identity = try XCTUnwrap(grid.cells.orderedIdentities.last)
                 let last = try XCTUnwrap(grid.mounted[identity]?.view)
                 var bottom = graphene_point_t(x: Float(last.frame.width / 2), y: Float(last.frame.height))
                 var inGrid = graphene_point_t()
@@ -679,7 +681,7 @@ final class GTKLazyTests: XCTestCase {
                 // Supply exact fixture geometry without building offscreen
                 // controls; this test exercises window identity and idle reuse.
                 if kind < 2 {
-                    for identity in lazy.cells.identities { lazy.cells.extents.measure(identity, extent: extent) }
+                    for identity in lazy.cells.orderedIdentities { lazy.cells.extents.measure(identity, extent: extent) }
                 } else {
                     for run in 0..<(1_000 / perRun) { lazy.cells.runs.measure(run, extent: extent) }
                 }
@@ -749,13 +751,13 @@ final class GTKLazyTests: XCTestCase {
                 let visible = lazy.cells.places(in: span, overscan: 0)
                 XCTAssertFalse(visible.isEmpty)
                 for place in visible {
-                    let item = try XCTUnwrap(lazy.mounted[lazy.cells.identities[place]])
+                    let item = try XCTUnwrap(lazy.mounted[lazy.cells.orderedIdentities[place]])
                     XCTAssertEqual(item.view.opacity, 1)
                     XCTAssertGreaterThan(item.view.frame.height, 0)
                 }
                 // Sample the actual GTK renderer, not merely the backing layout geometry.
                 let middle = visible.lowerBound + visible.count / 2
-                let painted = try XCTUnwrap(lazy.mounted[lazy.cells.identities[middle]])
+                let painted = try XCTUnwrap(lazy.mounted[lazy.cells.orderedIdentities[middle]])
                 let point = (painted.view.frame.x + 3,
                              painted.view.frame.y - span.lowerBound + painted.view.frame.height / 2)
                 let colors = GTKTestHost.pixels(of: scroll.widget, at: [point])
@@ -772,7 +774,7 @@ final class GTKLazyTests: XCTestCase {
                 let standing = scroll.scroller.standing
                 XCTAssertEqual(standing.offset.y, standing.reach.y, accuracy: 1)
                 XCTAssertEqual(standing.reach.y + scroll.frame.height, lazy.cells.total, accuracy: 1)
-                let last = try XCTUnwrap(lazy.mounted[lazy.cells.identities.last!]?.view)
+                let last = try XCTUnwrap(lazy.mounted[lazy.cells.orderedIdentities.last!]?.view)
                 XCTAssertEqual(last.frame.y + last.frame.height, lazy.cells.total, accuracy: 1)
             }
             for _ in 0..<10 { host.step() }
@@ -806,7 +808,7 @@ final class GTKLazyTests: XCTestCase {
                     scroll.scroller.move(to: scroll.scroller.standing.reach)
                     for _ in 0..<40 { host.step() }
                     let span = try XCTUnwrap(lazy.span)
-                    let last = try XCTUnwrap(lazy.mounted[lazy.cells.identities.last!]?.view,
+                    let last = try XCTUnwrap(lazy.mounted[lazy.cells.orderedIdentities.last!]?.view,
                                             "kind \(kind), \(action)")
                     let start = horizontal ? last.frame.x : last.frame.y
                     let extent = horizontal ? last.frame.width : last.frame.height
@@ -814,7 +816,7 @@ final class GTKLazyTests: XCTestCase {
                     XCTAssertGreaterThan(start + extent, span.lowerBound)
                     let standing = scroll.scroller.standing
                     let total = kind < 2 ? lazy.cells.total
-                        : lazy.cells.runs.total(count: (lazy.cells.identities.count + 3) / 4)
+                        : lazy.cells.runs.total(count: (lazy.cells.orderedIdentities.count + 3) / 4)
                     XCTAssertEqual((horizontal ? standing.reach.x : standing.reach.y)
                                    + (horizontal ? scroll.frame.width : scroll.frame.height), total, accuracy: 1,
                                    "kind \(kind), \(action): the native document must shrink with the content")
@@ -863,8 +865,8 @@ final class GTKLazyTests: XCTestCase {
 
             // Known rows replace only their own forty-four-point estimates.
             let lazy = try XCTUnwrap(host.views(GTKLazyStackView.self).first)
-            let measured = lazy.cells.identities.filter { lazy.cells.extents.hasMeasurement(for: $0) }.count
-            XCTAssertLessThan(measured, lazy.cells.identities.count)
+            let measured = lazy.cells.orderedIdentities.filter { lazy.cells.extents.hasMeasurement(for: $0) }.count
+            XCTAssertLessThan(measured, lazy.cells.orderedIdentities.count)
             XCTAssertEqual(lazy.frame.height, Double(measured) * 40 + Double(1_000 - measured) * 44, accuracy: 1)
         }
     }

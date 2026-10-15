@@ -134,6 +134,26 @@ extension ForEach: LazyRows {
         return false
     }
 
+    func changedLazyIdentityRanges(comparedTo other: any LazyRows)
+        -> (before: Range<Int>, after: Range<Int>)? {
+        guard let other = other as? Self, identity == other.identity else { return nil }
+        let oldCount = other.items.count, newCount = items.count
+        var head = 0
+        while head < Swift.min(oldCount, newCount),
+              items[items.index(items.startIndex, offsetBy: head)][keyPath: identity]
+                == other.items[other.items.index(other.items.startIndex, offsetBy: head)][keyPath: identity] {
+            head += 1
+        }
+        var oldEnd = oldCount, newEnd = newCount
+        while oldEnd > head, newEnd > head,
+              items[items.index(items.startIndex, offsetBy: newEnd - 1)][keyPath: identity]
+                == other.items[other.items.index(other.items.startIndex, offsetBy: oldEnd - 1)][keyPath: identity] {
+            oldEnd -= 1
+            newEnd -= 1
+        }
+        return (head..<oldEnd, head..<newEnd)
+    }
+
     func lazyRow(at index: Int) -> any Element {
         let item = items[items.index(items.startIndex, offsetBy: index)]
         return KeyedRow(identity: String(describing: item[keyPath: identity]), element: content(item))

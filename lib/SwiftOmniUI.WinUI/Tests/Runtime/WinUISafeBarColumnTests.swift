@@ -136,6 +136,13 @@ final class WinUISafeBarColumnTests: XCTestCase {
             let tabs = try XCTUnwrap(host.view(id: .manual("sidebar-tabs")))
             let split = try XCTUnwrap(host.views(WinUISplitView.self).first)
             let originalSize = split.laidOutFrame
+            let nativePages = host.views(WinUISingleChildView.self).filter { $0.nativeLayoutOwner === split }
+            XCTAssertEqual(nativePages.count, 2)
+            XCTAssertTrue(nativePages.allSatisfy { $0.rootSafeAreaContext != nil },
+                          "native SplitView pages must inherit the window's safe-area proposal")
+            let sidebarPage = try XCTUnwrap(nativePages.first { $0.origin.x < split.origin.x + 1 })
+            XCTAssertGreaterThan(sidebarPage.layoutSafeArea(in: sidebarPage.allocatedBounds).insets.top, 0,
+                                 "the sidebar page must inherit the title-bar's unsafe strip")
             for index in [1, 0, 1, 0] {
                 page.wrappedValue = index
                 let contentID = index == 0 ? "files" : "git"
@@ -151,6 +158,7 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 let bottom = try XCTUnwrap(host.view(id: .manual(bottomID)))
                 XCTAssertEqual(split.laidOutFrame.width, originalSize.width, accuracy: 1)
                 XCTAssertEqual(split.laidOutFrame.height, originalSize.height, accuracy: 1)
+                XCTAssertGreaterThan(sidebarPage.layoutSafeArea(in: sidebarPage.allocatedBounds).insets.top, 0)
                 XCTAssertGreaterThanOrEqual(content.origin.y, tabs.origin.y + tabs.frame.height - 1)
                 XCTAssertLessThanOrEqual(content.origin.y + content.frame.height,
                                          bottom.origin.y + 1)

@@ -67,7 +67,6 @@ final class WinUIImageView: WinUIView {
         if let name = source?.symbol {
             found = swiftomniui_winui_image_set_symbol(handle, name, aspect.rawValue, font.size ?? 0,
                 font.weight ?? (font.attributes.contains(.bold) ? 700 : 0), font.textStyle?.rawValue ?? -1, &size)
-            if !found { WinUIRenderer.log.error("no symbol \(name) the platform knows") }
         } else {
             let files = PictureArithmetic.files(for: file)
             found = WinUIStrings.withCStrings(files) { names in

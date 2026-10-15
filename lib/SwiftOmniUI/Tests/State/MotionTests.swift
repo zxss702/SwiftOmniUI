@@ -38,6 +38,51 @@ import XCTest
         XCTAssertNil(next.layoutTransition, "later unanimated data must not inherit the earlier transaction")
     }
 
+    func testOrdinaryHoverColourArrivesWithoutAnImplicitAnimation() {
+        let renders = Renders()
+
+        func row(_ hovered: Bool) -> Node {
+            ZStack { Text("Row") }
+                .background(hovered ? Color("#333333") : Color("#FFFFFF"))
+                .id("hover-row")
+                .node
+        }
+
+        renders.render(row(false), animation: .none)
+        let patch = renders.render(row(true), animation: .none)
+
+        XCTAssertEqual(patch.props[.background], Color("#333333").propValue)
+        XCTAssertNil(patch.transitions[.background])
+    }
+
+    func testValueGatedHoverColourStillAnimatesWhenItsValueChanges() {
+        let renders = Renders()
+        let law = Animation.eased(120, .linear)
+
+        func row(_ hovered: Bool) -> Node {
+            ZStack { Text("Row") }
+                .background(hovered ? Color("#333333") : Color("#FFFFFF"))
+                .animation(law, value: hovered)
+                .id("hover-row")
+                .node
+        }
+
+        renders.render(row(false), animation: .none)
+        let patch = renders.render(row(true), animation: .none)
+
+        XCTAssertEqual(patch.transitions[.background]?.animation, law)
+    }
+
+    func testFreshApplicationAndDifferDoNotAnimateOrdinaryChanges() {
+        XCTAssertEqual(ApplicationSession().animation, .none)
+
+        let differ = Differ()
+        let first = differ.reconcile(nil, with: panel(1))
+        let changed = differ.reconcile(first.node, with: panel(0.25)).patch
+        XCTAssertEqual(changed.props[.opacity], .number(0.25))
+        XCTAssertNil(changed.transitions[.opacity])
+    }
+
     /// A panel of a stated opacity, which is a number with a half-way.
     private func panel(_ opacity: Double, id: String = "panel") -> Node {
         ZStack { Text("x") }.opacity(opacity).id(id).node
@@ -719,6 +764,7 @@ import XCTest
     /// at the application's animation, and nothing else.
     func testAValueThatTravelsCarriesItsWalkAndNothingElse() {
         let differ = Differ()
+        differ.animation = .standard
 
         let first = differ.reconcile(nil, with: panel(1))
         XCTAssertEqual(first.patch.props["opacity"], .number(1))

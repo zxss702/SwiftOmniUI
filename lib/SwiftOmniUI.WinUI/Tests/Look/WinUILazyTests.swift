@@ -675,6 +675,77 @@ final class WinUILazyTests: XCTestCase {
         }
     }
 
+    func testPaintingMountedRowsKeepsTheLazyDocumentMeasurement() throws {
+        try onUIThread {
+            let highlighted = State(wrappedValue: false)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(0..<10_000) { number in
+                            Text("File \(number)")
+                                .foregroundStyle(highlighted.wrappedValue
+                                    ? Color("#FF0000") : Color("#0000FF"))
+                                .frame(height: 28)
+                        }
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let document = try XCTUnwrap(lazy.placingLayout as? WinUIScrollDocument)
+            let held = lazy.mounted.mapValues(\.view)
+            let measurements = lazy.cells.measurements
+            let searches = lazy.cells.searches
+            let documentRevision = document.measurementRevision
+            highlighted.wrappedValue = true
+            for _ in 0..<8 { host.step(); host.frame() }
+            XCTAssertEqual(lazy.cells.measurements, measurements,
+                           "paint-only updates must reuse measured row extents")
+            XCTAssertEqual(lazy.cells.searches, searches,
+                           "paint-only updates must not search the row source again")
+            XCTAssertEqual(document.measurementRevision, documentRevision,
+                           "paint-only updates must not invalidate the scroll document")
+            for (identity, view) in held { XCTAssertTrue(lazy.mounted[identity]?.view === view) }
+            XCTAssertEqual(lazy.cells.extents.spacing, 8)
+        }
+    }
+
+    func testNativeScrollNoticeRealizesItsUpcomingWindowBeforeTheNextPass() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<10_000) { number in
+                            Text("Commit \(number)").frame(height: 32)
+                        }
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let firstWindow = lazy.cells.built
+            let firstView = try XCTUnwrap(lazy.mounted[lazy.cells.orderedIdentities[firstWindow.lowerBound]]?.view)
+            let requested = lazy.cells.requests
+            let standing = scroll.scroller.standing.offset
+            scroll.scroller.nextOffset = Point(0, standing.y + 4_000)
+            for ear in scroll.scroller.ears { ear.moved() }
+            XCTAssertGreaterThan(lazy.cells.built.lowerBound, firstWindow.upperBound,
+                                 "the announced viewport is requested before another native layout pass")
+            XCTAssertGreaterThan(lazy.cells.requests, requested)
+            XCTAssertLessThan(lazy.cells.built.count, 80,
+                              "a distant fling does not build the intervening document")
+            scroll.scroller.nextOffset = nil
+            scroll.scroller.move(to: Point(0, standing.y + 4_000))
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertFalse(lazy.mounted.isEmpty)
+            XCTAssertFalse(lazy.mounted.values.contains { $0.view === firstView },
+                           "rows outside the moving window leave the native tree")
+        }
+    }
+
     func testSpeculativeProposalsKeepEveryLazyContainersCommittedGeometry() throws {
         try onUIThread {
             for kind in 0..<4 {

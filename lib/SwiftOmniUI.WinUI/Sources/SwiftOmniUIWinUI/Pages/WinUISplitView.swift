@@ -95,12 +95,22 @@ final class WinUISplitView: WinUILayoutView {
         guard items.count != pages.count || !zip(items, pages).allSatisfy({ $0.arranges(like: $1) }) else { return false }
 
         for page in pages where !items.contains(where: { $0.view === page.view }) {
-            page.view.nativeLayoutOwner = nil
+            release(page.view)
         }
         pages = items
         for page in items {
-            page.view.placingLayout = nil
-            page.view.nativeLayoutOwner = self
+            let view = page.view
+            view.placingLayout = nil
+            guard view.nativeLayoutOwner !== self else { continue }
+            view.nativeLayoutOwner = self
+            // A SplitView places its pages in XAML, so `WinUIView.layout` never
+            // passes them the enclosing safe region. Resolve that region when
+            // the native page is arranged, using its actual column position.
+            view.rootSafeAreaContext = { [weak self, weak view] bounds in
+                guard let self, let view else { return SafeAreaContext(bounds: bounds) }
+                return self.safeArea(for: view, in: bounds)
+            }
+            view.safeAreaContext = nil
         }
         configure()
         invalidateMeasurements()
@@ -173,6 +183,30 @@ final class WinUISplitView: WinUILayoutView {
         sidebar.layout(bounds)
     }
 
+    private func safeArea(for page: WinUIView, in bounds: Rect) -> SafeAreaContext {
+        guard allocatedBounds.width > 0, allocatedBounds.height > 0 else {
+            return SafeAreaContext(bounds: bounds)
+        }
+        let parent = origin, child = page.origin
+        let place = Rect(child.x - parent.x, child.y - parent.y, bounds.width, bounds.height)
+        return layoutSafeArea(in: allocatedBounds).child(
+            in: place, preservingOutsets: page.sourceElement?.observesSafeArea == true)
+    }
+
+    override func safeAreaChanged() {
+        super.safeAreaChanged()
+        // Native pages have no `placingLayout` to receive the usual context
+        // assignment. Their root closures read the new region on arrangement.
+        for page in pages { page.view.safeAreaChanged() }
+    }
+
+    private func release(_ page: WinUIView) {
+        guard page.nativeLayoutOwner === self else { return }
+        page.nativeLayoutOwner = nil
+        page.rootSafeAreaContext = nil
+        page.safeAreaContext = nil
+    }
+
     /// The host's one adaptation: a window wide enough for both panes opens with its sidebar shown, and says so.
     private func adaptToFirstRoom(width: Double) {
         guard adaptation.room(width, breakpoint: WinUISidebarView.expandsAt, shown: isPresented) else { return }
@@ -225,7 +259,7 @@ final class WinUISplitView: WinUILayoutView {
     }
 
     override func detach() {
-        for page in pages { page.view.nativeLayoutOwner = nil }
+        for page in pages { release(page.view) }
         sidebar.clear()
         middle.clear()
         ownedPages = []

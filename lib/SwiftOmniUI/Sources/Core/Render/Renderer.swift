@@ -522,7 +522,7 @@ public final class Renderer: @unchecked Sendable {
     /// they read lands in `rootReads`.
     private var root: (tree: Node, styles: StyleSheet?, animation: Animation) {
         guard let application = application else {
-            return (Renderer.unregistered, nil, .standard)
+            return (Renderer.unregistered, nil, .none)
         }
 
         // The application is the root and its open scenes its children.

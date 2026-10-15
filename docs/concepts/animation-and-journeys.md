@@ -22,12 +22,13 @@ still apply the final destination, normally by snapping. Only checked rows in
 
 Three special values select ownership:
 
-- `.inherited` resolves through the value or element, the application default,
-  and finally `Animation.standard`;
+- `.inherited` resolves through the value or element, then the application
+  default, which starts at `.none`;
 - `.none` snaps to the destination;
 - `.custom` leaves the walk to a SwiftOmniUI engine attached to the state.
 
-`Animation.standard` is a 200-millisecond cubic-out movement. Reduced-animation input
+`Animation.standard` is a 200-millisecond cubic-out movement chosen by
+`withAnimation()` or an explicit application setting. Reduced-animation input
 may shorten or remove an animation, but never changes its destination.
 
 ## Described property animation
@@ -66,7 +67,7 @@ For an ordinary described property, SwiftOmniUI chooses its law in this order:
 1. the last `.animation(animation, values)` rule on that element whose group matches;
 2. the element's `.animation(animation)` base rule;
 3. `ApplicationSession.animation`;
-4. `Animation.standard`.
+4. `.none` when the application has not chosen an animation.
 
 A later selective rule wins over an earlier matching rule. An element's rule
 applies to that element, not recursively to its descendants. A composed view
@@ -152,7 +153,7 @@ For a host-carried state, animation selection is:
 1. an explicit law supplied to `move(to:_:)`;
 2. the state's law from `@State(animation:)` or `journey.animation`;
 3. the attached element's resolved law when the state says `.inherited`;
-4. the application law, then `Animation.standard`.
+4. the application law, which starts at `.none`.
 
 One state is one host animation channel. Every control and driven property attached
 to it observes the same standing value, destination, velocity, and completion.

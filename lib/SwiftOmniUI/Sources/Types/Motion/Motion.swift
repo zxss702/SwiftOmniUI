@@ -7,8 +7,8 @@
 
 /// How a value animates when it changes.
 ///
-/// A change animates by default - assign a state and the control animates to
-/// the new value - and an animation says how:
+/// A plain change arrives immediately. An animation says how a change moves
+/// when a view, transaction, or application asks for one:
 ///
 ///     VStack { … }.animation(.spring(response: 0.26))
 ///
@@ -50,8 +50,7 @@ public struct Animation: Equatable, Sendable {
     /// see `custom`.
     @_spi(Host) public let isCustom: Bool
 
-    /// The animation the element resolves to: its own, else the application's,
-    /// else `standard`.
+    /// The animation the element resolves to: its own, else the application's.
     ///
     /// What a write means when it names no animation, so a plain assignment and
     /// `move(to:)` agree about the animation and differ only in being awaited.
@@ -126,8 +125,8 @@ public struct Animation: Equatable, Sendable {
         isInherited ? fallback : self
     }
 
-    /// The default animation: 200 milliseconds on `.cubicOut`, for ordinary
-    /// changes and a scroller's landing.
+    /// A conventional 200-millisecond `.cubicOut` animation, used when an
+    /// animation is requested without an explicit timing law.
     @_spi(Host) public static let standard = Animation.eased(200, .cubicOut)
 }
 
