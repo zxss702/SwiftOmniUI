@@ -42,9 +42,9 @@ enum GTKHoverHold {
     /// no part of that widget's surface, or GTK cannot say. The host's own answer, which a test stands aside for one
     /// of its own.
     static let livePointerPlace: (GTKView) -> Point? = { view in
-        guard let native = gtk_widget_get_native(view.widget.opaque),
+        guard let native = gtk_widget_get_native(view.widget),
               let surface = gtk_native_get_surface(native),
-              let display = gtk_widget_get_display(view.widget.opaque),
+              let display = gtk_widget_get_display(view.widget),
               let seat = gdk_display_get_default_seat(display),
               let pointer = gdk_seat_get_pointer(seat) else { return nil }
         var x = 0.0
@@ -94,7 +94,7 @@ enum GTKHoverHold {
     /// Whether a place of the view's native widget reaches the view, or what stands in it: the question a tap asks
     /// GTK before it is the view's (`GTKListening.tapReleased`), asked of the native the place is measured in.
     static func reaches(_ view: GTKView, _ place: Point) -> Bool {
-        guard let native = gtk_widget_get_native(view.widget.opaque) else { return false }
+        guard let native = gtk_widget_get_native(view.widget) else { return false }
         var from = graphene_point_t(x: Float(place.x), y: Float(place.y))
         var to = graphene_point_t()
         let nativeWidget = UnsafeMutableRawPointer(native).assumingMemoryBound(to: GtkWidget.self)
