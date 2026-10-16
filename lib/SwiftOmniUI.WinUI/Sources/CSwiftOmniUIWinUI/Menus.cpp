@@ -23,6 +23,29 @@
 using namespace swiftomniui;
 using Entries = winrt::Windows::Foundation::Collections::IVector<controls::MenuFlyoutItemBase>;
 
+extern "C" void swiftomniui_winui_menu_set_shortcuts(
+    SwiftOmniUIObjectRef handle, int64_t view, int32_t const *keys,
+    int32_t const *modifiers, int32_t const *items, int32_t count) {
+    try {
+        auto owner = as<xaml::UIElement>(handle);
+        auto accelerators = owner.KeyboardAccelerators();
+        accelerators.Clear();
+        owner.KeyboardAcceleratorPlacementMode(xaml::Input::KeyboardAcceleratorPlacementMode::Hidden);
+        for (int32_t at = 0; at < count; ++at) {
+            if (!keys[at]) continue;
+            xaml::Input::KeyboardAccelerator accelerator;
+            accelerator.Key(static_cast<winrt::Windows::System::VirtualKey>(keys[at]));
+            accelerator.Modifiers(static_cast<winrt::Windows::System::VirtualKeyModifiers>(modifiers[at]));
+            accelerator.Invoked(guarded("handling a menu shortcut",
+                [view, item = items[at]](auto const &, xaml::Input::KeyboardAcceleratorInvokedEventArgs const &args) {
+                    args.Handled(true);
+                    callbacks.menuChosen(view, item);
+                }));
+            accelerators.Append(accelerator);
+        }
+    } catch (...) { report("setting menu shortcuts"); }
+}
+
 namespace {
     /// Gives `entry` the identifier whatever drives the application finds it by; none for an empty one.
     void identify(xaml::UIElement const &entry, char const *identifier) {

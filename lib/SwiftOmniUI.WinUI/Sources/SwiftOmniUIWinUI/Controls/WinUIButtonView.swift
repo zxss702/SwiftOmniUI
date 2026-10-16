@@ -94,40 +94,8 @@ final class WinUIButtonView: WinUIView {
     /// The keyboard shortcut, as the `VirtualKey` and `VirtualKeyModifiers`
     /// numbers C++ hands straight to the accelerator.
     func setShortcut(_ shortcut: KeyboardShortcut?) {
-        let (key, modifiers) = shortcut.map(Self.numbers) ?? (0, 0)
-        swiftomniui_winui_button_set_shortcut(handle, key, modifiers)
-    }
-
-    /// The key and modifiers as Windows numbers them: a character's ASCII,
-    /// the named keys their `VirtualKey`, the command modifier Control.
-    private static func numbers(_ shortcut: KeyboardShortcut) -> (Int32, Int32) {
-        var modifiers: Int32 = 0
-        if shortcut.modifiers.contains(.command) { modifiers |= 1 }
-        if shortcut.modifiers.contains(.shift) { modifiers |= 4 }
-        if shortcut.modifiers.contains(.option) { modifiers |= 2 }
-        if shortcut.modifiers.contains(.control) { modifiers |= 1 }
-        let key: Int32 = switch shortcut.key.name {
-        case "return", "defaultaction": 13
-        case "escape", "cancelaction": 27
-        case "tab": 9
-        case "space": 32
-        case "delete": 8
-        case "deleteforward": 46
-        case "left": 37
-        case "up": 38
-        case "right": 39
-        case "down": 40
-        case "home": 36
-        case "end": 35
-        case "pageup": 33
-        case "pagedown": 34
-        case let name where name.hasPrefix("f") && name.dropFirst().allSatisfy(\.isNumber):
-            Int32(name.dropFirst()).map { $0 >= 1 && $0 <= 24 ? 111 + $0 : 0 } ?? 0
-        case let name where name.count == 1:
-            Int32(name.uppercased().unicodeScalars.first?.value ?? 0)
-        default: 0
-        }
-        return (key, modifiers)
+        let (key, modifiers) = shortcut.map(WinUIKeyboardShortcut.numbers) ?? (0, 0)
+        swiftomniui_winui_button_set_shortcut(handle, number, key, modifiers)
     }
 
     /// The staying-pressed look, or none: `nil` makes the button momentary
@@ -150,6 +118,7 @@ final class WinUIButtonView: WinUIView {
     }
 
     override func detach() {
+        setShortcut(nil)
         super.detach()
         onClicked = nil
         onPressed = nil

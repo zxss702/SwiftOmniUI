@@ -126,7 +126,7 @@ tree changed it or the choices changed, so the user's choice is never argued
 with. `isOpen` opens and closes the list; the user's opening and closing are
 reported and the program's are not, so the user closing a list the program
 opened is reported. The list standing open over the pointer holds the hover of
-what it covers, as a date picker's calendar does ([a popup over the
+the layer it opens above, as a date picker's calendar does ([a popup over the
 pointer](input.md#a-popup-over-the-pointer)). The chosen choice's mark in the
 list is the picker's tint.
 

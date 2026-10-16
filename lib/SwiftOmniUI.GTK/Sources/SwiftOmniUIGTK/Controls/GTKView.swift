@@ -415,14 +415,16 @@ class GTKView {
     /// What the view heard, handed to what hears it.
     ///
     /// A popup standing over the pointer takes the pointer to a surface of its own, so GTK tells the views under it
-    /// that the pointer left - which it did not. That exit is withheld until the last popup goes; a pointer coming
-    /// back on the view drops what was withheld, since the view's hover never left either.
+    /// that the pointer left - which it did not. That exit is withheld while a popup stands over the view; a pointer
+    /// coming back on the view drops what was withheld, since the view's hover never left either. A popup standing
+    /// over one layer is no popup over the layer it opens in: what stands in the popup itself - its own card's
+    /// content, where the pointer is - hears the pointer's own exits.
     /// Design: docs/design/platforms/gtk/input.md#a-popup-over-the-pointer
     func heard(_ heard: HeardInput) {
         if case .pointer(let event, _) = heard {
             if event == .pointerEntered {
                 GTKHoverHold.resumed(self)
-            } else if event == .pointerExited, GTKHoverHold.isStanding {
+            } else if event == .pointerExited, GTKHoverHold.standsOver(self) {
                 GTKHoverHold.withhold(heard, for: self)
                 return
             }
@@ -430,7 +432,7 @@ class GTKView {
         deliver(heard)
     }
 
-    /// What the view heard, past the hold above - what the hold itself uses when the last popup goes.
+    /// What the view heard, past the hold above - what the hold itself uses when a popup's going settles it.
     func deliver(_ heard: HeardInput) {
         onHeard?(heard)
     }

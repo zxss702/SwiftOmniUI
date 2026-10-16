@@ -382,7 +382,20 @@ extern "C" void swiftomniui_winui_button_invoke(SwiftOmniUIObjectRef handle) {
     }
 }
 
-extern "C" void swiftomniui_winui_button_set_shortcut(SwiftOmniUIObjectRef handle, int32_t key, int32_t modifiers) {
+extern "C" int32_t swiftomniui_winui_shortcut_key(uint32_t scalar, int32_t *modifiers) {
+    if (scalar > 0xffff || (scalar >= 0xd800 && scalar <= 0xdfff)) return 0;
+    auto mapped = VkKeyScanExW(static_cast<wchar_t>(scalar), GetKeyboardLayout(0));
+    if (mapped == -1) return 0;
+    auto shift = (static_cast<uint16_t>(mapped) >> 8) & 0xff;
+    if (modifiers) {
+        if (shift & 1) *modifiers |= 4; // Shift
+        if (shift & 2) *modifiers |= 1; // Control
+        if (shift & 4) *modifiers |= 2; // Alt (Menu)
+    }
+    return mapped & 0xff;
+}
+
+extern "C" void swiftomniui_winui_button_set_shortcut(SwiftOmniUIObjectRef handle, int64_t view, int32_t key, int32_t modifiers) {
     try {
         auto button = as<primitives::ToggleButton>(handle);
         // No key takes the shortcut away; any other is a Windows virtual key
@@ -393,6 +406,17 @@ extern "C" void swiftomniui_winui_button_set_shortcut(SwiftOmniUIObjectRef handl
         xaml::Input::KeyboardAccelerator accelerator;
         accelerator.Key(static_cast<winrt::Windows::System::VirtualKey>(key));
         accelerator.Modifiers(static_cast<winrt::Windows::System::VirtualKeyModifiers>(modifiers));
+        // Our native buttons are ToggleButtons. Their default accelerator uses
+        // UIA Toggle, which changes IsChecked but does not raise Click. Dispatch
+        // the same toggle-then-click sequence as a pointer press, exactly once.
+        accelerator.Invoked(guarded("handling a button shortcut",
+            [weak = winrt::make_weak(button), view](auto const &, xaml::Input::KeyboardAcceleratorInvokedEventArgs const &args) {
+                auto target = weak.get();
+                if (!target || !target.IsEnabled()) return;
+                args.Handled(true);
+                pattern<provider::IToggleProvider>(target, PatternInterface::Toggle).Toggle();
+                callbacks.clicked(view);
+            }));
         accelerators.Append(accelerator);
     } catch (...) {
         report("setting a button's shortcut");

@@ -622,15 +622,16 @@ class WinUIView {
     /// What the view presents opened or closed of WinUI's accord: a split view's sidebar, a picker's list, a date
     /// picker's calendar, a context menu, a menu button's menu, a popover's card.
     ///
-    /// A popup standing over the pointer holds the hover of what it stands over, so the base counts them; a view that
-    /// overrides this and does not call it - a split view's sidebar, which opens beside the pointer - is no popup
-    /// over it.
+    /// A popup standing over the pointer holds the hover of what it stands over, so the base counts each by the view
+    /// that presents it, and reads from that view what the popup holds of the element tree - its own content, which
+    /// the popup does not stand over; a view that overrides this and does not call it - a split view's sidebar, which
+    /// opens beside the pointer - is no popup over it.
     /// Design: docs/design/platforms/winui/input.md#a-popup-over-the-pointer
     func presented(_ open: Bool) {
         if open {
-            WinUIHoverHold.began()
+            WinUIHoverHold.began(self)
         } else {
-            WinUIHoverHold.ended()
+            WinUIHoverHold.ended(self)
         }
     }
 
@@ -707,14 +708,16 @@ class WinUIView {
     /// What the relay says the view heard.
     ///
     /// A popup standing over the pointer takes the pointer with it, so WinUI tells the views under it that it left -
-    /// which it did not. That exit is withheld until the last popup goes; a pointer coming back on the view drops
-    /// what was withheld, since its hover never left either.
+    /// which it did not. That exit is withheld while a popup stands over the view; a pointer coming back on the view
+    /// drops what was withheld, since its hover never left either. A popup standing over one layer is no popup over
+    /// the layer it opens in: what stands in a popup - its own card's content, where the pointer is - hears the
+    /// pointer's own exits, and so does a card's content while a popup opened from inside it stands over the card.
     /// Design: docs/design/platforms/winui/input.md#a-popup-over-the-pointer
     func heard(_ heard: HeardInput) {
         if case .pointer(let event, _) = heard {
             if event == .pointerEntered {
                 WinUIHoverHold.resumed(self)
-            } else if event == .pointerExited, WinUIHoverHold.isStanding {
+            } else if event == .pointerExited, WinUIHoverHold.standsOver(self) {
                 WinUIHoverHold.withhold(heard, for: self)
                 return
             }
@@ -722,7 +725,7 @@ class WinUIView {
         deliver(heard)
     }
 
-    /// What the view heard, past the hold above - what the hold itself uses when the last popup goes.
+    /// What the view heard, past the hold above - what the hold itself uses when a popup's going settles it.
     func deliver(_ heard: HeardInput) {
         onHeard?(heard)
     }
@@ -749,6 +752,8 @@ class WinUIView {
     func detach() {
         isDetached = true
         WinUIHoverHold.letGo(of: self)
+        // The popups it presented stood with it, and their going settles what they held.
+        WinUIHoverHold.ended(self)
         if let blurPresenter { swiftomniui_winui_blur_clear(blurPresenter) }
         hear([]) { _ in }
         setFocusChanged(nil)

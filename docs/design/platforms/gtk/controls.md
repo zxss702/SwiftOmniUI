@@ -224,7 +224,7 @@ label of its own beside the button's arrow - the day or the time, and its
 popover the face the user picks from. Only the user's opening and closing of
 the face are heard, by the host layer's rule
 ([a day and a time](../../host/runtime.md#a-day-and-a-time)). A face standing
-over the pointer does not take the hover of what it covers
+over the pointer does not take the hover of the layer it opens above
 ([a popup over the pointer](input.md#a-popup-over-the-pointer)).
 
 A DatePicker's face is a `GtkCalendar`, which stays open as the user picks,

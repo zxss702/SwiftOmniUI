@@ -213,12 +213,13 @@ included; the item's own handler runs. A bar's menus are written the same
 way. Any entry the tree changes, adds or
 removes gives the view its menu again, and a menu with no entries is none.
 
-A menu standing open over the pointer holds the hover of what it covers, as
-every popup the user sees stand over the pointer does ([a popup over the
-pointer](input.md#a-popup-over-the-pointer)). A bar's own menus do not: they
-stand at the window's edge, away from what a popup could cover. A split view's
-sidebar does not either - it opens beside the pointer and takes no hover from
-what it leaves behind.
+A menu standing open over the pointer holds the hover of the layer it opens
+above, as every popup the user sees stand over the pointer does ([a popup over
+the pointer](input.md#a-popup-over-the-pointer)); what stands in the menu - its
+own cards, where the pointer is - hears the pointer's own exits. A bar's own
+menus do not: they stand at the window's edge, away from what a popup could
+cover. A split view's sidebar does not either - it opens beside the pointer and
+takes no hover from what it leaves behind.
 
 A view-labeled Menu requests its root content through the native flyout's
 Opening event. MenuFlyoutSubItem has no separate public Opening event; WinUI

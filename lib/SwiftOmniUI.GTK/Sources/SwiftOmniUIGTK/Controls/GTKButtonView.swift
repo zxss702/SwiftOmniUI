@@ -54,48 +54,19 @@ final class GTKButtonView: GTKView {
             shortcutController = nil
         }
         guard let shortcut else { return }
-        let keyval = Self.keyval(shortcut.key.name)
-        guard keyval != GDK_KEY_VoidSymbol else { return }
-        var mask = GdkModifierType(rawValue: 0).rawValue
-        if shortcut.modifiers.contains(.command) || shortcut.modifiers.contains(.control) {
-            mask |= GDK_CONTROL_MASK.rawValue
-        }
-        if shortcut.modifiers.contains(.shift) { mask |= GDK_SHIFT_MASK.rawValue }
-        if shortcut.modifiers.contains(.option) { mask |= GDK_ALT_MASK.rawValue }
-        let modifiers = GdkModifierType(rawValue: mask)
         guard let controller = gtk_shortcut_controller_new(),
-              let trigger = gtk_keyval_trigger_new(keyval, modifiers),
+              let trigger = GTKKeyboardShortcut.trigger(shortcut),
               let action = gtk_callback_action_new({ target, _, _ in
-                  target.map { gtk_widget_activate($0) } ?? 0
+                  guard let target, gtk_widget_is_sensitive(target) != 0,
+                        gtk_widget_get_mapped(target) != 0 else { return 0 }
+                  return gtk_widget_activate(target)
               }, widget, nil),
               let made = gtk_shortcut_new(trigger, action)
         else { return }
+        gtk_shortcut_controller_set_scope(controller, GTK_SHORTCUT_SCOPE_GLOBAL)
         gtk_shortcut_controller_add_shortcut(controller, made)
         gtk_widget_add_controller(widget, controller)
         shortcutController = controller
-    }
-
-    /// The key's GDK keyval: the named keys by the names GDK gives them, a
-    /// character by itself.
-    private static func keyval(_ name: String) -> guint {
-        let gdk: String = switch name {
-        case "return", "defaultaction": "Return"
-        case "escape", "cancelaction": "Escape"
-        case "tab": "Tab"
-        case "space": "space"
-        case "delete": "BackSpace"
-        case "deleteforward": "Delete"
-        case "up": "Up"
-        case "down": "Down"
-        case "left": "Left"
-        case "right": "Right"
-        case "home": "Home"
-        case "end": "End"
-        case "pageup": "Page_Up"
-        case "pagedown": "Page_Down"
-        default: name
-        }
-        return gdk.withCString { gdk_keyval_from_name($0) }
     }
 
     /// The logical style's CSS classes on the widget now.
@@ -279,6 +250,7 @@ final class GTKButtonView: GTKView {
     }
 
     override func detach() {
+        setShortcut(nil)
         super.detach()
         onClicked = nil
         onToggled = nil

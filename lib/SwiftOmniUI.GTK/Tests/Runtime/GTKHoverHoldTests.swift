@@ -26,8 +26,39 @@ private struct HoverRowPage: View {
     }
 }
 
-/// What a popup standing over the pointer does to the hover of what it covers: the exit GTK tells is held while it
-/// stands, and when the last one goes the truth is taken again from where the pointer is.
+/// A page whose anchor presents a popover, its card holding a row of the page's own with a menu on it: what stands in
+/// a popup, and what a popup opened from inside it stands over.
+private struct HoverCardPage: View {
+    /// The card row's own hover, which the page writes and the test reads.
+    let hovered: State<Bool>
+
+    @State private var showing = true
+
+    var body: some View {
+        VStack {
+            ZStack { Text("Anchor") }
+                .frame(width: 200, height: 40)
+                .popover(isPresented: $showing) {
+                    VStack {
+                        ZStack { Text("Card Row") }
+                            .frame(width: 200, height: 40)
+                            .onHover { hovered.wrappedValue = $0 }
+                            .id("card-row")
+                        Menu { MenuItem("Open") } label: { Text("Menu") }
+                    }
+                }
+                .id("anchor")
+        }
+        .frame(width: 300)
+        .horizontalAlignment(.start)
+        .verticalAlignment(.start)
+    }
+}
+
+/// What a popup standing over the pointer does to the hover of the layer it opens above: the exit GTK tells is held
+/// while a popup stands over the view, and a popup going takes the truth again from where the pointer is. What stands
+/// in a popup is what the pointer is on, so it hears the pointer's own exits, and a popup opened from inside a card
+/// stands over the card's own views as well.
 /// Design: docs/design/platforms/gtk/input.md#a-popup-over-the-pointer
 final class GTKHoverHoldTests: XCTestCase {
     /// The page under a menu the test opened - the row's own hover to read, and the menu to close.
@@ -68,6 +99,7 @@ final class GTKHoverHoldTests: XCTestCase {
         gtk_menu_button_popup(menu.widget.opaque)
         host.settle { GTKHoverHold.isStanding }
         XCTAssertTrue(GTKHoverHold.isStanding, "the menu the test opened stands over the pointer")
+        XCTAssertTrue(GTKHoverHold.standsOver(row), "the menu stands over the row it drops on")
 
         row.heard(.pointer(.pointerEntered, .zero))
         XCTAssertTrue(hovered.wrappedValue, "the pointer on the row turns it on")
@@ -158,6 +190,61 @@ final class GTKHoverHoldTests: XCTestCase {
             gtk_widget_unparent(popover)
             host.step()
             XCTAssertFalse(GTKHoverHold.isStanding, "a popover whose widget went counts for nothing")
+        }
+    }
+
+    /// What stands in a popup is on the popup, not under it: the exits GTK tells a card's own row while the card
+    /// stands are the pointer's own, and are delivered.
+    func testARowInsideTheCardHearsThePointersOwnExits() throws {
+        try onUIThread {
+            let hovered = State(wrappedValue: false)
+            let host = GTKRenderer.running { HoverCardPage(hovered: hovered) }
+            host.settle { GTKHoverHold.isStanding }
+            XCTAssertTrue(GTKHoverHold.isStanding, "the card the page presents stands over the pointer")
+            let cardRow = try XCTUnwrap(host.view(id: .manual("card-row")), "the card's row is a view of the tree")
+            XCTAssertFalse(
+                GTKHoverHold.standsOver(cardRow), "the card stands over the page, not over its own row")
+
+            cardRow.heard(.pointer(.pointerEntered, .zero))
+            XCTAssertTrue(hovered.wrappedValue, "the pointer on the card's row turns it on")
+            cardRow.heard(.pointer(.pointerExited, .zero))
+            XCTAssertEqual(GTKHoverHold.holding, 0, "the card's own row is what the pointer is on")
+            XCTAssertFalse(hovered.wrappedValue)
+        }
+    }
+
+    /// A menu on a card's row stands over it: the exit it caused is held while it stands, and its going settles the
+    /// row there and then, with the card still standing.
+    func testAMenuOnTheCardsRowHoldsIt() throws {
+        try onUIThread {
+            defer { GTKHoverHold.pointerPlace = GTKHoverHold.livePointerPlace }
+            let hovered = State(wrappedValue: false)
+            let host = GTKRenderer.running { HoverCardPage(hovered: hovered) }
+            host.settle { GTKHoverHold.isStanding }
+            let cardRow = try XCTUnwrap(host.view(id: .manual("card-row")), "the card's row is a view of the tree")
+            // A place of the card's own surface, past the row: the menu stands below the row in the card.
+            let pastTheCardRow = Point(x: 5, y: 500)
+            XCTAssertFalse(GTKHoverHold.reaches(cardRow, pastTheCardRow), "the place past the row is not the row")
+            GTKHoverHold.pointerPlace = { _ in pastTheCardRow }
+            XCTAssertFalse(GTKHoverHold.standsOver(cardRow), "the card holds its own row")
+
+            cardRow.heard(.pointer(.pointerEntered, .zero))
+            XCTAssertTrue(hovered.wrappedValue, "the pointer on the card's row turns it on")
+
+            let menu = try XCTUnwrap(host.views(GTKMenuButtonView.self).first)
+            gtk_menu_button_popup(menu.widget.opaque)
+            host.settle { GTKHoverHold.standsOver(cardRow) }
+            XCTAssertTrue(GTKHoverHold.standsOver(cardRow), "the menu stands over the card's row")
+
+            cardRow.heard(.pointer(.pointerExited, .zero))
+            XCTAssertEqual(GTKHoverHold.holding, 1, "the menu over the card's row holds it")
+            XCTAssertTrue(hovered.wrappedValue)
+
+            gtk_menu_button_popdown(menu.widget.opaque)
+            host.settle { GTKHoverHold.holding == 0 }
+            XCTAssertFalse(GTKHoverHold.standsOver(cardRow), "the menu went, and the card does not hold the row")
+            XCTAssertEqual(GTKHoverHold.holding, 0, "the menu going settles the row while the card stands")
+            XCTAssertFalse(hovered.wrappedValue, "the pointer is past the row")
         }
     }
 }

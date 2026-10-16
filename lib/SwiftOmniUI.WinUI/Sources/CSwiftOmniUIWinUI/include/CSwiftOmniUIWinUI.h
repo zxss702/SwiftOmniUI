@@ -530,7 +530,12 @@ void swiftomniui_winui_button_set_face(SwiftOmniUIObjectRef button, SwiftOmniUIO
 void swiftomniui_winui_toolbar_button_set_look(SwiftOmniUIObjectRef button);
 
 /// A button's keyboard shortcut: a `VirtualKey` number, `VirtualKeyModifiers` flags in the same order - 0 for none.
-void swiftomniui_winui_button_set_shortcut(SwiftOmniUIObjectRef button, int32_t key, int32_t modifiers);
+void swiftomniui_winui_button_set_shortcut(SwiftOmniUIObjectRef button, int64_t view, int32_t key, int32_t modifiers);
+/// A Unicode character to VirtualKey in the active keyboard layout; merges its required modifiers.
+int32_t swiftomniui_winui_shortcut_key(uint32_t scalar, int32_t *modifiers);
+/// Window-scoped menu commands, dispatched by their menuChosen index, including while the menu is closed.
+void swiftomniui_winui_menu_set_shortcuts(SwiftOmniUIObjectRef owner, int64_t view, int32_t const *keys,
+                                        int32_t const *modifiers, int32_t const *items, int32_t count);
 
 /// Whether a button keeps its pressed look and whether it is down: `toggleable` wears `isOn` at all, `on` its state.
 void swiftomniui_winui_button_set_on(SwiftOmniUIObjectRef button, int32_t toggleable, int32_t on);

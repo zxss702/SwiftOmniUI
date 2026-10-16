@@ -39,13 +39,22 @@ pointer left, and are told nothing when the popup goes, since the pointer
 never moved. SwiftUI holds their hover instead - the pointer did not leave the
 view it was on, so the view is not told it did
 ([what the user does with a finger](../../host/runtime.md#what-the-user-does-with-a-finger)) -
-and so does this host: the exit a popup caused is withheld while any of them
-stands, and when the last one goes the truth is taken again from the pointer's
-own place. The view the pointer is still on keeps its hover, since the core
-was never told it left; a view the pointer has left is handed the exit it was
-owed. Only a view the relay told an exit is ever held, so no walk of the
-element tree is asked for, and a popup's own relation to what it covers is
-never worked out.
+and so does this host: the exit a popup caused is withheld while a popup
+stands over the view, and a popup going takes the truth again from the
+pointer's own place. The view the pointer is still on keeps its hover, since
+the core was never told it left; a view the pointer has left is handed the
+exit it was owed. What a popup stands over is the layer it opens above, not
+its own content: the pointer is on that content, where its exits are the
+pointer's own, and a popup opened from inside it - a menu on a card's row -
+stands over the layer below the card too. The element tree answers it: what a
+popup holds is the element its own content stands in - a popover's card, which
+the tree keeps where the view it hangs off wrote it however WinUI islands it,
+and a menu's entries, the slot child of the view that offers them. A view that
+stands in that element is on the popup, and every other view of the tree is
+below it; a popup holding no element of the tree - a picker's list, whose rows
+are the platform's own - holds nothing of it, and so stands over all of it.
+Only a view the relay told an exit is ever held, so nothing is worked out from
+where a popup stands.
 
 Two things are no popup over the pointer. A split view's sidebar opens beside
 it, and what it does to the hover is what WinUI says
@@ -58,8 +67,8 @@ picker's list already did ([the callbacks](relay.md#the-callbacks)); where the
 pointer stands, and whether a place of the window's content reaches a view,
 the relay answers itself ([the C surface](relay.md#the-c-surface)). The rule
 is one place, `WinUIHoverHold`, and the view's `heard` is its gate: an exit is
-withheld while a popup stands and delivered once the last one goes, and a
-pointer coming back on the view drops what was withheld.
+withheld while a popup stands over the view and delivered once none does, and
+a pointer coming back on the view drops what was withheld.
 
 ## Taps
 
@@ -113,3 +122,31 @@ into it - to it, or to what stands in it, as a number box's own field - and
 when it leaves. WinUI's `GotFocus` and `LostFocus` bubble from inside the
 element, so as each arrives the relay asks where the keyboard is now, the
 act of moving the focus asking the same, and tells only a change.
+
+## Keyboard shortcuts
+
+On Windows, `EventModifiers.command` is Control, `option` is Alt, and `shift`
+is Shift. The public `.control` member is absent; the old serialized Control
+bit remains readable as Control. macOS keeps SwiftUI's native modifier meanings.
+
+Named equivalents map to `VirtualKey`. Character equivalents are translated
+with `VkKeyScanExW` and the active keyboard layout when bound, merging required
+Shift/Control/Alt flags. Unicode punctuation values must never be treated as
+virtual-key codes: `,` maps to the layout's comma key, not VK_PRINT (0x2C).
+Unrepresentable characters do not install an accelerator.
+
+Buttons keep native `KeyboardAccelerator`s. Since SOUI's native buttons are
+ToggleButtons, an Invoked handler performs their toggle and sends the click
+once, marking the accelerator handled before dispatch. The default UIA Toggle
+pattern alone does not send the button's Click action. Disabled buttons do
+not invoke, and detach removes their accelerators.
+
+Command/menu buttons and menu bars own their menu-command accelerators while
+the flyout is closed. Each binding carries the same item index as menuChosen;
+disabled entries and disabled submenus install none. Shortcut changes update
+menu equality, replacement clears the previous bindings, and detach clears
+them before releasing the owner. Native window scoping keeps bindings in the
+window whose menu owns them.
+
+See Microsoft's [character-to-key mapping](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-vkkeyscanexw)
+and [keyboard accelerator invocation](https://learn.microsoft.com/en-us/windows/apps/develop/input/keyboard-accelerators).

@@ -20,6 +20,10 @@ final class GTKMenu {
     /// The actions its items run, by name.
     let actions: UnsafeMutablePointer<GSimpleActionGroup>
 
+    /// Controllers keep this live model; replacing a menu updates shortcuts
+    /// without leaving controllers bound to an obsolete set of actions.
+    private let shortcuts: OpaquePointer
+
     /// Each item's element, by its action's name.
     private(set) var items: [String: () -> MountedElement?] = [:]
 
@@ -44,6 +48,7 @@ final class GTKMenu {
     init(_ entries: [MenuEntry]) {
         model = g_menu_new()
         actions = g_simple_action_group_new()!
+        shortcuts = g_list_store_new(gtk_shortcut_get_type())!
         replace(entries)
     }
 
@@ -52,6 +57,13 @@ final class GTKMenu {
         for submenu in models.values { g_object_unref(UnsafeMutableRawPointer(submenu)) }
         g_object_unref(UnsafeMutableRawPointer(model))
         g_object_unref(UnsafeMutableRawPointer(actions))
+        g_object_unref(UnsafeMutableRawPointer(shortcuts))
+    }
+
+    func installShortcuts(on widget: GTKWidget) {
+        guard let controller = gtk_shortcut_controller_new_for_model(shortcuts) else { return }
+        gtk_shortcut_controller_set_scope(controller, GTK_SHORTCUT_SCOPE_GLOBAL)
+        gtk_widget_add_controller(widget, controller)
     }
 
     /// Apply another description to this live menu without replacing its native objects.
@@ -79,6 +91,19 @@ final class GTKMenu {
         }
         actionNames = usedActions
         currentEntries = entries
+        g_list_store_remove_all(shortcuts)
+        func bind(_ entries: [MenuEntry]) {
+            for entry in entries where entry.isEnabled {
+                if entry.kind == .submenu { bind(entry.entries); continue }
+                guard entry.kind == .item, let shortcut = entry.shortcut,
+                      let trigger = GTKKeyboardShortcut.trigger(shortcut),
+                      let action = gtk_named_action_new(Self.actionGroup + ".e\(entry.element?.mount ?? 0)"),
+                      let native = gtk_shortcut_new(trigger, action) else { continue }
+                g_list_store_append(shortcuts, UnsafeMutableRawPointer(native))
+                g_object_unref(UnsafeMutableRawPointer(native))
+            }
+        }
+        bind(entries)
         drawn = []
         func describe(_ entries: [MenuEntry]) {
             for entry in entries {
@@ -92,7 +117,8 @@ final class GTKMenu {
 
     private static func sameHeaders(_ entries: [MenuEntry], _ old: [MenuEntry]) -> Bool {
         entries.count == old.count && zip(entries, old).allSatisfy {
-            $0.kind == $1.kind && $0.title == $1.title && $0.isEnabled == $1.isEnabled && $0.element === $1.element
+            $0.kind == $1.kind && $0.title == $1.title && $0.isEnabled == $1.isEnabled
+                && $0.shortcut == $1.shortcut && $0.element === $1.element
         }
     }
 

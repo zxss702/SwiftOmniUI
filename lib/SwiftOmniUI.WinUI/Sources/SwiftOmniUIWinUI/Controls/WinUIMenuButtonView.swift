@@ -45,6 +45,7 @@ final class WinUIMenuButtonView: WinUIView {
         guard !menu.draws(like: shown) else { return }
 
         shown = menu
+        menu.installShortcuts(on: self)
         WinUIStrings.withCStrings(menu.titles) { titles in
             WinUIStrings.withCStrings(menu.identifiers) { identifiers in
                 menu.kinds.withUnsafeBufferPointer { kinds in
@@ -59,6 +60,7 @@ final class WinUIMenuButtonView: WinUIView {
     }
 
     override func detach() {
+        swiftomniui_winui_menu_set_shortcuts(handle, number, nil, nil, nil, 0)
         super.detach()
         shown = WinUIMenu()
     }

@@ -282,10 +282,12 @@ and where, as shares of the view (`PinchStep`). A host's toolkit hears the
 input and says it as `HeardInput`.
 
 A popup standing over the pointer - a menu, a picker's list, a popover's card -
-does not take the hover of what it covers: the pointer did not leave the view
-it was on, so the view is not told it did, and what the host withheld while the
-popup stood is settled when the last one goes, by where the pointer then
-stands. It is a host's own rule, since a toolkit's popups differ; WinUI's is
+does not take the hover of the layer it opens above: the pointer did not leave
+the view it was on, so the view is not told it did, and what the host withheld
+while it stood is settled when a popup goes, by where the pointer then stands.
+What stands in a popup is not above it but on it, where the pointer is, and a
+popup opened from inside that content stands over the layer below it as well.
+It is a host's own rule, since a toolkit's popups differ; WinUI's is
 `WinUIHoverHold` ([a popup over the
 pointer](../platforms/winui/input.md#a-popup-over-the-pointer)) and, where a
 toolkit's popups are surfaces of their own, `GTKHoverHold`

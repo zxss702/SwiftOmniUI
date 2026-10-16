@@ -384,6 +384,7 @@ extension GTKPageFrame {
         gtk_menu_button_set_menu_model(button.opaque, g_menu_model(menu.model))
         GTKHoverHold.watch(menuButton: button)
         gtk_widget_insert_action_group(button, GTKMenu.actionGroup, OpaquePointer(menu.actions))
+        menu.installShortcuts(on: button)
         gtk_box_append(menuBox.of(GtkBox.self), button)
         mainMenu = (button, menu)
     }

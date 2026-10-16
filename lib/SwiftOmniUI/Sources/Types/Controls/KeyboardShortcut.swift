@@ -67,8 +67,11 @@ public struct EventModifiers: OptionSet, Equatable, Sendable {
     public static let shift = EventModifiers(rawValue: 1 << 1)
     /// The Option key - Alt elsewhere.
     public static let option = EventModifiers(rawValue: 1 << 2)
-    /// The Control key, where a shortcut wants it by name.
+    #if !os(Windows) && !os(Linux)
+    /// The physical Control key, distinct from Command on Apple platforms.
+    /// Windows and Linux use `.command` for their Control shortcuts.
     public static let control = EventModifiers(rawValue: 1 << 3)
+    #endif
 }
 
 /// A key pressed with modifiers: `.keyboardShortcut(.return)` is Cmd-Return

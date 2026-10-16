@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <unordered_set>
 #include <vector>
 
 #include <winrt/Microsoft.UI.Composition.h>
@@ -30,47 +29,32 @@ using winrt::Windows::Foundation::Rect;
 namespace {
     struct SwiftOmniUIPanel;
 
-    // Membership by ABI identity. Asking the projected child vector whether it
-    // holds an element answers with a linear scan, so synchronizing N children a
-    // question at a time cost N²; a set answers each identity once.
-    using ChildSet = std::unordered_set<void const *>;
-
-    ChildSet childSetOf(std::vector<xaml::UIElement> const &held) {
-        ChildSet set;
-        set.reserve(held.size() * 2 + 1);
-        for (auto const &child : held) set.insert(winrt::get_abi(child));
-        return set;
+    // Keeping a panel's children in place asks, per child, whether the panel
+    // already holds it. Both directions of that question are the same identity
+    // test on the projection, so the only thing worth buying back here is the
+    // common case — a pass that re-sends the same children in the same order,
+    // which is every pass that only re-measures.
+    bool sameChildren(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
+                      std::vector<xaml::UIElement> const &held) {
+        if (items.Size() != held.size()) return false;
+        for (uint32_t index = 0; index < held.size(); ++index) {
+            if (items.GetAt(index) != held[index]) return false;
+        }
+        return true;
     }
 
     void removeUnused(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
-                      ChildSet const &held) {
+                      std::vector<xaml::UIElement> const &held) {
         for (uint32_t index = items.Size(); index > 0; --index) {
-            if (held.find(winrt::get_abi(items.GetAt(index - 1))) == held.end()) items.RemoveAt(index - 1);
+            if (std::find(held.begin(), held.end(), items.GetAt(index - 1)) == held.end()) items.RemoveAt(index - 1);
         }
     }
 
     void insertInOrder(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
                        std::vector<xaml::UIElement> const &held) {
-        bool same = items.Size() == held.size();
-        for (uint32_t index = 0; same && index < held.size(); ++index) {
-            if (items.GetAt(index) != held[index]) same = false;
-        }
-        if (same) return;
-        // removeUnused ran first, so a child of `held` is in place, still to
-        // come, or absent from `items`; the set says which without a scan.
-        ChildSet present;
-        present.reserve(items.Size() * 2 + 1);
-        for (uint32_t index = 0; index < items.Size(); ++index) {
-            present.insert(winrt::get_abi(items.GetAt(index)));
-        }
+        if (sameChildren(items, held)) return;
         for (uint32_t index = 0; index < held.size(); ++index) {
             if (index < items.Size() && items.GetAt(index) == held[index]) continue;
-            if (present.find(winrt::get_abi(held[index])) == present.end()) {
-                items.InsertAt(index, held[index]);
-                present.insert(winrt::get_abi(held[index]));
-                continue;
-            }
-            // Still held, but not here: it moved.
             uint32_t previous;
             if (items.IndexOf(held[index], previous)) items.RemoveAt(previous);
             items.InsertAt(index, held[index]);
@@ -164,10 +148,8 @@ namespace {
             }
             // Remove from both parents before a child's role changes; intersecting
             // children remain attached so updating a mask never remounts content.
-            ChildSet sourceChildren = childSetOf(source);
-            ChildSet alphaChildren = childSetOf(alpha);
-            removeUnused(content.Children(), sourceChildren);
-            removeUnused(mask.Children(), alphaChildren);
+            removeUnused(content.Children(), source);
+            removeUnused(mask.Children(), alpha);
             insertInOrder(content.Children(), source);
             insertInOrder(mask.Children(), alpha);
             brush.Mask(maskElement ? alphaBrush : nullptr);
@@ -316,7 +298,7 @@ extern "C" void swiftomniui_winui_navigation_set(
         std::vector<xaml::UIElement> children;
         if (background) children.push_back(as<xaml::UIElement>(background));
         children.push_back(frame);
-        removeUnused(held.Children(), childSetOf(children));
+        removeUnused(held.Children(), children);
         insertInOrder(held.Children(), children);
         auto next = content ? as<xaml::UIElement>(content) : xaml::UIElement{nullptr};
         if (next == owner->navigationContent) return;
@@ -416,7 +398,7 @@ extern "C" void swiftomniui_winui_panel_set_children(
         for (int32_t index = 0; index < count; ++index) held.push_back(as<xaml::UIElement>(children[index]));
         // A lazy window usually changes at its edges. Keep the intersecting
         // UIElements attached, preserving their native state and composition.
-        removeUnused(items, childSetOf(held));
+        removeUnused(items, held);
         insertInOrder(items, held);
     } catch (...) {
         report("holding a panel's children");

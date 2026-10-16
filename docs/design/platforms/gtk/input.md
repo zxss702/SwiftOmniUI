@@ -66,17 +66,22 @@ pointer's.
 ## A popup over the pointer
 
 A popup standing over the pointer - a context menu, a menu button's menu, a
-popover's card, a picker's list - does not take the hover of what it covers:
-the pointer did not leave the view it was on, so the view is not told it did.
+popover's card, a picker's list - does not take the hover of the layer it
+opens above: the pointer did not leave the view it was on, so the view is not
+told it did.
 GTK takes the pointer to the popover's own surface all the same, so the views
 under it are told the pointer left and are told nothing when the popup goes,
 since the pointer never moved. The host layer's rule
 ([what the user does with a
 finger](../../host/runtime.md#what-the-user-does-with-a-finger)) withholds the
-exit such a popup caused while any popup stands, and the last one going takes
-the truth again from where the pointer stands then: what the pointer is still
-on keeps its hover, and what it has left is handed the exit it was owed
-(`GTKHoverHold`).
+exit such a popup caused while a popup stands over the view, and a popup going
+takes the truth again from where the pointer stands then: what the pointer is
+still on keeps its hover, and what it has left is handed the exit it was owed
+(`GTKHoverHold`). What a popup stands over is the layer it opens above, not
+its own content, where the pointer is and its exits are the pointer's own: a
+popup opened from inside that content stands over the layer below it too,
+asked of the widget tree, which holds a popover's card inside the popover's
+own widget.
 
 A popup is counted where it is made - the popover a page shows, a context
 menu's, a picker's face, the popover a menu button makes of the menu model it
@@ -84,8 +89,8 @@ is handed, the list a drop-down holds of GTK's own - and uncounted where GTK
 says it left the screen: the popover's own `visible` where the host took it
 away, or the unmapping of one whose widget went without being told to hide, so
 no count outlives what it counted. Only a view the motion controller told an
-exit is ever held, so no walk of the element tree is needed, and a popup's own
-relatedness to what it covers is never asked.
+exit is ever held, so nothing is worked out from where a popup stands; the one
+question asked of a held exit is whether the view stands in the popup.
 
 ## A press dragged
 
@@ -119,3 +124,26 @@ the keyboard moving between a control's own parts tells nothing. A widget
 GTK gives no keyboard focus - a label, a box, a picture - never takes it,
 whoever asks, so its element hears nothing; the act that puts the keyboard
 on it answers that it did not.
+
+## Keyboard shortcuts
+
+On Linux, `EventModifiers.command` is Control, `option` is Alt, and `shift`
+is Shift. The public `.control` member is absent; the old serialized Control
+bit is still recognized as Control. macOS continues to use SwiftUI's own
+Command, Option and Control distinctions.
+
+Character equivalents use `gdk_unicode_to_keyval`, so punctuation such as
+`,` is a character rather than an invalid GDK key name. Named keys and function
+keys use GDK's names. Buttons use a `GtkShortcutController` with window-global
+scope, so keyboard focus can remain in an editor; an insensitive or unmapped
+button cannot activate. Detaching a button removes its controller.
+
+Command/menu buttons install window-global controllers backed by the menu's
+live `GListStore` of shortcuts. Named actions resolve through that owner's
+action group, even when its popover is closed. Replacing entries updates the
+model and excludes disabled items and disabled submenus. Removing the owner
+removes its root-scoped registration. Shortcut changes participate in menu
+equality rather than leaving an obsolete binding in place.
+
+See GTK's [shortcut scope](https://docs.gtk.org/gtk4/method.ShortcutController.set_scope.html)
+and [model-backed controller](https://docs.gtk.org/gtk4/ctor.ShortcutController.new_for_model.html).
