@@ -54,6 +54,7 @@ final class WinUIPopoverView: WinUISingleChildView {
     /// The flyout closed: of the user's accord while the element still says open, which the element hears; the
     /// host's own closing says nothing.
     override func presented(_ open: Bool) {
+        super.presented(open)
         guard !open, isOpen else { return }
         isOpen = false
         onDismissed?()

@@ -12,6 +12,10 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     private var contribution: [Double] = []
     private var measurePending = false
     private var released = false
+    private struct Ancestor {
+        weak var view: WinUIView?
+    }
+    private var drawingAncestors: [Ancestor] = []
     var onSourcePlaced: (() -> Void)?
     var spacing: Double {
         max(0, bar.sourceElement?.parent?.number(.spacing) ?? 0)
@@ -22,6 +26,14 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
         super.init()
         allowsNativeSafeBars = true
         bar.nativeSafeBarOwner = self
+        var ancestor = bar.sourceElement?.parent
+        while let element = ancestor {
+            if let view = element.winUI.view {
+                view.followPromotedBar(bar)
+                drawingAncestors.append(Ancestor(view: view))
+            }
+            ancestor = element.parent
+        }
         bar.placingLayout?.holdChildren()
         setChildren([bar])
     }
@@ -61,6 +73,8 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     /// logical panel. Never insert one control into two native parents.
     func releaseBar() {
         released = true
+        for ancestor in drawingAncestors { ancestor.view?.unfollowPromotedBar(bar) }
+        drawingAncestors.removeAll()
         onSourcePlaced = nil
         setChildren([])
         bar.nativeSafeBarOwner = nil

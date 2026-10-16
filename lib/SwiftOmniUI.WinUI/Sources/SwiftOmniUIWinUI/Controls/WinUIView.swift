@@ -41,6 +41,18 @@ class WinUIView {
     /// A native toolbar owns the widget, while the source modifier still owns
     /// its layout contribution, animation ancestry and parent-space report.
     weak var nativeSafeBarOwner: AnyObject?
+    private struct PromotedBar {
+        weak var view: WinUIView?
+    }
+    private var promotedBars: [Int64: PromotedBar] = [:]
+
+    func followPromotedBar(_ bar: WinUIView) {
+        promotedBars[bar.number] = PromotedBar(view: bar)
+    }
+
+    func unfollowPromotedBar(_ bar: WinUIView) {
+        promotedBars.removeValue(forKey: bar.number)
+    }
     private(set) var safeBarDrawing: HostMatrix?
 
     func recordSafeBarPlace(_ place: Rect, context: SafeAreaContext) {
@@ -96,16 +108,12 @@ class WinUIView {
     /// An ancestor opacity/offset animation need not cause layout. Mirror it
     /// to promoted descendants when drawing changes as well as when arranging.
     func refreshNativeSafeBarDrawing() {
-        func visit(_ element: MountedElement) {
-            for child in element.children {
-                if let view = (child.native as? WinUIElement)?.view, view.nativeSafeBarOwner != nil {
-                    view.updateSafeBarDrawing()
-                } else {
-                    visit(child)
-                }
-            }
+        // Promotion registers its actual drawing dependencies. Most animated
+        // rows have none; they must not search their entire subtree per frame.
+        for (number, entry) in promotedBars {
+            if let bar = entry.view, bar.nativeSafeBarOwner != nil { bar.updateSafeBarDrawing() }
+            else { promotedBars.removeValue(forKey: number) }
         }
-        if let sourceElement { visit(sourceElement) }
     }
 
     func layoutSafeArea(in bounds: Rect) -> SafeAreaContext {
@@ -302,6 +310,7 @@ class WinUIView {
 
     /// Moves, turns and scales the view where its layout put it, in DIPs and degrees.
     func setTransform(_ transform: HostDrawingTransform) {
+        guard transform != self.transform else { return }
         self.transform = transform
         writeTransform()
         refreshNativeSafeBarDrawing()
@@ -590,8 +599,19 @@ class WinUIView {
     func chose(_ index: Int) {}
 
     /// What the view presents opened or closed of WinUI's accord: a split view's sidebar, a picker's list, a date
-    /// picker's calendar.
-    func presented(_ open: Bool) {}
+    /// picker's calendar, a context menu, a menu button's menu, a popover's card.
+    ///
+    /// A popup standing over the pointer holds the hover of what it stands over, so the base counts them; a view that
+    /// overrides this and does not call it - a split view's sidebar, which opens beside the pointer - is no popup
+    /// over it.
+    /// Design: docs/design/platforms/winui/input.md#a-popup-over-the-pointer
+    func presented(_ open: Bool) {
+        if open {
+            WinUIHoverHold.began()
+        } else {
+            WinUIHoverHold.ended()
+        }
+    }
 
     /// The user picked a day - its year, month and day - or a time of day - its hour, minute and 0.
     func picked(_ first: Int32, _ second: Int32, _ third: Int32) {}
@@ -664,7 +684,25 @@ class WinUIView {
     }
 
     /// What the relay says the view heard.
+    ///
+    /// A popup standing over the pointer takes the pointer with it, so WinUI tells the views under it that it left -
+    /// which it did not. That exit is withheld until the last popup goes; a pointer coming back on the view drops
+    /// what was withheld, since its hover never left either.
+    /// Design: docs/design/platforms/winui/input.md#a-popup-over-the-pointer
     func heard(_ heard: HeardInput) {
+        if case .pointer(let event, _) = heard {
+            if event == .pointerEntered {
+                WinUIHoverHold.resumed(self)
+            } else if event == .pointerExited, WinUIHoverHold.isStanding {
+                WinUIHoverHold.withhold(heard, for: self)
+                return
+            }
+        }
+        deliver(heard)
+    }
+
+    /// What the view heard, past the hold above - what the hold itself uses when the last popup goes.
+    func deliver(_ heard: HeardInput) {
         onHeard?(heard)
     }
 
@@ -689,6 +727,7 @@ class WinUIView {
     /// overrides this lets go of what every view holds first, then of its own.
     func detach() {
         isDetached = true
+        WinUIHoverHold.letGo(of: self)
         if let blurPresenter { swiftomniui_winui_blur_clear(blurPresenter) }
         hear([]) { _ in }
         setFocusChanged(nil)

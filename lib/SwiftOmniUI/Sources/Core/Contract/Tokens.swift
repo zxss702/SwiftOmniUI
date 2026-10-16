@@ -9,9 +9,12 @@
 
 extension NodeType {
     /// Elements whose host arranges children from native measurement - the ones that
-    /// may say how their children animate.
+    /// may say how their children animate. A lazy column or grid is one of them: its
+    /// host keeps the children the window holds and stands each at the offset its
+    /// measure says, exactly as a stack does.
     static let places: Set<NodeType> = [
         .vStack, .hStack, .grid, .zStack,
+        .lazyVStack, .lazyHStack, .lazyVGrid, .lazyHGrid,
     ]
 
     /// Elements that always say a layout animation: child-placing layouts and the

@@ -218,6 +218,11 @@ extern "C" void swiftomniui_winui_set_context_menu(
                 flyout.Opening(guarded("requesting context menu contents", [view](auto const &, auto const &) {
                     if (callbacks.menuContentRequested) callbacks.menuContentRequested(view, 0);
                 }));
+                // The menu standing over the pointer: what is under it holds its hover until it goes.
+                flyout.Opened(guarded("handling a context menu's Opened",
+                    [view](auto const &, auto const &) { callbacks.presented(view, true); }));
+                flyout.Closed(guarded("handling a context menu's Closed",
+                    [view](auto const &, auto const &) { callbacks.presented(view, false); }));
                 element.ContextFlyout(flyout);
             }
             Writer writer{view, nullptr, {flyout.Items()}};
@@ -337,6 +342,11 @@ extern "C" void swiftomniui_winui_menu_button_set_menu(
                 flyout.Opening(guarded("requesting menu contents", [view](auto const &, auto const &) {
                     if (callbacks.menuContentRequested) callbacks.menuContentRequested(view, 0);
                 }));
+                // As the context menu's: the menu standing over the pointer holds what is under it.
+                flyout.Opened(guarded("handling a menu's Opened",
+                    [view](auto const &, auto const &) { callbacks.presented(view, true); }));
+                flyout.Closed(guarded("handling a menu's Closed",
+                    [view](auto const &, auto const &) { callbacks.presented(view, false); }));
                 button.Flyout(flyout);
             }
             Writer writer{view, nullptr, {flyout.Items()}};
@@ -369,6 +379,13 @@ extern "C" void swiftomniui_winui_menu_open_for_testing(SwiftOmniUIObjectRef han
         auto button = as<controls::Button>(handle);
         if (auto flyout = button.Flyout()) flyout.ShowAt(button);
     } catch (...) { report("opening a menu for testing"); }
+}
+
+extern "C" void swiftomniui_winui_menu_close_for_testing(SwiftOmniUIObjectRef handle) {
+    try {
+        auto button = as<controls::Button>(handle);
+        if (auto flyout = button.Flyout()) flyout.Hide();
+    } catch (...) { report("closing a menu for testing"); }
 }
 
 extern "C" uint64_t swiftomniui_winui_menu_identity_for_testing(SwiftOmniUIObjectRef handle) {

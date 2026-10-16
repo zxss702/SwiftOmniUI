@@ -113,8 +113,10 @@ including `withAnimation` timing, disabled animation and geometry feedback.
 Carried layouts receive that transaction when a descendant changes placement.
 The host uses it for insertion, movement and removal without replacing the
 standing configuration. A lazy window requested by a data update keeps that
-timing through its deferred realization; later ordinary content clears it,
-and viewport recycling does not start data transitions.
+timing through its deferred realization: the layout holds the change's law until
+the arrangement that can place the rows it adds, which the realization patch
+brings. Later ordinary content clears it, and viewport recycling does not start
+data transitions.
 
 A layout works out where each child goes; `LayoutMotion` decides where the
 child stands on the way. Why an arrangement happens decides everything:

@@ -48,4 +48,25 @@ final class WinUIContextMenuTests: XCTestCase {
             XCTAssertTrue(stacks[1].hits(190, 20), "still hearing taps")
         }
     }
+
+    /// A menu standing open over the pointer is a popup standing over it, and its going is a popup going: what the
+    /// views under it hold their hover through.
+    /// Design: docs/design/platforms/winui/input.md#a-popup-over-the-pointer
+    func testAMenuStandingOpenIsAPopupStandingOverThePointer() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                Menu { MenuItem("Item") } label: { Text("Trigger") }
+            }
+            let menu = try XCTUnwrap(host.views(WinUIMenuButtonView.self).first)
+            let standing = WinUIHoverHold.isStanding
+
+            swiftomniui_winui_menu_open_for_testing(menu.handle)
+            host.settle { WinUIHoverHold.isStanding != standing }
+            XCTAssertTrue(WinUIHoverHold.isStanding, "a menu standing open is a popup standing")
+
+            swiftomniui_winui_menu_close_for_testing(menu.handle)
+            host.settle { WinUIHoverHold.isStanding == standing }
+            XCTAssertEqual(WinUIHoverHold.isStanding, standing, "the menu going is the popup going")
+        }
+    }
 }

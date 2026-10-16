@@ -262,7 +262,9 @@ nothing on the first report.
 Where children go is the host's own arithmetic - a placement comes from a
 measurement - so it has no property for a transition to ride beside. A layout
 that places children, and an element that answered `.animation(_:)` for itself,
-say how their children animate in `HostPatch.animation`.
+say how their children animate in `HostPatch.animation`. `NodeType.places` names
+that first set: the stacks, the grid, the z stack, and the lazy column and grid
+runs, which stand the children their window keeps at each one's measured offset.
 
 `.inherited` is what a layout is until told otherwise, on both sides, so a
 layout that animates the way the application does says nothing on any message.

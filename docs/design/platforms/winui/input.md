@@ -30,6 +30,37 @@ offers a context menu, so a row answers a click past its words as well as on
 them; once it does neither, the clear paint goes, and an author's background
 is never touched.
 
+## A popup over the pointer
+
+A context menu, a menu button's menu, a popover's card, a picker's list and a
+date picker's calendar stand over the pointer in a window of their own, and
+WinUI hands the pointer to that window: the views under it are told the
+pointer left, and are told nothing when the popup goes, since the pointer
+never moved. SwiftUI holds their hover instead - the pointer did not leave the
+view it was on, so the view is not told it did
+([what the user does with a finger](../../host/runtime.md#what-the-user-does-with-a-finger)) -
+and so does this host: the exit a popup caused is withheld while any of them
+stands, and when the last one goes the truth is taken again from the pointer's
+own place. The view the pointer is still on keeps its hover, since the core
+was never told it left; a view the pointer has left is handed the exit it was
+owed. Only a view the relay told an exit is ever held, so no walk of the
+element tree is asked for, and a popup's own relation to what it covers is
+never worked out.
+
+Two things are no popup over the pointer. A split view's sidebar opens beside
+it, and what it does to the hover is what WinUI says
+([a split view](pages.md#a-split-view)). A menu bar's own menus stand at the window's edge,
+away from what a popup could cover, and WinUI hands a menu bar item no flyout
+to hang this on.
+
+The opening and closing of a popup over the pointer comes as `presented`, as a
+picker's list already did ([the callbacks](relay.md#the-callbacks)); where the
+pointer stands, and whether a place of the window's content reaches a view,
+the relay answers itself ([the C surface](relay.md#the-c-surface)). The rule
+is one place, `WinUIHoverHold`, and the view's `heard` is its gate: an exit is
+withheld while a popup stands and delivered once the last one goes, and a
+pointer coming back on the view drops what was withheld.
+
 ## Taps
 
 WinUI tells a tap, and a second tap soon after as a double tap in place of a

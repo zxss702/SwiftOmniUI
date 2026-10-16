@@ -20,6 +20,8 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.Provider.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Windowing.h>
+#include <winrt/Microsoft.UI.Content.h>
 
 using namespace swiftomniui;
 using winrt::Windows::Foundation::Point;
@@ -321,6 +323,51 @@ extern "C" bool swiftomniui_winui_reaches(SwiftOmniUIObjectRef handle, double x,
         return false;
     } catch (...) {
         report("finding what a click reaches");
+        return false;
+    }
+}
+
+extern "C" bool swiftomniui_winui_content_reaches(SwiftOmniUIObjectRef handle, double x, double y) {
+    try {
+        auto element = as<xaml::UIElement>(handle);
+        // The loop `reaches` runs, at a place already in the window's content: the pointer's own place is a place
+        // of the content, not of the view it is being asked of.
+        for (auto const &hit : xaml::Media::VisualTreeHelper::FindElementsInHostCoordinates(
+                 Point(static_cast<float>(x), static_cast<float>(y)), element.XamlRoot().Content())) {
+            for (xaml::DependencyObject at = hit; at; at = xaml::Media::VisualTreeHelper::GetParent(at))
+                if (at == element) return true;
+            return false;
+        }
+        return false;
+    } catch (...) {
+        report("finding what a place of the window reaches");
+        return false;
+    }
+}
+
+extern "C" bool swiftomniui_winui_pointer_place(SwiftOmniUIObjectRef handle, double *place) {
+    try {
+        if (!place) return false;
+        auto root = as<xaml::FrameworkElement>(handle).XamlRoot();
+        if (!root) return false;
+        auto window = winrt::Microsoft::UI::Windowing::AppWindow::GetFromWindowId(
+            root.ContentIslandEnvironment().AppWindowId());
+        if (!window) return false;
+        auto scale = root.RasterizationScale();
+        if (!(scale > 0)) return false;
+        POINT cursor{};
+        if (!GetCursorPos(&cursor)) return false;
+        auto hwnd = reinterpret_cast<HWND>(window.Id().Value);
+        // A popup stands in a window of its own, so a pointer over one is not over this window's content: the
+        // view under it is covered, and its hover is not held.
+        if (!IsWindowVisible(hwnd) || GetAncestor(WindowFromPoint(cursor), GA_ROOT) != hwnd) return false;
+        POINT origin{};
+        if (!ClientToScreen(hwnd, &origin)) return false;
+        place[0] = (cursor.x - origin.x) / scale;
+        place[1] = (cursor.y - origin.y) / scale;
+        return true;
+    } catch (...) {
+        report("reading the pointer's place");
         return false;
     }
 }

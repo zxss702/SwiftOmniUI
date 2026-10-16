@@ -79,6 +79,7 @@ final class WinUIDatePickerView: WinUIView {
     }
 
     override func presented(_ open: Bool) {
+        super.presented(open)
         guard showing.heard(open: open) else { return }
         if open { onOpened?() } else { onClosed?() }
     }

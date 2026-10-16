@@ -147,7 +147,8 @@ typedef struct {
     /// (-2); a tab.
     void (*chosen)(int64_t view, int32_t index);
 
-    /// A split view's sidebar opened or closed of WinUI's accord: a click beside it, or the window's room.
+    /// What stands over the pointer opened or closed of WinUI's accord: a split view's sidebar, a picker's list, a
+    /// date picker's calendar, a context menu, a menu button's menu, a popover's card.
     void (*presented)(int64_t view, bool open);
 
     /// Something the environment reports changed: the theme, the power, the network.
@@ -594,6 +595,9 @@ void swiftomniui_winui_menu_button_set_borderless(SwiftOmniUIObjectRef button, i
 
 /// Native menu interaction and identity used by regression tests.
 void swiftomniui_winui_menu_open_for_testing(SwiftOmniUIObjectRef button);
+
+/// Closes the menu a menu button opens, as the user's Escape does - what a test does.
+void swiftomniui_winui_menu_close_for_testing(SwiftOmniUIObjectRef button);
 uint64_t swiftomniui_winui_menu_identity_for_testing(SwiftOmniUIObjectRef button);
 bool swiftomniui_winui_menu_open_submenu_for_testing(SwiftOmniUIObjectRef button, uint64_t mount);
 
@@ -1004,6 +1008,14 @@ bool swiftomniui_winui_hits(SwiftOmniUIObjectRef element, double x, double y);
 /// Whether a click at (x, y) DIPs of `element` would reach it, or what stands in it, through everything its window
 /// shows over it - what a test reads.
 bool swiftomniui_winui_reaches(SwiftOmniUIObjectRef element, double x, double y);
+
+/// Whether a place in the window's content, in DIPs, reaches `element` or what stands in it - the pointer's own
+/// place asked the same way when a popup that stood over it goes.
+bool swiftomniui_winui_content_reaches(SwiftOmniUIObjectRef element, double x, double y);
+
+/// The pointer's place in the window's content, in DIPs; false where it stands outside the window, or its own place
+/// cannot be read.
+bool swiftomniui_winui_pointer_place(SwiftOmniUIObjectRef element, double *place);
 
 /// Tells `focused` whenever the keyboard comes into the element or leaves it, while `hearing`; false stops.
 void swiftomniui_winui_hear_focus(SwiftOmniUIObjectRef element, int64_t view, bool hearing);

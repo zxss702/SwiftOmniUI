@@ -87,6 +87,7 @@ final class WinUIPickerView: WinUIView {
 
     /// The list opened or closed: the user's, reported; the program's, not.
     override func presented(_ open: Bool) {
+        super.presented(open)
         if !open {
             closedSizes.removeAll(keepingCapacity: true)
             invalidateChoiceMeasurements()

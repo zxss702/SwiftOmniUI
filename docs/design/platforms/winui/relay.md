@@ -26,12 +26,25 @@ nothing, false or 0, leaving the object as it was. An exception crossing the
 C boundary ends the process where nobody can say why; a guard reads every
 function of the relay for its catch (`testNoCppExceptionLeavesTheRelay`).
 
+Two functions read the screen rather than an element, since Swift cannot.
+`swiftomniui_winui_pointer_place` answers where the pointer stands in the
+element's window's content, in DIPs, and nothing where it stands outside that
+window or over another one - a popup stands in a window of its own, so its own
+place is not this window's. `swiftomniui_winui_content_reaches` answers
+whether a place of that content reaches the element or what stands in it,
+where `swiftomniui_winui_reaches` takes the place in the element's own
+coordinates. They are what the host asks when a popup that stood over the
+pointer goes ([a popup over the pointer](input.md#a-popup-over-the-pointer)).
+
 ## The callbacks
 
 The host hands the relay one table of functions, which the relay calls on the
 UI thread: WinUI stands, a turn landed, a frame, a panel's measure and
 arrange, a click, a switch's turn, a slider's move, a field's words and its
-Return. Every one is set - the relay calls them unchecked, and an
+Return, and a popup opening or closing of WinUI's accord - a split view's
+sidebar, a picker's list, a date picker's calendar, a context menu, a menu
+button's menu, a popover's card - which comes as `presented`. Every one is
+set - the relay calls them unchecked, and an
 empty one is a jump to nothing.
 
 ## A view and its number

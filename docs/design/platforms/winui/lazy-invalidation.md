@@ -58,6 +58,44 @@ ScrollView prevents the temporary absence of that relationship from requesting
 every row through `tellAll`. A later measure/arrange or viewport event establishes
 the normal visible request. A truly unbounded Lazy container retains `tellAll`.
 
+## Native ownership and premature arrangements
+
+A promoted top safe-area bar has two owners: its logical layout supplies the
+contribution, while a native toolbar host measures the actual control. Its
+size invalidation must reach both. SplitView pages also have a native owner
+outside `placingLayout`; intrinsic changes now request that owner's arrangement,
+not only child replacement. This notification lives at the ownership boundary
+instead of walking to the root again for every `setItems` call. Lazy retains its
+existing measurement boundary.
+
+Promoted bars register their drawing dependencies on logical ancestors. Opacity,
+blur and transform updates notify that small set directly instead of searching
+the entire mounted descendant tree on every animation frame. Releasing a bar
+removes the registration. Ordinary rows with no promoted bars do no descendant
+search for this purpose.
+
+A WinUI Lazy Arrange can run before a requested window is acknowledged or its
+new rows are measured. Stack/grid arrangements now keep their pending motion
+and insertion markers across that intermediate pass, and a pass with no change
+waiting is never held back. Only a ready arrangement consumes them.
+
+Core now counts a lazy column or grid among the layouts that say how their
+children animate (`NodeType.places`), so a write inside `withAnimation`, or a
+query's own timing, reaches the lazy element at all; the host keeps that law
+until the arrangement that can place the rows the deferred realization adds.
+Inserted rows therefore fade in and their neighbours travel under the change's
+own timing, instead of every row arriving at once. This does not supply
+animation to an unanimated state write, nor does it change asynchronous
+application loading into synchronous loading.
+
+New regression code covers that intermediate Arrange, native ownership
+invalidation, promoted-bar drawing, and a bottom editor's decoration/control
+geometry across height and page changes. The bottom editor is not a promoted
+top bar; the screenshots alone do not establish that both glitches have the
+same cause. Independent JsonData tests cover URL/Bool state after reopening an
+isolated store and after autosaving a fetched model. No persistence defect has
+yet been established by source inspection, and none of these tests has run.
+
 ## Remaining differences and validation
 
 This is dependency-based reuse in the WinUI host, not a reproduction of

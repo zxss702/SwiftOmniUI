@@ -34,6 +34,44 @@ private struct HoverWorkRow: View {
 }
 
 final class WinUILazyInvalidationTests: XCTestCase {
+    func testAnEarlyArrangeDoesNotConsumePendingRowAnimation() throws {
+        try onUIThread {
+            for grid in [false, true] {
+                let host = WinUIRenderer.running(clock: TestClock()) {
+                    ScrollView {
+                        let rows = ForEach(0..<4) { index in
+                            Text("Row \(index)").frame(height: 32)
+                        }
+                        if grid {
+                            LazyVGrid(columns: [GridItem(.fixed(120))], spacing: 0) { rows }
+                        } else {
+                            LazyVStack(spacing: 0) { rows }
+                        }
+                    }.frame(width: 240, height: 200)
+                }
+                for _ in 0..<16 { host.step(); host.frame() }
+                let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+                let identity = try XCTUnwrap(lazy.mounted.keys.first)
+                let measurement = try XCTUnwrap(lazy.measured.removeValue(forKey: identity))
+                let revision = try XCTUnwrap(lazy.measuredRevisions.removeValue(forKey: identity))
+                lazy.cells.animatesChanges = true
+                lazy.cells.inserting.insert(identity)
+                lazy.places.patchArrived()
+
+                lazy.arrange(width: 240, height: 200)
+                XCTAssertTrue(lazy.cells.animatesChanges,
+                              "an unmeasured row must not consume the structural change's animation")
+                XCTAssertTrue(lazy.cells.inserting.contains(identity))
+
+                lazy.measured[identity] = measurement
+                lazy.measuredRevisions[identity] = revision
+                lazy.arrange(width: 240, height: 200)
+                XCTAssertFalse(lazy.cells.animatesChanges)
+                XCTAssertFalse(lazy.cells.inserting.contains(identity))
+            }
+        }
+    }
+
     func testHoverDoesNotResolveUnchangedLayoutSubtreesAsSourceGrows() throws {
         try onUIThread {
             let count = State(wrappedValue: 100)

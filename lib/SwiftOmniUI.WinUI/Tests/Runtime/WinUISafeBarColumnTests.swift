@@ -4,9 +4,119 @@
 @_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
+import SwiftOmniUIConformance
 import XCTest
 
+@MainActor private final class NativePageOwner: WinUILayoutView {
+    var arrangementRequests = 0
+    override func invalidateArrange() {
+        arrangementRequests += 1
+        super.invalidateArrange()
+    }
+}
+
 final class WinUISafeBarColumnTests: XCTestCase {
+    func testIntrinsicInvalidationReachesBothNativeOwnershipBoundaries() {
+        onUIThread {
+            let owner = NativePageOwner()
+            let page = WinUISingleChildView()
+            page.nativeLayoutOwner = owner
+            let content = WinUIStackView(axis: .vertical)
+            page.setItems([WinUILayoutItem(view: content)])
+            let before = owner.arrangementRequests
+            content.invalidateMeasurements()
+            XCTAssertGreaterThan(owner.arrangementRequests, before,
+                                 "unchanged child identities can still change page geometry")
+
+            let bar = WinUIStackView(axis: .vertical)
+            let promoted = WinUISafeAreaBarHost(bar: bar)
+            defer { promoted.releaseBar() }
+            let revision = promoted.measurementRevision
+            bar.invalidateMeasurements()
+            XCTAssertGreaterThan(promoted.measurementRevision, revision)
+            let after = promoted.measurementRevision
+            bar.setOpacity(0.5)
+            XCTAssertEqual(promoted.measurementRevision, after, "paint does not change a bar's contribution")
+        }
+    }
+
+    func testPromotedBarFollowsAncestorDrawingUntilReleased() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView { Text("Content") }
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Text("Bar").frame(height: 40).id("promoted")
+                    }.id("ancestor")
+            }
+            let ancestor = try XCTUnwrap(host.view(id: .manual("ancestor")))
+            let bar = try XCTUnwrap(host.view(id: .manual("promoted")))
+            let promoted = try XCTUnwrap(bar.nativeSafeBarOwner as? WinUISafeAreaBarHost)
+            ancestor.setOpacity(0.4)
+            XCTAssertEqual(bar.drawnOpacity, 0.4, accuracy: 0.01)
+            promoted.releaseBar()
+            ancestor.setOpacity(0.2)
+            XCTAssertEqual(bar.drawnOpacity, 1, accuracy: 0.01,
+                           "a released bar must no longer receive its old native promotion's drawing")
+        }
+    }
+
+    func testBottomEditorDecorationAndControlsFollowHeightAndPageChanges() throws {
+        try onUIThread {
+            let text = State(wrappedValue: "")
+            let history = State(wrappedValue: false)
+            let sidebar = State(wrappedValue: true)
+            let clock = TestClock()
+            let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(sidebar.projectedValue) {
+                    Text("Sidebar")
+                } detail: {
+                    ScrollView { Text(history.wrappedValue ? "History" : "Start") }
+                        .safeAreaInset(edge: .bottom, spacing: 0) {
+                            HStack(alignment: .bottom) {
+                                Button("Attach") {}.frame(width: 40, height: 40).id("attach")
+                                TextEditor(text: text.projectedValue)
+                                    .scrollContentBackground(.hidden)
+                                    .frame(height: text.wrappedValue.isEmpty && history.wrappedValue ? 40 : 128)
+                                    .background {
+                                        RoundedRectangle(cornerRadius: 20).fill(Color.white).id("editor-fill")
+                                    }.id("editor")
+                                if text.wrappedValue.isEmpty {
+                                    HStack {
+                                        Button("Send") {}.frame(width: 40, height: 40).id("send-horizontal")
+                                    }
+                                } else {
+                                    VStack {
+                                        Button("Send") {}.frame(width: 40, height: 40).id("send-vertical")
+                                    }
+                                }
+                            }.padding(16)
+                        }
+                }
+            }
+            let editor = try XCTUnwrap(host.view(id: .manual("editor")))
+            for step in 0..<4 {
+                withAnimation(.eased(200, .linear)) {
+                    history.wrappedValue = step != 3
+                    text.wrappedValue = step == 1 ? "输入内容" : ""
+                }
+                for _ in 0..<12 { host.step(); host.frame() }
+                clock.now += 400
+                for _ in 0..<12 { host.frame(); host.step() }
+                let fill = try XCTUnwrap(host.view(id: .manual("editor-fill")))
+                let expected = step == 1 || step == 3 ? 128.0 : 40.0
+                XCTAssertEqual(editor.laidOutFrame.height, expected, accuracy: 1)
+                XCTAssertEqual(fill.laidOutFrame.height, expected, accuracy: 1)
+                XCTAssertTrue(host.view(id: .manual("editor")) === editor)
+                for id in ["attach", step == 1 ? "send-vertical" : "send-horizontal"] {
+                    let control = try XCTUnwrap(host.view(id: .manual(id)))
+                    XCTAssertTrue(control.isAttached)
+                    XCTAssertGreaterThan(control.laidOutFrame.width, 0)
+                    XCTAssertEqual(control.drawnOpacity, 1, accuracy: 0.01)
+                }
+            }
+        }
+    }
+
     func testWideSidebarIsOpenBeforeTheWindowFirstActivates() {
         onUIThread {
             let window = WinUIWindow()

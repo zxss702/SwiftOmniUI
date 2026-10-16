@@ -125,7 +125,10 @@ list's through a style for its items. The chosen one is written only where the
 tree changed it or the choices changed, so the user's choice is never argued
 with. `isOpen` opens and closes the list; the user's opening and closing are
 reported and the program's are not, so the user closing a list the program
-opened is reported. The chosen choice's mark in the list is the picker's tint.
+opened is reported. The list standing open over the pointer holds the hover of
+what it covers, as a date picker's calendar does ([a popup over the
+pointer](input.md#a-popup-over-the-pointer)). The chosen choice's mark in the
+list is the picker's tint.
 
 Choices are collected in an unattached WinRT vector, then assigned once through
 `ItemsSource`. Updating several model pickers therefore sends one collection

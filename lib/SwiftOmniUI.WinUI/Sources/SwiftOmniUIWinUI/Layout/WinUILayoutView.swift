@@ -122,9 +122,6 @@ class WinUILayoutView: WinUIView {
         for item in items { item.view.placingLayout = self }
         holdChildren()
         invalidateMeasurements()
-        var root: WinUIView = self
-        while let parent = root.placingLayout { root = parent }
-        root.nativeLayoutOwner?.invalidateArrange()
         return true
     }
 
@@ -244,6 +241,14 @@ class WinUILayoutView: WinUIView {
         // These panels report zero DesiredSize to their placing parents.
         // New content still needs new places when the native size stays zero.
         invalidateArrange()
+        // A promoted bar keeps its logical placingLayout, but its actual XAML
+        // parent has an independent size cache. Invalidate both ownership paths
+        // when descendants change, even before a new logical place is reported.
+        (nativeSafeBarOwner as? WinUISafeAreaBarHost)?.invalidateOwnMeasurements()
+        // Native page owners do not appear in placingLayout. A change of
+        // intrinsic size (not just replacing children) must arrange their
+        // content again even when XAML still sees zero DesiredSize here.
+        nativeLayoutOwner?.invalidateArrange()
     }
 
     /// Native TextBlock.Loaded may arrive for many labels in the same pass.

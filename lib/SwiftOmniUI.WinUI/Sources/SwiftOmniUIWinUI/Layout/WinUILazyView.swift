@@ -497,7 +497,42 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// Every pass re-asks the window: a place in the air lands in the one it
     /// asks for, and a move of the scroller's brings one.
+    func canArrangeRows() -> Bool {
+        // Only a change still waiting for its rows is held back. A plain viewport pass places
+        // what it holds; holding it would leave the mounted rows standing at the places of the
+        // last arrangement until some later pass happened to resume them.
+        guard cells.animatesChanges else { return true }
+        // A source patch can reach Arrange before its window patch and native
+        // measurements. Do not consume patchArrived/animatesChanges in that
+        // intermediate pass: it would leave the real insertion with no law.
+        guard cells.element?.handler(.realizedChanged) == nil || cells.requestedItemsAreCurrent else {
+            retell()
+            return false
+        }
+        // The rows the change added stand in the built window and are measured in the pass before
+        // its arrangement. A row outside that window - one the window has dropped, or one kept
+        // alive by its own travelling - is no part of what is waiting, and an unmeasured one of
+        // those must not hold the change back for good.
+        let waiting = mounted.contains { entry in
+            guard !entry.value.departing, let place = cells.position(of: entry.key),
+                  cells.built.contains(place) else { return false }
+            return measured[entry.key] == nil
+                || measuredRevisions[entry.key] != entry.value.view.measurementRevision
+        }
+        guard !waiting else {
+            retell()
+            return false
+        }
+        return true
+    }
+
     override func arrange(in bounds: Rect) {
+        // A change's motion stands until the arrangement that can place its rows: a run that
+        // holds its children by a window mounts those rows in a later patch, which names no
+        // timing of its own. Every arrangement takes the kept motion with it, so none outlives
+        // the change it belongs to.
+        let motion = takeArrivalMotion()
+        if cells.animatesChanges, let motion { places.animation = motion }
         places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
                                          axis == .vertical ? cells.anchorShift : 0), refining: true)
@@ -617,6 +652,7 @@ final class WinUILazyStackView: WinUILazyView {
 
     /// Place only measurements completed before this arrangement. Native subtrees are never measured here.
     override func arrange(in bounds: Rect) {
+        guard canArrangeRows() else { return }
         let across = max(0, axis == .vertical
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom)
@@ -795,9 +831,9 @@ final class WinUILazyGridView: WinUILazyView {
         acrossRoom = max(0, axis == .vertical
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom)
-        super.arrange(in: bounds)
         let widths = columns
-        guard !widths.isEmpty else { return }
+        guard !widths.isEmpty, canArrangeRows() else { return }
+        super.arrange(in: bounds)
         var trackOrigins: [Double] = []
         let extent = widths.reduce(0, +) + Double(max(widths.count - 1, 0)) * trackSpacing
         var start = Extent.start(option: trackAlignment.rawValue, extent: extent,

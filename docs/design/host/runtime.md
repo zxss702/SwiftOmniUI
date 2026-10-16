@@ -281,6 +281,15 @@ enough ([a swipe](#a-swipe)); a pinch says each step's scale since the last
 and where, as shares of the view (`PinchStep`). A host's toolkit hears the
 input and says it as `HeardInput`.
 
+A popup standing over the pointer - a menu, a picker's list, a popover's card -
+does not take the hover of what it covers: the pointer did not leave the view
+it was on, so the view is not told it did, and what the host withheld while the
+popup stood is settled when the last one goes, by where the pointer then
+stands. It is a host's own rule, since a toolkit's popups differ; WinUI's is
+`WinUIHoverHold` ([a popup over the
+pointer](../platforms/winui/input.md#a-popup-over-the-pointer)), and every
+other host keeps what its toolkit says until it takes this up.
+
 ## A press dragged
 
 A host whose toolkit tells a press and its moves, and no drag of its own,

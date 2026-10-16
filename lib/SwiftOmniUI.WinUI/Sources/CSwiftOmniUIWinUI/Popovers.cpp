@@ -59,6 +59,9 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_popover_make(int64_t view, Swi
                                     winrt::box_value(controls::ScrollBarVisibility::Disabled)));
         flyout.FlyoutPresenterStyle(style);
         flyout.Content(as<xaml::UIElement>(content));
+        // The card opening and closing over what it was made beside: the views under it hold their hover while it stands.
+        flyout.Opened(guarded("handling a popover's Opened",
+            [view](IInspectable const &, IInspectable const &) { callbacks.presented(view, true); }));
         flyout.Closed(guarded("handling a popover's Closed",
             [view](IInspectable const &, IInspectable const &) { callbacks.presented(view, false); }));
         return detach(flyout);
