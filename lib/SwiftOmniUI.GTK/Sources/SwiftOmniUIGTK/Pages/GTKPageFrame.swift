@@ -329,6 +329,8 @@ final class GTKPageFrame {
         let menu = gtk_menu_button_new()!
         gtk_menu_button_set_icon_name(menu.opaque, "view-more-symbolic")
         gtk_menu_button_set_popover(menu.opaque, popover)
+        // The overflow's own menu stands over what its button drops on, as a page menu's does.
+        GTKHoverHold.watch(menuButton: menu)
         gtk_box_append(actionsBox.of(GtkBox.self), menu)
         overflowButton = menu
     }
@@ -380,6 +382,7 @@ extension GTKPageFrame {
         gtk_menu_button_set_icon_name(button.opaque, "open-menu-symbolic")
         gtk_widget_set_tooltip_text(button, "Main Menu")
         gtk_menu_button_set_menu_model(button.opaque, g_menu_model(menu.model))
+        GTKHoverHold.watch(menuButton: button)
         gtk_widget_insert_action_group(button, GTKMenu.actionGroup, OpaquePointer(menu.actions))
         gtk_box_append(menuBox.of(GtkBox.self), button)
         mainMenu = (button, menu)

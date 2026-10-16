@@ -17,6 +17,8 @@ final class GTKPickerView: GTKView {
 
     init() {
         super.init { _ in gtk_drop_down_new(nil, nil) }
+        // The list a drop-down opens is a popover of GTK's own, held in its build beside the button.
+        if let list = Self.list(of: widget) { GTKHoverHold.watch(list) }
         notify("selected") { _, _, data in
             MainActor.assumeIsolated {
                 guard let view = GTKView.find(viewNumber(data)) as? GTKPickerView, let chosen = view.chosen else { return }
@@ -52,6 +54,18 @@ final class GTKPickerView: GTKView {
         } else {
             gtk_widget_remove_css_class(widget, "flat")
         }
+    }
+
+    /// The list popover GTK holds on the drop-down, found among the children of its own build; nil where that
+    /// build has none.
+    private static func list(of widget: GTKWidget) -> GTKWidget? {
+        var child = gtk_widget_get_first_child(widget)
+        while let each = child {
+            if g_type_check_instance_is_a(each.of(GTypeInstance.self), gtk_popover_get_type()) != 0 { return each }
+            if let found = list(of: each) { return found }
+            child = gtk_widget_get_next_sibling(each)
+        }
+        return nil
     }
 
     override func detach() {

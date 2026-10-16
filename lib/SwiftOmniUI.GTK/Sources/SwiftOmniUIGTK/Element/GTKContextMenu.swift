@@ -34,6 +34,7 @@ final class GTKContextMenu {
         gtk_widget_set_halign(popover, GTK_ALIGN_START)
         gtk_widget_insert_action_group(widget, GTKMenu.actionGroup, OpaquePointer(menu.actions))
         Self.shown[number] = self
+        GTKHoverHold.watch(popover)
         listen()
     }
 

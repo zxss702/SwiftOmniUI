@@ -151,6 +151,11 @@ A view's context menu is a `GtkPopoverMenu` on the view's widget, opened
 where the user clicks with the secondary button or holds a finger, at that
 point; a panel presents it as it lays out. A menu of no entries is none.
 
+Standing over the pointer, a menu does not take the hover of what it covers:
+the exit GTK tells the views under it is withheld while it stands, and settled
+from where the pointer stands when it goes
+([a popup over the pointer](input.md#a-popup-over-the-pointer)).
+
 A view-labeled Menu requests its root content when GtkMenuButton becomes
 active. A submenu's stateful GSimpleAction requests that submenu when GTK
 opens it. Unopened submenus do not mount their contents or run appearance

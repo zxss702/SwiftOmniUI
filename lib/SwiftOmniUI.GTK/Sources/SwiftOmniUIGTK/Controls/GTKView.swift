@@ -413,7 +413,25 @@ class GTKView {
     }
 
     /// What the view heard, handed to what hears it.
+    ///
+    /// A popup standing over the pointer takes the pointer to a surface of its own, so GTK tells the views under it
+    /// that the pointer left - which it did not. That exit is withheld until the last popup goes; a pointer coming
+    /// back on the view drops what was withheld, since the view's hover never left either.
+    /// Design: docs/design/platforms/gtk/input.md#a-popup-over-the-pointer
     func heard(_ heard: HeardInput) {
+        if case .pointer(let event, _) = heard {
+            if event == .pointerEntered {
+                GTKHoverHold.resumed(self)
+            } else if event == .pointerExited, GTKHoverHold.isStanding {
+                GTKHoverHold.withhold(heard, for: self)
+                return
+            }
+        }
+        deliver(heard)
+    }
+
+    /// What the view heard, past the hold above - what the hold itself uses when the last popup goes.
+    func deliver(_ heard: HeardInput) {
         onHeard?(heard)
     }
 
@@ -443,6 +461,7 @@ class GTKView {
     /// The element left the tree: the view lets go of everything that would call back into it. An override
     /// calls this first.
     func detach() {
+        GTKHoverHold.letGo(of: self)
         hear([]) { _ in }
         setFocusChanged(nil)
         contextMenu = nil

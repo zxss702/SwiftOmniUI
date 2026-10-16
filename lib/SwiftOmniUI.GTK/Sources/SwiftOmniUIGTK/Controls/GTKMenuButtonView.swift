@@ -67,6 +67,8 @@ final class GTKMenuButtonView: GTKView {
         let menu = GTKMenu(entries)
         gtk_widget_insert_action_group(widget, GTKMenu.actionGroup, OpaquePointer(menu.actions))
         gtk_menu_button_set_menu_model(widget.opaque, g_menu_model(menu.model))
+        // The popover GTK makes of the model it was handed: a menu stands over what its button drops on.
+        GTKHoverHold.watch(menuButton: widget)
         self.menu = menu
     }
 }

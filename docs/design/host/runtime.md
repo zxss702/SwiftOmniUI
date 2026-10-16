@@ -287,8 +287,11 @@ it was on, so the view is not told it did, and what the host withheld while the
 popup stood is settled when the last one goes, by where the pointer then
 stands. It is a host's own rule, since a toolkit's popups differ; WinUI's is
 `WinUIHoverHold` ([a popup over the
-pointer](../platforms/winui/input.md#a-popup-over-the-pointer)), and every
-other host keeps what its toolkit says until it takes this up.
+pointer](../platforms/winui/input.md#a-popup-over-the-pointer)) and, where a
+toolkit's popups are surfaces of their own, `GTKHoverHold`
+([a popup over the
+pointer](../platforms/gtk/input.md#a-popup-over-the-pointer)); the other hosts
+keep what their toolkit says until they take this up.
 
 ## A press dragged
 

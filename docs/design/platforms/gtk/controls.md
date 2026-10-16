@@ -180,7 +180,9 @@ chosen one shown on its button. The chosen one is written only where the tree
 changed it or the choices changed, so the user's choice is never argued with,
 and the user's choice is reported onto the state it is carried in. GTK gives a
 drop-down no placeholder and no way to open or close its list from outside, so
-the title and the list's opening and closing are not realized.
+the title and the list's opening and closing are not realized. The list GTK
+opens is a popover of its own, counted while it stands as every popup over the
+pointer is ([a popup over the pointer](input.md#a-popup-over-the-pointer)).
 
 ## What shows work
 
@@ -221,7 +223,9 @@ A DatePicker and a TimePicker are each a `GtkMenuButton`: its words - a
 label of its own beside the button's arrow - the day or the time, and its
 popover the face the user picks from. Only the user's opening and closing of
 the face are heard, by the host layer's rule
-([a day and a time](../../host/runtime.md#a-day-and-a-time)).
+([a day and a time](../../host/runtime.md#a-day-and-a-time)). A face standing
+over the pointer does not take the hover of what it covers
+([a popup over the pointer](input.md#a-popup-over-the-pointer)).
 
 A DatePicker's face is a `GtkCalendar`, which stays open as the user picks,
 as GNOME's calendars do. Its day is written on the button in the user's own

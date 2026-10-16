@@ -35,6 +35,7 @@ final class GTKPopoverView: GTKSingleChildView {
         connectSignal(UnsafeMutableRawPointer(popover), "closed", number: number) { (_: UnsafeMutableRawPointer?, data) in
             MainActor.assumeIsolated { (GTKView.find(viewNumber(data)) as? GTKPopoverView)?.closed() }
         }
+        GTKHoverHold.watch(popover)
     }
 
     isolated deinit {

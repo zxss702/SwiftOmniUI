@@ -35,6 +35,7 @@ class GTKPopoverPickerView: GTKView {
         connectNotify(UnsafeMutableRawPointer(popover), "visible", number: number) { _, _, data in
             MainActor.assumeIsolated { (GTKView.find(viewNumber(data)) as? GTKPopoverPickerView)?.shownOrHidden() }
         }
+        GTKHoverHold.watch(popover)
     }
 
     /// Whether the face shows.

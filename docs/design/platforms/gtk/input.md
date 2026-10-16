@@ -63,6 +63,30 @@ down, released where it was let go. That gesture stands in one group with a
 pan's on the same view, so the pan claiming the press does not end the
 pointer's.
 
+## A popup over the pointer
+
+A popup standing over the pointer - a context menu, a menu button's menu, a
+popover's card, a picker's list - does not take the hover of what it covers:
+the pointer did not leave the view it was on, so the view is not told it did.
+GTK takes the pointer to the popover's own surface all the same, so the views
+under it are told the pointer left and are told nothing when the popup goes,
+since the pointer never moved. The host layer's rule
+([what the user does with a
+finger](../../host/runtime.md#what-the-user-does-with-a-finger)) withholds the
+exit such a popup caused while any popup stands, and the last one going takes
+the truth again from where the pointer stands then: what the pointer is still
+on keeps its hover, and what it has left is handed the exit it was owed
+(`GTKHoverHold`).
+
+A popup is counted where it is made - the popover a page shows, a context
+menu's, a picker's face, the popover a menu button makes of the menu model it
+is handed, the list a drop-down holds of GTK's own - and uncounted where GTK
+says it left the screen: the popover's own `visible` where the host took it
+away, or the unmapping of one whose widget went without being told to hide, so
+no count outlives what it counted. Only a view the motion controller told an
+exit is ever held, so no walk of the element tree is needed, and a popup's own
+relatedness to what it covers is never asked.
+
 ## A press dragged
 
 A press of the primary button, or a finger, becomes a drag by the host
