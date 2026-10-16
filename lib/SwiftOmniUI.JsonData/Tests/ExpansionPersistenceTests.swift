@@ -59,7 +59,7 @@ struct ExpansionPersistenceTests {
         // both see the same field update after autosave has completed.
         var persisted = false
         for _ in 0..<100 {
-            if try !restored(from: store).contains(url) {
+            if try restored(from: store).contains(url) == false {
                 persisted = true
                 break
             }
@@ -79,5 +79,29 @@ struct ExpansionPersistenceTests {
         try write(to: store, urls: [url])
         try await toggleAndAutosave(at: store, url: url)
         #expect(try restored(from: store).isEmpty)
+    }
+
+    @Test @MainActor func insertingExpansionIsVisibleBeforeAndAfterAutosave() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = directory.appendingPathComponent("expansion.sqlite")
+        let url = directory.appendingPathComponent("project/nested", isDirectory: true)
+        let context = try container(at: store).mainContext
+        context.insert(PersistedExpansion(url: url, expanded: true))
+
+        #expect(Set(try context.fetch(FetchDescriptor<PersistedExpansion>())
+            .filter(\.expanded).map(\.url)) == Set([url]),
+            "a reopened sidebar must see pending inserts in the same context")
+
+        var persisted = false
+        for _ in 0..<100 {
+            if try restored(from: store).contains(url) {
+                persisted = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(persisted, "a new process must find the inserted expansion on disk")
     }
 }

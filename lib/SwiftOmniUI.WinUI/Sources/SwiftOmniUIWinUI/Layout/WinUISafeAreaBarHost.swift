@@ -72,6 +72,7 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     /// Detach from the native toolbar before returning ownership to the
     /// logical panel. Never insert one control into two native parents.
     func releaseBar() {
+        guard !released else { return }
         released = true
         for ancestor in drawingAncestors { ancestor.view?.unfollowPromotedBar(bar) }
         drawingAncestors.removeAll()

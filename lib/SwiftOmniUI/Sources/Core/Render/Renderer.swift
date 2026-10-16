@@ -220,7 +220,10 @@ public final class Renderer: @unchecked Sendable {
             dirty = true
             changed.insert(id)
 
-            if let transaction {
+            // Native size reports can arrive after an animated state write but
+            // before its render. They settle geometry; they must not replace
+            // the animation the user attached to that same pending render.
+            if let transaction, !transaction.isGeometryFeedback || pendingTransaction == nil {
                 pendingTransaction = transaction
             }
 
@@ -326,6 +329,7 @@ public final class Renderer: @unchecked Sendable {
             changed.removeAll()
             names.removeAll()
             untracked = false
+            pendingTransaction = nil
         }
     }
 

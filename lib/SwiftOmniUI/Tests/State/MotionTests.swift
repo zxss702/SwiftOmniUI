@@ -73,6 +73,33 @@ import XCTest
         XCTAssertNil(next.layoutTransition, "later unanimated data must not inherit the earlier transaction")
     }
 
+    func testGeometryFeedbackDoesNotReplaceAnAnimatedWriteBeforeRender() {
+        let renderer = Renderer.shared
+        let observed = NSObject()
+        let id = ObjectIdentifier(observed)
+        renderer.clearInvalidation()
+        renderer.reading([id])
+        defer {
+            renderer.unreading([id])
+            renderer.clearInvalidation()
+        }
+
+        let law = Animation.eased(200, .linear)
+        withAnimation(law) { renderer.stateChanged(observed) }
+        var feedback = Transaction()
+        feedback.isGeometryFeedback = true
+        withTransaction(feedback) { renderer.stateChanged(observed) }
+
+        _ = renderer.renderHost(baseline: 0)
+        XCTAssertEqual(renderer.differ.transaction?.animation, law)
+        XCTAssertFalse(renderer.differ.transaction?.isGeometryFeedback ?? true)
+
+        withTransaction(feedback) { renderer.stateChanged(observed) }
+        _ = renderer.renderHost(baseline: 0)
+        XCTAssertTrue(renderer.differ.transaction?.isGeometryFeedback == true,
+                      "geometry feedback alone must still suppress geometry animation")
+    }
+
     func testOrdinaryHoverColourArrivesWithoutAnImplicitAnimation() {
         let renders = Renders()
 
