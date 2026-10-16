@@ -79,6 +79,19 @@ in the room. Most toolkits show the words cut; WinUI, which measures until
 its layout settles, finds the words' size changing at every pass and ends
 the application (`0xc000027b`, a layout cycle).
 
+## A control and its face
+
+A control that wears content of its own - a button, a menu button - is laid out
+as that content asks: the first arranged child is the one a host hands its
+native button to draw, so what the child says of itself, the control says, and a
+label bounding its own width (`.frame(maxWidth: .infinity)`) makes the whole
+button fill the room its stack offers, the way it does where SwiftUI lays the
+label out inside the button. A face bounding neither way, and a control whose
+own values bound it, leave the control's values in charge. A slot - a menu's
+entries - stands in no room and is read for none of this. A control whose
+content the host itself draws - a picker, a toggle - takes nothing from its
+children.
+
 ## Stacks
 
 A stack sets its shown children one after another with its spacing between

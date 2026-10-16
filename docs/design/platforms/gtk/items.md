@@ -50,7 +50,10 @@ name alone.
 GTK binds its rows as it allocates the list, and a row bound makes the tree
 render at once - where the entries may change. The host changes the string
 list at once when it can, and otherwise once GTK has laid the frame out,
-in the order said.
+in the order said. A row bound in that window is given the entry the host
+speaks for its place, and not the one the string list still shows: the list
+shows the entries of a write it owes until the frame is laid out, and a row
+bound then would take a name it is about to stop showing.
 
 ## Scrolling to an item
 

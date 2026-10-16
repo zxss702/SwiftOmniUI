@@ -670,6 +670,24 @@ import CRT
                 : vertical ? .vertical : .neither
             values.expandingAxes = expandsAcross && expandsDown ? .both : expandsAcross ? .horizontal
                 : expandsDown ? .vertical : .neither
+        case .button, .menuButton:
+            // A control that wears a face is laid out as the face asks: the first child is what the native
+            // button draws (`GTKElement+Layout.arrangeChildren`, `WinUIElement+Layout.arrangeChildren`), so a
+            // label bounding its own width - `.frame(maxWidth: .infinity)` - fills the button's room and the
+            // button takes the share its stack gives, as SwiftUI's does. A face that bounds neither way, or
+            // one the control itself bounds, leaves the control's own values alone.
+            // Design: docs/design/host/layout.md#a-control-and-its-face
+            var expandsAcross = false, expandsDown = false
+            for child in currentChildren {
+                let childValues = readChild(child)
+                guard !childValues.isLayoutDecoration else { continue }
+                expandsAcross = expandsAcross || childValues.expandingAxes == .horizontal
+                    || childValues.expandingAxes == .both
+                expandsDown = expandsDown || childValues.expandingAxes == .vertical
+                    || childValues.expandingAxes == .both
+            }
+            values.expandingAxes = expandsAcross && expandsDown ? .both : expandsAcross ? .horizontal
+                : expandsDown ? .vertical : .neither
         default:
             break
         }

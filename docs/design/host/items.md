@@ -52,6 +52,14 @@ showing its entry tells nothing: the entry stays built while it is within
 reach, and leaves with the next render once the cells have moved away.
 Cells far apart, after a jump, build around each and nothing between.
 
+A cell holds an entry the collection shows, and never a name the list was
+showing a moment before: a backend may bind a row while the list still shows
+the entries of a write it owes, and a cell taking one of those would stand
+over the entry of another place, or over none at all. An entry within reach
+the tree holds no subtree for is asked for again: a cell whose entry the
+tree let go of, because the reach moved under it, stands empty until that
+entry is built again, and nothing else would ask for it.
+
 ## Changes one by one
 
 A collection that applies a snapshot works out its own changes. One told its
@@ -158,13 +166,20 @@ reduce the requested range, and shorter rows may extend it. It does not run
 a growing render and native arrangement for each unknown row. Look-ahead
 and neighbour policy still bound realization; nothing requests the entire
 source merely because its rows have no measurements yet. The actual window (or
-a program jump's destination) is synchronous demand. A viewport of optional
+a program jump's destination) is synchronous demand. A window the mounted
+rows do not cover is demand as well: its rows are asked for in the turn that
+asked, not left to the optional units of later frames. Only a window they
+already cover is narrowed to its demand. A viewport of optional
 neighbours on either side is prefetched on the UI thread in single-row (or
 single-grid-run) units, only while time remains in the frame's four millisecond
 work budget after visible rendering. A builder cannot be preempted; the deadline
 is checked between units. Ready owners rotate within the same frame. A WinUI
-owner waiting for its mounted rows' native measurements yields rather than
-building more estimated rows. New sources, direction changes, jumps and detach cancel or replace
+owner stands optional work unless a change is still waiting for its rows,
+and yields it then: that work is what fills the window ahead of a moving one,
+and yielding until every mounted row has been measured yields exactly while
+the window moves - the frames of a fling. A row mounted before its own
+measurement arrives stands at its estimate, and the pass that follows corrects
+it. New sources, direction changes, jumps and detach cancel or replace
 stale work. Native layout and paint retain the rest of the frame. Images still
 load synchronously when their row is requested.
 
@@ -187,7 +202,12 @@ It waits for requested fragments to commit before interpreting missing
 native children as empty content, then arranges the resulting window once.
 GTK and WinUI source changes keep surviving rows'
 measurement caches. Their native revisions, placement values and cross-axis
-proposals decide which rows need fresh measurement.
+proposals decide which rows need fresh measurement. A patch inside a mounted
+row - a hover, a word, a spinner - is no source change: the run keeps every
+measurement it holds, measures again the rows whose own view moved, holds no
+mounted row as travelling and animates nothing for it. Costing the whole
+window is what makes a hover, or one folder opened, cost what every folder
+opened so far costs.
 
 The mounted lazy element versions its shared identity snapshot separately from row
 content. Viewport changes and drawing/row feedback do not read, compare or

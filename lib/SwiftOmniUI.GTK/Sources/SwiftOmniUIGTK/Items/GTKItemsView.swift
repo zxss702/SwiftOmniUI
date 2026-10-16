@@ -363,9 +363,12 @@ final class GTKItemsView: GTKLayoutView {
             && bounds.origin.y < height && bounds.origin.y + bounds.size.height > 0
     }
 
-    /// The identity at `place` of the string list.
+    /// The entry at `place`: what the host speaks while the list still shows the entries of a write it owes -
+    /// a row bound then, or a choice told then, would otherwise name what the list is about to stop showing -
+    /// and the string list's own entry otherwise, which is what the list shows.
     func identity(at place: guint) -> String {
-        gtk_string_list_get_string(model, place).map { String(cString: $0) } ?? ""
+        if !waiting.isEmpty, cells.identities.indices.contains(Int(place)) { return cells.identities[Int(place)] }
+        return gtk_string_list_get_string(model, place).map { String(cString: $0) } ?? ""
     }
 
     // MARK: - Acts

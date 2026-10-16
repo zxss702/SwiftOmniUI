@@ -39,6 +39,9 @@ class WinUILazyView: WinUITravellingLayout {
     var measuredRevision = -1
     var measuredAcross: Double?
     var naturalAcross = 44.0
+    /// The across size of every row measured in the room `measuredAcross` names: the
+    /// widest row the document was told about, and not the widest row now mounted.
+    var acrossWidest: [String: Double] = [:]
     var geometryChanged = false
     var measuredExtent = 0.0
 
@@ -73,10 +76,11 @@ class WinUILazyView: WinUITravellingLayout {
         super.init()
         cells.prefetchReady = { [weak self] in
             guard let self else { return false }
-            return !self.geometryChanged && self.measuredRevision == self.measurementRevision
-                && self.mounted.allSatisfy { identity, item in
-                    item.departing || self.measuredRevisions[identity] == item.view.measurementRevision
-                }
+            // Optional work stands unless a change is still waiting for its rows. It is what
+            // fills the window ahead of a moving one, and holding it until every mounted row
+            // is measured holds it exactly while the window moves - the frames of a fling -
+            // so the rows it would have asked for are the rows the next frame paints.
+            return !self.cells.animatesChanges
         }
         swiftomniui_winui_panel_watch_viewport(handle, true)
     }
@@ -95,15 +99,23 @@ class WinUILazyView: WinUITravellingLayout {
         let sourceChanged = !hasMountedSource || mountedSourceID != sourceID
         mountedSourceID = sourceID
         hasMountedSource = true
-        if contentChanged && mounted.contains(where: {
-            measuredRevisions[$0.key] != nil && measuredRevisions[$0.key] != $0.value.view.measurementRevision
-        }) {
-            cells.animatesChanges = true
-            forgetMeasurements()
+        // A patch inside a mounted row - a hover, a word, a spinner - is no change to the
+        // run's arrangement, and no row of the run is left holding a stale view:
+        // `measuredRevisions` follows each row's own view, so the pass this invalidation
+        // asks for re-measures exactly the rows whose view moved and keeps every other
+        // measurement. Forgetting them all here, and animating the whole window, costs one
+        // native measurement per mounted row for any patch anywhere in the list - a pointer
+        // resting on a row costs what every folder opened so far costs.
+        if contentChanged {
             invalidateMeasure()
             invalidateArrange()
         }
-        if sourceChanged, cells.total != measuredExtent { commitChangedContentExtent() }
+        if sourceChanged {
+            // A width kept for a row the run no longer shows would widen the document for
+            // good; a row the run shows anew is measured in this pass.
+            acrossWidest = [:]
+            if cells.total != measuredExtent { commitChangedContentExtent() }
+        }
         if sourceChanged || requestAcknowledged { retell() }
     }
 
@@ -593,6 +605,8 @@ final class WinUILazyStackView: WinUILazyView {
                 cells.extents.reset()
                 measured = [:]
                 measuredRevisions = [:]
+                // A width measured in another room is no width of this one.
+                acrossWidest = [:]
                 measuredAcross = across
             }
             if cells.requestedItemsAreCurrent {
@@ -617,17 +631,19 @@ final class WinUILazyStackView: WinUILazyView {
                     measured[identity] = (proposal, size)
                     measuredRevisions[identity] = item.view.measurementRevision
                 }
+                let acrossSize = axis == .vertical
+                    ? size.width + margin.left + margin.right : size.height + margin.top + margin.bottom
                 let extent = axis == .vertical
                     ? size.height + margin.top + margin.bottom
                     : size.width + margin.left + margin.right
                 cells.extents.measure(identity, extent: extent)
+                acrossWidest[identity] = acrossSize
             }
-            let natural = mounted.compactMap { identity, item -> Double? in
-                guard !item.departing, let size = measured[identity]?.size else { return nil }
-                let margin = item.values.margin
-                return axis == .vertical
-                    ? size.width + margin.left + margin.right : size.height + margin.top + margin.bottom
-            }.max() ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
+            // The widest row measured in this room, and not the widest row now mounted:
+            // rows leave the window as it moves, and a width that follows them narrows the
+            // document - the scroller's cross extent - over and over, which is the cross
+            // bar's flicker while the list scrolls along its own axis.
+            let natural = acrossWidest.values.max() ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
             if naturalAcross != natural {
                 if axis != .vertical || width == nil {
                     geometryChanged = true
@@ -659,7 +675,14 @@ final class WinUILazyStackView: WinUILazyView {
         super.arrange(in: bounds)
         for (identity, item) in mounted {
             let margin = item.values.margin
-            guard let place = cells.position(of: identity), let size = measured[identity]?.size else { continue }
+            guard let place = cells.position(of: identity) else { continue }
+            // A row mounted in this pass is measured in it, and one mounted after it in the
+            // next. Placing only what is measured leaves the frame a heavy row stands in with
+            // a hole where it takes longest, which is the document showing through a scroll.
+            // Its place is known - the arithmetic holds 44 for every place it has not
+            // measured - so it stands at its own last width and the estimate, and the
+            // measurement corrects it on the pass that follows.
+            let size = measured[identity]?.size
             let extent = cells.extents.extent(of: identity)
             let run = cells.offset(of: place)
             let frame: Rect
@@ -668,7 +691,8 @@ final class WinUILazyStackView: WinUILazyView {
                 let expands = item.values.expandingAxes == .horizontal || item.values.expandingAxes == .both
                 let width = Extent.of(
                     option: expands ? 3 : item.values.horizontal, stated: item.values.width,
-                    natural: size.width,
+                    natural: size?.width
+                        ?? acrossWidest[identity].map { $0 - margin.left - margin.right } ?? open,
                     available: open, minimum: item.values.minimumWidth,
                     maximum: item.values.maximumWidth)
                 let x = padding.left + margin.left + Extent.start(
@@ -683,7 +707,8 @@ final class WinUILazyStackView: WinUILazyView {
                 let expands = item.values.expandingAxes == .vertical || item.values.expandingAxes == .both
                 let height = Extent.of(
                     option: expands ? 3 : item.values.vertical, stated: item.values.height,
-                    natural: size.height,
+                    natural: size?.height
+                        ?? acrossWidest[identity].map { $0 - margin.top - margin.bottom } ?? open,
                     available: open, minimum: item.values.minimumHeight,
                     maximum: item.values.maximumHeight)
                 let y = padding.top + margin.top + Extent.start(

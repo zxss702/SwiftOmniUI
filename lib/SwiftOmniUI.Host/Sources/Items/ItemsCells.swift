@@ -96,11 +96,23 @@
     /// reach where the tree can build it, else with the turn under way.
     /// Design: docs/design/host/items.md#one-cell-an-entry
     public func hold(_ identity: String, in holding: any ItemsHolding) {
+        // A cell holds an entry the collection shows, never a name the list was
+        // showing a moment before: a toolkit may bind a row while the list still
+        // shows the entries of a write it owes, and a cell holding one of those
+        // would stand over the entry of another place - or over none at all.
+        guard positions[identity] != nil || positions.isEmpty else {
+            endShowing(in: holding)
+            return
+        }
         if let previous = holding.identity, previous != identity { letGo(previous, from: holding) }
         if let other = holders[identity], other !== holding { other.letGo() }
         holders[identity] = holding
         held.insert(identity)
-        if !built.contains(identity) { tell() }
+        // An entry within reach the tree holds no subtree for is asked for, not
+        // only one the cells never asked for: a cell whose entry the tree let go
+        // of - because the entries within its reach moved under it - stands empty
+        // until it is built again, and nothing else would ask for it.
+        if !built.contains(identity) || item(identity) == nil { tell() }
         let item = item(identity)
         if holding.identity != identity || holding.shown !== item { holding.hold(identity, item) }
     }

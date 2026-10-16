@@ -302,6 +302,15 @@
                held.lowerBound <= visible.upperBound, visible.lowerBound <= held.upperBound {
                 within = min(held.lowerBound, visible.lowerBound)..<max(held.upperBound, visible.upperBound)
             }
+            // A window the mounted rows do not cover is the window the next frame
+            // stands in - a jump, or a fling past what is built. Every place of it
+            // is asked for now: a place left to the optional work paints a gap for
+            // as long as that work takes, and a frame on a moving scroller has not
+            // the time. Only a window already covered is narrowed to the demand,
+            // with the rows around it left standing where they are.
+            if !target.isEmpty, target.lowerBound < built.lowerBound || target.upperBound > built.upperBound {
+                within = target
+            }
             lower = within.lowerBound
             upper = within.upperBound
             if !visible.isEmpty, within != target, element.handler(.realizedChanged) != nil {

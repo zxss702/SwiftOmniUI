@@ -252,6 +252,17 @@ template again. Unchanged resolved margins post no new commit.
 Native scroller proposals first encountered during arrangement are prepared
 after the pass. Size feedback to a placing layout is deferred as well.
 
+A lazy run under the scroller answers the document's cross size with the
+widest row measured in the room it was given, and keeps that width for as
+long as that is the room: the rows a moving window leaves behind do not
+narrow it. A cross size that follows the window toggles the document's
+extent - and the scroller's cross bar with it - between two states while the
+list scrolls along its own axis, so a widened extent is committed to the
+document once, when it grows. A row mounted before its own measurement
+arrives stands at its estimate, at the place the arithmetic holds for it:
+skipping it leaves the frame a hole where a heavy row takes longest, and the
+pass that follows corrects it.
+
 The scroller says where its view stands through `ViewChanged`, and that the
 user holds it through `DirectManipulationStarted` and `Completed`. The user's
 movement is joined up to the display's next frame, which reports it to its
