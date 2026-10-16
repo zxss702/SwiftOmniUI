@@ -27,9 +27,22 @@ final class GTKMenuButtonView: GTKView {
         }
     }
 
+    /// The view whose widget the button draws as its face, while it draws one: measuring a face asks the layout
+    /// arithmetic, not GTK's own requisition (`measure(width:height:)`).
+    private weak var faceView: GTKView?
+
     /// The widget the button's face draws; GTK keeps its own arrow beside it.
-    func setFace(_ face: GTKWidget?) {
-        gtk_menu_button_set_child(widget.opaque, face)
+    func setFace(_ face: GTKView?) {
+        faceView = face
+        gtk_menu_button_set_child(widget.opaque, face?.widget)
+    }
+
+    /// The button's size for the room offered: the room a `GtkMenuButton` leaves its face, with the face measured
+    /// in it (`GTKFace`) - the arrow GTK keeps beside the face is part of that room.
+    /// Design: docs/design/platforms/gtk/layout.md#measuring-a-widget
+    override func measure(width: Double?, height: Double?) -> LayoutSize {
+        guard let faceView else { return super.measure(width: width, height: height) }
+        return GTKFace.size(of: widget, wearing: faceView, width: width, height: height)
     }
 
     /// Whether the button opens its menu - `.isEnabled`'s.

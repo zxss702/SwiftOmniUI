@@ -42,7 +42,7 @@ extension GTKElement {
             // The menu is a slot's - the layout never places it, so it is read among the element's own children.
             let entries = element.children.first { $0.type == .contextMenu }
                 .map { MenuEntry.entries(of: $0) } ?? []
-            menu.setFace(arranged.first?.view?.widget)
+            menu.setFace(arranged.first?.view)
             menu.setEntries(entries)
             return
         }

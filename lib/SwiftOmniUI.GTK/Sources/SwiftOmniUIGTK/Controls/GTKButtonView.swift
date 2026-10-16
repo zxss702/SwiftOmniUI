@@ -10,9 +10,14 @@ import CSwiftOmniUIGTK
 final class GTKButtonView: GTKView {
     private var hasViewLabel = false
 
+    /// The view whose widget the button wears as its face, while it wears one: measuring a face asks the layout
+    /// arithmetic, not GTK's own requisition (`measure(width:height:)`).
+    private weak var faceView: GTKView?
+
     func setFace(_ face: GTKView?) {
         guard face != nil || hasViewLabel else { return }
         hasViewLabel = face != nil
+        faceView = face
         guard let face else {
             gtk_widget_remove_css_class(widget, GTKStyleSheet.contentButton)
             writeCaption()
@@ -22,6 +27,14 @@ final class GTKButtonView: GTKView {
         if gtk_button_get_child(widget.of(GtkButton.self)) != face.widget {
             gtk_button_set_child(widget.of(GtkButton.self), face.widget)
         }
+    }
+
+    /// The button's size for the room offered: the room a `GtkButton` leaves its face, with the face measured in
+    /// it (`GTKFace`).
+    /// Design: docs/design/platforms/gtk/layout.md#measuring-a-widget
+    override func measure(width: Double?, height: Double?) -> LayoutSize {
+        guard hasViewLabel, let faceView else { return super.measure(width: width, height: height) }
+        return GTKFace.size(of: widget, wearing: faceView, width: width, height: height)
     }
 
     /// What the button does when the user clicks it.
@@ -251,6 +264,7 @@ final class GTKButtonView: GTKView {
 
     override func detach() {
         setShortcut(nil)
+        faceView = nil
         super.detach()
         onClicked = nil
         onToggled = nil

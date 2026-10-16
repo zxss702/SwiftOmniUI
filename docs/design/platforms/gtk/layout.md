@@ -72,6 +72,15 @@ A widget is measured at its natural width, no wider than offered and no
 narrower than its least, and then at its natural height for that width - a
 label wraps to the width it is given.
 
+A native frame - a `GtkButton`'s, a `GtkMenuButton`'s - asks its child for a
+size request with no width in mind, so a face bounding its own width
+(`.frame(maxWidth:)`) is asked without that bound and answers with the width of
+its words alone; the frame would then collapse onto them. The host measures
+such a face itself, through the layout arithmetic, in the room the frame's own
+requisition leaves inside its box, and keeps the frame's own answer for the
+height at the width it chose. The bound is then kept the way the hosts that
+measure their content at an available size keep it.
+
 ## Where a view stands
 
 A view whose frame the tree reads - a state its frame drives, or a handler
