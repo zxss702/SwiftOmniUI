@@ -451,9 +451,16 @@ Then each is offered the windows it had open, as the scene's
 `windowRestored`: the scene opens the ones it still declares, and a window
 of a kind it no longer declares is kept no more. The scenes are kept again
 whenever the text they write changes - a scene's value the application
-keeps, a window opened or closed, a scene ended - but not once no scene
-stands: the last scene's end is the application's, and the next start finds
-the scenes as they stood before it.
+keeps, a window opened or closed, a scene ended - including the empty text
+after the last window closes. Only scenes that still contain windows are
+serialized; a scene retained in memory after a programmatic close is not a
+window session to restore. An absent mounted tree is unavailable information,
+so it does not overwrite the store. A mounted tree with no windows is a
+known empty session and replaces the old snapshot before native shutdown.
+The next ordinary start therefore connects one fresh scene and opens its
+declared initial window. Explicitly closed windows are not restored. A
+snapshot of windows still open remains available for recovery after an
+interrupted process.
 
 ## Typed words
 

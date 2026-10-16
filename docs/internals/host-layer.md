@@ -540,7 +540,8 @@ and nothing more.
   next start, on a platform that restores no windows: each scene's kept
   values and the windows of a kind of its own it had open. At the start each
   scene comes back with its values and is offered its windows; the scenes are
-  kept again as they change, but not once the last one ended. The host reads
+  kept again as they change, including an empty snapshot after the last
+  window closes. Scenes with no windows are not restored. The host reads
   and writes the text, and performs `persistSceneValue` through `keep`.
   ([Kept scenes](../design/host/runtime.md#kept-scenes))
 

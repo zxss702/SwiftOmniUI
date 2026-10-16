@@ -301,6 +301,14 @@ failed write leaves the old. Windows restores no windows either, so the
 scenes are kept the same way, in a second file beside it, by the host
 layer's rule ([kept scenes](../../host/runtime.md#kept-scenes)): read as the
 host starts, and written whenever the scenes it holds write another text.
+The current window-session store is `open scenes.txt`. Closing the last
+window writes an empty snapshot before native windows are closed and the
+dispatcher schedules shutdown. A later ordinary launch opens the declared
+initial window. Scenes retained without windows after programmatic closing
+are excluded from restoration. The legacy `kept scenes.txt` is not read:
+that format's lifecycle deliberately retained pre-close snapshots, with no
+way to distinguish closed windows from an interrupted session. Application
+preferences continue to use their separate stores.
 
 ## Self-contained
 

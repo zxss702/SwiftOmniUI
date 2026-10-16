@@ -192,9 +192,11 @@ final class WinUIRenderer {
 
 extension WinUIRenderer: TurnPresenter {
     func presentRendered() {
+        // Commit the logical open-window roster before closing native windows
+        // or scheduling shutdown after the last one.
+        if let text = scenes.changed(root: runtime.tree.root) { WinUIPersistence.writeScenes(text) }
         showWindows()
         LazyCells.realizing = false
-        if let text = scenes.changed(root: runtime.tree.root) { WinUIPersistence.writeScenes(text) }
     }
 
     func perform(_ call: HostActCall) {

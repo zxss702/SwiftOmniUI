@@ -30,7 +30,10 @@ enum WinUIPersistence {
 
     /// The file the kept values stand in, and the one the scenes do.
     static let valuesFile = "kept values.txt"
-    static let scenesFile = "kept scenes.txt"
+    // The legacy file kept pre-close snapshots even after every window closed.
+    // Their open/closed status cannot be recovered, so do not replay them after
+    // upgrading. The new store records only sessions with windows still open.
+    static let scenesFile = "open scenes.txt"
 
     /// What the store holds; nothing where there is none.
     static func read() -> KeptValuesText {

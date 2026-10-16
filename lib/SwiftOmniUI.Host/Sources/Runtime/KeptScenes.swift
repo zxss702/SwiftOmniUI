@@ -66,10 +66,11 @@
         }
     }
 
-    /// The scenes `root` holds, in order - each with the values `values` keeps for it by its key, and its windows of
-    /// a kind of their own.
+    /// The scenes `root` holds with open windows, in order - each with the values `values` keeps for it by its
+    /// key, and its windows of a kind of their own. A scene retained after a programmatic close is not an open
+    /// window session to restore on the next launch.
     @MainActor public init(of root: MountedElement?, values: [String: [String: HostValue]]) {
-        scenes = Self.scenes(of: root).map { scene in
+        scenes = Self.scenes(of: root).filter { !$0.windows.isEmpty }.map { scene in
             Scene(
                 values: values[Self.key(of: scene)] ?? [:],
                 windows: scene.windows.compactMap { window in
