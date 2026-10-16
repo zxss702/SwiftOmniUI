@@ -137,7 +137,9 @@ final class AndroidLazyStackView: AndroidLazyView {
         let revision = cells.extents.revision
         if measuredAcross != across {
             cells.extents.reset()
-            measured = [:]
+            // Each row's own measure is kept: it names the proposal it was taken at, and the loop
+            // below measures again exactly the rows whose proposal is no longer that one. A room
+            // that returns costs no measure at all.
             measuredAcross = across
         }
         if measuredRevision != measurements.revision { measured = [:] }
@@ -247,7 +249,8 @@ final class AndroidLazyGridView: AndroidLazyView {
     private var columns: [Double] = [] {
         didSet {
             if columns != oldValue {
-                measured = [:]
+                // The rows' own measures are kept: each names the track width it was taken at,
+                // and only the rows whose proposal changed are measured again.
                 cells.runs.reset()
                 invalidateMeasurements()
             }

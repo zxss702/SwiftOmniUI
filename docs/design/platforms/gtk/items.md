@@ -55,6 +55,14 @@ speaks for its place, and not the one the string list still shows: the list
 shows the entries of a write it owes until the frame is laid out, and a row
 bound then would take a name it is about to stop showing.
 
+A change stands for as long as it is owed and as long as it runs, so a row the
+splice itself binds is given the host layer's entry for its place too. Between
+one splice of a sequence and the next the string list names neither the list as
+it was nor the one it will be, and a row given one of the string list's own
+names would stand over the entry of another place, or over none at all - the
+row of the folder being opened among them. A change raised while a write runs
+joins the queue behind it; one walk leads them all.
+
 ## Scrolling to an item
 
 GTK brings the item into view, the shortest way; once it is laid out, the

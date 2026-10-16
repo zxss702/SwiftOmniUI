@@ -247,14 +247,28 @@ final class GTKItemsView: GTKLayoutView {
 
     /// Runs `apply` now, or once the list is done binding its rows, after everything waiting before it.
     private func change(_ apply: @escaping () -> Void) {
-        guard binding > 0 || !waiting.isEmpty else { return apply() }
         waiting.append(apply)
+        // One drain leads them all: a write raised while one runs joins behind its head rather than
+        // starting a second walk of the queue.
         guard waiting.count == 1 else { return }
-        GTKDoorbell.afterLayout { [weak self] in
-            guard let self else { return }
-            let waiting = self.waiting
-            self.waiting = []
-            for apply in waiting { apply() }
+        // A write raised inside a bind waits for GTK to be done binding its rows: the list lays
+        // its rows out as it binds them, and a splice from inside that walk rewrites the model
+        // under it.
+        guard binding == 0 else {
+            GTKDoorbell.afterLayout { [weak self] in self?.drain() }
+            return
+        }
+        drain()
+    }
+
+    /// Runs the writes owed, in order, the one under way standing at the head of the queue: a row
+    /// the splice itself binds reads its place while the write stands, and reads the host layer's
+    /// entries - the list as it will stand - never the model's, which between one splice of a
+    /// sequence and the next still name the list as it was.
+    private func drain() {
+        while let next = waiting.first {
+            next()
+            waiting.removeFirst()
         }
     }
 

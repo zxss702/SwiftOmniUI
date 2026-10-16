@@ -71,6 +71,15 @@ new places - stay; every other one is removed and inserted, which is how a
 move is told. `removedRuns` and `insertedRuns` gather neighbours into runs,
 each told in one call, in the same order.
 
+A backend that owes its toolkit a sequence of splices speaks a place from the
+host layer's entries for as long as a write stands - owed, and under way - and
+never from the toolkit's model: between one splice of the sequence and the next
+the model names neither the list as it was nor the one it will be. A row the
+splice itself binds is one of those. Given the model's own name it would stand
+over the entry of another place, or over none at all - the row of the folder
+the user opened among them. A write raised while one runs joins the queue
+behind it, and one walk leads them all.
+
 ## The end reached
 
 `EndReachedWatch`: the end is told as the last item in view comes within
@@ -238,4 +247,19 @@ them on the next viewport reconciliation. They also retain surviving mounted
 rows for the first changed arrangement. These extra identities are requested
 individually in source order; unbuilt rows between them and the viewport are
 not realized. The normal bounded range still controls new initialization.
+
+A run with no scroller to narrow it - a first mount, a re-parenting - told the
+tree to build every row, and keeps that window only until a scroller clips it:
+the window is taken again the moment one does, and the run narrows back to the
+rows in reach. A window standing for the whole source would leave every row
+built for good, and every later patch, hover and row measure costing what the
+whole source costs. The identities a run asks to keep are the ones it still
+holds a place for: a row the source has dropped is not retained by a placement
+journey it has already left.
+
+A row's own measure is kept beside the proposal it was taken at, and the row is
+measured again only where its proposal, its view or its room has changed. A room
+that returns - the bar toggling a scroller's cross size brings the last one
+back, a scroller's own axis changes nothing - costs no measure at all, while the
+arithmetic's extents, which are the room's, are taken again.
 

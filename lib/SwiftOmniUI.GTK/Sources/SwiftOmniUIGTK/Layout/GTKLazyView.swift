@@ -293,7 +293,10 @@ final class GTKLazyStackView: GTKLazyView {
         let revision = cells.extents.revision
         if measuredAcross != across {
             cells.extents.reset()
-            measured = [:]
+            // Each row's own measure is kept: it names the proposal it was taken at, and the loop
+            // below measures again exactly the rows whose proposal is no longer that one. A room
+            // that returns - the bar toggling the document's cross size brings it back - costs no
+            // measure at all.
             measuredAcross = across
         }
         for (identity, item) in mounted {
@@ -414,7 +417,8 @@ final class GTKLazyGridView: GTKLazyView {
     private var columns: [Double] = [] {
         didSet {
             if columns != oldValue {
-                measured = [:]
+                // The rows' own measures are kept: each names the track width it was taken at,
+                // and only the rows whose proposal changed are measured again.
                 cells.runs.reset()
                 invalidateMeasurements()
             }

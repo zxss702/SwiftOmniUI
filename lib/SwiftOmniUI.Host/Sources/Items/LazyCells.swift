@@ -427,6 +427,12 @@
         built = 0..<identities.count
         retained = []
         needsMeasurement = false
+        // The window is re-asked, not kept: a run that told the tree to build every row
+        // because no scroller clipped it - a first mount, a re-parenting - narrows back to
+        // the window its scroller names the moment one does. A kept window standing for the
+        // same span would leave every row of the source built for good, and every later
+        // patch, hover and row measure costing what the whole source costs.
+        window = nil
         requests += 1
         let generation = nextRequestGeneration(for: element)
         element.send(.realizedChanged, [.strings(Array(identities)), .number(Double(generation))], in: runtime)

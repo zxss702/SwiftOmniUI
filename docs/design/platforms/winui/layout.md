@@ -103,6 +103,12 @@ for those tracks without resetting the visible grid.
 Writing an unchanged child place between passes does not invalidate its
 parent again. ArrangeOverride still arranges every native child it holds.
 
+A run whose change still waits for its rows' own measurements holds its
+arrangement for them, and not past a bound: a row kept alive by a window of its
+own, or one that left the room of a native pass, would otherwise hold the
+change's arrangement - and with it the change's law and the retention it
+stands - for good.
+
 Lazy viewport realization requests the estimated window as one batch, as
 GTK does. The former one-unknown-run policy performed a synchronous core
 render for each incoming row; reconciliation revisited the growing mounted
@@ -188,8 +194,12 @@ measures again, and so on up; a layout measured inside its parent's own
 measure is read there and tells nothing. A picture read after its layouts
 were measured tells the layout holding it through the relay.
 
-Content, child membership or layout-property changes also invalidate native
-arrangement along the affected placing chain. A panel's zero DesiredSize can
+A lazy run's changed content extent reaches the scroll document even where the
+run is not yet placed: the write names the scroller the run's own tree declares
+where no placing layout reaches one, so a document first measured at the
+estimates is not left standing under a bar while the rows stand at their
+measures. Content, child membership or layout-property changes also invalidate
+native arrangement along the affected placing chain. A panel's zero DesiredSize can
 remain unchanged while its children's places change; remeasurement alone is
 not a reliable request for new child arrangements. Child attachment likewise
 requests arrangement after committing the new native child list. No synchronous

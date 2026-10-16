@@ -47,6 +47,10 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// A window change under way asks the run again once, not per notice.
     private var retellQueued = false
+    /// How many passes an arrival has stood waiting for its own rows' measurements: the
+    /// change's arrangement, and with it the change's law and retention, is not held
+    /// past a bound (`canArrangeRows`).
+    private var arrivalHeld = 0
     /// WinUI's effective viewport is the compositor's window in this panel's coordinates.
     private var effectiveViewport: Rect?
     private var lastTargetViewport: Rect?
@@ -63,11 +67,20 @@ class WinUILazyView: WinUITravellingLayout {
     private var inViewportChange = false
     private var pendingViewport = false
 
+    /// The mounted rows still on their way: a change's own rows while the change stands, and
+    /// afterwards the mounts the motion itself says are moving.
+    ///
+    /// A row the run no longer shows is none of them. `LazyCells.show` keeps only the rows it
+    /// still holds a place for, so one left here would stand against the set the run kept for
+    /// good - a viewport re-ask, and a window re-tell, on every pass until the animation ends,
+    /// and for ever where none ends.
     var travellingIdentities: Set<String> {
-        if cells.animatesChanges { return Set(mounted.keys) }
-        return Set(mounted.compactMap { identity, item in
-            places.layoutMotion?.isTravelling(mount: item.mount) == true ? identity : nil
-        })
+        let moving = cells.animatesChanges
+            ? Set(mounted.keys)
+            : Set(mounted.compactMap { identity, item in
+                places.layoutMotion?.isTravelling(mount: item.mount) == true ? identity : nil
+            })
+        return Set(moving.filter { cells.position(of: $0) != nil })
     }
 
     init(axis: StackArithmetic.Axis, cells: LazyCells) {
@@ -114,6 +127,7 @@ class WinUILazyView: WinUITravellingLayout {
             // A width kept for a row the run no longer shows would widen the document for
             // good; a row the run shows anew is measured in this pass.
             acrossWidest = [:]
+            arrivalHeld = 0
             if cells.total != measuredExtent { commitChangedContentExtent() }
         }
         if sourceChanged || requestAcknowledged { retell() }
@@ -178,8 +192,23 @@ class WinUILazyView: WinUITravellingLayout {
             guard let self else { return }
             self.ancestorMeasureQueued = false
             guard !self.isDetached else { return }
-            self.placingLayout?.invalidateMeasurements()
+            // An extent the document has already read must reach it even where this panel is
+            // not yet placed: a run mounted under a scroller it cannot yet climb to would
+            // otherwise keep the extent of the estimates until some later patch - a bar
+            // standing over a document of estimates while the rows stand at their measures.
+            (self.placingLayout ?? self.declaredScroll)?.invalidateMeasurements()
         }
+    }
+
+    /// The scroller an ancestor element declares on this run's own axis, where the placing
+    /// layouts do not reach one yet.
+    private var declaredScroll: WinUIScrollView? {
+        var ancestor = sourceElement?.parent
+        while let each = ancestor {
+            if let scroll = each.winUI.view as? WinUIScrollView, scroll.orientation.takes(axis) { return scroll }
+            ancestor = each.parent
+        }
+        return nil
     }
 
     /// The nearest scroller clipping this run on its own axis, found up the
@@ -380,12 +409,7 @@ class WinUILazyView: WinUITravellingLayout {
                 guard self.isAttached else { return }
                 // Attachment can precede installation of placingLayout links.
                 // A declared same-axis scroller is not an unbounded container.
-                var ancestor = self.sourceElement?.parent
-                while let each = ancestor {
-                    if let scroll = each.winUI.view as? WinUIScrollView,
-                       scroll.orientation.takes(self.axis) { return }
-                    ancestor = each.parent
-                }
+                guard self.declaredScroll == nil else { return }
                 self.cells.tellAll()
                 return
             }
@@ -532,9 +556,20 @@ class WinUILazyView: WinUITravellingLayout {
                 || measuredRevisions[entry.key] != entry.value.view.measurementRevision
         }
         guard !waiting else {
+            // The rows of a change are measured in the pass before its arrangement. A row
+            // whose own measure never lands - a view that left the room of a native pass, a
+            // row kept alive by a window of its own - must not hold the change's
+            // arrangement, and with it the change's law and the retention it stands, for
+            // good: past the bound its place is the one the arithmetic holds for it.
+            guard arrivalHeld < 2 else {
+                arrivalHeld = 0
+                return true
+            }
+            arrivalHeld += 1
             retell()
             return false
         }
+        arrivalHeld = 0
         return true
     }
 
@@ -571,6 +606,7 @@ class WinUILazyView: WinUITravellingLayout {
         watching = nil
         scrollEar = nil
         ancestorMeasureQueued = false
+        arrivalHeld = 0
     }
 }
 
@@ -603,9 +639,13 @@ final class WinUILazyStackView: WinUILazyView {
             let revision = cells.extents.revision
             if measuredAcross != across {
                 cells.extents.reset()
-                measured = [:]
-                measuredRevisions = [:]
-                // A width measured in another room is no width of this one.
+                // Row measurements stand across a room change: each carries the proposal it
+                // was measured at, and the loop below measures again exactly the rows whose
+                // proposal differs. Dropping them all charged one native measure per mounted
+                // row every time the query flipped - a finite proposal beside the last
+                // allocation is the same room twice - and charged it again on every scroll
+                // back over a row the window had left. A width measured in another room is
+                // no width of this one.
                 acrossWidest = [:]
                 measuredAcross = across
             }
@@ -800,8 +840,9 @@ final class WinUILazyGridView: WinUILazyView {
             let revision = cells.runs.revision
             if widths != columns {
                 columns = widths
-                measured = [:]
-                measuredRevisions = [:]
+                // Each row is measured at its own track's width, which the proposal names: a
+                // row whose track kept its width keeps its measurement, so a track count or a
+                // width that returns to a former one costs no native measure.
                 cells.runs.reset()
                 geometryChanged = true
             }
