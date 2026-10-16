@@ -345,6 +345,24 @@ what arrives, innermost first, so what it saves is there for its replacement
 to read. `forget` drops the handlers and disarms the engines of everything
 under an element that left.
 
+`.task(priority:)` and `.task(id:priority:)` declare async work on the node,
+separate from lifetime and value-change handlers. `RenderedNode.tasks` owns
+the running handles, paired by modifier order and the key's type and equality.
+Rebuilding, carrying or resynchronizing the same element with the same key
+keeps its job, including a completed job; an ordinary refresh never restarts it.
+A changed key cancels its old job and starts the latest closure. Removing the
+modifier or forgetting its element cancels the job too. Multiple modifiers
+have independent slots; lazy rows own only the jobs of materialized elements.
+
+The walk retires a departing job immediately so a queued start cannot revive
+it, but cancellation handlers and new starts run after the walk, with departing
+jobs cancelled first. A start creates a separate Swift task at the requested
+priority and preserves the action's caller actor isolation; rendering never
+awaits the job's completion. Cancellation is cooperative: app work must check
+it before publishing stale results. No task declarations or handles cross to
+GTK or WinUI. This is the view-lifetime and ID-restart contract of
+[SwiftUI's task modifier](https://developer.apple.com/documentation/swiftui/view/task(id:name:priority:file:line:_:)).
+
 ## Engines on an element
 
 An element's engines are registered under numbers it keeps, so a render hands

@@ -130,6 +130,9 @@ final class RenderedNode {
     /// What `.onDisappear` runs as it leaves: its last build's closures.
     var destroying: [EventHandler] = []
 
+    /// Jobs owned by this element, retained when the authored node is rebuilt.
+    var tasks: [MountedTask] = []
+
     /// What the element holds for its life, where it asked for one.
     var session: AnyObject?
 

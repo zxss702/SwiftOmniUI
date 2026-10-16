@@ -367,6 +367,7 @@ extension Node {
             // And its lifetime handlers, in the same order (Lifetime.swift).
             node.created += written.created
             node.destroying += written.destroying
+            node.tasks += written.tasks
 
             // And its engines, registered against the element its body ends on.
             node.engines += written.engines
@@ -394,6 +395,7 @@ extension Node {
             child.watches += written.watches
             child.created += written.created
             child.destroying += written.destroying
+            child.tasks += written.tasks
             child.engines += written.engines
             child.children += written.children
             child.lazyIdentity = written.lazyIdentity ?? child.lazyIdentity
@@ -514,6 +516,7 @@ extension Node {
         watches += fragment.watches
         created += fragment.created
         destroying += fragment.destroying
+        tasks += fragment.tasks
         engines += fragment.engines
 
         // Its published bags too: a fragment owns no element, so a

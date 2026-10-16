@@ -1,21 +1,21 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-// `.task`: an async job tied to the view's life - started on appear, cancelled
-// on disappear.
+// `.task`: declarations belong to the authored node; running jobs belong to
+// the rendered element, so a body rebuild cannot lose their cancellation handle.
 // Design: docs/design/core/identity-and-diffing.md#created-and-destroying
 
 extension View {
-    /// Runs an async job while the view is on screen: started when the view is
-    /// first described, cancelled when it leaves the tree:
+    /// Starts an async job when the view enters the tree and cancels it when
+    /// the view or this modifier leaves:
     ///
     ///     List { … }
     ///         .task { await items.load() }
     ///
-    /// Once per element, the outermost first, as `.onAppear` is - and where
-    /// the element leaves and comes back, a new job for a new element. The job
-    /// outliving its view is cancelled, so a load in flight is dropped rather
-    /// than written into state nobody shows.
+    /// Rebuilding the same view does not restart the job, even after it has
+    /// completed. Cancellation is cooperative: the work must honor cancellation
+    /// before publishing a result that is no longer wanted. The closure keeps
+    /// the caller's actor isolation; the render does not await its completion.
     ///
     /// - Parameters:
     ///   - priority: the job's scheduling weight, as `Task` takes it.
@@ -24,13 +24,8 @@ extension View {
         priority: TaskPriority = .userInitiated,
         @_inheritActorContext _ work: sending @escaping @isolated(any) () async -> Void
     ) -> ModifiedContent {
-        let box = TaskBox()
-        return onAppear {
-            box.task = Task(priority: priority) { await work() }
-        }
-        .onDisappear {
-            box.task?.cancel()
-        }
+        let declaration = TaskDeclaration(UnkeyedTask.value, priority: priority, work: work)
+        return revised { $0.tasks.append(declaration) }
     }
 
     /// As `.task`, and again whenever `id` moves: a view showing `id`'s
@@ -51,17 +46,8 @@ extension View {
         priority: TaskPriority = .userInitiated,
         @_inheritActorContext _ work: sending @escaping @isolated(any) () async -> Void
     ) -> ModifiedContent {
-        let box = TaskBox()
-        return onAppear {
-            box.task = Task(priority: priority) { await work() }
-        }
-        .onChange(of: id) {
-            box.task?.cancel()
-            box.task = Task(priority: priority) { await work() }
-        }
-        .onDisappear {
-            box.task?.cancel()
-        }
+        let declaration = TaskDeclaration(id, priority: priority, work: work)
+        return revised { $0.tasks.append(declaration) }
     }
 }
 
@@ -74,8 +60,7 @@ extension View {
     ///
     /// The subscription is the `.task` it rides: starts when the view appears,
     /// cancelled when it leaves - so a sequence outliving its view stops
-    /// writing state nobody shows. The sequence's own errors end the job the
-    /// way a `.task` error does.
+    /// writing state nobody shows. The sequence's own errors end the job.
     ///
     /// Combine-shaped `.onReceive` callers on Darwin can pass any `Publisher`
     /// through `publisher.values`; on Linux an `AsyncSequence` is the honest
@@ -114,8 +99,87 @@ private final class OnReceiveBox<S: AsyncSequence>: @unchecked Sendable {
     init(_ sequence: S) { self.sequence = sequence }
 }
 
-/// The running job a `.task` started, so its disappear can cancel it.
-private final class TaskBox: @unchecked Sendable {
-    /// The job running for the view, or none yet or anymore.
-    var task: Task<Void, Never>?
+/// A distinct key type keeps `.task` separate from `.task(id:)` at the same slot.
+private enum UnkeyedTask: Equatable { case value }
+
+/// One modifier's latest description. Its slot in the element pairs it with the
+/// running job, independently of `.onChange` and `.onAppear` handlers.
+struct TaskDeclaration {
+    let value: Any
+    let matches: (Any) -> Bool
+    let priority: TaskPriority
+    private let action: TaskAction
+
+    init<ID: Equatable>(
+        _ id: ID,
+        priority: TaskPriority,
+        work: sending @escaping @isolated(any) () async -> Void
+    ) {
+        value = id
+        matches = { ($0 as? ID).map { $0 == id } ?? false }
+        self.priority = priority
+        action = TaskAction(work)
+    }
+
+    func start() -> Task<Void, Never> {
+        let action = action
+        return Task(priority: priority) {
+            guard !Task.isCancelled else { return }
+            await action.run()
+        }
+    }
+}
+
+/// The caller transfers the closure here once. Only the task invokes it, on
+/// the executor carried by `@isolated(any)`; IDs and render state never cross.
+private final class TaskAction: @unchecked Sendable {
+    let run: @isolated(any) () async -> Void
+
+    init(_ work: sending @escaping @isolated(any) () async -> Void) {
+        run = work
+    }
+}
+
+/// Held by `RenderedNode` across rebuilds, including after the job completes.
+/// Only the render/lifecycle executor changes the handle, never the job itself.
+final class MountedTask {
+    let value: Any
+    private var active = true
+    private var task: Task<Void, Never>?
+
+    init(_ declaration: TaskDeclaration) { value = declaration.value }
+
+    func start(_ declaration: TaskDeclaration) {
+        guard active, task == nil else { return }
+        task = declaration.start()
+    }
+
+    /// Prevents a queued start from running after a later settling pass removed it.
+    func retire() { active = false }
+
+    func cancel() {
+        task?.cancel()
+        task = nil
+    }
+
+    deinit { task?.cancel() }
+}
+
+extension Differ {
+    /// Reuse an unchanged slot; restart a changed ID with this build's closure.
+    func reconcileTasks(_ declarations: [TaskDeclaration], previous: [MountedTask]) -> [MountedTask] {
+        var tasks: [MountedTask] = []
+        for (index, declaration) in declarations.enumerated() {
+            if index < previous.count, declaration.matches(previous[index].value) {
+                tasks.append(previous[index])
+            } else {
+                if index < previous.count { stopTask(previous[index]) }
+                let task = MountedTask(declaration)
+                tasks.append(task)
+                fire { task.start(declaration) }
+            }
+        }
+        for task in previous.dropFirst(declarations.count) { stopTask(task) }
+        return tasks
+    }
 }

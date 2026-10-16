@@ -562,6 +562,8 @@ extension Differ {
             node.created.forEach(fire)
         }
 
+        let tasks = reconcileTasks(node.tasks, previous: previous?.tasks ?? [])
+
         // Every property when there is nothing to compare against, or on a resync.
         let changed = previous.map { was in
             node.props.filter { key, value in was.props[key] != value }
@@ -761,6 +763,7 @@ extension Differ {
 
         // What it runs as it leaves: this build's closures, the newest.
         result.destroying = node.destroying
+        result.tasks = tasks
         result.session = session
 
         return (result, patch)
@@ -850,6 +853,7 @@ extension Differ {
             node.watches.count == kept.watches.count,
             node.created.count == kept.created.count,
             node.destroying.count == kept.destroying.count,
+            node.tasks.count == kept.tasks.count,
             node.environments.count == kept.environments.count,
             node.driven.count == kept.driven.count,
             node.focusedValues.same(as: kept.focusedValues),
@@ -858,6 +862,11 @@ extension Differ {
 
         for (fresh, old) in zip(node.watches, kept.watches)
         where fresh.matches(old.value) != true {
+            return false
+        }
+
+        for (fresh, old) in zip(node.tasks, kept.tasks)
+        where !fresh.matches(old.value) {
             return false
         }
 

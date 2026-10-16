@@ -372,6 +372,9 @@ public struct Node {
     /// What `.onDisappear` runs, in written order.
     var destroying: [EventHandler] = []
 
+    /// Async jobs declared by `.task`; their handles live on the rendered element.
+    var tasks: [TaskDeclaration] = []
+
     /// The pages `.navigationDestination` registered on this node: a page
     /// factory per presented value's type, and one an item binding drives.
     /// The enclosing navigation stack reads them from its root. Never crosses.

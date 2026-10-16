@@ -408,6 +408,13 @@ final class Differ {
         return taken
     }
 
+    /// Retire immediately, but invoke cancellation handlers only after the walk,
+    /// before any newly declared jobs start. Cancellation can write app state.
+    func stopTask(_ task: MountedTask) {
+        task.retire()
+        leaving.append { task.cancel() }
+    }
+
     /// Drops the handlers and engines of an element that left the tree, and of
     /// everything under it, and books its `.onDisappear`.
     func forget(_ node: RenderedNode) {
@@ -427,6 +434,8 @@ final class Differ {
         for child in node.children {
             forget(child)
         }
+
+        node.tasks.forEach(stopTask)
 
         // Its `.onDisappear`, once its subtree's is booked - innermost first.
         leaving.append(contentsOf: node.destroying)
