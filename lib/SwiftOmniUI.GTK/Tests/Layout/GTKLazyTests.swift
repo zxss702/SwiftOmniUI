@@ -166,6 +166,52 @@ final class GTKLazyTests: XCTestCase {
         }
     }
 
+    /// A source patch reaches the run's arrangement before the realization that mounts the rows it
+    /// added. An arrangement that runs in between must keep the change, or those rows arrive under
+    /// no timing of their own.
+    func testAnEarlyArrangeDoesNotConsumePendingRowAnimation() throws {
+        try onUIThread {
+            for grid in [false, true] {
+                let rows = State(wrappedValue: Array(0..<40))
+                let host = GTKRenderer.running(clock: TestClock()) {
+                    ScrollView {
+                        let row = ForEach(rows.wrappedValue) { number in
+                            Text("File \(number)")
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                        }
+                        if grid {
+                            LazyVGrid(columns: [GridItem(.fixed(160))], spacing: 0) { row }
+                        } else {
+                            LazyVStack(spacing: 0) { row }
+                        }
+                    }
+                    .frame(width: 320, height: 240)
+                }
+                for _ in 0..<12 { host.step(); host.frame() }
+                let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
+                XCTAssertFalse(lazy.mounted.isEmpty, "the window stands before the change")
+
+                withAnimation(.eased(200, .linear)) { rows.wrappedValue.insert(-1, at: 0) }
+                // The source patch is here; the window it asks for has not been answered.
+                _ = host.runtime.core.runJobs()
+                let inserted = lazy.cells.orderedIdentities[0]
+                XCTAssertTrue(lazy.cells.animatesChanges, "the change waits for the rows it added")
+                XCTAssertFalse(lazy.cells.requestedItemsAreCurrent, "and the tree has not answered the window")
+                XCTAssertTrue(lazy.cells.inserting.contains(inserted))
+
+                lazy.arrange(in: Rect(0, 0, 320, 240))
+                XCTAssertTrue(lazy.cells.animatesChanges,
+                              "an arrangement before the rows must not consume the change")
+                XCTAssertTrue(lazy.cells.inserting.contains(inserted))
+
+                for _ in 0..<12 { host.step(); host.frame() }
+                XCTAssertFalse(lazy.cells.animatesChanges, "the arrangement that can place the rows spends it")
+                XCTAssertFalse(lazy.cells.inserting.contains(inserted))
+            }
+        }
+    }
+
     func testGraphRowsReleaseOffscreenViewsAndNeverBuildClosedDetails() throws {
         try onUIThread {
             let builds = ModifiedLazyBuilds()

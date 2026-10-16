@@ -46,6 +46,49 @@ class GTKLazyView: GTKTravellingLayout {
         })
     }
 
+    /// Whether the arrangement under way can place the rows a change brought, or must wait for them.
+    ///
+    /// A source patch reaches a run's arrangement before the realization that mounts the rows it
+    /// added. Spending the change there would leave those rows arriving with nothing to travel
+    /// under, so an arrangement with a change still waiting asks the window again and stands down.
+    /// A pass with no change waiting is never held: the rows already mounted keep the places the
+    /// last arrangement gave them, and holding them would show the room of a frame that has gone.
+    func canArrangeRows() -> Bool {
+        guard cells.animatesChanges else { return true }
+        // Nowhere to ask means nothing arrives: an unasked run keeps no row back for good.
+        guard cells.element?.handler(.realizedChanged) != nil else { return true }
+        guard cells.requestedItemsAreCurrent else {
+            retell()
+            return false
+        }
+        // A row of the change stands in the built window once the tree has answered. One outside
+        // it - a row the window has dropped, or one held by its own travelling - is no part of
+        // what is waiting, and an unmounted one of those must not hold the change back for good.
+        let waiting = cells.inserting.contains { identity in
+            guard let place = cells.position(of: identity), cells.built.contains(place) else { return false }
+            return mounted[identity] == nil
+        }
+        guard !waiting else {
+            retell()
+            return false
+        }
+        return true
+    }
+
+    /// Begins the arrangement, spending the change's kept motion where one still waits: a run that
+    /// holds its children by a window mounts the rows of a data change in a later patch, which
+    /// names no timing of its own. Every arrangement takes the kept motion with it, so none
+    /// outlives the change it belongs to.
+    func beginArrangementOfRows(width: Double) {
+        let motion = takeArrivalMotion()
+        if cells.animatesChanges, let motion { places.animation = motion }
+        places.begin(width: width, animating: cells.animatesChanges,
+                     anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
+                                         axis == .vertical ? cells.anchorShift : 0), refining: true)
+        cells.animatesChanges = false
+        cells.anchorShift = 0
+    }
+
     init(axis: StackArithmetic.Axis, cells: LazyCells) {
         self.axis = axis
         self.cells = cells
@@ -243,6 +286,7 @@ final class GTKLazyStackView: GTKLazyView {
     /// Every mounted child measures, is stood at its offset, and the window
     /// re-asks what the tree builds.
     override func arrange(in bounds: Rect) {
+        guard canArrangeRows() else { return }
         let across = max(0, axis == .vertical
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom)
@@ -280,11 +324,7 @@ final class GTKLazyStackView: GTKLazyView {
             invalidateMeasurements()
         }
         if let origin = cells.correctedOrigin() { anchorTarget = origin }
-        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
-                     anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                         axis == .vertical ? cells.anchorShift : 0), refining: true)
-        cells.animatesChanges = false
-        cells.anchorShift = 0
+        beginArrangementOfRows(width: axis == .vertical ? bounds.width : bounds.height)
         if cells.extents.revision != revision {
             measurements.invalidate()
             geometryChanged = true
@@ -415,7 +455,7 @@ final class GTKLazyGridView: GTKLazyView {
             width: room, spacing: trackSpacing)
         if next != columns { columns = next }
         let widths = columns
-        guard !widths.isEmpty else { return }
+        guard !widths.isEmpty, canArrangeRows() else { return }
         let revision = cells.runs.revision
         var runExtents: [Int: Double] = [:]
         for (identity, item) in mounted {
@@ -440,11 +480,7 @@ final class GTKLazyGridView: GTKLazyView {
         }
         for (run, extent) in runExtents { cells.runs.measure(run, extent: extent) }
         if let origin = cells.correctedOrigin(perRun: perRun, grid: true) { anchorTarget = origin }
-        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
-                     anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                         axis == .vertical ? cells.anchorShift : 0), refining: true)
-        cells.animatesChanges = false
-        cells.anchorShift = 0
+        beginArrangementOfRows(width: axis == .vertical ? bounds.width : bounds.height)
         if cells.runs.revision != revision {
             measurements.invalidate()
             geometryChanged = true

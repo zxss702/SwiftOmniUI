@@ -14,6 +14,7 @@ extension GTKElement {
 
         layout.places.layoutMotion = host?.runtime.layoutMotion
         layout.places.animation = element.animation
+        layout.keepArrivalMotion(element.animation)
         layout.places.framesRead = element.framesRead
         layout.places.patchArrived()
     }

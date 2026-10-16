@@ -43,6 +43,24 @@ affected row. When GTK requests a native measurement, the lazy container
 revalidates retained proposals through GTK's own requisition cache, so native
 text, font and CSS changes can still update row extents without a core patch.
 
+## A change and its rows
+
+A lazy arrangement the source patch reaches before the rows it added asks the
+window again and stands down. The pass in between would otherwise spend the
+change, and the rows the realization mounts would arrive with nothing to travel
+under. GTK measures a row within the arrangement that places it, so what such a
+run waits for is the window, not a measurement: the pass is held where the tree
+has not yet answered what the run asked of it, or where a row the change added
+stands in the built window unmounted.
+
+The run keeps the timing that patch named across the pass in between - the
+realization names no timing of its own - and spends it in the arrangement that
+can place those rows, so an inserted row fades in and its neighbours travel
+under the change's own law. A pass with no change waiting arranges at once, the
+way an ordinary layout does: the rows already mounted keep the places the last
+arrangement gave them. Every arrangement that begins takes the kept law with it,
+so none outlives the change it belongs to.
+
 ## Measuring a widget
 
 A widget's size counts its CSS padding, border and padding: a button measured
