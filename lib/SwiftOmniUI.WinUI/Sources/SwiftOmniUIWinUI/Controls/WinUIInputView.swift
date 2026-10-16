@@ -42,10 +42,6 @@ class WinUIInputView: WinUIView {
         swiftomniui_winui_field_set_placeholder(handle, placeholder ?? "")
     }
 
-    func setEnabled(_ enabled: Bool) {
-        swiftomniui_winui_set_enabled(handle, enabled)
-    }
-
     /// How the words are taken: read only, and with `traits` - spell checked, predicted, and the keyboard's scope.
     func setBehaviour(readOnly: Bool, traits: InputTraits) {
         swiftomniui_winui_field_set_behaviour(

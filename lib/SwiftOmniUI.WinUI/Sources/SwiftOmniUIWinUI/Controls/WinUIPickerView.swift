@@ -75,10 +75,6 @@ final class WinUIPickerView: WinUIView {
     /// The choice WinUI shows; -1 for none.
     var chosen: Int { Int(swiftomniui_winui_picker_selected(handle)) }
 
-    func setEnabled(_ enabled: Bool) {
-        swiftomniui_winui_set_enabled(handle, enabled)
-    }
-
     override func chose(_ index: Int) {
         guard !ProgramWrite.isWriting, written.choices.indices.contains(index) else { return }
         onChosen?(index)

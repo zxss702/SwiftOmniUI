@@ -27,10 +27,6 @@ class WinUIToggleView: WinUIView {
         swiftomniui_winui_toggle_set_on(handle, on)
     }
 
-    func setEnabled(_ enabled: Bool) {
-        swiftomniui_winui_set_enabled(handle, enabled)
-    }
-
     /// What the control is drawn over; nil for WinUI's own.
     func setBackground(_ value: HostValue?) {
         let brush = WinUIBrush(value)

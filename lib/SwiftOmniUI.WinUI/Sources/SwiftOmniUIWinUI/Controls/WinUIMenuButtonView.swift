@@ -39,10 +39,6 @@ final class WinUIMenuButtonView: WinUIView {
     }
 
     /// Whether the press opens the menu.
-    func setEnabled(_ enabled: Bool) {
-        swiftomniui_winui_set_enabled(handle, enabled)
-    }
-
     /// The entries the press opens, the flyout written again only where what it draws changed.
     func show(_ menu: WinUIMenu) {
         menuActions = menu.actions
