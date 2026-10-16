@@ -100,6 +100,16 @@ reported by nobody. The text of a `TextField`, a `TextEditor` and a
 on the state whole as the host's own write. The two directions differ per
 control, so the driven text is written per control.
 
+### Page search
+
+`content.searchable(text: $query, placement: .toolbar, prompt: "Find")`
+installs a search field in that page's native toolbar. Desktop `.automatic`
+uses the same placement. GTK uses `GtkSearchEntry`; WinUI uses `AutoSuggestBox`.
+The field uses `SearchField`'s two-way binding path and native clear behavior.
+`.onSubmit(of: .search) { … }` on the searched content handles Return or the
+native search glyph independently of edits to the query. The application owns
+the results and their scope; the modifier does not filter or rebuild content.
+
 ## Two way controls
 
 A control the user changes - a switch, a check box, a radio button, a picker,
