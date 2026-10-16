@@ -146,6 +146,31 @@ Left unsaid, whether a screen reader skips a view is the platform's decision,
 which is nearly always right: a view with words is reachable and a plain
 container is not.
 
+## Disabled interaction
+
+`.disabled(condition)` adds an interaction condition to the view's branch.
+Conditions accumulate: `.disabled(false)` cannot undo another true condition
+on the same view or an ancestor. The keyed environment exposes the result as
+`@Environment(\.isEnabled)` (true by default), including in composed views,
+custom labels, menu entries and rows materialized later by a lazy container.
+A changed interaction environment invalidates a carried composed view, even
+when that view has no explicit environment reader of its own. Native properties
+and declared Disabled visual states consume that same result.
+
+Both captioned and view-label `Button`s mount native buttons, rather than
+turning a custom label into a tap recognizer. GTK sensitivity and WinUI
+`Control.IsEnabled` own pointer, keyboard and accessibility activation and the
+platform's Disabled state. Plain buttons remove native chrome/padding/minimum
+sizes while retaining native interaction. An authored label can paint explicit
+colors or images that the native disabled foreground cannot recolor, so its
+default button style also dims the label's presentation. This composes with
+authored opacity and transition opacity, without changing layout. Native input
+intake rejects disabled activations and user-value changes; lifecycle and
+geometry reports continue to flow, and a pointer exit can clear old hover state.
+
+See [SwiftUI disabled](https://developer.apple.com/documentation/swiftui/view/disabled(_:))
+and [isEnabled](https://developer.apple.com/documentation/swiftui/environmentvalues/isenabled).
+
 ## Gestures
 
 Gestures belong to every view, so a stack holding a whole row, an Image or a

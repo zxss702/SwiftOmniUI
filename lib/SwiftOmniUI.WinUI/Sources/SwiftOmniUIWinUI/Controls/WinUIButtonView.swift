@@ -10,6 +10,23 @@ import CSwiftOmniUIWinUI
 final class WinUIButtonView: WinUIView {
     override var takesDirection: Bool { true }
 
+    private var hasViewLabel = false
+    private var caption = ""
+    override var controlStateOpacity: Double { hasViewLabel && !enabled ? 0.5 : 1 }
+
+    /// An arbitrary label may paint its own foreground/background. Native
+    /// ForegroundDisabled alone cannot affect those explicitly drawn colors.
+    func setFace(_ face: WinUIView?) {
+        guard face != nil || hasViewLabel else { return }
+        hasViewLabel = face != nil
+        if let face {
+            swiftomniui_winui_button_set_face(handle, face.presentationHandle)
+        } else {
+            swiftomniui_winui_set_caption(handle, caption)
+        }
+        setOpacity(opacity)
+    }
+
     /// What the button does when the user clicks it, holds it down and lets it go.
     var onClicked: (() -> Void)?
     var onPressed: (() -> Void)?
@@ -27,6 +44,8 @@ final class WinUIButtonView: WinUIView {
 
     /// The caption.
     func setText(_ text: String) {
+        caption = text
+        guard !hasViewLabel else { return }
         swiftomniui_winui_set_caption(handle, text)
     }
 
@@ -109,10 +128,6 @@ final class WinUIButtonView: WinUIView {
         default: 0
         }
         return (key, modifiers)
-    }
-
-    func setEnabled(_ enabled: Bool) {
-        swiftomniui_winui_set_enabled(handle, enabled)
     }
 
     /// The staying-pressed look, or none: `nil` makes the button momentary

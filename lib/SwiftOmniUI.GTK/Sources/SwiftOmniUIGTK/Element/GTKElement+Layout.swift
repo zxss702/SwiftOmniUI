@@ -33,8 +33,8 @@ extension GTKElement {
         }
         let arranged = (type == .navigationStack ? element.stackedChildren : element.arrangedChildren).map(\.gtk)
 
-        if let button = view as? GTKButtonView, let face = arranged.first?.view {
-            gtk_button_set_child(button.widget.of(GtkButton.self), face.widget)
+        if let button = view as? GTKButtonView {
+            button.setFace(arranged.first?.view)
             return
         }
 

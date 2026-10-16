@@ -110,6 +110,10 @@ final class RenderedNode {
     /// The keyed environment this element wrote, overlaid again by the clean walk.
     var environmentValues = EnvironmentValues()
 
+    /// The interaction environment at the composed view's entry, before its
+    /// body adds any local modifiers. A parent change must invalidate carries.
+    var inputIsEnabled = true
+
     /// The `.focusedValue` bag this element publishes while the focus stands
     /// in its subtree - what the `FocusedValueStore`'s chain fold reads. Kept
     /// so the clean walk folds the same tree.

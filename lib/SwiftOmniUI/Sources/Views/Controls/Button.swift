@@ -149,9 +149,8 @@ public struct Button: VisualElement, TextElement, FontElement, PaddingElement, B
         node.write(ButtonContract.role, role)
     }
 
-    /// A button whose label is a view - composed of it rather than the
-    /// platform's captioned control: the label stands alone and a tap on it
-    /// is the press.
+    /// A native button whose content is the supplied view. The native control
+    /// owns activation, keyboard focus and disabled/pressed states.
     ///
     ///     Button { open(url) } label: { Label("Docs", systemImage: "book") }
     public init(action: @escaping EventHandler, @ViewBuilder label: () -> any View) {
@@ -227,8 +226,7 @@ public enum ButtonRole: Int32, Sendable, HostRepresentable {
 
 extension ButtonRole: StateChoice {}
 
-/// What `Button(action:label:)` builds: the label, tapped - no caption, no
-/// border of the platform's own, which a content button does not wear.
+/// Branch markers let the content button use the toolbar/menu's native host.
 struct ToolbarContentKey: EnvironmentKey {
     static let defaultValue = false
 }
@@ -257,7 +255,7 @@ struct ContentButton: View {
     /// The label the button shows.
     let label: any View
 
-    /// The label, answering a tap.
+    /// The supplied view is content of a real button on every branch.
     var body: any View {
         if isMenuContent {
             var button = Button().onClicked(action)
@@ -283,7 +281,9 @@ struct ContentButton: View {
             button.node.children = [label.node]
             return button
         }
-        return label.onTapGesture(action)
+        var button = Button().onClicked(action)
+        button.node.children = [label.node]
+        return button
     }
 }
 

@@ -14,7 +14,17 @@ struct AccessibilityReduceMotionKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+struct IsEnabledKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
 extension EnvironmentValues {
+    /// Whether controls in this branch allow user interaction.
+    public var isEnabled: Bool {
+        get { self[IsEnabledKey.self] }
+        set { self[IsEnabledKey.self] = newValue }
+    }
+
     /// The color scheme the host reports.
     public var colorScheme: ColorScheme {
         get { self[ColorSchemeKey.self] }

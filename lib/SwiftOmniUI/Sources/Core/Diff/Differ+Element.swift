@@ -92,6 +92,7 @@ extension Differ {
         var pushed = node.environments.count
         let outerValues = envValues
         envValues = envValues.overlaid(with: node.environmentValues)
+        let inputIsEnabled = envValues.isEnabled
         scope.append(contentsOf: node.environments)
         defer { scope.removeLast(pushed); envValues = outerValues }
 
@@ -191,6 +192,7 @@ extension Differ {
                         kept.type == stateful.viewType,
                         rendered.reads.isDisjoint(with: changed),
                         rendered.seen == seen,
+                        rendered.inputIsEnabled == inputIsEnabled,
                         let wrote = rendered.placeholder,
                         sameWriting(node, as: wrote),
                         Input.same(stateful.inputs, kept.inputs) {
@@ -356,6 +358,7 @@ extension Differ {
                 seen: seen,
                 children: children)
             result.environmentValues = node.environmentValues
+            result.inputIsEnabled = inputIsEnabled
             result.lazyIdentity = node.lazyIdentity
             // Its writes and listeners fanned out into the children above; what
             // a parent's fold reads of it is theirs alone.
@@ -364,9 +367,12 @@ extension Differ {
             return (result, patch)
         }
 
+        node.resolveEnabled(in: envValues)
+
         // The style is applied here, so a host receives every value already on the
         // control (Style.swift).
         node = styled(node, with: styles)
+        node.resolveEnabled(in: envValues)
 
         // And its visual states resolved, the element reading what they follow.
         // Design: docs/design/views/styles.md#which-state-a-control-is-in
@@ -733,6 +739,7 @@ extension Differ {
             children: children
         )
         result.environmentValues = node.environmentValues
+        result.inputIsEnabled = inputIsEnabled
         result.placementPlan = node.animation
         result.childSizesArrive = node.childSizesArrive
         result.lazySource = lazySource

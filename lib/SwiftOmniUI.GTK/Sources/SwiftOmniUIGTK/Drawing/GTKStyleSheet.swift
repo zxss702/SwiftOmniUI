@@ -12,6 +12,23 @@ enum GTKStyleSheet {
     private static var provider: UnsafeMutablePointer<GtkCssProvider>?
     private static var rules: [String: String] = [:]
 
+    /// Plain buttons keep native activation/focus/disabled state, while all
+    /// geometry and chrome belong to their supplied content.
+    static var plainButton: String {
+        let name = "swiftomniui-plain-button"
+        write(name, "padding: 0; min-width: 0; min-height: 0; border: none; background: none; box-shadow: none;",
+              states: ".\(name):hover, .\(name):active { background: none; box-shadow: none; }\n")
+        return name
+    }
+
+    /// Authored label colors/images need a disabled treatment of their own;
+    /// GTK's disabled text color only reaches labels using the theme's color.
+    static var contentButton: String {
+        let name = "swiftomniui-content-button"
+        write(name, "", states: ".\(name):disabled { opacity: 0.5; }\n")
+        return name
+    }
+
     /// The authored bar owns its spacing. Native toolbar styling must not
     /// add another padding or minimum height to the measured contribution.
     static var safeAreaBar: String {

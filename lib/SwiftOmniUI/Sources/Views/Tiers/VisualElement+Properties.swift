@@ -78,7 +78,7 @@ extension VisualElementProperties {
     ///
     ///     Button("Save").disabled(!form.isValid)
     public func disabled(_ disabled: Bool = true) -> Modified {
-        setValue(VisualElementContract.isEnabled, !disabled)
+        modified { $0.disable(disabled) }
     }
 
     /// Hides the view without unbuilding it.
@@ -447,9 +447,10 @@ extension VisualElementProperties {
         plain(VisualElementContract.isVisible, by: state.convert { !$0 })
     }
 
-    /// `isEnabled` from a state, `$x`, inverted.
+    /// A branch's interaction environment follows the state, including labels
+    /// and controls that are materialized later.
     @_spi(Host) public func disabled(_ state: Binding<Bool>) -> Modified {
-        plain(VisualElementContract.isEnabled, by: state.convert { !$0 })
+        disabled(state.wrappedValue)
     }
 
     /// `ignoresInput` from a state, `$x`, inverted.
@@ -465,7 +466,7 @@ extension View {
     ///     Button("Save").disabled(!form.isValid)
     @_disfavoredOverload
     public func disabled(_ disabled: Bool = true) -> ModifiedContent {
-        setting(VisualElementContract.isEnabled, !disabled)
+        revised { $0.disable(disabled) }
     }
 
     /// Hides the view without unbuilding it.
@@ -484,7 +485,7 @@ extension View {
     /// `isEnabled` from a state, `$x`, inverted as `.disabled` reads it.
     @_disfavoredOverload
     @_spi(Host) public func disabled(_ state: Binding<Bool>) -> ModifiedContent {
-        revised { $0.drivePlain(VisualElementContract.isEnabled, by: state.convert { !$0 }) }
+        disabled(state.wrappedValue)
     }
 
     /// `isVisible` from a state, `$x`, inverted as `.hidden` reads it.

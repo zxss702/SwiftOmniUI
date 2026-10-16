@@ -261,6 +261,8 @@ extern "C" void swiftomniui_winui_button_set_face(SwiftOmniUIObjectRef handle, S
         auto control = as<controls::ContentControl>(handle);
         auto next = content ? as<xaml::UIElement>(content) : xaml::UIElement{nullptr};
         if (control.Content() != next) control.Content(next);
+        control.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
+        control.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
     } catch (...) { report("giving a button its label view"); }
 }
 
@@ -303,6 +305,32 @@ extern "C" void swiftomniui_winui_button_set_style(SwiftOmniUIObjectRef handle, 
         // The kind is logical: the button is a toggle at heart, whose template reads
         // the `ToggleButton*` look keys, so each kind writes the look directly -
         // the accent style's fill is the system's accent under every state.
+        auto styleKey = winrt::box_value(L"SwiftOmniUIButtonStyle");
+        auto previous = resources.HasKey(styleKey) ? winrt::unbox_value<int>(resources.Lookup(styleKey)) : 0;
+        if (previous != kind) {
+            xaml::Media::Brush nothing{nullptr};
+            if (previous == 2) {
+                button.ClearValue(controls::Control::ForegroundProperty());
+                keepToggleKeys(resources, L"Foreground", nothing, nothing, nothing);
+            }
+            if (previous == 2 || previous == 3 || previous == 4) {
+                button.ClearValue(controls::Control::BackgroundProperty());
+                button.ClearValue(controls::Control::BorderBrushProperty());
+                button.ClearValue(controls::Control::BorderThicknessProperty());
+                button.ClearValue(controls::Control::PaddingProperty());
+                button.ClearValue(xaml::FrameworkElement::MinWidthProperty());
+                button.ClearValue(xaml::FrameworkElement::MinHeightProperty());
+                keepToggleKeys(resources, L"Background", nothing, nothing, nothing);
+                keepToggleKeys(resources, L"BorderBrush", nothing, nothing, nothing);
+                for (auto key : {L"ToggleButtonBackgroundDisabled", L"ToggleButtonBackgroundCheckedDisabled",
+                                 L"ToggleButtonBackgroundIndeterminateDisabled", L"ToggleButtonBorderBrushDisabled",
+                                 L"ToggleButtonBorderBrushCheckedDisabled", L"ToggleButtonBorderBrushIndeterminateDisabled"}) {
+                    auto name = winrt::box_value(key);
+                    if (resources.HasKey(name)) resources.Remove(name);
+                }
+            }
+        }
+        resources.Insert(styleKey, winrt::box_value(kind));
         if (kind == 2) {
             winrt::Windows::UI::ViewManagement::UISettings settings;
             auto accent = settings.GetColorValue(winrt::Windows::UI::ViewManagement::UIColorType::Accent);
@@ -317,12 +345,25 @@ extern "C" void swiftomniui_winui_button_set_style(SwiftOmniUIObjectRef handle, 
             keepToggleKeys(resources, L"Foreground", words, words, words);
         } else if (kind == 3 || kind == 4) {
             // Borderless and plain show the caption on what stands beneath it.
-            button.ClearValue(controls::Control::BackgroundProperty());
-            button.ClearValue(controls::Control::BorderBrushProperty());
+            auto transparent = clearGround();
+            button.Background(transparent);
+            button.BorderBrush(transparent);
             button.BorderThickness({0, 0, 0, 0});
-            xaml::Media::Brush nothing{nullptr};
-            keepToggleKeys(resources, L"Background", nothing, nothing, nothing);
-            keepToggleKeys(resources, L"BorderBrush", nothing, nothing, nothing);
+            keepToggleKeys(resources, L"Background", transparent, transparent, transparent);
+            keepToggleKeys(resources, L"BorderBrush", transparent, transparent, transparent);
+            for (auto key : {L"ToggleButtonBackgroundDisabled", L"ToggleButtonBackgroundCheckedDisabled",
+                             L"ToggleButtonBackgroundIndeterminateDisabled", L"ToggleButtonBorderBrushDisabled",
+                             L"ToggleButtonBorderBrushCheckedDisabled", L"ToggleButtonBorderBrushIndeterminateDisabled"})
+                resources.Insert(winrt::box_value(key), transparent);
+            if (kind == 4) {
+                button.Padding({0, 0, 0, 0});
+                button.MinWidth(0);
+                button.MinHeight(0);
+            } else {
+                button.ClearValue(controls::Control::PaddingProperty());
+                button.ClearValue(xaml::FrameworkElement::MinWidthProperty());
+                button.ClearValue(xaml::FrameworkElement::MinHeightProperty());
+            }
         } else {
             // Anything else clears back to the platform's own look.
             button.ClearValue(xaml::FrameworkElement::StyleProperty());

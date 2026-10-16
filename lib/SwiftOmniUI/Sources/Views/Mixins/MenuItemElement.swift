@@ -33,13 +33,13 @@ extension MenuItemElement {
     /// Whether it responds to selection. A disabled item stays visible, so the
     /// user still knows the action exists.
     public func disabled(_ value: Bool) -> Modified {
-        setValue(MenuItemElementContract.isEnabled, !value)
+        modified { $0.disable(value) }
     }
 
     /// `isEnabled` from a state, `$x`, inverted as `.disabled` reads it: the
-    /// host carries the state, the item enabled where it stands false.
+    /// item is enabled where it stands false and no ancestor disables it.
     public func disabled(_ state: Binding<Bool>) -> Modified {
-        plain(MenuItemElementContract.isEnabled, by: state.convert { !$0 })
+        disabled(state.wrappedValue)
     }
 }
 

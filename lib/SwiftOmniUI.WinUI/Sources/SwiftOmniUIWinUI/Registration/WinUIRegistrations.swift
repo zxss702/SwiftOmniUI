@@ -39,6 +39,7 @@ enum WinUIRegistrations {
         registry.everyElementRealizes(VisualElementContract.opacity)
         registry.everyElementRealizes(VisualElementContract.blur)
         registry.everyElementRealizes(VisualElementContract.isVisible)
+        registry.everyElementRealizes(VisualElementContract.isEnabled)
         registry.everyElementRealizes(VisualElementContract.transition)
         registry.everyElementTakesItsPlace()
         registry.everyElementRealizes(VisualElementContract.translationX)

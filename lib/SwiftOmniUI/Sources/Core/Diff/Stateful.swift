@@ -440,6 +440,7 @@ extension Node {
 
         node.keptState = kept
         node.materialize()
+        node.resolveEnabled(in: values)
         node.resolveControlStyle(in: scope)
         node.children = node.children.map { $0.built(within: scope, under: values) }
         return node

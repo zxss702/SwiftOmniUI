@@ -23,6 +23,23 @@ extension [Prop: PropValue] {
 }
 
 extension Node {
+    /// Disabled conditions accumulate. A false condition never re-enables an
+    /// earlier modifier or an ancestor; the environment reaches composed/lazy
+    /// content as well as the native element described by this node.
+    mutating func disable(_ disabled: Bool) {
+        props[.isEnabled] = .bool(props[.isEnabled]?.bool != false && !disabled)
+        if disabled { environmentValues.isEnabled = false }
+    }
+
+    /// Native controls and visual-state rules consume the same answer as
+    /// `@Environment(\.isEnabled)`. Do not put a default on every normal node.
+    mutating func resolveEnabled(in values: EnvironmentValues) {
+        if !values.isEnabled {
+            props[.isEnabled] = .bool(false)
+            driven[.isEnabled] = nil
+        }
+    }
+
     /// Button styles are a branch environment, including native menu triggers.
     mutating func resolveControlStyle(in scope: [(key: ObjectIdentifier, object: AnyObject)]) {
         guard type == .button || type == .menuButton,

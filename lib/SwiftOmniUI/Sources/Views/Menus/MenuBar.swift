@@ -60,7 +60,7 @@ public struct Menu: View, ModifiableElement {
     /// Whether the menu opens at all.
     public func disabled(_ value: Bool) -> Self {
         var copy = self
-        copy.node.write(MenuContract.isEnabled, value)
+        copy.node.disable(value)
         return copy
     }
 

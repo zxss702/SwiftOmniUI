@@ -330,7 +330,8 @@ extern "C" bool swiftomniui_winui_animations_enabled(void) {
 
 extern "C" void swiftomniui_winui_set_enabled(SwiftOmniUIObjectRef handle, bool enabled) {
     try {
-        as<controls::Control>(handle).IsEnabled(enabled);
+        if (auto control = as<IInspectable>(handle).try_as<controls::Control>())
+            control.IsEnabled(enabled);
     } catch (...) {
         report("enabling");
     }

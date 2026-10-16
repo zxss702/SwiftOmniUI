@@ -213,7 +213,7 @@ class WinUIView {
     /// it differs from what was.
     func setOpacity(_ opacity: Double) {
         self.opacity = opacity
-        let drawn = opacity * placedOpacity
+        let drawn = opacity * placedOpacity * controlStateOpacity
         guard drawn != writtenOpacity else { return }
         writtenOpacity = drawn
         swiftomniui_winui_set_opacity(presentationHandle, drawn)
@@ -283,7 +283,28 @@ class WinUIView {
 
     /// Whether clicks and touches go through the view to what is behind it.
     func setIgnoresInput(_ ignores: Bool) {
-        swiftomniui_winui_set_hit_testable(presentationHandle, !ignores)
+        ignoresInput = ignores
+        updateHitTesting()
+    }
+
+    private(set) var enabled = true
+    private var ignoresInput = false
+
+    /// A control style can dim an authored label without replacing its opacity
+    /// modifier or an insertion/removal transition's presentation.
+    var controlStateOpacity: Double { 1 }
+
+    /// Controls enter their native Disabled state. Panels have no IsEnabled,
+    /// but still stop pointer input; descendants receive the same environment.
+    func setEnabled(_ enabled: Bool) {
+        self.enabled = enabled
+        swiftomniui_winui_set_enabled(handle, enabled)
+        updateHitTesting()
+        setOpacity(opacity)
+    }
+
+    private func updateHitTesting() {
+        swiftomniui_winui_set_hit_testable(presentationHandle, enabled && !ignoresInput)
     }
 
     /// Whether the view lays itself out and writes in its element's direction: a control does; a layout, whose

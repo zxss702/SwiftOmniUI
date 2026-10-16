@@ -8,6 +8,22 @@ import CSwiftOmniUIGTK
 /// A `GtkButton`: its caption and how it looks, whether it takes a press, and the click it raises.
 @MainActor
 final class GTKButtonView: GTKView {
+    private var hasViewLabel = false
+
+    func setFace(_ face: GTKView?) {
+        guard face != nil || hasViewLabel else { return }
+        hasViewLabel = face != nil
+        guard let face else {
+            gtk_widget_remove_css_class(widget, GTKStyleSheet.contentButton)
+            writeCaption()
+            return
+        }
+        gtk_widget_add_css_class(widget, GTKStyleSheet.contentButton)
+        if gtk_button_get_child(widget.of(GtkButton.self)) != face.widget {
+            gtk_button_set_child(widget.of(GtkButton.self), face.widget)
+        }
+    }
+
     /// What the button does when the user clicks it.
     var onClicked: (() -> Void)?
 
@@ -89,7 +105,8 @@ final class GTKButtonView: GTKView {
     func setStyle(_ style: ButtonStyleKind?) {
         let wanted: [String] = switch style ?? .automatic {
         case .borderedProminent: ["suggested-action"]
-        case .plain, .borderless: ["flat"]
+        case .plain: ["flat", GTKStyleSheet.plainButton]
+        case .borderless: ["flat"]
         case .link: ["flat", "link"]
         default: []
         }
@@ -139,6 +156,7 @@ final class GTKButtonView: GTKView {
     /// words stand aside - GTK's icon button - or beside the words in libadwaita's button content; a picture's
     /// file alone; the words alone otherwise.
     private func writeCaption() {
+        guard !hasViewLabel else { return }
         let button = widget.of(GtkButton.self)
         let name = picture
         let alone = showsPictureAlone || caption.isEmpty

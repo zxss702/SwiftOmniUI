@@ -34,8 +34,8 @@ extension WinUIElement {
 
         if let button = view as? WinUIButtonView {
             // The bar's button draws its picture in its own icon slot: the label child stands nowhere.
-            if !button.isToolbarControl, let face = arranged.first?.view {
-                swiftomniui_winui_button_set_face(button.handle, face.presentationHandle)
+            if !button.isToolbarControl {
+                button.setFace(arranged.first?.view)
             }
             return
         }

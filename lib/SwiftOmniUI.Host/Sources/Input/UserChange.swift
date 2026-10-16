@@ -22,8 +22,24 @@
 /// What the user does to an element's native control, carried into the runtime alike on every host.
 /// Design: docs/design/host/runtime.md#a-users-change
 extension MountedElement {
+    /// Logical ancestry also covers menus and safe bars reparented into native
+    /// chrome. A stale native activation must not escape the disabled scope.
+    public var isEnabled: Bool {
+        var next: MountedElement? = self
+        while let element = next {
+            if element.value(.isEnabled)?.bool == false { return false }
+            next = element.parent
+        }
+        return true
+    }
+
     /// An event the control raised, with what it carries, to the handler the tree listens with.
     public func send(_ event: Event, _ values: [HostValue], in runtime: HostRuntime) {
+        if event == .clicked || event == .submitted || event == .itemActivated
+            || event == .pinClicked || event == .pinDetailsClicked || event == .pressed
+            || event == .tapGesture || event == .swiped || event == .panUpdated || event == .pinchUpdated {
+            guard isEnabled else { return }
+        }
         guard let handler = handler(event) else { return }
         runtime.dispatch(handler, payload: values)
     }
@@ -35,7 +51,7 @@ extension MountedElement {
         _ property: Prop, _ event: Event, _ value: HostValue, in runtime: HostRuntime,
         turningOff turnOff: (MountedElement) -> Void
     ) {
-        guard !ProgramWrite.isWriting else { return }
+        guard !ProgramWrite.isWriting, isEnabled else { return }
         guard type == .radioButton, property == .isOn, value == .bool(true) else {
             return carry(property, event, value, in: runtime)
         }

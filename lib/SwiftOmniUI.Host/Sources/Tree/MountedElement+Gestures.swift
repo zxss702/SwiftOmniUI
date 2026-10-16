@@ -24,6 +24,9 @@ extension MountedElement {
     /// for - at once for a press assistive technology made; the pointer where it is; a press dragged moving the
     /// states it carries, a swipe as it ends far enough; a pinch's step.
     public func hear(_ input: HeardInput, in runtime: HostRuntime) {
+        if case .pointer(.pointerExited, _) = input {
+            // Clear a hover that began before the scope became disabled.
+        } else if !isEnabled { return }
         switch input {
         case .tap(let run):
             let count = max(1, Int(number(.tapCount) ?? 1))
