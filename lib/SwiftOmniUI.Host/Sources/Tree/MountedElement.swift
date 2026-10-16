@@ -33,6 +33,10 @@ import CRT
     /// Whether the last patch changed this element's children - the first counts.
     public private(set) var childrenChanged = false
 
+    /// Direct child membership/order changed in this patch. A sparse descendant
+    /// paint patch changes `childrenChanged`, but not a native layout's inputs.
+    public private(set) var childOrderChanged = false
+
     /// A content rebuild updates mounted lazy rows; their own measurement
     /// revisions decide which geometry must be measured again.
     public private(set) var lazyContentRevision = 0
@@ -133,6 +137,7 @@ import CRT
     /// Applies a patch of this element.
     public func apply(_ patch: HostPatch) {
         guard let tree else { return }
+        childOrderChanged = false
         // A patch re-described a departing element: its removal turns around.
         if isDeparting { revive() }
 
@@ -225,6 +230,7 @@ import CRT
             break
 
         case .arranged(let childPatches):
+            childOrderChanged = true
             writingOrder = Dictionary(childPatches.enumerated().map { ($1.id, $0) }) { first, _ in first }
             arrange(childPatches, tree: tree, virtualized: lazy)
 
@@ -244,6 +250,7 @@ import CRT
                 if child.type == childPatch.type, !childPatch.replace {
                     child.apply(childPatch)
                 } else if childPatch.replace {
+                    childOrderChanged = true
                     child.leave()
                     children[index] = MountedElement(childPatch, tree: tree, parent: self)
                 } else {
@@ -265,7 +272,7 @@ import CRT
                     : patch.transitions[property]?.animation)
         }
 
-        restack()
+        if restack() { childOrderChanged = true }
         if changed.contains(.layoutDirection) {
             directionTurned(arrangingItself: false)
         } else if !described {
@@ -615,6 +622,12 @@ import CRT
     /// What a layout reads of this element as its child.
     /// Design: docs/design/host/layout.md#the-layout-arithmetic
     public var layoutValues: LayoutValues {
+        layoutValues(readingChildren: { $0.layoutValues })
+    }
+
+    /// Hosts with dependency-tracked layout inputs can reuse each child's
+    /// resolved values instead of recursively describing the subtree again.
+    public func layoutValues(readingChildren readChild: (MountedElement) -> LayoutValues) -> LayoutValues {
         var values = LayoutValues()
         if let sides = value(.padding)?.numbers, sides.count >= 4 {
             values.margin = insets(.padding)
@@ -641,7 +654,7 @@ import CRT
             var horizontal = false, vertical = false
             var expandsAcross = false, expandsDown = false
             for child in currentChildren {
-                let childValues = child.layoutValues
+                let childValues = readChild(child)
                 guard !childValues.isLayoutDecoration else { continue }
                 let axes = childValues.scrollAxes
                 let expands = childValues.expandingAxes

@@ -81,8 +81,13 @@ class WinUILazyView: WinUITravellingLayout {
         swiftomniui_winui_panel_watch_viewport(handle, true)
     }
 
-    /// The mounted children, held by identity.
-    func setItems(_ items: [(identity: String, item: WinUILayoutItem)], contentChanged: Bool = false) {
+    /// A sparse patch can refresh row content without rebuilding layout items.
+    func refreshContent() {
+        let contentChanged = cells.takeItems()
+        refreshContent(contentChanged: contentChanged)
+    }
+
+    private func refreshContent(contentChanged: Bool) {
         let generation = cells.element?.lazyRequestGeneration ?? 0
         let requestAcknowledged = generation != lastAcknowledgedGeneration
         lastAcknowledgedGeneration = generation
@@ -90,27 +95,34 @@ class WinUILazyView: WinUITravellingLayout {
         let sourceChanged = !hasMountedSource || mountedSourceID != sourceID
         mountedSourceID = sourceID
         hasMountedSource = true
+        if contentChanged && mounted.contains(where: {
+            measuredRevisions[$0.key] != nil && measuredRevisions[$0.key] != $0.value.view.measurementRevision
+        }) {
+            cells.animatesChanges = true
+            forgetMeasurements()
+            invalidateMeasure()
+            invalidateArrange()
+        }
+        if sourceChanged, cells.total != measuredExtent { commitChangedContentExtent() }
+        if sourceChanged || requestAcknowledged { retell() }
+    }
+
+    func setItems(_ items: [(identity: String, item: WinUILayoutItem)], contentChanged: Bool = false) {
+        let sourceID = cells.element?.lazyRows.map(ObjectIdentifier.init)
+        let sourceChanged = !hasMountedSource || mountedSourceID != sourceID
         let now = Dictionary(items.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
         guard now.keys != mounted.keys || now.contains(where: {
             mounted[$0.key]?.arranges(like: $0.value) != true
         }) else {
             // A content patch may change a row's drawing without changing its
             // geometry. Re-measure only when its own view says its size is stale.
-            if contentChanged && now.contains(where: {
-                measuredRevisions[$0.key] != $0.value.view.measurementRevision
-            }) {
-                forgetMeasurements()
-                invalidateMeasure()
-                invalidateArrange()
-            }
-            if sourceChanged {
-                if cells.total != measuredExtent { commitChangedContentExtent() }
-            }
-            if sourceChanged || requestAcknowledged {
-                retell()
-            }
+            refreshContent(contentChanged: contentChanged)
             return
         }
+        if now.contains(where: { identity, item in
+            guard let old = mounted[identity], old.view === item.view else { return false }
+            return !old.arranges(like: item)
+        }) { cells.animatesChanges = true }
         for (identity, previous) in mounted {
             if now[identity]?.view !== previous.view {
                 swiftomniui_winui_scroller_anchor(previous.view.presentationHandle, false)
@@ -133,6 +145,7 @@ class WinUILazyView: WinUITravellingLayout {
             }
         }
         mounted = now
+        refreshContent(contentChanged: contentChanged)
         setChildren(items.map(\.item.view))
         // Recycling and row patches only change this panel's arrangement.
         // The document is invalidated when measured content extent actually
@@ -353,6 +366,14 @@ class WinUILazyView: WinUITravellingLayout {
             // container outside any scroller builds every child.
             guard self.watching != nil else {
                 guard self.isAttached else { return }
+                // Attachment can precede installation of placingLayout links.
+                // A declared same-axis scroller is not an unbounded container.
+                var ancestor = self.sourceElement?.parent
+                while let each = ancestor {
+                    if let scroll = each.winUI.view as? WinUIScrollView,
+                       scroll.orientation.takes(self.axis) { return }
+                    ancestor = each.parent
+                }
                 self.cells.tellAll()
                 return
             }

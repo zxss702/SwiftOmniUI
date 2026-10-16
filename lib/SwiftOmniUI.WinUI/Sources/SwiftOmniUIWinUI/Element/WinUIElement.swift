@@ -23,6 +23,43 @@ final class WinUIElement: NativeElement {
     var hadContextMenu = false
     var contextMenuChanged = false
 
+    /// Child layout inputs, separate from descendant paint and event changes.
+    var layoutItemsDirty = true
+    private(set) var layoutItemCollections = 0
+    private var cachedLayoutValues: LayoutValues?
+    private(set) var layoutInputResolutions = 0
+
+    /// Every property read by MountedElement.layoutValues, including derived
+    /// expansion/scroll axes inherited from children.
+    private static let layoutInputs = MountedElement.arrangedProperties.union([
+        .flex, .isFrameContent, .isLayoutDecoration, .orientation,
+        .horizontalAlignmentDefault, .verticalAlignmentDefault,
+        .layoutPriority, .horizontalGuide, .verticalGuide,
+    ])
+
+    var resolvedLayoutValues: LayoutValues {
+        if let cachedLayoutValues { return cachedLayoutValues }
+        let values = element.layoutValues(readingChildren: { $0.winUI.resolvedLayoutValues })
+        layoutInputResolutions += 1
+        cachedLayoutValues = values
+        return values
+    }
+
+    func layoutItemChanged() {
+        cachedLayoutValues = nil
+        var owner = parent
+        while let each = owner {
+            each.layoutItemsDirty = true
+            each.cachedLayoutValues = nil
+            owner = each.parent
+        }
+    }
+
+    func collectedLayoutItems() {
+        layoutItemsDirty = false
+        layoutItemCollections += 1
+    }
+
     init(_ element: MountedElement, host: WinUIRenderer) {
         self.element = element
         self.host = host
@@ -74,6 +111,9 @@ final class WinUIElement: NativeElement {
     }
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {
+        if !wasDescribed || element.childOrderChanged || !changed.isDisjoint(with: Self.layoutInputs) {
+            layoutItemChanged()
+        }
         if wasDescribed, changed.contains(.isVisible) { crossVisibility() }
         applyProperties(changed: changed)
         if let view, let host { element.applyDrawnChildren(to: view, through: WinUIRegistrations.registry, in: host.runtime) }
@@ -82,7 +122,16 @@ final class WinUIElement: NativeElement {
             self?.send(.isFocusedChanged, [.bool(focused)])
         })
         configureLayoutMotion()
-        arrangeChildren()
+        let plainLayout = view is WinUIStackView || view is WinUIZStackView || view is WinUIGridView
+            || view is WinUILazyView
+        if !plainLayout || !wasDescribed || layoutItemsDirty || element.childOrderChanged
+            || changed.contains(.layoutDirection) {
+            arrangeChildren()
+        } else if let lazy = view as? WinUILazyView {
+            // A sparse patch can acknowledge a window or change row content
+            // without changing the parent's list of layout items.
+            lazy.refreshContent()
+        }
         arrangePages(changed: changed)
         if changed.contains(.preferredColumnWidth) || (element.childrenChanged && parent?.type == .navigationSplitView),
            let split = element.parent?.enclosing(type: .navigationSplitView)?.winUI {
@@ -98,10 +147,12 @@ final class WinUIElement: NativeElement {
     }
 
     func presentFrame(_ changed: Set<Prop>) {
+        if !changed.isDisjoint(with: Self.layoutInputs) { layoutItemChanged() }
         applyProperties(changed: changed)
     }
 
     func departureChanged() {
+        layoutItemChanged()
         if element.isDeparting, element.transition?.removal.blur != nil {
             view?.prepareBlur()
         }
@@ -109,6 +160,7 @@ final class WinUIElement: NativeElement {
     }
 
     func leave() {
+        layoutItemChanged()
         if let view { host?.runtime.frames.follow(self, order: view.number, reads: false) }
         view?.detach()
     }
