@@ -10,17 +10,23 @@ import CSwiftOmniUIGTK
 /// SwiftUI holds a view's `onHover` state while a context menu, a popover or a picker's list stands over the pointer:
 /// the pointer did not leave the view it was on, so the view is not told it did. GTK takes the pointer to such a popup
 /// all the same - a popover is a surface of its own - so the views under it are told the pointer left, and are told
-/// nothing when the popup goes, since the pointer never moved. So the exit such a popup caused is withheld while any
-/// of them stands, and the last one going takes the truth again from the pointer's own place: a view the pointer is
-/// still on keeps its hover, and one the pointer has left is handed the exit it was owed.
+/// nothing when the popup goes, since the pointer never moved. So the exit such a popup caused is withheld while it
+/// stands, and a popup going takes the truth again from the pointer's own place: a view the pointer is still on keeps
+/// its hover, and one the pointer has left is handed the exit it was owed.
 ///
-/// Only a view the motion controller told an exit is ever held, so no walk of the element tree is needed, and a
-/// popup's own relatedness to what it covers is never asked. A popup is counted where it is made - the popover a page
-/// shows, a context menu's, a picker's face, the list a drop-down holds of GTK's own, the popover a menu button makes
-/// with its menu model - and uncounted where GTK says it left the screen: the popover's own `visible` for one the
-/// host hid, and the `unmap` of one whose widget went without being told to - its button leaving the tree with it,
-/// its window closing - each counted by the popover's own identity, so one popover gone in two ways at once is one
-/// popover gone, and no count outlives what it counted.
+/// What is held is the layer a popup opens above, never the popup's own: the pointer is on the popup's content, and
+/// its exits are the pointer's own. Whether a popup holds a view is asked of the widget tree, which holds a popup's
+/// card inside the popup's own widget and a popup opened from inside that card inside it too - so the outer card's
+/// views are stood over by the nested popup as well, and its going settles them while the card still stands.
+///
+/// Only a view the motion controller told an exit is ever held, so no walk of the element tree is needed and nothing
+/// is worked out from where a popup stands; the one question asked is whether the view stands in the popup.
+///
+/// A popup is counted where it is made - the popover a page shows, a context menu's, a picker's face, the list a
+/// drop-down holds of GTK's own, the popover a menu button makes with its menu model - and uncounted where GTK says
+/// it left the screen: the popover's own `visible` for one the host hid, and the `unmap` of one whose widget went
+/// without being told to - its button leaving the tree with it, its window closing - each counted by the popover's
+/// own identity, so one popover gone in two ways at once is one popover gone, and no count outlives what it counted.
 /// Design: docs/design/platforms/gtk/input.md#a-popup-over-the-pointer
 @MainActor
 enum GTKHoverHold {
@@ -74,21 +80,47 @@ enum GTKHoverHold {
         standing.insert(UInt(bitPattern: popup))
     }
 
-    /// `popup` went - the host asked GTK to hide it, or its widget left the screen. With the last one gone, what was
-    /// withheld is settled: what the popup covered is holding its hover, and what it does not cover is owed the exit
-    /// it was denied.
+    /// `popup` went - the host asked GTK to hide it, or its widget left the screen. What it stood over is settled
+    /// there and then, since the pointer's own place answers for it again: a nested popup going settles what it
+    /// stood over inside the card, and leaves what the card itself stands over to the card's own going.
     static func ended(_ popup: UnsafeMutableRawPointer) {
-        guard standing.remove(UInt(bitPattern: popup)) != nil, standing.isEmpty, !withheld.isEmpty else { return }
+        guard standing.remove(UInt(bitPattern: popup)) != nil else { return }
+        settle()
+    }
 
-        let settling = withheld
-        withheld.removeAll(keepingCapacity: true)
-        for held in settling {
+    /// Whether a popup stands over the view - one that does not hold it. A popup holds its own card's content, where
+    /// the pointer is and its exits are the pointer's own, and an outer card holds a popup opened from inside it.
+    /// Walked from the view's own place's parent up, which a popup the view itself presents is not below: that popup
+    /// stands over it.
+    static func standsOver(_ view: GTKView) -> Bool {
+        guard !standing.isEmpty else { return false }
+        var left = standing
+        var widget = gtk_widget_get_parent(view.widget)
+        while let each = widget, !left.isEmpty {
+            left.remove(UInt(bitPattern: UnsafeMutableRawPointer(each)))
+            widget = gtk_widget_get_parent(each)
+        }
+        return !left.isEmpty
+    }
+
+    /// What no standing popup stands over is settled against the pointer's own place; what one still stands over
+    /// waits for its going.
+    private static func settle() {
+        guard !withheld.isEmpty else { return }
+        var kept: [Held] = []
+        kept.reserveCapacity(withheld.count)
+        for held in withheld {
             guard let view = held.view else { continue }
+            if standsOver(view) {
+                kept.append(held)
+                continue
+            }
             if let place = pointerPlace(view), reaches(view, place) {
                 continue  // the pointer is still on the view: its hover never left.
             }
             view.deliver(held.exit)
         }
+        withheld = kept
     }
 
     /// Whether a place of the view's native widget reaches the view, or what stands in it: the question a tap asks
@@ -112,7 +144,7 @@ enum GTKHoverHold {
             MainActor.assumeIsolated {
                 guard let popover else { return }
                 let showing = gtk_widget_get_visible(popover.assumingMemoryBound(to: GtkWidget.self)) != 0
-                if showing { began(popover) } else { ended(popover) }
+                if showing { GTKHoverHold.began(popover) } else { GTKHoverHold.ended(popover) }
             }
         }
         // A popover that left the screen without being told to hide would stand in the count over nothing: its
@@ -122,7 +154,7 @@ enum GTKHoverHold {
             MainActor.assumeIsolated {
                 guard let popover else { return }
                 let showing = gtk_widget_get_visible(popover.assumingMemoryBound(to: GtkWidget.self)) != 0
-                if showing { ended(popover) }
+                if showing { GTKHoverHold.ended(popover) }
             }
         }
         connectSignal(instance, "unmap", number: 0, left)
@@ -136,7 +168,8 @@ enum GTKHoverHold {
         watch(popover)
     }
 
-    /// The pointer was told to leave a view while a popup stood over it: the exit is held until the last one goes.
+    /// The pointer was told to leave a view while a popup stood over it: the exit is held until no popup stands over
+    /// it any more.
     static func withhold(_ exit: HeardInput, for view: GTKView) {
         if let at = withheld.firstIndex(where: { $0.view === view }) {
             withheld[at].exit = exit
