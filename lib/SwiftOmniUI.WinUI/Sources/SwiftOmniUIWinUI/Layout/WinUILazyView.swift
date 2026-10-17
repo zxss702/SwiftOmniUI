@@ -347,7 +347,8 @@ class WinUILazyView: WinUITravellingLayout {
         }
         var needsArrangement = false
         defer {
-            if needsArrangement, let placed { arrange(width: placed.width, height: placed.height) }
+            // XAML must measure the changed extent before placing the new rows.
+            if needsArrangement { invalidateArrange() }
         }
         let built = cells.built
         tellWindow(span ?? 0..<0, realize: realize ?? 0..<0, demand: incoming)
