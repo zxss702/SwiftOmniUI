@@ -626,7 +626,7 @@ final class WinUILazyStackView: WinUILazyView {
     override func contentSize(width: Double?) -> LayoutSize {
         let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         let across = axis == .vertical
-            ? (width ?? standsAt).map { max(0, $0 - padding.left - padding.right) } : nil
+            ? (width ?? standsAt).map { max(0, Double(Float($0)) - padding.left - padding.right) } : nil
         if WinUIView.arranging == 0, WinUILayoutView.queryingSize == 0 {
             let revision = cells.extents.revision
             if measuredAcross != across {
@@ -823,7 +823,7 @@ final class WinUILazyGridView: WinUILazyView {
     override func contentSize(width: Double?) -> LayoutSize {
         let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         let room = max(0, axis == .vertical
-            ? ((width ?? standsAt).map { $0 - padding.left - padding.right } ?? acrossRoom)
+            ? ((width ?? standsAt).map { Double(Float($0)) - padding.left - padding.right } ?? acrossRoom)
             : acrossRoom)
         let proposed = LazyGridTracks.resolve(tracks, width: room, spacing: trackSpacing)
         let widths = LazyGridTracks.extents(proposed, width: room, spacing: trackSpacing)
