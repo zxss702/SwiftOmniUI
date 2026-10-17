@@ -180,6 +180,15 @@ the application's own `Resources/AppIcon/appicon_gnome.svg`; an SVG embedding
 the application's PNG artwork is also valid. This is a per-user installation,
 not a system package installer. Direct `swift build` does not install it.
 
+An optional `app-info.json` in `Resources/Bundle` (or
+`Sources/<target>/Assets/Bundle`) supplies `{"displayName":"My App"}`. The
+installer reads it with Python 3 for the desktop-entry Name; run/deploy copies it
+beside the executable. GTK sets the application name before registration, so
+`AppInfo.name` agrees with the launcher. Window navigation titles stay independent;
+only a missing window title falls back to the application name. The stable
+application ID and executable/product name do not change when localized branding
+changes.
+
 In VS Code, with **GTK** chosen in the status bar, **SwiftOmniUI: Debug** builds
 the head with `run-app.sh --build-only` and starts it under `lldb-dap`, so a
 breakpoint in the application's Swift holds from the first line.

@@ -6,6 +6,23 @@ set -euo pipefail
 app_dir="$(cd "${1:?application directory}" && pwd)"
 executable="${2:?absolute executable path}"
 application="$(basename "$app_dir")"
+metadata="$app_dir/Resources/Bundle/app-info.json"
+if [[ ! -f "$metadata" ]]; then
+  for candidate in "$app_dir"/Sources/*/Assets/Bundle/app-info.json; do
+    [[ ! -f "$candidate" ]] || { metadata="$candidate"; break; }
+  done
+fi
+if [[ -f "$metadata" ]]; then
+  application="$(python3 - "$metadata" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    name = json.load(source)["displayName"]
+if not isinstance(name, str) or not name.strip() or any(c in name for c in "\r\n"):
+    raise ValueError("app-info.json must supply a nonempty single-line displayName")
+print(name.replace("\\", "\\\\"))
+PY
+)"
+fi
 product="$(basename "$executable")"
 # The desktop shows a window with the icon of the entry named by its application's ID: both are installed for
 # the user, the entry starting this build.

@@ -22,6 +22,7 @@ mkdir -p "$destination"
 cp "$build/${application}GTK" "$destination/"
 find "$build" -maxdepth 1 -name '*.so' -exec cp {} "$destination/" \;
 [[ ! -d "$build/Images" ]] || cp -R "$build/Images" "$destination/"
+[[ ! -f "$build/app-info.json" ]] || cp "$build/app-info.json" "$destination/"
 for resources in "$build"/*.resources "$build"/*.bundle; do
   [[ ! -d "$resources" ]] || cp -R "$resources" "$destination/"
 done

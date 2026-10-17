@@ -2,6 +2,22 @@
 # Compile an application icon as a link input, never rewrite the finished exe.
 # Resources/AppIcon/appicon.ico is preferred; appicon.png is converted with the
 # Windows imaging APIs. This script is dot-sourced; defining it runs no tools.
+function Get-SwiftOmniUIAppDisplayName([string]$Application) {
+    $metadata = Join-Path $Application 'Resources\Bundle\app-info.json'
+    if (-not (Test-Path $metadata)) {
+        $metadata = Get-ChildItem (Join-Path $Application 'Sources') -Directory -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName 'Assets\Bundle\app-info.json' } |
+            Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
+    if ($metadata) {
+        $info = Get-Content -LiteralPath $metadata -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if ($info.displayName -is [string] -and -not [string]::IsNullOrWhiteSpace($info.displayName) -and
+            $info.displayName -notmatch '[\r\n]') { return [string]$info.displayName }
+        throw 'app-info.json must supply a nonempty single-line displayName.'
+    }
+    return Split-Path $Application -Leaf
+}
+
 function Get-SwiftOmniUIAppIconResource([string]$Application, [string]$Scratch, [string]$Architecture) {
     $assets = Join-Path $Application 'Resources\AppIcon'
     $icon = Join-Path $assets 'appicon.ico'
@@ -45,12 +61,34 @@ function Get-SwiftOmniUIAppIconResource([string]$Application, [string]$Scratch, 
     }
     # Resource files use C-style escaping, including in absolute Windows paths.
     $escaped = $icon.Replace('\', '\\').Replace('"', '\"')
+    $displayName = (Get-SwiftOmniUIAppDisplayName $Application).Replace('\', '\\').Replace('"', '\"')
     $rc = Join-Path $output 'appicon.rc'
     # SwiftPM does not track an arbitrary linker's resource input. Include its
     # content identity in the argument so changing the artwork forces relinking.
     $identity = (Get-FileHash -LiteralPath $icon -Algorithm SHA256 -ErrorAction Stop).Hash
-    $resource = Join-Path $output "appicon-$identity.res"
-    [IO.File]::WriteAllText($rc, "1 ICON `"$escaped`"`r`n", [Text.Encoding]::Unicode)
+    $description = @"
+1 ICON "$escaped"
+1 VERSIONINFO
+ FILEVERSION 0,0,0,0
+ PRODUCTVERSION 0,0,0,0
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904B0"
+  BEGIN
+   VALUE "FileDescription", "$displayName\0"
+   VALUE "ProductName", "$displayName\0"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x0409, 1200
+ END
+END
+"@
+    [IO.File]::WriteAllText($rc, $description, [Text.Encoding]::Unicode)
+    $metadataIdentity = (Get-FileHash -LiteralPath $rc -Algorithm SHA256 -ErrorAction Stop).Hash
+    $resource = Join-Path $output "appicon-$identity-$metadataIdentity.res"
     $compiler = Get-Command rc.exe -ErrorAction SilentlyContinue
     if (-not $compiler) {
         $sdk = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
@@ -67,19 +105,31 @@ function Get-SwiftOmniUIAppIconResource([string]$Application, [string]$Scratch, 
 
 # An unpackaged desktop application uses a normal per-user Start-menu shortcut.
 # Point it at the current run/deploy output; IconLocation reads the exe resource.
-function Set-SwiftOmniUIAppLauncher([string]$Executable, [string]$Name) {
+function Set-SwiftOmniUIAppLauncher([string]$Executable, [string]$Name, [string]$Application) {
+    $displayName = if ($Application) { Get-SwiftOmniUIAppDisplayName $Application } else { $Name }
+    if ($displayName.IndexOfAny([IO.Path]::GetInvalidFileNameChars()) -ge 0) {
+        throw 'The application displayName cannot be used as a Start-menu shortcut filename.'
+    }
     $programs = [Environment]::GetFolderPath([Environment+SpecialFolder]::Programs)
     if (-not $programs) { throw 'The current user has no Start-menu Programs directory.' }
     New-Item -ItemType Directory -Force $programs -ErrorAction Stop | Out-Null
     $shell = New-Object -ComObject WScript.Shell -ErrorAction Stop
     try {
-        $shortcut = $shell.CreateShortcut((Join-Path $programs "$Name.lnk"))
+        $shortcut = $shell.CreateShortcut((Join-Path $programs "$displayName.lnk"))
         try {
             $shortcut.TargetPath = $Executable
             $shortcut.WorkingDirectory = Split-Path $Executable
             $shortcut.IconLocation = "$Executable,0"
-            $shortcut.Description = $Name
+            $shortcut.Description = $displayName
             $shortcut.Save()
         } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut) }
+        # Migrate only our old executable-named shortcut, never an unrelated one.
+        $oldPath = Join-Path $programs "$Name.lnk"
+        if ($displayName -ne $Name -and (Test-Path $oldPath)) {
+            $old = $shell.CreateShortcut($oldPath)
+            try {
+                if ($old.TargetPath -eq $Executable) { Remove-Item -LiteralPath $oldPath -ErrorAction Stop }
+            } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($old) }
+        }
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) }
 }

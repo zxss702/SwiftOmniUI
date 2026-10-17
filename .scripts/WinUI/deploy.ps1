@@ -55,7 +55,7 @@ Add-SwiftOmniUICppRuntime -Directory $Destination -Architecture $Architecture
 if ((Test-Path (Join-Path $application 'Resources\AppIcon\appicon.ico')) -or
     (Test-Path (Join-Path $application 'Resources\AppIcon\appicon.png'))) {
     $deployedExecutable = Join-Path (Resolve-Path $Destination).Path "$(Split-Path $application -Leaf)WinUI.exe"
-    Set-SwiftOmniUIAppLauncher -Executable $deployedExecutable -Name (Split-Path $application -Leaf)
+    Set-SwiftOmniUIAppLauncher -Executable $deployedExecutable -Name (Split-Path $application -Leaf) -Application $application
 }
 Write-Host "deployed $(Join-Path $Destination "$(Split-Path $application -Leaf)WinUI.exe")"
 $global:LASTEXITCODE = 0

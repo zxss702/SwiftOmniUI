@@ -11,6 +11,9 @@
 @MainActor
 struct WinUIWindowChrome {
     var title = ""
+    /// The system caption can fall back to the app name without adding words
+    /// to a titlebar whose page deliberately has no visible heading.
+    var windowTitle: String?
     var subtitle = ""
     var showsToolbar = true
     var back: WinUIToolbarAction?

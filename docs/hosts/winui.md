@@ -200,6 +200,25 @@ Deploy replaces the development shortcut's target with the deployed path.
 MSIX identity and a running window's explicit icon are separate concerns.
 Direct `swift build` does not perform this script's asset preparation.
 
+### Application name and window titles
+
+Supply `Resources/Bundle/app-info.json` (or the library layout
+`Sources/<target>/Assets/Bundle/app-info.json`) with `{"displayName":"My App"}`.
+The run/deploy scripts copy this file beside the executable, name the Start-menu
+shortcut from it, and put FileDescription/ProductName in the native exe resource
+when preparing the application icon. Executable/product filenames and the
+single-instance application ID remain independent of the localized display name.
+`@Environment`'s `AppInfo.name` reads this name instead of the executable stem.
+
+Each window keeps the existing navigation-title composition: the current naming
+page's `.navigationTitle`, then its enclosing title/scene title. The titlebar
+and native Window.Title update from that window's own composition, including on
+push/pop and title changes. A missing title falls back to the application name
+for the system caption only; an explicit empty title stays empty, and a titleless
+page does not acquire an extra visible toolbar heading. Titles do not get an
+automatic app-name suffix. This keeps app identity separate from document/page
+identity, as in SwiftUI.
+
 Keep an application's folder near the root of a drive: the Swift compiler on
 Windows fails with "the filename or extension is too long" under a deep path.
 

@@ -155,6 +155,7 @@ final class WinUIWindowController {
         let composed = WindowChrome(window: element, arrangement: presentation.arrangement)
         var chrome = WinUIWindowChrome()
         chrome.title = composed.title ?? ""
+        chrome.windowTitle = composed.title ?? DesktopApplicationInfo.displayName
         chrome.subtitle = composed.subtitle ?? ""
         chrome.showsToolbar = composed.toolbarVisibility?.enumeration != Visibility.hidden.rawValue
         chrome.back = composed.back.map { back in

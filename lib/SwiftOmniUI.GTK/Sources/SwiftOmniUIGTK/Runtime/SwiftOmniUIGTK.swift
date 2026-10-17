@@ -47,6 +47,7 @@ public enum SwiftOmniUIGTK {
         Fonts.add = { path in MainActor.assumeIsolated { GTKFonts.register(path) } }
         for path in Fonts.pending { _ = Fonts.add?(path) }
         Fonts.pending.removeAll()
+        if let displayName = DesktopApplicationInfo.displayName { g_set_application_name(displayName) }
         let application = adw_application_new(
             applicationID, GApplicationFlags(G_APPLICATION_HANDLES_OPEN.rawValue))!
         gtk_window_set_default_icon_name(applicationID)

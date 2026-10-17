@@ -101,7 +101,7 @@ if (Test-Path $bundleResources) {
     Copy-Item -Path (Join-Path $bundleResources '*') -Destination $bin -Recurse -Force
 }
 
-if ($iconResource) { Set-SwiftOmniUIAppLauncher -Executable $executable -Name $name }
+if ($iconResource) { Set-SwiftOmniUIAppLauncher -Executable $executable -Name $name -Application $application }
 
 if ($BuildOnly) {
     Write-Host "built $executable"

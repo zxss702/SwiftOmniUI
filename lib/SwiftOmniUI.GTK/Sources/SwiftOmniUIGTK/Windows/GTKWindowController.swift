@@ -138,7 +138,7 @@ final class GTKWindowController {
             shown.gtk.composeChrome()
         }
         let chrome = WindowChrome(window: element, arrangement: presentation.arrangement)
-        window.setTitle(chrome.title ?? element.value(.title)?.string)
+        window.setTitle(chrome.title ?? element.value(.title)?.string ?? DesktopApplicationInfo.displayName)
         window.setBackground(chrome.windowBackground)
         window.showToolbarlessChrome(chrome.toolbarVisibility?.enumeration == Visibility.hidden.rawValue)
     }
