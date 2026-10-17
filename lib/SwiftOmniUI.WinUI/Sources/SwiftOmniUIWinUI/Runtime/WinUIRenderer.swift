@@ -210,8 +210,9 @@ extension WinUIRenderer: FramePresenter {
     }
 
     func commitUserReports(now: Double) {
-        WinUIDoorbell.commitPending()
         runtime.frames.commit(now: now)
+        // The frame's viewport requests must land before this frame is presented.
+        WinUIDoorbell.commitPending()
     }
 
     func present(states: [Int32: HostStateValue], properties: [UInt64: Set<Prop>]) {

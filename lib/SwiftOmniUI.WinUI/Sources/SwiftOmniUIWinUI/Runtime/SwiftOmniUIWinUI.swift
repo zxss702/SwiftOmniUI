@@ -122,8 +122,10 @@ enum WinUICallbacks {
                     guard let scroller = WinUIView.find(view) as? WinUIScrollerView else { return }
                     scroller.nextOffset = Point(x: x, y: y)
                     scroller.finalOffset = Point(x: fx, y: fy)
-                    scroller.ears.removeAll { $0.owner == nil }
-                    for ear in scroller.ears { ear.moved() }
+                    // Actual position is reported in every interaction state;
+                    // lazy realization is reconciled on the display frame.
+                    scroller.onScrolled?(Point(x: x, y: y))
+                    WinUIRenderer.shared?.runtime.frames.laidOut()
                 }
             },
             scrolled: { view, x, y in

@@ -214,8 +214,6 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
             double x = scroller.HorizontalOffset(), y = scroller.VerticalOffset();
             callbacks.scrolling(view, x, y,
                 std::isnan(flight->x) ? x : flight->x, std::isnan(flight->y) ? y : flight->y);
-            if (scroller.State() == controls::ScrollingInteractionState::Interaction)
-                callbacks.scrolled(view, x, y);
         }));
         // An animation - inertia's or a move the program animated - names its
         // landing as it starts. That endpoint is metadata, not a visible window.

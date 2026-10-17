@@ -242,6 +242,10 @@ final class WinUIScrollView: WinUILayoutView {
 
     /// One frame of the display: what the scroller has to say, said here and nowhere else.
     func frame(now: Double) {
+        // Keep the visible window current through inertia, independently of
+        // how many native ViewChanged notifications arrived between frames.
+        scroller.ears.removeAll { $0.owner == nil }
+        for ear in scroller.ears { ear.moved() }
         for report in movement.frame(now: now) {
             switch report {
             case .moved(let from, let to): onOffsetChanged?(from, to)
