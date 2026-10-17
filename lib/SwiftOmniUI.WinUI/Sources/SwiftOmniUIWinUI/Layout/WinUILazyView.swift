@@ -659,8 +659,10 @@ final class WinUILazyStackView: WinUILazyView {
                    measuredRevisions[identity] == item.view.measurementRevision {
                     size = kept.size
                 } else {
+                    let startedAt = WinUIView.provisionalMeasureRevision
                     size = item.size(offered: proposal)
                     cells.measurements += 1
+                    guard startedAt == WinUIView.provisionalMeasureRevision else { continue }
                     measured[identity] = (proposal, size)
                     measuredRevisions[identity] = item.view.measurementRevision
                 }
@@ -839,6 +841,7 @@ final class WinUILazyGridView: WinUILazyView {
                 geometryChanged = true
             }
             var runExtents: [Int: Double] = [:]
+            var pendingRuns: Set<Int> = []
             if cells.requestedItemsAreCurrent, !widths.isEmpty {
                 for identity in cells.orderedIdentities[cells.built] where mounted[identity] == nil {
                     if let place = cells.position(of: identity) { runExtents[place / widths.count] = 0 }
@@ -855,8 +858,13 @@ final class WinUILazyGridView: WinUILazyView {
                    measuredRevisions[identity] == item.view.measurementRevision {
                     size = kept.size
                 } else {
+                    let startedAt = WinUIView.provisionalMeasureRevision
                     size = item.size(offered: proposal)
                     cells.measurements += 1
+                    guard startedAt == WinUIView.provisionalMeasureRevision else {
+                        pendingRuns.insert(run)
+                        continue
+                    }
                     measured[identity] = (proposal, size)
                     measuredRevisions[identity] = item.view.measurementRevision
                 }
@@ -865,7 +873,9 @@ final class WinUILazyGridView: WinUILazyView {
                     : size.width + margin.left + margin.right
                 runExtents[run] = max(runExtents[run] ?? 0, extent)
             }
-            for (run, extent) in runExtents { cells.runs.measure(run, extent: extent) }
+            for (run, extent) in runExtents where !pendingRuns.contains(run) {
+                cells.runs.measure(run, extent: extent)
+            }
             commitAnchor(perRun: perRun, grid: true)
             let total = cells.runs.total(count: runCount)
             if cells.runs.revision != revision || total != measuredExtent {
