@@ -195,7 +195,7 @@ extension WinUIRenderer: TurnPresenter {
         // Commit the logical open-window roster before closing native windows
         // or scheduling shutdown after the last one.
         if let text = scenes.changed(root: runtime.tree.root) { WinUIPersistence.writeScenes(text) }
-        showWindows()
+        if runtime.tree.chromeMayChange { showWindows() }
         LazyCells.realizing = false
     }
 
