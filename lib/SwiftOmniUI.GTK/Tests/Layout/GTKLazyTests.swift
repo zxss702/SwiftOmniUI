@@ -102,6 +102,29 @@ final class GTKLazyTests: XCTestCase {
         }
     }
 
+    func testButtonClearsFaceWhenItsLabelReallyBecomesEmpty() throws {
+        try onUIThread {
+            let hasLabel = State(wrappedValue: true)
+            let host = GTKRenderer.running(reducesMotion: true) {
+                Button {} label: {
+                    if hasLabel.wrappedValue {
+                        HStack { Text("Folder") }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let button = try XCTUnwrap(host.views(GTKButtonView.self).first)
+            let oldFace = try XCTUnwrap(gtk_button_get_child(button.widget.of(GtkButton.self)))
+
+            hasLabel.wrappedValue = false
+            for _ in 0..<12 { host.step(); host.frame() }
+
+            XCTAssertTrue(host.views(GTKButtonView.self).contains { $0 === button })
+            XCTAssertNotEqual(gtk_button_get_child(button.widget.of(GtkButton.self)), oldFace)
+        }
+    }
+
     func testFolderChangesShareSourcesAndKeepNativeWorkBoundedAsTheTreeGrows() throws {
         try onUIThread {
             for count in [10_000, 100_000] {

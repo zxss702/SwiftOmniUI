@@ -45,6 +45,51 @@ private struct Drafting: View {
     }
 }
 
+/// Different pages can have the same native root. Their composed view types,
+/// rather than the root widget type, delimit their lifetimes.
+private struct FolderLifetimePage: View {
+    @Binding var log: [String]
+    @State private var didLoad = false
+
+    var body: some View {
+        VStack { Text("Folders") }
+            .onAppear {
+                guard !didLoad else { return }
+                didLoad = true
+                log.append("load folders")
+            }
+            .onDisappear { log.append("leave folders") }
+    }
+}
+
+private struct SearchLifetimePage: View {
+    @Binding var log: [String]
+
+    var body: some View {
+        VStack { Text("Search") }
+            .onAppear { log.append("enter search") }
+            .onDisappear { log.append("leave search") }
+    }
+}
+
+private struct SidebarLifetimeSwitch: View {
+    @Binding var showsFolders: Bool
+    @Binding var log: [String]
+
+    var body: some View {
+        VStack {
+            Group {
+                if showsFolders {
+                    FolderLifetimePage(log: $log)
+                } else {
+                    SearchLifetimePage(log: $log)
+                }
+            }
+            .transition(.opacity)
+        }
+    }
+}
+
 @MainActor final class LifetimeTests: XCTestCase {
     override func setUp() {
         super.setUp()
@@ -158,6 +203,44 @@ private struct Drafting: View {
         renders.render(tree(), changed: Renderer.shared.pendingChanges)
 
         XCTAssertEqual(log.wrappedValue, ["created 1", "destroying 1", "created 2"])
+    }
+
+    func testChangingComposedPageWithSameNativeRootStartsANewLifetime() {
+        let log = State(wrappedValue: [String]())
+        let renders = Renders()
+
+        renders.render(AnyView(FolderLifetimePage(log: log.projectedValue)).node)
+        renders.render(AnyView(SearchLifetimePage(log: log.projectedValue)).node)
+        renders.render(AnyView(FolderLifetimePage(log: log.projectedValue)).node)
+
+        XCTAssertEqual(log.wrappedValue, [
+            "load folders", "leave folders", "enter search",
+            "leave search", "load folders",
+        ])
+    }
+
+    func testSidebarBranchReentryLoadsFreshStateWithTransition() {
+        let log = State(wrappedValue: [String]())
+        let showsFolders = State(wrappedValue: true)
+        let renders = Renders()
+
+        func page() -> Node {
+            SidebarLifetimeSwitch(
+                showsFolders: showsFolders.projectedValue,
+                log: log.projectedValue
+            ).node
+        }
+
+        renders.render(page())
+        showsFolders.wrappedValue = false
+        renders.render(page(), changed: Renderer.shared.pendingChanges)
+        showsFolders.wrappedValue = true
+        renders.render(page(), changed: Renderer.shared.pendingChanges)
+
+        XCTAssertEqual(log.wrappedValue, [
+            "load folders", "leave folders", "enter search",
+            "leave search", "load folders",
+        ])
     }
 
     /// What is written ON a composed view runs as well as what its body

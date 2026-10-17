@@ -34,7 +34,14 @@ extension GTKElement {
         let arranged = (type == .navigationStack ? element.stackedChildren : element.arrangedChildren).map(\.gtk)
 
         if let button = view as? GTKButtonView {
-            button.setFace(arranged.lazy.compactMap(\.layoutItem).first?.view)
+            if let face = arranged.lazy.compactMap(\.layoutItem).first?.view {
+                button.setFace(face)
+            } else if arranged.isEmpty {
+                // A child can be present before its composed subtree has a
+                // presenting widget. Keep the current face until that subtree
+                // arrives; an actually empty label still clears it.
+                button.setFace(nil)
+            }
             return
         }
 
@@ -42,7 +49,11 @@ extension GTKElement {
             // The menu is a slot's - the layout never places it, so it is read among the element's own children.
             let entries = element.children.first { $0.type == .contextMenu }
                 .map { MenuEntry.entries(of: $0) } ?? []
-            menu.setFace(arranged.lazy.compactMap(\.layoutItem).first?.view)
+            if let face = arranged.lazy.compactMap(\.layoutItem).first?.view {
+                menu.setFace(face)
+            } else if arranged.isEmpty {
+                menu.setFace(nil)
+            }
             menu.setEntries(entries)
             return
         }

@@ -429,21 +429,21 @@ extension Differ {
             node.canvas = nil
         }
 
-        // The engines this element runs, under numbers it keeps; a conversion's engines
-        // come first, in property order.
-        // Design: docs/design/core/identity-and-diffing.md#engines-on-an-element
-        let converting = node.driven.keys.sorted()
-            .compactMap { node.driven[$0]!.conversion }
-            .flatMap { $0.declarations() }
-        let engines = arm(converting + node.engines, previous: rendered?.engines)
-
         // Properties described last render and not now are named for the host to clear.
         // Design: docs/design/core/identity-and-diffing.md#properties-no-longer-described
         let lost = (rendered?.props.keys.filter { node.props[$0] == nil } ?? []).sorted()
 
         // Except those with no host default, which replace the element.
+        // A different outer composed view at the same structural slot begins
+        // a new lifetime even when both bodies produce the same native node.
+        // Deeper type changes keep this element's outer lifetime; the builder
+        // gives conditional branches distinct child keys.
+        let outerViewChanged = rendered.map { old in
+            old.views.first?.type != views.first?.type
+        } ?? false
         let replace = rendered != nil
-            && (rendered!.type != node.type || lost.contains { !$0.facts.cleared })
+            && (rendered!.type != node.type || outerViewChanged
+                || lost.contains { !$0.facts.cleared })
 
         // Nothing to build on: the element is new, or cannot become what is described.
         let previous = replace ? nil : rendered
@@ -451,6 +451,15 @@ extension Differ {
         if replace, let rendered = rendered {
             forget(rendered)
         }
+
+        // The engines this element runs, under numbers it keeps; a conversion's engines
+        // come first, in property order. A replacement must arm new engines after
+        // forgetting the old ones, rather than retaining IDs that forget disarms.
+        // Design: docs/design/core/identity-and-diffing.md#engines-on-an-element
+        let converting = node.driven.keys.sorted()
+            .compactMap { node.driven[$0]!.conversion }
+            .flatMap { $0.declarations() }
+        let engines = arm(converting + node.engines, previous: previous?.engines)
 
         var patch = HostPatch(id: id, type: node.type)
         patch.replace = replace
