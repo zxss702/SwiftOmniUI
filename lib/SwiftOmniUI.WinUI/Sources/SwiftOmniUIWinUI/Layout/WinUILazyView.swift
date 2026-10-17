@@ -528,7 +528,7 @@ class WinUILazyView: WinUITravellingLayout {
         viewportChanged(rect, effective: false, target: rect)
     }
 
-    /// Every pass re-asks the window: a place in the air lands in the one it
+    /// Animation readiness only: a place in the air lands in the window it
     /// asks for, and a move of the scroller's brings one.
     func canArrangeRows() -> Bool {
         // Only a change still waiting for its rows is held back. A plain viewport pass places
@@ -573,14 +573,15 @@ class WinUILazyView: WinUITravellingLayout {
     override func arrange(in bounds: Rect) {
         // A change's motion stands until the arrangement that can place its rows: a run that
         // holds its children by a window mounts those rows in a later patch, which names no
-        // timing of its own. Every arrangement takes the kept motion with it, so none outlives
+        // timing of its own. The first ready arrangement takes the kept motion, so none outlives
         // the change it belongs to.
-        let motion = takeArrivalMotion()
+        let ready = canArrangeRows()
+        let motion = ready ? takeArrivalMotion() : nil
         if cells.animatesChanges, let motion { places.animation = motion }
-        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
+        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges && ready,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
                                          axis == .vertical ? cells.anchorShift : 0), refining: true)
-        cells.animatesChanges = false
+        if ready { cells.animatesChanges = false }
         cells.anchorShift = 0
         retell()
     }
@@ -705,7 +706,6 @@ final class WinUILazyStackView: WinUILazyView {
 
     /// Place only measurements completed before this arrangement. Native subtrees are never measured here.
     override func arrange(in bounds: Rect) {
-        guard canArrangeRows() else { return }
         let across = max(0, axis == .vertical
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom)
@@ -757,7 +757,7 @@ final class WinUILazyStackView: WinUILazyView {
                              width: extent - margin.left - margin.right, height: height)
             }
             var placed = item
-            if cells.inserting.remove(identity) == nil { placed.fadeIn = nil }
+            if cells.animatesChanges || cells.inserting.remove(identity) == nil { placed.fadeIn = nil }
             self.place(placed, at: direction.places(frame, in: bounds))
         }
     }
@@ -895,7 +895,7 @@ final class WinUILazyGridView: WinUILazyView {
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom)
         let widths = columns
-        guard !widths.isEmpty, canArrangeRows() else { return }
+        guard !widths.isEmpty else { return }
         super.arrange(in: bounds)
         var trackOrigins: [Double] = []
         let extent = widths.reduce(0, +) + Double(max(widths.count - 1, 0)) * trackSpacing
@@ -947,7 +947,7 @@ final class WinUILazyGridView: WinUILazyView {
                              width: runExtent - margin.left - margin.right, height: height)
             }
             var placed = item
-            if cells.inserting.remove(identity) == nil { placed.fadeIn = nil }
+            if cells.animatesChanges || cells.inserting.remove(identity) == nil { placed.fadeIn = nil }
             self.place(placed, at: direction.places(frame, in: bounds))
         }
     }
