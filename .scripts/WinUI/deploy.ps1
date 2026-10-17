@@ -31,6 +31,7 @@ param(
     [ValidateSet('arm64', 'x64')][string]$Architecture
 )
 . (Join-Path $PSScriptRoot 'tools.ps1')
+. (Join-Path $PSScriptRoot 'app-icon.ps1')
 if (-not $Architecture) { $Architecture = $SwiftOmniUIArchitecture }
 
 & (Join-Path $PSScriptRoot 'run-app.ps1') -App $App -Configuration release -Architecture $Architecture -BuildOnly
@@ -51,5 +52,10 @@ if ($LASTEXITCODE -ge 8) { throw "the head could not be copied from $bin" }
 Add-SwiftOmniUISwiftRuntime -Directory $Destination -Architecture $Architecture
 Remove-Item (Join-Path $Destination 'swift-runtime.txt') -ErrorAction SilentlyContinue
 Add-SwiftOmniUICppRuntime -Directory $Destination -Architecture $Architecture
+if ((Test-Path (Join-Path $application 'Resources\AppIcon\appicon.ico')) -or
+    (Test-Path (Join-Path $application 'Resources\AppIcon\appicon.png'))) {
+    $deployedExecutable = Join-Path (Resolve-Path $Destination).Path "$(Split-Path $application -Leaf)WinUI.exe"
+    Set-SwiftOmniUIAppLauncher -Executable $deployedExecutable -Name (Split-Path $application -Leaf)
+}
 Write-Host "deployed $(Join-Path $Destination "$(Split-Path $application -Leaf)WinUI.exe")"
 $global:LASTEXITCODE = 0

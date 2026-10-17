@@ -25,4 +25,7 @@ find "$build" -maxdepth 1 -name '*.so' -exec cp {} "$destination/" \;
 for resources in "$build"/*.resources "$build"/*.bundle; do
   [[ ! -d "$resources" ]] || cp -R "$resources" "$destination/"
 done
+# The launcher must start the deployed copy, not the intermediate build.
+destination="$(cd "$destination" && pwd)"
+bash "$script_dir/install-app-icon.sh" "$app_dir" "$destination/${application}GTK"
 echo "deployed:   $destination/${application}GTK"

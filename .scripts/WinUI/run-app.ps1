@@ -35,6 +35,7 @@ param(
     [switch]$BuildOnly
 )
 . (Join-Path $PSScriptRoot 'tools.ps1')
+. (Join-Path $PSScriptRoot 'app-icon.ps1')
 if (-not $Architecture) { $Architecture = $SwiftOmniUIArchitecture }
 $arch = Get-SwiftOmniUIArchitectureArguments $Architecture
 
@@ -63,7 +64,9 @@ if (-not $env:SWIFTTERM_BUILD_DIRTY) { $env:SWIFTTERM_BUILD_DIRTY = '0' }
 
 Write-Host "building ${name}WinUI, $Configuration, $Architecture - SwiftPM reads the packages first, printing nothing"
 Write-SwiftOmniUIEditorBuilds
-swift build --package-path $application -c $Configuration --product "${name}WinUI" --scratch-path $scratch @arch
+$iconResource = Get-SwiftOmniUIAppIconResource -Application $application -Scratch $scratch -Architecture $Architecture
+$iconArguments = if ($iconResource) { @('-Xlinker', $iconResource) } else { @() }
+swift build --package-path $application -c $Configuration --product "${name}WinUI" --scratch-path $scratch @arch @iconArguments
 if ($LASTEXITCODE) { throw "the WinUI head of $name did not build" }
 Write-Host "laying the Windows App SDK beside ${name}WinUI.exe"
 $bin = (swift build --package-path $application -c $Configuration --scratch-path $scratch --show-bin-path @arch).Trim()
@@ -97,6 +100,8 @@ if (-not (Test-Path $bundleResources)) {
 if (Test-Path $bundleResources) {
     Copy-Item -Path (Join-Path $bundleResources '*') -Destination $bin -Recurse -Force
 }
+
+if ($iconResource) { Set-SwiftOmniUIAppLauncher -Executable $executable -Name $name }
 
 if ($BuildOnly) {
     Write-Host "built $executable"

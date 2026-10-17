@@ -171,6 +171,15 @@ window's icon through that entry. `release` builds the optimized head, `--detach
 the application has started, and `--build-only` builds it and starts
 nothing.
 
+`install-app-icon.sh` owns that desktop-entry installation for both run and
+deploy. Deploy rewrites the entry to launch the final deployed executable,
+with paths quoted for desktop-entry Exec syntax. The entry's basename and Icon
+use the same application ID as GTK; StartupWMClass retains the executable name
+for X11 matching. The installed icon is
+the application's own `Resources/AppIcon/appicon_gnome.svg`; an SVG embedding
+the application's PNG artwork is also valid. This is a per-user installation,
+not a system package installer. Direct `swift build` does not install it.
+
 In VS Code, with **GTK** chosen in the status bar, **SwiftOmniUI: Debug** builds
 the head with `run-app.sh --build-only` and starts it under `lldb-dap`, so a
 breakpoint in the application's Swift holds from the first line.

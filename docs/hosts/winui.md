@@ -183,6 +183,23 @@ itself - no package, no installer: its runtime, a manifest registering its
 classes and `resources.pri` stand beside the executable. `-Detach` returns once
 the application has started.
 
+### Application icon
+
+Put `appicon.ico` or `appicon.png` in `Resources/AppIcon`. `run-app.ps1`
+compiles it into an ICON resource and passes it to the head's linker; deploy
+uses the same build. A PNG is exported to ICO sizes 16, 24, 32, 48, 64, 128 and
+256 through Windows imaging APIs. An ICO is used unchanged. This needs the
+Windows SDK's `rc.exe`, discovered on PATH or in Windows Kits. Outputs stay in
+`.build/winui/app-icon/<architecture>`. Applications with no icon retain their
+existing build. The finished executable is never patched, so subsequent SwiftPM
+builds and later code signing see an ordinary linked resource.
+
+For an application supplying an icon, run/deploy also creates a per-user
+Start-menu shortcut targeting that exact output, using the embedded exe icon.
+Deploy replaces the development shortcut's target with the deployed path.
+MSIX identity and a running window's explicit icon are separate concerns.
+Direct `swift build` does not perform this script's asset preparation.
+
 Keep an application's folder near the root of a drive: the Swift compiler on
 Windows fails with "the filename or extension is too long" under a deep path.
 
