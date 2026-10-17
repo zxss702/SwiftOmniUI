@@ -473,14 +473,12 @@ class WinUILazyView: WinUITravellingLayout {
         // Preserve precise viewport dimensions without changing its native origin.
         rect.width = effectiveViewport?.width ?? raw[2]
         rect.height = effectiveViewport?.height ?? raw[3]
-        // ViewChanged can precede EffectiveViewportChanged by a frame. Mount
-        // a newly exposed window now; movement inside an already mounted
-        // window can keep the ordinary coalesced layout notice.
+        // A native scroll notification records position only. Coalesce row
+        // realization outside the ScrollPresenter's callback/layout stack.
         if rect.width > 0, rect.height > 0,
            rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite {
             announcedRect = rect
-            if hasMountedWindow(at: rect) { retell() }
-            else { viewportChanged(rect, effective: false, target: rect) }
+            retell()
         } else { retell() }
     }
 
@@ -649,7 +647,6 @@ final class WinUILazyStackView: WinUILazyView {
                     size = kept.size
                 } else {
                     let startedAt = WinUIView.provisionalMeasureRevision
-                    item.view.prepareMeasure(width: proposal ?? .infinity)
                     size = item.size(offered: proposal)
                     cells.measurements += 1
                     guard startedAt == WinUIView.provisionalMeasureRevision else { continue }
@@ -849,7 +846,6 @@ final class WinUILazyGridView: WinUILazyView {
                     size = kept.size
                 } else {
                     let startedAt = WinUIView.provisionalMeasureRevision
-                    item.view.prepareMeasure(width: proposal ?? .infinity)
                     size = item.size(offered: proposal)
                     cells.measurements += 1
                     guard startedAt == WinUIView.provisionalMeasureRevision else {
