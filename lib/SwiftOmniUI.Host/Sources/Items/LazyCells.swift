@@ -35,6 +35,10 @@
     private var itemsRevision = -1
     private var positions: [String: Int] = [:]
     private var source: HostLazySource?
+    /// Held only until the changed viewport is requested. New rows outside
+    /// that window must not allocate transition bookkeeping or animate later
+    /// merely because the user scrolled to them.
+    private var insertionPredecessor: HostLazySource?
     private var prefetchPlan: (demand: Range<Double>, target: Range<Double>, perRun: Int, grid: Bool)?
     private var prefetchForward = true
     private var prefetchInvalidated = false
@@ -132,10 +136,7 @@
                         }
                     } else { animatesChanges = true }
                 }
-                if wasKnown {
-                    if follows { inserting.formUnion(next.inserted) }
-                    else { inserting.formUnion(next.sequence.filter { position(of: $0) == nil }) }
-                }
+                insertionPredecessor = wasKnown ? (insertionPredecessor ?? source) : nil
                 inserting = inserting.filter { next.position(of: $0) != nil }
                 extents.adopt(next)
                 source = next
@@ -147,6 +148,7 @@
                 window = nil
                 needsMeasurement = false
             } else {
+                insertionPredecessor = nil
                 // Direct host SPI users can still provide the .items property.
                 let now = element.value(.items)?.strings ?? []
                 if now != directIdentities || source != nil {
@@ -320,6 +322,12 @@
             } else { cancelPrefetch(invalidate: false) }
         } else { cancelPrefetch(invalidate: false) }
         let within = lower < upper && !wanted.isEmpty ? lower..<upper : 0..<0
+        if let previous = insertionPredecessor, !within.isEmpty {
+            for identity in identities[within] where previous.position(of: identity) == nil {
+                inserting.insert(identity)
+            }
+            if !needsMeasurement { insertionPredecessor = nil }
+        }
         if !needsMeasurement { inserting.formIntersection(identities[within]) }
         request(within, keeping: keeping)
         // The visible request is always dispatched before optional neighbours.
@@ -425,6 +433,12 @@
         cancelPrefetch()
         let identities = orderedIdentities
         guard let element, let runtime, built != 0..<identities.count else { return }
+        if let previous = insertionPredecessor {
+            for identity in identities where previous.position(of: identity) == nil {
+                inserting.insert(identity)
+            }
+            insertionPredecessor = nil
+        }
         if !inserting.isEmpty { animatesChanges = true }
         built = 0..<identities.count
         retained = []
@@ -505,8 +519,9 @@
         if let source, next.predecessor == ObjectIdentifier(source) {
             switch next.edit {
             case .replace(let before, let after):
-                let allNew = after.count == next.inserted.count
-                    && next.inserted.allSatisfy { measured[$0] == nil }
+                let allNew = next.sequence[after].allSatisfy {
+                    source.position(of: $0) == nil && measured[$0] == nil
+                }
                 let replacement = allNew ? LazyExtentTree(count: after.count)
                     : LazyExtentTree(next.sequence[after], measurement: { measured[$0] })
                 sums.replace(before, with: replacement)

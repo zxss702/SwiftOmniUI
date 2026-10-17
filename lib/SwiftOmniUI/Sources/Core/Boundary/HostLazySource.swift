@@ -10,6 +10,7 @@ import Synchronization
     /// array is only made if a caller explicitly needs the compatibility
     /// representation; native lazy layouts use the shared sequence directly.
     private let identitiesCache: Mutex<[String]?>
+    private let insertedCache: Mutex<Set<String>?>
     public var identities: [String] {
         identitiesCache.withLock { stored in
             if let stored { return stored }
@@ -36,7 +37,18 @@ import Synchronization
     public let predecessor: ObjectIdentifier?
     public let edit: Edit
     /// Changes relative to a predecessor; the initial source has no insert animation.
-    public let inserted: Set<String>
+    private let insertionBase: HostLazyIdentitySequence?
+    private let insertionRange: Range<Int>
+    public var inserted: Set<String> {
+        insertedCache.withLock { stored in
+            if let stored { return stored }
+            let result = insertionBase.map { base in
+                Set(sequence[insertionRange].filter { base.position(of: $0) == nil })
+            } ?? []
+            stored = result
+            return result
+        }
+    }
     public let removed: [String]
 
     public enum Edit: Sendable {
@@ -56,6 +68,7 @@ import Synchronization
     init(_ identities: [String], following previous: HostLazySource?,
          changedRanges: (before: Range<Int>, after: Range<Int>)?) {
         identitiesCache = Mutex<[String]?>(identities)
+        insertedCache = Mutex<Set<String>?>(nil)
         predecessor = previous.map(ObjectIdentifier.init)
         let old = previous?.identities ?? []
         let before: Range<Int>, after: Range<Int>
@@ -106,7 +119,8 @@ import Synchronization
         }
         edit = detectedEdit
         sequence = ordered
-        inserted = previous == nil ? [] : Set(identities[after].filter { previous?.position(of: $0) == nil })
+        insertionBase = previous?.sequence
+        insertionRange = after
         removed = old[before].filter { ordered.position(of: $0) == nil }
     }
 
@@ -144,8 +158,10 @@ import Synchronization
         }
         sequence = ordered
         identitiesCache = Mutex<[String]?>(nil)
+        insertedCache = Mutex<Set<String>?>(nil)
         edit = detectedEdit
-        inserted = Set(names.filter { previous.position(of: $0) == nil })
+        insertionBase = old
+        insertionRange = after
         removed = old[before].filter { ordered.position(of: $0) == nil }
     }
 }

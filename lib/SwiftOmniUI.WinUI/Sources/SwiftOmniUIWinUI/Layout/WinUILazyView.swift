@@ -196,7 +196,11 @@ class WinUILazyView: WinUITravellingLayout {
             // not yet placed: a run mounted under a scroller it cannot yet climb to would
             // otherwise keep the extent of the estimates until some later patch - a bar
             // standing over a document of estimates while the rows stand at their measures.
-            (self.placingLayout ?? self.declaredScroll)?.invalidateMeasurements()
+            let scroll = self.clip ?? self.declaredScroll
+            ProgramWrite.perform {
+                (self.placingLayout ?? self.declaredScroll)?.invalidateMeasurements()
+                scroll?.invalidateContentExtent()
+            }
         }
     }
 

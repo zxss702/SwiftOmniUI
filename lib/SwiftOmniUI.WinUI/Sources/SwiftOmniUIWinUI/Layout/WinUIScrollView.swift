@@ -87,6 +87,13 @@ final class WinUIScrollView: WinUILayoutView {
         wrapper.forgetMeasurements()
     }
 
+    /// A lazy descendant can change the document's extent without changing this
+    /// ScrollView's allocated frame. Make the native presenter read that extent
+    /// again so its scroll range and thumb follow the same geometry as the rows.
+    func invalidateContentExtent() {
+        document.invalidateOwnMeasurements()
+    }
+
     /// Where a `.defaultScrollAnchor` asks the scroller to begin: fractions
     /// across and down the content and the room. Applied once, on the first
     /// layout with a document to place.

@@ -47,6 +47,7 @@ class WinUILayoutView: WinUIView {
 
     /// The children, in order.
     private(set) var items: [WinUILayoutItem] = []
+    private var itemMeasurementRevisions: [Int] = []
 
     /// The direction the children are laid out in, the element's; a turn lays them out again.
     var direction = LayoutDirection.leftToRight {
@@ -114,13 +115,22 @@ class WinUILayoutView: WinUIView {
     /// Puts `items` in the panel, in order, where they differ from the children it holds; whether they did.
     @discardableResult
     func setItems(_ items: [WinUILayoutItem]) -> Bool {
-        guard items.count != self.items.count
-            || !zip(items, self.items).allSatisfy({ $0.arranges(like: $1) })
-        else { return false }
+        let sameArrangement = items.count == self.items.count
+            && zip(items, self.items).allSatisfy { $0.arranges(like: $1) }
+        let revisions = items.map { $0.view.measurementRevision }
+        guard !sameArrangement || revisions != itemMeasurementRevisions else { return false }
 
+        if !sameArrangement {
+            let surviving = Set(items.map { ObjectIdentifier($0.view) })
+            for previous in self.items where !surviving.contains(ObjectIdentifier(previous.view))
+                && previous.view.placingLayout === self {
+                previous.view.placingLayout = nil
+            }
+        }
         self.items = items
+        itemMeasurementRevisions = revisions
         for item in items { item.view.placingLayout = self }
-        holdChildren()
+        if !sameArrangement { holdChildren() }
         invalidateMeasurements()
         return true
     }

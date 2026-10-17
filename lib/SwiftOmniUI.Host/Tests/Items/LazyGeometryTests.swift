@@ -51,6 +51,7 @@ final class LazyGeometryTests: XCTestCase {
         XCTAssertTrue(element.lazyRows === next)
         XCTAssertEqual(cells.position(of: "500"), 501)
         XCTAssertEqual(cells.extents.extent(of: "500"), 28)
+        cells.show(0..<240)
         XCTAssertEqual(cells.inserting, ["new"])
         XCTAssertEqual(cells.total, 100_001 * 44 - 16)
         XCTAssertLessThan(cells.extents.storageNodes, 12)
@@ -90,6 +91,7 @@ final class LazyGeometryTests: XCTestCase {
         XCTAssertNotEqual(element.lazyItemsRevision, source)
         XCTAssertEqual(cells.position(of: "5"), 6)
         XCTAssertEqual(cells.extents.extent(of: "5"), 28)
+        cells.show(0..<240)
         XCTAssertEqual(cells.inserting, ["new"])
     }
 
@@ -130,6 +132,36 @@ final class LazyGeometryTests: XCTestCase {
         XCTAssertEqual(extents.total(in: rows), 156)
         extents.spacing = nil
         XCTAssertEqual(extents.total(in: rows), 148)
+    }
+
+    @MainActor
+    func testLargeFolderEditKeepsInsertionAnimationWithinRequestedWindow() throws {
+        let runtime = HostRuntime.still()
+        let original = HostLazySource((0..<10_000).map(String.init))
+        var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+        patch.lazyRows = original
+        runtime.tree.apply(patch, complete: true)
+        let element = try XCTUnwrap(runtime.tree.root)
+        let cells = LazyCells(element, in: runtime)
+        cells.extents.spacing = 0
+        cells.takeItems()
+        cells.show(0..<240)
+
+        let expanded = HostLazySource((0..<5_000).map { "new-\($0)" } + original.identities,
+                                      following: original)
+        var update = HostPatch(id: element.id, type: element.type)
+        update.lazyRows = expanded
+        runtime.tree.apply(update, complete: false)
+        cells.takeItems()
+        XCTAssertTrue(cells.inserting.isEmpty,
+                      "a structural edit does not allocate an animation entry for every new row")
+        cells.show(0..<240)
+        XCTAssertFalse(cells.inserting.isEmpty)
+        XCTAssertLessThan(cells.inserting.count, 32)
+
+        cells.show(100_000..<100_240)
+        XCTAssertTrue(cells.inserting.isEmpty,
+                      "rows first encountered by scrolling after the edit do not animate as new")
     }
 
     func testZeroMeasurementsKeepProvisionalRoomForUnseenRows() {

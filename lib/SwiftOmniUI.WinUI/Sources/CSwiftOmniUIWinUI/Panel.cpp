@@ -40,6 +40,17 @@ namespace {
         return true;
     }
 
+    // A structural branch can move an existing UIElement from an HStack panel
+    // into a VStack panel. XAML rejects insertion while the old panel still
+    // owns it; detach that exact child before synchronizing the new parent.
+    void detachFromForeignPanel(controls::Panel const &target, xaml::UIElement const &child) {
+        auto parent = xaml::Media::VisualTreeHelper::GetParent(child);
+        auto panel = parent.try_as<controls::Panel>();
+        if (!panel || panel == target) return;
+        uint32_t index;
+        if (panel.Children().IndexOf(child, index)) panel.Children().RemoveAt(index);
+    }
+
     // A moving lazy window normally drops children at one edge and adds them at
     // the other. Keep the overlapping projected UIElements attached. Comparing
     // projections here is intentional: their ABI interface pointers need not
@@ -445,6 +456,8 @@ extern "C" void swiftomniui_winui_panel_set_children(
         std::vector<xaml::UIElement> held;
         held.reserve(count);
         for (int32_t index = 0; index < count; ++index) held.push_back(as<xaml::UIElement>(children[index]));
+        if (sameChildren(items, held)) return;
+        for (auto const &child : held) detachFromForeignPanel(owner, child);
         // A lazy window usually changes at its edges. Keep the intersecting
         // UIElements attached, preserving their native state and composition.
         if (!syncEdgeChildren(items, held)) {
