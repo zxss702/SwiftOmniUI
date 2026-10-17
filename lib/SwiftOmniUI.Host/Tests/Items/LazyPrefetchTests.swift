@@ -7,24 +7,6 @@ import XCTest
 @MainActor final class LazyPrefetchTests: XCTestCase {
     private final class Owner {}
 
-    func testReadyRunsShareTheBudgetAndStopAfterAnExpensiveRun() {
-        let queue = LazyPrefetchQueue()
-        let owner = Owner()
-        let start = ContinuousClock.now
-        var time = start
-        queue.now = { time }
-        var calls = 0
-        queue.schedule(owner: owner, ready: { true }) {
-            calls += 1
-            time = time.advanced(by: .milliseconds(calls == 2 ? 5 : 1))
-            return true
-        }
-        queue.drain(until: start.advanced(by: .milliseconds(4)))
-        XCTAssertEqual(calls, 2, "check after each run, not after a sixteen-row batch")
-        XCTAssertTrue(queue.isPending)
-        queue.cancel(owner: owner)
-    }
-
     func testNativeMeasurementReadinessPausesWithoutSpinning() {
         let queue = LazyPrefetchQueue()
         let owner = Owner()
@@ -35,12 +17,12 @@ import XCTest
             ready = false
             return true
         }
-        queue.drain(until: .now.advanced(by: .seconds(1)))
+        queue.drain()
         XCTAssertEqual(calls, 1)
-        queue.drain(until: .now.advanced(by: .seconds(1)))
+        queue.drain()
         XCTAssertEqual(calls, 1)
         ready = true
-        queue.drain(until: .now.advanced(by: .seconds(1)))
+        queue.drain()
         XCTAssertEqual(calls, 2)
         queue.cancel(owner: owner)
     }
@@ -54,30 +36,10 @@ import XCTest
             queue.schedule(owner: owner, ready: { true }) { calls.append(-1); return false }
             return true
         }
-        queue.drain(until: .now.advanced(by: .seconds(1)))
+        queue.drain()
         XCTAssertEqual(calls, [1])
-        queue.drain(until: .now.advanced(by: .seconds(1)))
+        queue.drain()
         XCTAssertEqual(calls, [1, -1])
-    }
-
-    func testDeadlineStopsOptionalWorkAndEachOwnerGetsOneTurnPerFrame() {
-        let queue = LazyPrefetchQueue()
-        let first = Owner(), second = Owner()
-        let start = ContinuousClock.now
-        var time = start
-        queue.now = { time }
-        var calls: [Int] = []
-        queue.schedule(owner: first) { calls.append(1); time = time.advanced(by: .milliseconds(5)); return true }
-        queue.schedule(owner: second) { calls.append(2); return false }
-        queue.drain(until: start)
-        XCTAssertTrue(calls.isEmpty)
-        queue.drain(until: start.advanced(by: .milliseconds(4)))
-        XCTAssertEqual(calls, [1])
-        XCTAssertTrue(queue.isPending)
-        queue.drain(until: start.advanced(by: .seconds(1)))
-        XCTAssertEqual(calls, [1, 2, 1], "unfinished owners rotate so other layouts get the next frame")
-        queue.cancel(owner: first)
-        XCTAssertFalse(queue.isPending)
     }
 
     func testLatestViewportReplacesStaleWorkEvenDuringAJob() {
@@ -90,10 +52,10 @@ import XCTest
             queue.schedule(owner: owner) { calls.append(2); return false }
             return false
         }
-        queue.drain(until: ContinuousClock.now.advanced(by: .seconds(1)))
+        queue.drain()
         XCTAssertEqual(calls, [1])
         XCTAssertTrue(queue.isPending, "the old job's completion must not cancel its replacement")
-        queue.drain(until: ContinuousClock.now.advanced(by: .seconds(1)))
+        queue.drain()
         XCTAssertEqual(calls, [1, 2])
         XCTAssertFalse(queue.isPending)
     }
@@ -107,7 +69,7 @@ import XCTest
         owner = nil
         XCTAssertNil(held)
         XCTAssertFalse(queue.isPending)
-        queue.drain(until: ContinuousClock.now.advanced(by: .seconds(1)))
+        queue.drain()
         XCTAssertFalse(called)
     }
 

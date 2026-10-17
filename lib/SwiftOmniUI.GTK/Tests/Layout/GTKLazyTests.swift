@@ -820,7 +820,7 @@ final class GTKLazyTests: XCTestCase {
                     if kind == 1 && offset == 1_600 { XCTAssertGreaterThanOrEqual(lazy.mounted.count, 8) }
                 }
                 for _ in 0..<48 where host.runtime.lazyPrefetch.isPending {
-                    host.runtime.lazyPrefetch.drain(until: ContinuousClock.now.advanced(by: .seconds(1)))
+                    host.runtime.lazyPrefetch.drain()
                     host.step()
                 }
                 let work = [lazy.cells.searches, lazy.cells.requests, lazy.cells.measurements]

@@ -13,7 +13,6 @@
     private var jobs: [ObjectIdentifier: Job] = [:]
     private var serial: UInt64 = 0
     var onPending: (() -> Void)?
-    var now: () -> ContinuousClock.Instant = { .now }
 
     public init() {}
 
@@ -32,18 +31,17 @@
     /// Ready jobs may take another bounded step in this frame. A host still
     /// waiting for native layout yields until a later frame; it never busy-waits.
     /// Jobs without a readiness signal retain their one-step-per-frame contract.
-    public func drain(until deadline: ContinuousClock.Instant, commit: (() -> Void)? = nil) {
+    public func drain(commit: (() -> Void)? = nil) {
         var pending = jobs.sorted { $0.value.serial < $1.value.serial }
         var index = 0
         while index < pending.count {
-            guard now() < deadline else { break }
             let (id, job) = pending[index]
             index += 1
             guard jobs[id]?.serial == job.serial else { continue }
             guard job.owner != nil else { jobs[id] = nil; continue }
             guard job.ready?() != false else { continue }
             let more = job.step()
-            // Include realization in this unit's budget before checking readiness again.
+            // Commit this unit before checking native readiness again.
             commit?()
             // A synchronous render can replace or cancel this very job.
             if jobs[id]?.serial == job.serial {

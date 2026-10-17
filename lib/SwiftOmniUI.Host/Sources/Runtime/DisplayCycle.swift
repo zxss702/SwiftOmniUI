@@ -61,13 +61,10 @@
 
     /// One frame: the user's reports, the animations, the core's cycle, one walk, a render, the hold.
     public func frame(now: Double) {
-        let began = ContinuousClock.now
         presenter?.commitUserReports(now: now)
         drain(now: now)
         presenter?.renderIfNeeded()
-        // Visible work consumes the budget first. Leave native layout and paint
-        // room even on a high refresh display; unused budget builds neighbours.
-        lazyPrefetch?.drain(until: began.advanced(by: .milliseconds(4))) {
+        lazyPrefetch?.drain {
             self.presenter?.renderIfNeeded()
         }
         hold()

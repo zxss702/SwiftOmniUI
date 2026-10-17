@@ -302,18 +302,7 @@ class WinUILazyView: WinUITravellingLayout {
         // Preserve the previous window until the scroller can name real room.
         guard cells.orderedIdentities.isEmpty || incoming != nil else { return }
         let span = self.span ?? incoming
-        var realize = incoming
-        if let realized = realize {
-            // The look-ahead must stand on the same sixty-fourth grid the
-            // window's own bounds snap to, or a float's worth of room lands a
-            // boundary row on one side of the window and not the other.
-            let raw = axis == .vertical ? rect.height : rect.width
-            let room = (raw * 64).rounded() / 64
-            // Keep the existing viewport of look-ahead, releasing old rows as
-            // the position moves. Predicted endpoints and scroll history are
-            // not visible windows and must not grow this range.
-            realize = max(0, realized.lowerBound - room)..<(realized.upperBound + room)
-        }
+        let realize = incoming
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)
             || cells.window?.realize != (realize ?? 0..<0)
             || cells.window?.revision != revision || cells.needsWindowUpdate
@@ -341,7 +330,7 @@ class WinUILazyView: WinUITravellingLayout {
             let upper = min(cells.orderedIdentities.count, (wanted.upperBound + 1) * perRun)
             if !wanted.isEmpty, (lower..<upper) == cells.built {
                 cells.show(span, perRun: perRun, grid: grid, realize: realize, keeping: keeping,
-                           prefetch: true, demand: incoming)
+                           prefetch: false, demand: incoming)
                 return
             }
         }
@@ -760,7 +749,7 @@ final class WinUILazyStackView: WinUILazyView {
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {
-        cells.show(span, realize: realize, keeping: travellingIdentities, prefetch: true, demand: demand)
+        cells.show(span, realize: realize, keeping: travellingIdentities, prefetch: false, demand: demand)
     }
 }
 
@@ -959,7 +948,7 @@ final class WinUILazyGridView: WinUILazyView {
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {
         cells.show(span, perRun: perRun, grid: true, realize: realize, keeping: travellingIdentities,
-                   prefetch: true, demand: demand)
+                   prefetch: false, demand: demand)
     }
 }
 

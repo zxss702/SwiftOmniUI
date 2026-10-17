@@ -1446,7 +1446,7 @@ final class WinUILazyTests: XCTestCase {
                     previous = lazy.mounted.mapValues(\.view)
                 }
                 for _ in 0..<48 where host.runtime.lazyPrefetch.isPending {
-                    host.runtime.lazyPrefetch.drain(until: ContinuousClock.now.advanced(by: .seconds(1)))
+                    host.runtime.lazyPrefetch.drain()
                     host.step()
                 }
                 let work = [lazy.cells.searches, lazy.cells.requests, lazy.cells.measurements]
@@ -1878,7 +1878,7 @@ final class WinUILazyTests: XCTestCase {
                                scroll.scroller.origin.y + scroll.scroller.laidOutFrame.height, accuracy: 1,
                                "the visible footer must meet the viewport bottom at the scroll limit")
                 for _ in 0..<48 where host.runtime.lazyPrefetch.isPending {
-                    host.runtime.lazyPrefetch.drain(until: ContinuousClock.now.advanced(by: .seconds(1)))
+                    host.runtime.lazyPrefetch.drain()
                     host.step()
                 }
                 let work = [lazy.cells.searches, lazy.cells.requests, lazy.cells.measurements]
