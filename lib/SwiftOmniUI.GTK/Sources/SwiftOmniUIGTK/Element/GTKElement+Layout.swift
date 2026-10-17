@@ -34,11 +34,7 @@ extension GTKElement {
         let arranged = (type == .navigationStack ? element.stackedChildren : element.arrangedChildren).map(\.gtk)
 
         if let button = view as? GTKButtonView {
-            if let face = element.currentChildren.lazy.compactMap({ $0.gtk.layoutItem }).first?.view {
-                button.setFace(face)
-            } else if element.currentChildren.isEmpty {
-                button.setFace(nil)
-            }
+            button.setFace(element.currentChildren.lazy.compactMap { $0.gtk.currentView }.first)
             return
         }
 
@@ -46,11 +42,7 @@ extension GTKElement {
             // The menu is a slot's - the layout never places it, so it is read among the element's own children.
             let entries = element.children.first { $0.type == .contextMenu }
                 .map { MenuEntry.entries(of: $0) } ?? []
-            if let face = element.currentChildren.lazy.compactMap({ $0.gtk.layoutItem }).first?.view {
-                menu.setFace(face)
-            } else if element.currentChildren.isEmpty {
-                menu.setFace(nil)
-            }
+            menu.setFace(element.currentChildren.lazy.compactMap { $0.gtk.currentView }.first)
             menu.setEntries(entries)
             return
         }
@@ -96,14 +88,18 @@ extension GTKElement {
         label.setRuns(runs)
     }
 
+    private var currentView: GTKView? {
+        if let view { return view }
+        return element.currentChildren.lazy.compactMap { $0.gtk.currentView }.first
+    }
+
     /// What this element gives the layout it stands in: its view, or the first view of an element drawn by its parent.
     var layoutItem: GTKLayoutItem? {
         // A popover stands in no layout: its `GtkPopover` holds it.
         guard type != .popover else { return nil }
         guard let view else {
             // What a departing element passes up departs with it.
-            let candidates = element.currentChildren.isEmpty ? children : element.currentChildren.map(\.gtk)
-            guard var item = candidates.lazy.compactMap(\.layoutItem).first else { return nil }
+            guard var item = children.lazy.compactMap(\.layoutItem).first else { return nil }
             if element.isDeparting { item.departing = true; item.isShown = false }
             return item
         }
