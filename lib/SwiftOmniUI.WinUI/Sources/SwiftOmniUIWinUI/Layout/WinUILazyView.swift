@@ -450,17 +450,10 @@ class WinUILazyView: WinUITravellingLayout {
     /// is the window a moving scroller can show before the next notice.
     func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {}
 
-    /// Adopt the anchor's coordinates when committed measurements change the document.
-    /// The ScrollViewer owns the physical scroll adjustment through its native anchor.
+    /// Update anchor bookkeeping; only native viewport reports establish the visible coordinates.
+    /// Native scroll anchoring adjusts the offset after layout commits the new extent.
     func commitAnchor(perRun: Int = 1, grid: Bool = false) {
-        guard let origin = cells.correctedOrigin(perRun: perRun, grid: grid) else { return }
-        if axis == .vertical {
-            if let previous = effectiveViewport?.y { announcedRect?.y += origin - previous }
-            effectiveViewport?.y = origin
-        } else {
-            if let previous = effectiveViewport?.x { announcedRect?.x += origin - previous }
-            effectiveViewport?.x = origin
-        }
+        cells.correctedOrigin(perRun: perRun, grid: grid)
     }
 
     /// Recomputes the places when the scroller's window moved.
