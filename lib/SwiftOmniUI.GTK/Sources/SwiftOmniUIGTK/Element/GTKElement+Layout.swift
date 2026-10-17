@@ -34,7 +34,7 @@ extension GTKElement {
         let arranged = (type == .navigationStack ? element.stackedChildren : element.arrangedChildren).map(\.gtk)
 
         if let button = view as? GTKButtonView {
-            button.setFace(arranged.first?.view)
+            button.setFace(arranged.lazy.compactMap(\.layoutItem).first?.view)
             return
         }
 
@@ -42,7 +42,7 @@ extension GTKElement {
             // The menu is a slot's - the layout never places it, so it is read among the element's own children.
             let entries = element.children.first { $0.type == .contextMenu }
                 .map { MenuEntry.entries(of: $0) } ?? []
-            menu.setFace(arranged.first?.view)
+            menu.setFace(arranged.lazy.compactMap(\.layoutItem).first?.view)
             menu.setEntries(entries)
             return
         }

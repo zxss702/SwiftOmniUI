@@ -34,7 +34,9 @@ final class GTKMenuButtonView: GTKView {
     /// The widget the button's face draws; GTK keeps its own arrow beside it.
     func setFace(_ face: GTKView?) {
         faceView = face
-        gtk_menu_button_set_child(widget.opaque, face?.widget)
+        if gtk_menu_button_get_child(widget.opaque) != face?.widget {
+            gtk_menu_button_set_child(widget.opaque, face?.widget)
+        }
     }
 
     /// The button's size for the room offered: the room a `GtkMenuButton` leaves its face, with the face measured

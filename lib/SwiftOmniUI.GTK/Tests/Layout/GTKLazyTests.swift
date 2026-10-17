@@ -67,6 +67,41 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on GTK answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class GTKLazyTests: XCTestCase {
+    func testRetainedFolderButtonKeepsItsComposedFaceAfterChildrenArrive() throws {
+        try onUIThread {
+            let rows = State(wrappedValue: [0])
+            let host = GTKRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            Button {} label: {
+                                Group {
+                                    HStack {
+                                        Image(systemName: "folder")
+                                        Text("Folder \(number)")
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .frame(height: 28)
+                        }
+                    }
+                }
+                .frame(width: 240, height: 160)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let button = try XCTUnwrap(host.views(GTKButtonView.self).first)
+            let face = try XCTUnwrap(gtk_button_get_child(button.widget.of(GtkButton.self)))
+
+            rows.wrappedValue.append(1)
+            for _ in 0..<12 { host.step(); host.frame() }
+
+            XCTAssertTrue(host.views(GTKButtonView.self).contains { $0 === button })
+            XCTAssertEqual(gtk_button_get_child(button.widget.of(GtkButton.self)), face)
+            XCTAssertEqual(gtk_widget_get_mapped(face), 1)
+        }
+    }
+
     func testFolderChangesShareSourcesAndKeepNativeWorkBoundedAsTheTreeGrows() throws {
         try onUIThread {
             for count in [10_000, 100_000] {
