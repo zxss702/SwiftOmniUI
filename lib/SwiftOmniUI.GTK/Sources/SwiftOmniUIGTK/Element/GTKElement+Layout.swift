@@ -34,12 +34,9 @@ extension GTKElement {
         let arranged = (type == .navigationStack ? element.stackedChildren : element.arrangedChildren).map(\.gtk)
 
         if let button = view as? GTKButtonView {
-            if let face = arranged.lazy.compactMap(\.layoutItem).first?.view {
+            if let face = element.currentChildren.lazy.compactMap({ $0.gtk.layoutItem }).first?.view {
                 button.setFace(face)
-            } else if arranged.isEmpty {
-                // A child can be present before its composed subtree has a
-                // presenting widget. Keep the current face until that subtree
-                // arrives; an actually empty label still clears it.
+            } else if element.currentChildren.isEmpty {
                 button.setFace(nil)
             }
             return
@@ -49,9 +46,9 @@ extension GTKElement {
             // The menu is a slot's - the layout never places it, so it is read among the element's own children.
             let entries = element.children.first { $0.type == .contextMenu }
                 .map { MenuEntry.entries(of: $0) } ?? []
-            if let face = arranged.lazy.compactMap(\.layoutItem).first?.view {
+            if let face = element.currentChildren.lazy.compactMap({ $0.gtk.layoutItem }).first?.view {
                 menu.setFace(face)
-            } else if arranged.isEmpty {
+            } else if element.currentChildren.isEmpty {
                 menu.setFace(nil)
             }
             menu.setEntries(entries)
@@ -105,7 +102,8 @@ extension GTKElement {
         guard type != .popover else { return nil }
         guard let view else {
             // What a departing element passes up departs with it.
-            guard var item = children.lazy.compactMap(\.layoutItem).first else { return nil }
+            let candidates = element.currentChildren.isEmpty ? children : element.currentChildren.map(\.gtk)
+            guard var item = candidates.lazy.compactMap(\.layoutItem).first else { return nil }
             if element.isDeparting { item.departing = true; item.isShown = false }
             return item
         }
