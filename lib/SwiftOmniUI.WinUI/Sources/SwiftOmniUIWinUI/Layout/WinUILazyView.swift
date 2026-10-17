@@ -649,6 +649,7 @@ final class WinUILazyStackView: WinUILazyView {
                     size = kept.size
                 } else {
                     let startedAt = WinUIView.provisionalMeasureRevision
+                    item.view.prepareMeasure(width: proposal ?? .infinity)
                     size = item.size(offered: proposal)
                     cells.measurements += 1
                     guard startedAt == WinUIView.provisionalMeasureRevision else { continue }
@@ -848,6 +849,7 @@ final class WinUILazyGridView: WinUILazyView {
                     size = kept.size
                 } else {
                     let startedAt = WinUIView.provisionalMeasureRevision
+                    item.view.prepareMeasure(width: proposal ?? .infinity)
                     size = item.size(offered: proposal)
                     cells.measurements += 1
                     guard startedAt == WinUIView.provisionalMeasureRevision else {
