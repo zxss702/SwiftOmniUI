@@ -304,16 +304,10 @@
                held.lowerBound <= visible.upperBound, visible.lowerBound <= held.upperBound {
                 within = min(held.lowerBound, visible.lowerBound)..<max(held.upperBound, visible.upperBound)
             }
-            // A jump needs its visible rows before the look-ahead. WinUI supplies
-            // the announced viewport as `demand`; its extra `realize` window is
-            // optional work. Other hosts can continue asking for the whole new
-            // window when they do not supply that separate demand.
-            if !target.isEmpty, target.lowerBound < built.lowerBound || target.upperBound > built.upperBound {
-                if demand != nil, !visible.isEmpty, element.handler(.realizedChanged) != nil {
-                    within = visible
-                } else {
-                    within = target
-                }
+            // Keep the bounded neighbours above when demand moves continuously.
+            // A disjoint jump already leaves `within` at its visible range.
+            if !target.isEmpty, demand == nil || element.handler(.realizedChanged) == nil {
+                within = target
             }
             lower = within.lowerBound
             upper = within.upperBound
