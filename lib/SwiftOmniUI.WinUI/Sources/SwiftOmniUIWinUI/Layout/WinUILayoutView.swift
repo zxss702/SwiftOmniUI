@@ -338,10 +338,12 @@ class WinUILayoutView: WinUIView {
     /// reads its size from `naturalSize(width:)`, and otherwise the room the children take, within the room offered.
     /// Design: docs/design/platforms/winui/layout.md#no-room-asked
     func measure(width: Double, height: Double) -> LayoutSize {
-        // WinUI arranging a marked element measures it first, inside the pass: the size it already measured
-        // stands, and no child is measured - measuring one now marks it, and the marked element is arranged
-        // again for ever.
-        guard WinUIView.arranging == 0 else { return desiredSize }
+        // Arrange may invoke Measure for a dirty child. Its previous DesiredSize
+        // is provisional; preserve the proposal through the shared deferred-measure path.
+        guard WinUIView.arranging == 0 else {
+            _ = super.measure(width: Optional(width), height: Optional(height))
+            return desiredSize
+        }
         WinUILayoutUpdates.measured(self)
 
         Self.arithmeticMeasuring += 1

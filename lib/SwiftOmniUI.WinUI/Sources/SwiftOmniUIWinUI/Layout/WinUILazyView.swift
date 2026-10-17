@@ -26,7 +26,6 @@ class WinUILazyView: WinUITravellingLayout {
     private var mountedSourceID: ObjectIdentifier?
     private var hasMountedSource = false
     private var lastAcknowledgedGeneration = 0
-    private var ancestorMeasureQueued = false
 
     /// The scroller whose window the run answers, and the ear it hears it by.
     private weak var watching: WinUIScrollView?
@@ -184,23 +183,12 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     func commitChangedContentExtent() {
-        // The first measured extent also replaces the 44-point estimates
-        // already read by the scroll document during its arithmetic query.
-        guard !ancestorMeasureQueued else { return }
-        ancestorMeasureQueued = true
-        WinUIDoorbell.afterPass { [weak self] in
-            guard let self else { return }
-            self.ancestorMeasureQueued = false
-            guard !self.isDetached else { return }
-            // An extent the document has already read must reach it even where this panel is
-            // not yet placed: a run mounted under a scroller it cannot yet climb to would
-            // otherwise keep the extent of the estimates until some later patch - a bar
-            // standing over a document of estimates while the rows stand at their measures.
-            let scroll = self.clip ?? self.declaredScroll
-            ProgramWrite.perform {
-                (self.placingLayout ?? self.declaredScroll)?.invalidateMeasurements()
-                scroll?.invalidateContentExtent()
-            }
+        // Discard old arithmetic now; native requests already defer during layout.
+        let scroll = clip ?? declaredScroll
+        ProgramWrite.perform {
+            forgetMeasurements()
+            (placingLayout ?? declaredScroll)?.invalidateMeasurements()
+            scroll?.invalidateContentExtent()
         }
     }
 
@@ -394,8 +382,7 @@ class WinUILazyView: WinUITravellingLayout {
                 self.geometryChanged = false
                 // Extent changes have their own coalesced upward report. A
                 // new visible range or internal placement only dirties this panel.
-                self.invalidateOwnMeasurements()
-                self.measuredRevision = self.measurementRevision
+                self.invalidateArrange()
             }
             // No clip to narrow by means all of it stands in view - a lazy
             // container outside any scroller builds every child.
@@ -407,10 +394,9 @@ class WinUILazyView: WinUITravellingLayout {
                 self.cells.tellAll()
                 return
             }
-            // The first effective-viewport event can precede attachment to a
-            // ScrollView. It need not fire again after that relationship is
-            // installed. Seed the first window from the actual native scroller.
-            if self.viewport == nil, self.isAttached, let scroll = self.watching {
+            // Layout and native anchoring may move the viewport after the notification.
+            // Reconcile against its current position, not the queued notification's origin.
+            if self.isAttached, let scroll = self.watching {
                 var raw = [Double](repeating: 0, count: 6)
                 swiftomniui_winui_scroller_viewport(scroll.scroller.handle, self.handle, &raw)
                 // A newly attached ScrollViewer can report a zero effective
@@ -585,7 +571,6 @@ class WinUILazyView: WinUITravellingLayout {
         preparedViewport = nil
         watching = nil
         scrollEar = nil
-        ancestorMeasureQueued = false
         arrivalHeld = 0
     }
 }

@@ -43,6 +43,7 @@ final class WinUIScrollDocument: WinUILayoutView {
     /// the extent the presenter reads is the run's, not the room it stood in last.
     override func measure(width: Double, height: Double) -> LayoutSize {
         guard WinUIView.arranging == 0 else {
+            _ = super.measure(width: Optional(width), height: Optional(height))
             guard placingLayout == nil else { return .zero }
             let size = naturalSize(width: width.isFinite ? width : nil)
             return LayoutSize(width: min(size.width, width), height: min(size.height, height))
