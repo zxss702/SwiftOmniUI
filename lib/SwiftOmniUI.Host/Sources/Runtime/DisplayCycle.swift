@@ -67,7 +67,9 @@
         presenter?.renderIfNeeded()
         // Visible work consumes the budget first. Leave native layout and paint
         // room even on a high refresh display; unused budget builds neighbours.
-        lazyPrefetch?.drain(until: began.advanced(by: .milliseconds(4)))
+        lazyPrefetch?.drain(until: began.advanced(by: .milliseconds(4))) {
+            self.presenter?.renderIfNeeded()
+        }
         hold()
     }
 
