@@ -32,7 +32,7 @@ final class WinUIMaskTests: XCTestCase {
     private static let red: UInt32 = 0xFFFF_0000
     private static let blue: UInt32 = 0xFF00_00FF
 
-    @MainActor private func native(_ view: WinUIView, _ property: String) -> String {
+    @MainActor private static func native(_ view: WinUIView, _ property: String) -> String {
         let count = Int(swiftomniui_winui_read(view.handle, property, nil, 0))
         var bytes = [CChar](repeating: 0, count: count + 1)
         _ = swiftomniui_winui_read(view.handle, property, &bytes, Int32(bytes.count))
@@ -57,8 +57,8 @@ final class WinUIMaskTests: XCTestCase {
             let expected = [Self.red, Self.red, Self.blue, Self.blue]
             host.settle { root.presentedPixels(at: points, in: window) == expected }
             XCTAssertEqual(root.presentedPixels(at: points, in: window), expected)
-            XCTAssertEqual(native(masked, "alphaMasked"), "1")
-            XCTAssertEqual(native(masked, "clipped"), "0")
+            XCTAssertEqual(Self.native(masked,"alphaMasked"), "1")
+            XCTAssertEqual(Self.native(masked,"clipped"), "0")
         }
     }
 
@@ -277,7 +277,7 @@ final class WinUIMaskTests: XCTestCase {
                 XCTAssertEqual(Array(facts[5...6]), [1, 2])
             }
             masked.detach()
-            XCTAssertEqual(native(masked, "alphaMasked"), "0", "detaching releases the redirected visual trees")
+            XCTAssertEqual(Self.native(masked,"alphaMasked"), "0", "detaching releases the redirected visual trees")
         }
     }
 

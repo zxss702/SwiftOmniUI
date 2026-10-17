@@ -21,15 +21,15 @@ final class WinUIActivationTests: XCTestCase {
             try XCTUnwrap(host.views(WinUIButtonView.self).first { $0.text == "Change" }).invoke()
             XCTAssertEqual(label.text, "Editor: 1")
 
-            let welcomeHandle = try nativeHandle(welcome)
+            let welcomeHandle = try Self.nativeHandle(welcome)
             _ = SendMessageW(welcomeHandle, UINT(WM_CLOSE), 0, 0)
             host.settle { host.windows.count == 1 }
             XCTAssertTrue(host.windows.first?.window === editor)
             WinUICallbacks.table.activated?()
             host.settle { host.windows.count == 2 }
             let reopened = try XCTUnwrap(host.windows.first?.window)
-            let reopenedHandle = try nativeHandle(reopened)
-            let editorHandle = try nativeHandle(editor)
+            let reopenedHandle = try Self.nativeHandle(reopened)
+            let editorHandle = try Self.nativeHandle(editor)
             host.settle { GetForegroundWindow() == reopenedHandle && Self.isAbove(reopenedHandle, editorHandle) }
             XCTAssertEqual(GetForegroundWindow(), reopenedHandle, "the reopened first window must be findable in front")
             XCTAssertTrue(Self.isAbove(reopenedHandle, editorHandle))
@@ -64,14 +64,14 @@ final class WinUIActivationTests: XCTestCase {
         try onUIThread {
             let host = WinUIRenderer.running(application: { WinUIActivationApplication() })
             let welcome = try XCTUnwrap(host.windows.first?.window)
-            let handle = try nativeHandle(welcome)
+            let handle = try Self.nativeHandle(welcome)
             swiftomniui_winui_window_show_as_user(welcome.handle, 6)
-            host.settle { IsIconic(handle) != 0 }
-            XCTAssertNotEqual(IsIconic(handle), 0)
+            host.settle { IsIconic(handle) }
+            XCTAssertTrue(IsIconic(handle))
 
             for _ in 0..<5 { WinUICallbacks.table.activated?(); host.step() }
-            host.settle { IsIconic(handle) == 0 && GetForegroundWindow() == handle }
-            XCTAssertEqual(IsIconic(handle), 0)
+            host.settle { !IsIconic(handle) && GetForegroundWindow() == handle }
+            XCTAssertFalse(IsIconic(handle))
             XCTAssertEqual(GetActiveWindow(), handle)
             XCTAssertEqual(GetForegroundWindow(), handle)
             XCTAssertEqual(host.windows.count, 1)
@@ -86,15 +86,15 @@ final class WinUIActivationTests: XCTestCase {
             try XCTUnwrap(host.views(WinUIButtonView.self).first { $0.text == "Open editor" }).invoke()
             host.settle { host.windows.count == 2 }
             let editor = try XCTUnwrap(host.windows.last?.window)
-            let welcomeHandle = try nativeHandle(welcome), editorHandle = try nativeHandle(editor)
+            let welcomeHandle = try Self.nativeHandle(welcome), editorHandle = try Self.nativeHandle(editor)
             swiftomniui_winui_window_set_shown(welcome.handle, false)
             swiftomniui_winui_window_activate(editor.handle)
-            host.settle { IsWindowVisible(welcomeHandle) == 0 && GetForegroundWindow() == editorHandle }
-            XCTAssertEqual(IsWindowVisible(welcomeHandle), 0)
+            host.settle { !IsWindowVisible(welcomeHandle) && GetForegroundWindow() == editorHandle }
+            XCTAssertFalse(IsWindowVisible(welcomeHandle))
 
             WinUICallbacks.table.activated?()
-            host.settle { IsWindowVisible(welcomeHandle) != 0 && GetForegroundWindow() == welcomeHandle }
-            XCTAssertNotEqual(IsWindowVisible(welcomeHandle), 0)
+            host.settle { IsWindowVisible(welcomeHandle) && GetForegroundWindow() == welcomeHandle }
+            XCTAssertTrue(IsWindowVisible(welcomeHandle))
             XCTAssertEqual(GetForegroundWindow(), welcomeHandle)
             XCTAssertTrue(Self.isAbove(welcomeHandle, editorHandle))
             XCTAssertEqual(host.windows.count, 2)
@@ -114,7 +114,7 @@ final class WinUIActivationTests: XCTestCase {
         return false
     }
 
-    @MainActor private func nativeHandle(_ window: WinUIWindow) throws -> HWND {
+    @MainActor private static func nativeHandle(_ window: WinUIWindow) throws -> HWND {
         let title = "SOUITest-activation-\(window.number)"
         window.setTitle(title)
         let name = Array(title.utf16) + [0]

@@ -70,7 +70,7 @@ extension Node {
 
     /// Writes one member's value into this node - what a modifier setting
     /// several members at once writes through, where `setValue` cannot chain.
-    mutating func write<Owner: Contract, Value: HostRepresentable>(
+    @_spi(Host) public mutating func write<Owner: Contract, Value: HostRepresentable>(
         _ property: ElementProperty<Owner, Value>,
         _ value: Value
     ) {

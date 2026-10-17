@@ -112,14 +112,14 @@ class WinUILazyView: WinUITravellingLayout {
         let sourceChanged = !hasMountedSource || mountedSourceID != sourceID
         mountedSourceID = sourceID
         hasMountedSource = true
-        // A patch inside a mounted row - a hover, a word, a spinner - is no change to the
-        // run's arrangement, and no row of the run is left holding a stale view:
-        // `measuredRevisions` follows each row's own view, so the pass this invalidation
-        // asks for re-measures exactly the rows whose view moved and keeps every other
-        // measurement. Forgetting them all here, and animating the whole window, costs one
-        // native measurement per mounted row for any patch anywhere in the list - a pointer
-        // resting on a row costs what every folder opened so far costs.
-        if contentChanged {
+        // A content revision can be only a drawing change. The row's own measurement
+        // revision is the layout signal; an unchanged revision needs no native pass.
+        // Structural changes still need a pass to place their new window.
+        let rowSizeChanged = contentChanged && mounted.contains { identity, item in
+            measured[identity] == nil
+                || measuredRevisions[identity] != item.view.measurementRevision
+        }
+        if sourceChanged || rowSizeChanged {
             invalidateMeasure()
             invalidateArrange()
         }
@@ -679,18 +679,18 @@ final class WinUILazyStackView: WinUILazyView {
                 cells.extents.measure(identity, extent: extent)
                 acrossWidest[identity] = acrossSize
             }
-            // The widest row measured in this room, and not the widest row now mounted:
-            // rows leave the window as it moves, and a width that follows them narrows the
-            // document - the scroller's cross extent - over and over, which is the cross
-            // bar's flicker while the list scrolls along its own axis.
-            let natural = acrossWidest.values.max() ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
-            if naturalAcross != natural {
-                if axis != .vertical || width == nil {
+            // A finite proposal fixes a vertical stack's returned width. Scanning every
+            // row ever measured in this room cannot affect that answer. An intrinsic
+            // cross-axis size still uses the widest measured row, including rows that
+            // have scrolled out, so the document does not narrow while scrolling.
+            if axis != .vertical || width == nil {
+                let natural = acrossWidest.values.max() ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
+                if naturalAcross != natural {
                     geometryChanged = true
                     commitChangedContentExtent()
                 }
+                naturalAcross = natural
             }
-            naturalAcross = natural
             commitAnchor()
             let total = cells.total
             if cells.extents.revision != revision || total != measuredExtent {

@@ -11,7 +11,7 @@ extension Node {
     /// `alignment` or another layer's places it without it ever standing at
     /// a natural size of nothing. Stated sizes still win - `Circle().frame(24)`
     /// is 24 across wherever it stands.
-    init<Declaration: ElementContract>(shape contract: Declaration.Type) {
+    @_spi(Host) public init<Declaration: ElementContract>(shape contract: Declaration.Type) {
         self.init(contract: contract)
         write(ViewContract.horizontalAlignment, .fill)
         write(ViewContract.verticalAlignment, .fill)

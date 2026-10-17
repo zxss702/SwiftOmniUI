@@ -856,14 +856,46 @@ final class WinUILazyTests: XCTestCase {
             XCTAssertGreaterThan(lazy.cells.built.lowerBound, firstWindow.upperBound,
                                  "the announced viewport is requested before another native layout pass")
             XCTAssertGreaterThan(lazy.cells.requests, requested)
-            XCTAssertLessThan(lazy.cells.built.count, 80,
-                              "a distant fling does not build the intervening document")
+            XCTAssertLessThan(lazy.cells.built.count, 20,
+                              "a distant fling requests the announced viewport before optional look-ahead")
             scroll.scroller.nextOffset = nil
             scroll.scroller.move(to: Point(0, standing.y + 4_000))
             for _ in 0..<12 { host.step(); host.frame() }
             XCTAssertFalse(lazy.mounted.isEmpty)
             XCTAssertFalse(lazy.mounted.values.contains { $0.view === firstView },
                            "rows outside the moving window leave the native tree")
+        }
+    }
+
+    func testEdgeScrollKeepsTheOverlappingNativeInputAndItsFocus() throws {
+        try onUIThread {
+            let builds = ModifiedLazyBuilds()
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<100) { number in
+                            let row = ModifiedLazyInputRow(number: number)
+                            builds.rows[number] = row
+                            return row
+                        }
+                    }
+                }.frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let field = try XCTUnwrap(host.views(WinUITextFieldView.self).first { $0.text == "Row 5" })
+            XCTAssertTrue(swiftomniui_winui_focus(field.handle, true))
+            host.settle { builds.rows[5]?.focused == true }
+            let previous = lazy.cells.built
+
+            scroll.scroller.move(to: Point(0, 80))
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertNotEqual(lazy.cells.built, previous)
+            XCTAssertTrue(host.views(WinUITextFieldView.self).contains { $0 === field })
+            XCTAssertEqual(builds.rows[5]?.focused, true)
+            XCTAssertTrue(swiftomniui_winui_focused(field.handle),
+                          "an edge update must keep the overlapping XAML control attached")
         }
     }
 

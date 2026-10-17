@@ -155,8 +155,8 @@ final class WinUIRendererTests: XCTestCase {
             XCTAssertEqual(host.windows.count, 2)
             guard host.windows.count == 2 else { return }
             let (main, other) = (host.windows[0].window, host.windows[1].window)
-            let mainHandle = try nativeHandle(main, title: "SOUITest-main-\(main.number)")
-            let otherHandle = try nativeHandle(other, title: "SOUITest-group-\(other.number)")
+            let mainHandle = try Self.nativeHandle(main, title: "SOUITest-main-\(main.number)")
+            let otherHandle = try Self.nativeHandle(other, title: "SOUITest-group-\(other.number)")
             XCTAssertNil(GetWindow(mainHandle, UINT(GW_OWNER)))
             XCTAssertNil(GetWindow(otherHandle, UINT(GW_OWNER)), "a grouped window must be an independent top-level window")
             XCTAssertFalse(swiftomniui_winui_window_belongs_to(other.handle, main.handle))
@@ -182,7 +182,7 @@ final class WinUIRendererTests: XCTestCase {
         }
     }
 
-    @MainActor private func nativeHandle(_ window: WinUIWindow, title: String) throws -> HWND {
+    @MainActor private static func nativeHandle(_ window: WinUIWindow, title: String) throws -> HWND {
         window.setTitle(title)
         let name = Array(title.utf16) + [0]
         return try XCTUnwrap(name.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })

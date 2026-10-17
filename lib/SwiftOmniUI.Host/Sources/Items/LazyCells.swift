@@ -302,14 +302,16 @@
                held.lowerBound <= visible.upperBound, visible.lowerBound <= held.upperBound {
                 within = min(held.lowerBound, visible.lowerBound)..<max(held.upperBound, visible.upperBound)
             }
-            // A window the mounted rows do not cover is the window the next frame
-            // stands in - a jump, or a fling past what is built. Every place of it
-            // is asked for now: a place left to the optional work paints a gap for
-            // as long as that work takes, and a frame on a moving scroller has not
-            // the time. Only a window already covered is narrowed to the demand,
-            // with the rows around it left standing where they are.
+            // A jump needs its visible rows before the look-ahead. WinUI supplies
+            // the announced viewport as `demand`; its extra `realize` window is
+            // optional work. Other hosts can continue asking for the whole new
+            // window when they do not supply that separate demand.
             if !target.isEmpty, target.lowerBound < built.lowerBound || target.upperBound > built.upperBound {
-                within = target
+                if demand != nil, !visible.isEmpty, element.handler(.realizedChanged) != nil {
+                    within = visible
+                } else {
+                    within = target
+                }
             }
             lower = within.lowerBound
             upper = within.upperBound

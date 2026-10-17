@@ -32,8 +32,8 @@ final class WinUIDividerTests: XCTestCase {
             XCTAssertEqual(horizontal.frame.height, 1)
             XCTAssertEqual(vertical.frame.width, 1)
             XCTAssertEqual(vertical.frame.height, 80)
-            try assertPainted(horizontal, at: [(1, 0.5), (60, 0.5), (119, 0.5)])
-            try assertPainted(vertical, at: [(0.5, 1), (0.5, 40), (0.5, 79)])
+            try Self.assertPainted(horizontal, at: [(1, 0.5), (60, 0.5), (119, 0.5)])
+            try Self.assertPainted(vertical, at: [(0.5, 1), (0.5, 40), (0.5, 79)])
 
             width.wrappedValue = 200
             height.wrappedValue = 100
@@ -44,8 +44,8 @@ final class WinUIDividerTests: XCTestCase {
             XCTAssertEqual(horizontal.frame.height, 1)
             XCTAssertEqual(vertical.frame.width, 1)
             XCTAssertEqual(vertical.frame.height, 100)
-            try assertPainted(horizontal, at: [(1, 0.5), (100, 0.5), (199, 0.5)])
-            try assertPainted(vertical, at: [(0.5, 1), (0.5, 50), (0.5, 99)])
+            try Self.assertPainted(horizontal, at: [(1, 0.5), (100, 0.5), (199, 0.5)])
+            try Self.assertPainted(vertical, at: [(0.5, 1), (0.5, 50), (0.5, 99)])
         }
     }
 
@@ -59,28 +59,28 @@ final class WinUIDividerTests: XCTestCase {
             defer { swiftomniui_winui_set_theme_for_testing(content.handle, 0) }
             var light: UInt32?
             var dark: UInt32?
-            for theme in [Int32(1), 2, 1] {
+            for theme: Int32 in [1, 2, 1] {
                 swiftomniui_winui_set_theme_for_testing(content.handle, theme)
                 WinUITestHost.pump()
                 host.layOut()
-                let fill = try fill(of: line)
+                let fill = try Self.fill(of: line)
                 if theme == 1 {
                     if let light { XCTAssertEqual(fill, light, "returning to light restores the native separator brush") }
                     else { light = fill }
                 } else { dark = fill }
-                try assertPainted(line, at: [(1, 0.5), (60, 0.5), (119, 0.5)])
+                try Self.assertPainted(line, at: [(1, 0.5), (60, 0.5), (119, 0.5)])
                 XCTAssertTrue(host.view(id: .manual("line")) === line)
             }
             var contrast = HIGHCONTRASTW()
             contrast.cbSize = UINT(MemoryLayout<HIGHCONTRASTW>.size)
-            XCTAssertNotEqual(SystemParametersInfoW(UINT(SPI_GETHIGHCONTRAST), contrast.cbSize, &contrast, 0), 0)
+            XCTAssertTrue(SystemParametersInfoW(UINT(SPI_GETHIGHCONTRAST), contrast.cbSize, &contrast, 0))
             if contrast.dwFlags & DWORD(HCF_HIGHCONTRASTON) == 0 {
                 XCTAssertNotEqual(light, dark, "light/dark resource changes must reach the same native rectangle")
             }
         }
     }
 
-    @MainActor private func fill(of view: WinUIDividerView) throws -> UInt32 {
+    @MainActor private static func fill(of view: WinUIDividerView) throws -> UInt32 {
         var bytes = [CChar](repeating: 0, count: 32)
         let length = swiftomniui_winui_read(view.handle, "fill", &bytes, Int32(bytes.count))
         XCTAssertGreaterThan(length, 0)
@@ -89,8 +89,8 @@ final class WinUIDividerTests: XCTestCase {
         return try XCTUnwrap(UInt32(text.dropFirst(), radix: 16))
     }
 
-    @MainActor private func assertPainted(_ view: WinUIDividerView, at points: [(Double, Double)]) throws {
-        let fill = try fill(of: view), alpha = Double(fill >> 24)
+    @MainActor private static func assertPainted(_ view: WinUIDividerView, at points: [(Double, Double)]) throws {
+        let fill = try Self.fill(of: view), alpha = Double(fill >> 24)
         XCTAssertGreaterThan(alpha, 0, "the default native divider must not become a transparent brush")
         for pixel in view.pixels(at: points) {
             XCTAssertEqual(Double(pixel >> 24), alpha, accuracy: 1)

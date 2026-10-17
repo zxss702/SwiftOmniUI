@@ -97,6 +97,7 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 let collections = elements.map(\.layoutItemCollections)
                 let otherBodies = builds.calls.filter { $0.key != 0 }
                 let measurements = lazy.cells.measurements
+                let lazyRevision = lazy.measurementRevision
 
                 row.heard(.pointer(.pointerEntered, .zero))
                 for _ in 0..<4 { host.step(); host.frame() }
@@ -109,11 +110,71 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 }
                 XCTAssertEqual(builds.calls.filter { $0.key != 0 }, otherBodies)
                 XCTAssertEqual(lazy.cells.measurements, measurements)
+                XCTAssertEqual(lazy.measurementRevision, lazyRevision,
+                               "a drawing-only row patch must not schedule a native Lazy measure")
                 XCTAssertFalse(host.runtime.animator.isMoving)
                 row.heard(.pointer(.pointerExited, .zero))
                 for _ in 0..<4 { host.step(); host.frame() }
                 XCTAssertEqual(row.sourceElement?.value(.background), Color.clear.propValue)
             }
+        }
+    }
+
+    func testFiniteVerticalWidthDoesNotRecomputeHistoricalNaturalWidth() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<100) { index in
+                            Text("Row \(index)").frame(height: 32)
+                        }
+                    }
+                }.frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            lazy.standsAt = 320
+            _ = lazy.contentSize(width: 320)
+            let offscreen = lazy.cells.orderedIdentities[50]
+            XCTAssertNil(lazy.mounted[offscreen])
+            lazy.acrossWidest[offscreen] = 900
+            lazy.naturalAcross = 44
+            lazy.invalidateMeasure()
+
+            let fixed = lazy.contentSize(width: 320)
+            XCTAssertEqual(fixed.width, 320)
+            XCTAssertEqual(lazy.naturalAcross, 44,
+                           "fixed-width vertical layout does not scan historical row widths")
+
+            lazy.invalidateMeasure()
+            let intrinsic = lazy.contentSize(width: nil)
+            XCTAssertGreaterThanOrEqual(intrinsic.width, 900,
+                                        "intrinsic layout still includes the widest offscreen row")
+        }
+    }
+
+    func testHorizontalLazyKeepsTheHistoricalNaturalHeight() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(0..<100) { index in
+                            Text("Row \(index)").frame(width: 48, height: 32)
+                        }
+                    }
+                }.frame(width: 240, height: 120)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            _ = lazy.contentSize(width: nil)
+            let offscreen = lazy.cells.orderedIdentities[50]
+            XCTAssertNil(lazy.mounted[offscreen])
+            lazy.acrossWidest[offscreen] = 160
+            lazy.invalidateMeasure()
+
+            let size = lazy.contentSize(width: nil)
+            XCTAssertGreaterThanOrEqual(size.height, 160,
+                                        "horizontal intrinsic size retains previously measured rows")
         }
     }
 

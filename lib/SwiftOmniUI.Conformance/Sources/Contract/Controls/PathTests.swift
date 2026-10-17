@@ -34,9 +34,13 @@
             },
             ConformanceCase("legacySVGDataRemainsAccepted", proves: [Covered(PathContract.data)]) { s in
                 s.start {
+                    // A legacy tree hands a host the `data` spelling alone, so
+                    // the node carries it raw, the fill written beside it - the
+                    // `ModifiedContent` wrapper is no shape for `.fill`.
                     var node = Node(shape: PathContract.self)
                     node.write(PathContract.data, "M 0 0 L 40 0 L 0 40 Z")
-                    ModifiedContent(node: node).fill(.red).frame(width: 40, height: 40).id("shape")
+                    node.write(ShapeContract.fill, Brush.solidColor(.red))
+                    return ModifiedContent(node: node).frame(width: 40, height: 40).id("shape")
                 }
                 let shape = try s.element("shape")
                 try s.settle { try s.shows(.red, on: shape, at: Point(5, 5)) }

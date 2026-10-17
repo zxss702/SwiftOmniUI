@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+import CSwiftOmniUIWinUI
 @_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
@@ -236,7 +237,7 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 }
             }
             let tabs = try XCTUnwrap(host.view(id: .manual("tabs")))
-            func checkInsets() throws {
+            @MainActor func checkInsets() throws {
                 let first = try XCTUnwrap(host.view(id: .manual("file-0")))
                 let search = try XCTUnwrap(host.view(id: .manual("search")))
                 let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)

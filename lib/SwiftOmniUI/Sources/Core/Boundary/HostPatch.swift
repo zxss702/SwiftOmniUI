@@ -86,6 +86,25 @@
     public var children: HostChildrenUpdate = .unchanged
 }
 
+extension HostPatch {
+    /// A patch naming the element it is about and the kind of thing it now is,
+    /// with every change left out for the caller to set as it means it.
+    ///
+    /// This module's memberwise initializer stays its own; a host builds a change
+    /// through a render, and a host's tests build the one they are testing here.
+    @_spi(Host) public init(id: ElementId, type: NodeType) {
+        self.id = id
+        self.type = type
+        self.lazyRows = nil
+        self.lazyRequestGeneration = nil
+        self.lazyIdentity = nil
+        self.driven = nil
+        self.events = nil
+        self.animation = nil
+        self.layoutTransition = nil
+    }
+}
+
 /// A property transition accompanying its target value.
 @_spi(Host) public struct HostTransition: Equatable, Sendable {
     /// How the property moves to its target.

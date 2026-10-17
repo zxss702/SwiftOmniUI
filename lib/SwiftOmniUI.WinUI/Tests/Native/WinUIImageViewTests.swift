@@ -12,7 +12,7 @@ final class WinUIImageViewTests: XCTestCase {
     /// Inspect decoded bytes directly, before the UI queue has any chance to
     /// finish a load. Metadata or a later rendered screenshot alone cannot prove this.
     @MainActor
-    private func decoded(_ image: WinUIImageView) throws -> (width: Int, height: Int, rgba: [UInt8]) {
+    private static func decoded(_ image: WinUIImageView) throws -> (width: Int, height: Int, rgba: [UInt8]) {
         var size: [Int32] = [0, 0]
         XCTAssertTrue(swiftomniui_winui_image_decoded_pixels(image.handle, &size, nil, 0))
         let width = Int(size[0]), height = Int(size[1])
@@ -24,7 +24,7 @@ final class WinUIImageViewTests: XCTestCase {
         return (width, height, rgba)
     }
 
-    private func pixel(_ decoded: (width: Int, height: Int, rgba: [UInt8]), x: Int, y: Int) -> [UInt8] {
+    private static func pixel(_ decoded: (width: Int, height: Int, rgba: [UInt8]), x: Int, y: Int) -> [UInt8] {
         let start = (y * decoded.width + x) * 4
         return Array(decoded.rgba[start..<(start + 4)])
     }
@@ -42,11 +42,11 @@ final class WinUIImageViewTests: XCTestCase {
             }
             let image = WinUIImageView()
             image.apply(source: ImageSource("cold.svg"), aspect: .fit, resizable: true)
-            let data = try decoded(image)
+            let data = try Self.decoded(image)
             XCTAssertEqual(data.width, 40)
             XCTAssertEqual(data.height, 20)
-            XCTAssertEqual(pixel(data, x: 5, y: 10), [255, 0, 0, 255])
-            XCTAssertEqual(pixel(data, x: 35, y: 10), [0, 0, 255, 255])
+            XCTAssertEqual(Self.pixel(data, x: 5, y: 10), [255, 0, 0, 255])
+            XCTAssertEqual(Self.pixel(data, x: 35, y: 10), [0, 0, 255, 255])
             XCTAssertEqual(image.measure(width: nil, height: nil), LayoutSize(width: 40, height: 20))
         }
     }
@@ -65,11 +65,11 @@ final class WinUIImageViewTests: XCTestCase {
             first.apply(source: ImageSource("test_halves.svg"), aspect: .fit, resizable: true, font: font)
             XCTAssertTrue(swiftomniui_winui_images_share_source(first.handle, second.handle),
                           "inherited font changes must not replace a file image's prepared raster")
-            let data = try decoded(first)
+            let data = try Self.decoded(first)
             XCTAssertEqual(data.width, 80)
             XCTAssertEqual(data.height, 40)
-            XCTAssertEqual(pixel(data, x: 10, y: 20), [255, 0, 0, 255])
-            XCTAssertEqual(pixel(data, x: 70, y: 20), [0, 0, 255, 255])
+            XCTAssertEqual(Self.pixel(data, x: 10, y: 20), [255, 0, 0, 255])
+            XCTAssertEqual(Self.pixel(data, x: 70, y: 20), [0, 0, 255, 255])
         }
     }
 
@@ -78,11 +78,11 @@ final class WinUIImageViewTests: XCTestCase {
             let image = WinUIImageView()
             image.apply(source: ImageSource("test_halves.svg"), aspect: .stretch, resizable: true)
             image.layout(Rect(x: 0, y: 0, width: 80, height: 80))
-            let data = try decoded(image)
+            let data = try Self.decoded(image)
             XCTAssertEqual(data.width, 80)
             XCTAssertEqual(data.height, 80)
-            XCTAssertEqual(pixel(data, x: 10, y: 5), [255, 0, 0, 255])
-            XCTAssertEqual(pixel(data, x: 70, y: 75), [0, 0, 255, 255])
+            XCTAssertEqual(Self.pixel(data, x: 10, y: 5), [255, 0, 0, 255])
+            XCTAssertEqual(Self.pixel(data, x: 70, y: 75), [0, 0, 255, 255])
             XCTAssertEqual(image.measure(width: nil, height: nil), LayoutSize(width: 40, height: 20))
         }
     }
@@ -103,10 +103,10 @@ final class WinUIImageViewTests: XCTestCase {
             let image = WinUIImageView()
             swiftomniui_winui_set_pictures(red.path)
             image.apply(source: ImageSource("icon.svg"), aspect: .fit, resizable: true)
-            XCTAssertEqual(pixel(try decoded(image), x: 4, y: 4), [255, 0, 0, 255])
+            XCTAssertEqual(Self.pixel(try Self.decoded(image), x: 4, y: 4), [255, 0, 0, 255])
             swiftomniui_winui_set_pictures(blue.path)
             image.apply(source: ImageSource("icon.svg"), aspect: .fit, resizable: true)
-            XCTAssertEqual(pixel(try decoded(image), x: 4, y: 4), [0, 0, 255, 255])
+            XCTAssertEqual(Self.pixel(try Self.decoded(image), x: 4, y: 4), [0, 0, 255, 255])
             image.apply(source: nil, aspect: .fit)
             XCTAssertEqual(image.measure(width: nil, height: nil), .zero, "clearing a source clears its intrinsic size")
         }
@@ -144,7 +144,7 @@ final class WinUIImageViewTests: XCTestCase {
                 XCTAssertEqual(images.count, count)
                 XCTAssertTrue(images.contains { $0 === original }, "surviving rows keep their native image")
                 for image in images {
-                    let data = try decoded(image)
+                    let data = try Self.decoded(image)
                     XCTAssertGreaterThan(data.rgba[3], 0)
                 }
             }
@@ -171,7 +171,7 @@ final class WinUIImageViewTests: XCTestCase {
                 }
                 .frame(width: 180, height: 64)
             }
-            func visible(_ id: String, width: Int, height: Int) throws {
+            @MainActor func visible(_ id: String, width: Int, height: Int) throws {
                 let image = try XCTUnwrap(host.view(id: .manual(id)) as? WinUIImageView)
                 let points = (0..<height).flatMap { y in
                     (0..<width).map { x in (Double(x) + 0.5, Double(y) + 0.5) }
@@ -265,7 +265,7 @@ final class WinUIImageViewTests: XCTestCase {
             }
             let image = WinUIImageView()
             image.apply(source: ImageSource("dot.png"), aspect: .fit)
-            let pixels = try decoded(image)
+            let pixels = try Self.decoded(image)
             XCTAssertEqual(pixels.width, 6)
             XCTAssertEqual(pixels.height, 4)
             XCTAssertTrue(stride(from: 3, to: pixels.rgba.count, by: 4).contains { pixels.rgba[$0] > 0 },

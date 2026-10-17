@@ -16,8 +16,8 @@ private struct HoverRowPage: View {
         VStack {
             ZStack { Text("Row") }
                 .frame(width: 200, height: 40)
-                .background(hovered.wrappedValue ? Color.black : Color.clear)
-                .onHover { hovered.wrappedValue = $0 }
+                .background(hovered ? Color.black : Color.clear)
+                .onHover { hovered = $0 }
                 .contextMenu { MenuItem("Open") }
                 .id("hover-row")
         }
@@ -40,8 +40,8 @@ private struct HoverCardPage: View {
                 .popover(isPresented: $showing) {
                     ZStack { Text("Card Row") }
                         .frame(width: 200, height: 40)
-                        .background(cardRowHovered.wrappedValue ? Color.black : Color.clear)
-                        .onHover { cardRowHovered.wrappedValue = $0 }
+                        .background(cardRowHovered ? Color.black : Color.clear)
+                        .onHover { cardRowHovered = $0 }
                         .contextMenu { MenuItem("Open") }
                         .id("card-row")
                 }
@@ -63,8 +63,8 @@ private struct HoverMenuOverTheCardPage: View {
             VStack {
                 ZStack { Text("Row") }
                     .frame(width: 200, height: 40)
-                    .background(hovered.wrappedValue ? Color.black : Color.clear)
-                    .onHover { hovered.wrappedValue = $0 }
+                    .background(hovered ? Color.black : Color.clear)
+                    .onHover { hovered = $0 }
                     .id("inner-row")
             }
             .contextMenu { MenuItem("Open") }
@@ -90,7 +90,7 @@ final class WinUIHoverHoldTests: XCTestCase {
     /// Runs `body` over the page's row under the pointer with a popup standing over it - entered, the popup open, the
     /// exit WinUI told it - with the pointer's own place answered as `place` while it stands.
     @MainActor
-    private func withARowUnderAPopup(
+    private static func withARowUnderAPopup(
         pointerAt place: Point, _ body: @MainActor (MountedElement, WinUIView) throws -> Void
     ) throws {
         defer { WinUIHoverHold.pointerPlace = WinUIHoverHold.livePointerPlace }
@@ -121,7 +121,7 @@ final class WinUIHoverHoldTests: XCTestCase {
     /// left, so the view keeps what it has.
     func testTheHoverStaysWhenThePopupGoesWithThePointerStillOnTheRow() throws {
         try onUIThread {
-            try withARowUnderAPopup(pointerAt: Self.onTheRow) { element, row in
+            try Self.withARowUnderAPopup(pointerAt: Self.onTheRow) { element, row in
                 WinUIHoverHold.ended(row)
                 XCTAssertEqual(element.value(.background), Color.black.propValue)
                 XCTAssertEqual(WinUIHoverHold.holding, 0)
@@ -132,7 +132,7 @@ final class WinUIHoverHoldTests: XCTestCase {
     /// The popup going with the pointer away from the row hands it the exit it was owed.
     func testTheHoverGoesWhenThePopupGoesWithThePointerAway() throws {
         try onUIThread {
-            try withARowUnderAPopup(pointerAt: Self.pastTheRow) { element, row in
+            try Self.withARowUnderAPopup(pointerAt: Self.pastTheRow) { element, row in
                 WinUIHoverHold.ended(row)
                 XCTAssertEqual(element.value(.background), Color.clear.propValue)
                 XCTAssertEqual(WinUIHoverHold.holding, 0)
@@ -144,7 +144,7 @@ final class WinUIHoverHoldTests: XCTestCase {
     /// when the popup goes.
     func testARowThatLeftTheTreeWhileItsPopupStoodIsLetGoOf() throws {
         try onUIThread {
-            try withARowUnderAPopup(pointerAt: Self.pastTheRow) { _, row in
+            try Self.withARowUnderAPopup(pointerAt: Self.pastTheRow) { _, row in
                 row.detach()
                 XCTAssertEqual(WinUIHoverHold.holding, 0, "a view that left is owed nothing")
                 WinUIHoverHold.ended(row)
@@ -157,7 +157,7 @@ final class WinUIHoverHoldTests: XCTestCase {
     /// either, so nothing is owed it when the popup goes.
     func testThePointerComingBackDropsWhatWasWithheld() throws {
         try onUIThread {
-            try withARowUnderAPopup(pointerAt: Self.pastTheRow) { element, row in
+            try Self.withARowUnderAPopup(pointerAt: Self.pastTheRow) { element, row in
                 row.heard(.pointer(.pointerEntered, .zero))
                 XCTAssertEqual(WinUIHoverHold.holding, 0)
                 XCTAssertEqual(element.value(.background), Color.black.propValue)

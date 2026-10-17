@@ -29,11 +29,8 @@ using winrt::Windows::Foundation::Rect;
 namespace {
     struct SwiftOmniUIPanel;
 
-    // Keeping a panel's children in place asks, per child, whether the panel
-    // already holds it. Both directions of that question are the same identity
-    // test on the projection, so the only thing worth buying back here is the
-    // common case — a pass that re-sends the same children in the same order,
-    // which is every pass that only re-measures.
+    // Use projected equality for every native child comparison. An unchanged
+    // panel needs no edits; changed panels can then keep an overlap attached.
     bool sameChildren(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
                       std::vector<xaml::UIElement> const &held) {
         if (items.Size() != held.size()) return false;
@@ -41,6 +38,58 @@ namespace {
             if (items.GetAt(index) != held[index]) return false;
         }
         return true;
+    }
+
+    // A moving lazy window normally drops children at one edge and adds them at
+    // the other. Keep the overlapping projected UIElements attached. Comparing
+    // projections here is intentional: their ABI interface pointers need not
+    // be identical even when they refer to the same XAML element.
+    bool syncEdgeChildren(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
+                          std::vector<xaml::UIElement> const &held) {
+        if (sameChildren(items, held)) return true;
+        auto oldCount = items.Size();
+        auto newCount = static_cast<uint32_t>(held.size());
+        uint32_t prefix = 0;
+        while (prefix < oldCount && prefix < newCount && items.GetAt(prefix) == held[prefix]) ++prefix;
+        if (prefix == std::min(oldCount, newCount)) {
+            while (items.Size() > prefix) items.RemoveAtEnd();
+            for (uint32_t index = prefix; index < newCount; ++index) items.Append(held[index]);
+            return true;
+        }
+
+        uint32_t oldStart;
+        if (items.IndexOf(held.front(), oldStart) && oldStart > 0
+            && oldCount - oldStart <= newCount) {
+            auto overlap = oldCount - oldStart;
+            bool equal = true;
+            for (uint32_t index = 0; index < overlap; ++index) {
+                if (items.GetAt(oldStart + index) != held[index]) { equal = false; break; }
+            }
+            if (equal) {
+                for (uint32_t index = 0; index < oldStart; ++index) items.RemoveAt(0);
+                for (uint32_t index = overlap; index < newCount; ++index) items.Append(held[index]);
+                return true;
+            }
+        }
+
+        auto firstOld = items.GetAt(0);
+        auto newStart = std::find(held.begin(), held.end(), firstOld);
+        if (newStart != held.end()) {
+            auto offset = static_cast<uint32_t>(newStart - held.begin());
+            if (offset > 0 && newCount - offset <= oldCount) {
+                auto overlap = newCount - offset;
+                bool equal = true;
+                for (uint32_t index = 0; index < overlap; ++index) {
+                    if (items.GetAt(index) != held[offset + index]) { equal = false; break; }
+                }
+                if (equal) {
+                    while (items.Size() > overlap) items.RemoveAtEnd();
+                    for (uint32_t index = offset; index > 0; --index) items.InsertAt(0, held[index - 1]);
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     void removeUnused(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
@@ -398,8 +447,10 @@ extern "C" void swiftomniui_winui_panel_set_children(
         for (int32_t index = 0; index < count; ++index) held.push_back(as<xaml::UIElement>(children[index]));
         // A lazy window usually changes at its edges. Keep the intersecting
         // UIElements attached, preserving their native state and composition.
-        removeUnused(items, held);
-        insertInOrder(items, held);
+        if (!syncEdgeChildren(items, held)) {
+            removeUnused(items, held);
+            insertInOrder(items, held);
+        }
     } catch (...) {
         report("holding a panel's children");
     }

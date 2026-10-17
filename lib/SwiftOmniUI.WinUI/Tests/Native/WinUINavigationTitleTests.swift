@@ -30,30 +30,30 @@ final class WinUINavigationTitleTests: XCTestCase {
                 .frame(minWidth: 640, minHeight: 320)
             }
             let bar = try XCTUnwrap(host.window).titleBar
-            XCTAssertEqual(read("title", of: bar), "SwiftOmniUI")
-            XCTAssertEqual(read("subtitle", of: bar), "新对话")
+            XCTAssertEqual(Self.read("title", of: bar), "SwiftOmniUI")
+            XCTAssertEqual(Self.read("subtitle", of: bar), "新对话")
 
             title.wrappedValue = "Logorythia"
             subtitle.wrappedValue = "规划会话"
             host.step()
-            XCTAssertEqual(read("title", of: bar), "Logorythia")
-            XCTAssertEqual(read("subtitle", of: bar), "规划会话")
+            XCTAssertEqual(Self.read("title", of: bar), "Logorythia")
+            XCTAssertEqual(Self.read("subtitle", of: bar), "规划会话")
             XCTAssertTrue(host.window?.titleBar === bar)
 
             path.wrappedValue = [1]
-            host.settle { read("title", of: bar) == "File.swift" }
-            XCTAssertEqual(read("title", of: bar), "File.swift")
-            XCTAssertEqual(read("subtitle", of: bar), "编辑文件")
+            host.settle { Self.read("title", of: bar) == "File.swift" }
+            XCTAssertEqual(Self.read("title", of: bar), "File.swift")
+            XCTAssertEqual(Self.read("subtitle", of: bar), "编辑文件")
             path.wrappedValue = []
-            host.settle { read("title", of: bar) == "Logorythia" }
-            XCTAssertEqual(read("title", of: bar), "Logorythia")
-            XCTAssertEqual(read("subtitle", of: bar), "规划会话")
+            host.settle { Self.read("title", of: bar) == "Logorythia" }
+            XCTAssertEqual(Self.read("title", of: bar), "Logorythia")
+            XCTAssertEqual(Self.read("subtitle", of: bar), "规划会话")
 
             title.wrappedValue = ""
             subtitle.wrappedValue = ""
             host.step()
-            XCTAssertEqual(read("title", of: bar), "")
-            XCTAssertEqual(read("subtitle", of: bar), "")
+            XCTAssertEqual(Self.read("title", of: bar), "")
+            XCTAssertEqual(Self.read("subtitle", of: bar), "")
         }
     }
 
@@ -64,17 +64,17 @@ final class WinUINavigationTitleTests: XCTestCase {
                 VStack { Text("Body").navigationTitle(title.projectedValue) }.navigationSubtitle("Subtitle")
             }
             let bar = try XCTUnwrap(host.window).titleBar
-            XCTAssertEqual(read("title", of: bar), "Before")
+            XCTAssertEqual(Self.read("title", of: bar), "Before")
             title.wrappedValue = "After"
             host.step()
-            XCTAssertEqual(read("title", of: bar), "After")
-            XCTAssertEqual(read("subtitle", of: bar), "Subtitle")
+            XCTAssertEqual(Self.read("title", of: bar), "After")
+            XCTAssertEqual(Self.read("subtitle", of: bar), "Subtitle")
             XCTAssertTrue(host.window?.titleBar === bar)
         }
     }
 
     /// Read the TitleBar's actual WinRT properties, rather than Swift's last composed chrome.
-    @MainActor private func read(_ property: String, of bar: WinUITitleBarView) -> String {
+    @MainActor private static func read(_ property: String, of bar: WinUITitleBarView) -> String {
         var bytes = [CChar](repeating: 0, count: 512)
         let length = swiftomniui_winui_read(bar.handle, property, &bytes, Int32(bytes.count))
         XCTAssertGreaterThanOrEqual(length, 0)
