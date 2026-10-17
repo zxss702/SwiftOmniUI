@@ -474,21 +474,15 @@ class WinUILazyView: WinUITravellingLayout {
         }
     }
 
-    /// The scroller's view is moving: `nextOffset` says where the change about to
-    /// compose stands, ahead of the effective viewport's after-the-fact notice.
+    /// Realize the current native viewport when the scroller moves.
     private func scrollerMoved() {
         guard let scroll = watching else { return }
         var raw = [Double](repeating: 0, count: 6)
         swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
         var rect = Rect(x: raw[0], y: raw[1], width: raw[2], height: raw[3])
-        let standing = scroll.scroller.standing.offset
-        let next = scroll.scroller.nextOffset ?? standing
-        // The announced window: the scroller's own read says where the view
-        // stands now; the effective viewport lends its size, whose fractions
-        // the direct read rounds away, and the notice's next offset moves it.
+        // Preserve precise viewport dimensions without changing its native origin.
         rect.width = effectiveViewport?.width ?? raw[2]
         rect.height = effectiveViewport?.height ?? raw[3]
-        if axis == .vertical { rect.y += next.y - standing.y } else { rect.x += next.x - standing.x }
         // ViewChanged can precede EffectiveViewportChanged by a frame. Mount
         // a newly exposed window now; movement inside an already mounted
         // window can keep the ordinary coalesced layout notice.

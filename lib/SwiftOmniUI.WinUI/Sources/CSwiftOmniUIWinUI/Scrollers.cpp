@@ -251,13 +251,6 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
                 callbacks.scrolled(view, scroller.HorizontalOffset(), scroller.VerticalOffset());
             }
         }));
-        // An anchor to hold the view by when the extent moves: the document
-        // itself stands in for a run with no registered cell.
-        scroller.AnchorRequested(guarded("handling AnchorRequested",
-            [](controls::ScrollView const &scroller,
-                controls::ScrollingAnchorRequestedEventArgs const &args) {
-            if (auto content = scroller.Content()) args.AnchorCandidates().Append(content);
-        }));
         return detach(scroller);
     } catch (...) {
         report("making a scroller");
