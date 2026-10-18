@@ -167,6 +167,9 @@ namespace {
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view) {
     try {
         controls::TitleBar bar;
+        // Keep an 8-DIP gap between the trailing toolbar and native caption
+        // buttons instead of TitleBar's default 48-DIP drag strip.
+        bar.Resources().Insert(winrt::box_value(L"TitleBarMinDragRegionWidth"), winrt::box_value(8.0));
         bar.Tag(winrt::box_value(view));
         bar.BackRequested(guarded("handling BackRequested",
             [view](controls::TitleBar const &, IInspectable const &) { callbacks.chosen(view, -1); }));

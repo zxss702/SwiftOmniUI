@@ -90,8 +90,9 @@ as wide as the window's insets - which it takes in pixels as though they were
 DIPs (microsoft-ui-xaml #10344): at 200% the actions stand a caption's width
 short of the bar's end. The relay caps each column at the inset over the
 window's scale, whenever the bar is loaded or changes size; a column WinUI
-sizes right stays as it is. The drag column WinUI keeps beside the buttons
-stays too.
+sizes right stays as it is. The title bar's local
+`TitleBarMinDragRegionWidth` resource sets the gap between the trailing
+toolbar and caption buttons to 8 DIPs instead of WinUI's default 48.
 
 ## A navigation stack
 
