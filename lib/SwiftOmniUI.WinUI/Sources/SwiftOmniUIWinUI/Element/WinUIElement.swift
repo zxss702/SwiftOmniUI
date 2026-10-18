@@ -123,7 +123,7 @@ final class WinUIElement: NativeElement {
         })
         configureLayoutMotion()
         let plainLayout = view is WinUIStackView || view is WinUIZStackView || view is WinUIGridView
-            || view is WinUILazyView
+            || view is WinUILazyView || view is WinUIScrollView || view is WinUISingleChildView
         if !plainLayout || !wasDescribed || layoutItemsDirty || element.childOrderChanged
             || changed.contains(.layoutDirection) {
             arrangeChildren()
