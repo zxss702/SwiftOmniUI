@@ -29,6 +29,13 @@ final class WinUIElement: NativeElement {
     private var cachedLayoutValues: LayoutValues?
     private(set) var layoutInputResolutions = 0
 
+    private struct PendingLayout {
+        let element: MountedElement
+        let depth: Int
+    }
+    private static var pendingLayouts: [ObjectIdentifier: PendingLayout] = [:]
+    private static var layoutCommitScheduled = false
+
     /// Every property read by MountedElement.layoutValues, including derived
     /// expansion/scroll axes inherited from children.
     private static let layoutInputs = MountedElement.arrangedProperties.union([
@@ -47,11 +54,35 @@ final class WinUIElement: NativeElement {
 
     func layoutItemChanged() {
         cachedLayoutValues = nil
+        var owners: [WinUIElement] = []
         var owner = parent
         while let each = owner {
             each.layoutItemsDirty = true
             each.cachedLayoutValues = nil
+            owners.append(each)
             owner = each.parent
+        }
+        guard ProgramWrite.isWriting, !owners.isEmpty else { return }
+        for (index, each) in owners.enumerated() {
+            Self.pendingLayouts[ObjectIdentifier(each)] = PendingLayout(
+                element: each.element, depth: owners.count - index)
+        }
+        guard !Self.layoutCommitScheduled else { return }
+        Self.layoutCommitScheduled = true
+        ProgramWrite.afterWrites {
+            let pending = Self.pendingLayouts.values.sorted { $0.depth > $1.depth }
+            Self.pendingLayouts.removeAll(keepingCapacity: true)
+            Self.layoutCommitScheduled = false
+            // Frame traversal arranges the nearest native parent only. Derived
+            // layout values farther up still need publishing in this batch,
+            // including after the animation's final frame or a removal landing.
+            ProgramWrite.perform {
+                for entry in pending {
+                    let element = entry.element.winUI
+                    guard element.layoutItemsDirty, element.view?.isDetached != true else { continue }
+                    element.arrangeChildren()
+                }
+            }
         }
     }
 
