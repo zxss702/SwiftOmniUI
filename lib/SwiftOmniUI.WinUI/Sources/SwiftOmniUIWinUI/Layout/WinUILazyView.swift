@@ -5,6 +5,64 @@
 @_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIWinUI
 
+/// One entry per measured identity. Reading the widest row is constant time;
+/// changing a width repairs only its path through this indexed max heap.
+struct WinUILazyCrossExtents {
+    private var heap: [(identity: String, extent: Double)] = []
+    private var positions: [String: Int] = [:]
+
+    var maximum: Double? { heap.first?.extent }
+
+    subscript(identity: String) -> Double? {
+        get { positions[identity].map { heap[$0].extent } }
+        set {
+            if let index = positions[identity] {
+                if let newValue {
+                    guard heap[index].extent != newValue else { return }
+                    heap[index].extent = newValue
+                } else {
+                    let last = heap.removeLast()
+                    positions.removeValue(forKey: identity)
+                    guard index < heap.count else { return }
+                    heap[index] = last
+                    positions[last.identity] = index
+                }
+                repair(at: index)
+            } else if let newValue {
+                positions[identity] = heap.count
+                heap.append((identity, newValue))
+                repair(at: heap.count - 1)
+            }
+        }
+    }
+
+    private mutating func swap(_ a: Int, _ b: Int) {
+        heap.swapAt(a, b)
+        positions[heap[a].identity] = a
+        positions[heap[b].identity] = b
+    }
+
+    private mutating func repair(at index: Int) {
+        var index = index
+        if index > 0, heap[index].extent > heap[(index - 1) / 2].extent {
+            while index > 0 {
+                let parent = (index - 1) / 2
+                guard heap[index].extent > heap[parent].extent else { break }
+                swap(index, parent)
+                index = parent
+            }
+        } else {
+            while index * 2 + 1 < heap.count {
+                var child = index * 2 + 1
+                if child + 1 < heap.count, heap[child + 1].extent > heap[child].extent { child += 1 }
+                guard heap[child].extent > heap[index].extent else { break }
+                swap(index, child)
+                index = child
+            }
+        }
+    }
+}
+
 /// What a lazy container's view does alike: it keeps the children in view
 /// mounted - and only those - telling the tree which identities the window
 /// wants built, and standing each at the offset its measure says.
@@ -23,6 +81,37 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// The children mounted now, by identity.
     private(set) var mounted: [String: WinUILayoutItem] = [:]
+    private var identitiesByView: [Int64: String] = [:]
+    private var measurementRows: Set<String> = []
+    private var measuredEmptyGeneration = -1
+
+    // Row invalidation names its work directly. A viewport pass must not
+    // rediscover that work by polling every surviving row's revision.
+    func rowMeasurementChanged(_ view: WinUIView) {
+        if let identity = identitiesByView[view.number] { measurementRows.insert(identity) }
+    }
+
+    func measureMountedRows() {
+        measurementRows.formUnion(mounted.keys)
+        measuredEmptyGeneration = -1
+    }
+
+    func takeMeasurementRows() -> Set<String> {
+        let rows = measurementRows
+        measurementRows = []
+        return rows
+    }
+
+    func retryMeasurement(_ identity: String) { measurementRows.insert(identity) }
+    func completedMeasurement(_ identity: String) { measurementRows.remove(identity) }
+
+    func takeEmptyRows() -> [String] {
+        guard cells.requestedItemsAreCurrent,
+              let generation = cells.element?.lazyRequestGeneration,
+              generation != measuredEmptyGeneration else { return [] }
+        measuredEmptyGeneration = generation
+        return cells.orderedIdentities[cells.built].filter { mounted[$0] == nil }
+    }
     // New rows must have real arranged coordinates before the native scroller
     // can use them as anchors. Promote them on the following measure pass.
     private var pendingAnchors: Set<Int64> = []
@@ -45,7 +134,7 @@ class WinUILazyView: WinUITravellingLayout {
     var naturalAcross = 44.0
     /// The across size of every row measured in the room `measuredAcross` names: the
     /// widest row the document was told about, and not the widest row now mounted.
-    var acrossWidest: [String: Double] = [:]
+    var acrossWidest = WinUILazyCrossExtents()
     var geometryChanged = false
     var measuredExtent = 0.0
 
@@ -112,25 +201,29 @@ class WinUILazyView: WinUITravellingLayout {
         let generation = cells.element?.lazyRequestGeneration ?? 0
         let requestAcknowledged = generation != lastAcknowledgedGeneration
         lastAcknowledgedGeneration = generation
-        let sourceID = cells.element?.lazyRows.map(ObjectIdentifier.init)
+        let source = cells.element?.lazyRows
+        let sourceID = source.map(ObjectIdentifier.init)
         let sourceChanged = !hasMountedSource || mountedSourceID != sourceID
+        let followsSource = hasMountedSource && source?.predecessor == mountedSourceID
         mountedSourceID = sourceID
         hasMountedSource = true
         // A content revision can be only a drawing change. The row's own measurement
         // revision is the layout signal; an unchanged revision needs no native pass.
         // Structural changes still need a pass to place their new window.
-        let rowSizeChanged = contentChanged && mounted.contains { identity, item in
-            measured[identity] == nil
-                || measuredRevisions[identity] != item.view.measurementRevision
-        }
+        let rowSizeChanged = contentChanged && !measurementRows.isEmpty
         if sourceChanged || rowSizeChanged {
             invalidateMeasure()
             invalidateArrange()
         }
         if sourceChanged {
-            // A width kept for a row the run no longer shows would widen the document for
-            // good; a row the run shows anew is measured in this pass.
-            acrossWidest = [:]
+            // A local edit removes only widths belonging to deleted identities.
+            // Surviving offscreen measurements need neither scanning nor rebuilding.
+            if let source, followsSource {
+                for identity in source.removed { acrossWidest[identity] = nil }
+            } else {
+                acrossWidest = WinUILazyCrossExtents()
+            }
+            measureMountedRows()
             arrivalHeld = 0
             if cells.total != measuredExtent { commitChangedContentExtent() }
         }
@@ -155,6 +248,8 @@ class WinUILazyView: WinUITravellingLayout {
         }) { cells.animatesChanges = true }
         for (identity, previous) in mounted {
             if now[identity]?.view !== previous.view {
+                identitiesByView.removeValue(forKey: previous.view.number)
+                measurementRows.remove(identity)
                 swiftomniui_winui_scroller_anchor(previous.view.presentationHandle, false)
                 pendingAnchors.remove(previous.view.number)
                 placedAnchors.remove(previous.view.number)
@@ -167,6 +262,10 @@ class WinUILazyView: WinUITravellingLayout {
         }
         if !cells.inserting.isDisjoint(with: now.keys) { cells.animatesChanges = true }
         for item in items {
+            identitiesByView[item.item.view.number] = item.identity
+            if mounted[item.identity]?.arranges(like: item.item) != true {
+                measurementRows.insert(item.identity)
+            }
             if cells.inserting.contains(item.identity),
                item.item.element?.transition?.insertion.blur != nil {
                 item.item.view.prepareBlur()
@@ -183,6 +282,7 @@ class WinUILazyView: WinUITravellingLayout {
             }
         }
         mounted = now
+        measuredEmptyGeneration = -1
         refreshContent(contentChanged: contentChanged)
         setChildren(items.map(\.item.view))
         // Recycling and row patches only change this panel's arrangement.
@@ -571,7 +671,8 @@ class WinUILazyView: WinUITravellingLayout {
     /// Measuring again, the window is re-asked: a new pass is a new chance
     /// for the places the run holds.
     override func measure(width: Double, height: Double) -> LayoutSize {
-        for item in mounted.values where !item.departing && readyAnchors.contains(item.view.number) {
+        for number in readyAnchors {
+            guard let identity = identitiesByView[number], let item = mounted[identity], !item.departing else { continue }
             swiftomniui_winui_scroller_anchor(item.view.presentationHandle, true)
         }
         readyAnchors.removeAll(keepingCapacity: true)
@@ -600,6 +701,9 @@ class WinUILazyView: WinUITravellingLayout {
         pendingAnchors.removeAll()
         placedAnchors.removeAll()
         readyAnchors.removeAll()
+        identitiesByView.removeAll()
+        measurementRows.removeAll()
+        measuredEmptyGeneration = -1
         cells.cancelPrefetch()
         super.detach()
         swiftomniui_winui_panel_watch_viewport(handle, false)
@@ -649,19 +753,17 @@ final class WinUILazyStackView: WinUILazyView {
                 // allocation is the same room twice - and charged it again on every scroll
                 // back over a row the window had left. A width measured in another room is
                 // no width of this one.
-                acrossWidest = [:]
+                acrossWidest = WinUILazyCrossExtents()
                 measuredAcross = across
+                measureMountedRows()
             }
-            if cells.requestedItemsAreCurrent {
-                // An empty builder fragment produces no native child at all.
-                // Once its render is committed, it is a measured zero, not a
-                // permanently unmeasured row that blocks incremental filling.
-                for identity in cells.orderedIdentities[cells.built] where mounted[identity] == nil {
-                    cells.extents.measure(identity, extent: 0)
-                }
+            // Empty fragments are acknowledged once per window, not per measure.
+            for identity in takeEmptyRows() {
+                cells.extents.measure(identity, extent: 0)
             }
-            for (identity, item) in mounted {
-                guard !item.departing, cells.position(of: identity) != nil else { continue }
+            for identity in takeMeasurementRows() {
+                guard let item = mounted[identity], !item.departing,
+                      cells.position(of: identity) != nil else { continue }
                 let margin = item.values.margin
                 let proposal = across.map { Double(Float(max(0, $0 - margin.left - margin.right))) }
                 let size: LayoutSize
@@ -672,7 +774,10 @@ final class WinUILazyStackView: WinUILazyView {
                     let startedAt = WinUIView.provisionalMeasureRevision
                     size = item.size(offered: proposal)
                     cells.measurements += 1
-                    guard startedAt == WinUIView.provisionalMeasureRevision else { continue }
+                    guard startedAt == WinUIView.provisionalMeasureRevision else {
+                        retryMeasurement(identity)
+                        continue
+                    }
                     measured[identity] = (proposal, size)
                     measuredRevisions[identity] = item.view.measurementRevision
                 }
@@ -683,13 +788,14 @@ final class WinUILazyStackView: WinUILazyView {
                     : size.width + margin.left + margin.right
                 cells.extents.measure(identity, extent: extent)
                 acrossWidest[identity] = acrossSize
+                completedMeasurement(identity)
             }
             // A finite proposal fixes a vertical stack's returned width. Scanning every
             // row ever measured in this room cannot affect that answer. An intrinsic
             // cross-axis size still uses the widest measured row, including rows that
             // have scrolled out, so the document does not narrow while scrolling.
             if axis != .vertical || width == nil {
-                let natural = acrossWidest.values.max() ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
+                let natural = acrossWidest.maximum ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
                 if naturalAcross != natural {
                     geometryChanged = true
                     commitChangedContentExtent()
@@ -848,40 +954,59 @@ final class WinUILazyGridView: WinUILazyView {
                 // row whose track kept its width keeps its measurement, so a track count or a
                 // width that returns to a former one costs no native measure.
                 cells.runs.reset()
+                measureMountedRows()
                 geometryChanged = true
             }
             var runExtents: [Int: Double] = [:]
             var pendingRuns: Set<Int> = []
-            if cells.requestedItemsAreCurrent, !widths.isEmpty {
-                for identity in cells.orderedIdentities[cells.built] where mounted[identity] == nil {
-                    if let place = cells.position(of: identity) { runExtents[place / widths.count] = 0 }
+            var changedRuns: Set<Int> = []
+            if !widths.isEmpty {
+                let changed = takeMeasurementRows().union(takeEmptyRows())
+                for identity in changed {
+                    if let place = cells.position(of: identity) { changedRuns.insert(place / widths.count) }
                 }
             }
-            for (identity, item) in mounted {
-                guard !item.departing, let place = cells.position(of: identity), !widths.isEmpty else { continue }
-                let run = place / widths.count, track = place % widths.count
-                let margin = item.values.margin
-                let proposal: Double? = axis == .vertical
-                    ? Double(Float(max(0, widths[track] - margin.left - margin.right))) : nil
-                let size: LayoutSize
-                if let kept = measured[identity], kept.proposal == proposal,
-                   measuredRevisions[identity] == item.view.measurementRevision {
-                    size = kept.size
-                } else {
-                    let startedAt = WinUIView.provisionalMeasureRevision
-                    size = item.size(offered: proposal)
-                    cells.measurements += 1
-                    guard startedAt == WinUIView.provisionalMeasureRevision else {
-                        pendingRuns.insert(run)
+            for run in changedRuns {
+                runExtents[run] = 0
+                let start = run * widths.count
+                let end = min(cells.orderedIdentities.count, start + widths.count)
+                for place in start..<end {
+                    let identity = cells.orderedIdentities[place]
+                    guard let item = mounted[identity] else {
+                        // Retained animation cells can stand outside the requested
+                        // window. Do not shrink their run using a partial row.
+                        if !cells.requestedItemsAreCurrent || !cells.built.contains(place) {
+                            pendingRuns.insert(run)
+                        }
                         continue
                     }
-                    measured[identity] = (proposal, size)
-                    measuredRevisions[identity] = item.view.measurementRevision
+                    guard !item.departing else { pendingRuns.insert(run); continue }
+                    let track = place % widths.count
+                    let margin = item.values.margin
+                    let proposal: Double? = axis == .vertical
+                        ? Double(Float(max(0, widths[track] - margin.left - margin.right))) : nil
+                    let size: LayoutSize
+                    if let kept = measured[identity], kept.proposal == proposal,
+                       measuredRevisions[identity] == item.view.measurementRevision {
+                        size = kept.size
+                    } else {
+                        let startedAt = WinUIView.provisionalMeasureRevision
+                        size = item.size(offered: proposal)
+                        cells.measurements += 1
+                        guard startedAt == WinUIView.provisionalMeasureRevision else {
+                            pendingRuns.insert(run)
+                            retryMeasurement(identity)
+                            continue
+                        }
+                        measured[identity] = (proposal, size)
+                        measuredRevisions[identity] = item.view.measurementRevision
+                    }
+                    let extent = axis == .vertical
+                        ? size.height + margin.top + margin.bottom
+                        : size.width + margin.left + margin.right
+                    runExtents[run] = max(runExtents[run] ?? 0, extent)
+                    completedMeasurement(identity)
                 }
-                let extent = axis == .vertical
-                    ? size.height + margin.top + margin.bottom
-                    : size.width + margin.left + margin.right
-                runExtents[run] = max(runExtents[run] ?? 0, extent)
             }
             for (run, extent) in runExtents where !pendingRuns.contains(run) {
                 cells.runs.measure(run, extent: extent)

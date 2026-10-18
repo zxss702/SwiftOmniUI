@@ -167,7 +167,9 @@ class WinUIView {
     /// provisional; ancestors must not retain it as a completed measurement.
     static var provisionalMeasureRevision = 0
     /// Changes when properties or a native size change invalidate this view, not on a repeated Measure query.
-    var measurementRevision = 0
+    var measurementRevision = 0 {
+        didSet { (placingLayout as? WinUILazyView)?.rowMeasurementChanged(self) }
+    }
     /// Native preparation can discover a changed answer to a previously queried
     /// proposal. Enclosing arithmetic must then discard that answer as well.
     static var nativeSizeRevision = 0
