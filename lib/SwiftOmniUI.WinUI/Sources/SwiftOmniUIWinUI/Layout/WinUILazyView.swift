@@ -402,7 +402,7 @@ class WinUILazyView: WinUITravellingLayout {
         let incoming = windowSpan(in: target)
         // A finite zero-area panel has not yet received a native allocation.
         // Preserve the previous window until the scroller can name real room.
-        guard cells.orderedIdentities.isEmpty || incoming != nil else { return }
+        guard cells.orderedIdentities.isEmpty || allocatedExtent > 0 else { return }
         let span = self.span ?? incoming
         let realize = incoming
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)
@@ -469,22 +469,24 @@ class WinUILazyView: WinUITravellingLayout {
         }
     }
 
+    private var allocatedExtent: Double {
+        axis == .vertical
+            ? (placed?.height ?? laidOutFrame.height) : (placed?.width ?? laidOutFrame.width)
+    }
+
     /// The window `rect` shows of the run, clipped to its document extent.
     private func windowSpan(in rect: Rect) -> Range<Double>? {
         guard !cells.orderedIdentities.isEmpty else { return nil }
         let start = axis == .vertical ? rect.y : rect.x
         let room = axis == .vertical ? rect.height : rect.width
-        let own = axis == .vertical
-            ? (placed?.height ?? laidOutFrame.height) : (placed?.width ?? laidOutFrame.width)
-        // A move announced past either end lands where the scroller clamps it:
-        // the far end's window, not no window - or every mounted row falls away
-        // until the effective viewport reports the clamp.
-        let origin = min(max(0, start), max(0, own - room))
+        // The native scroller bounds its own offset. This run can be wholly
+        // outside that viewport when several lazy containers share a document;
+        // clamping to its first/last page would build offscreen rows forever.
         // XAML's window jitters by a float's worth between notices; snapped to
         // a sixty-fourth, one place stands either in or out of it, not both.
         let grain = 1.0 / 64.0
-        let low = (origin / grain).rounded() * grain
-        let high = (min(own, origin + room) / grain).rounded() * grain
+        let low = (max(0, start) / grain).rounded() * grain
+        let high = (min(allocatedExtent, start + room) / grain).rounded() * grain
         guard high > low else { return nil }
         return low..<high
     }
