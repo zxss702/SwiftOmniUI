@@ -123,8 +123,24 @@ class WinUIView {
     }
 
     func layoutSafeArea(in bounds: Rect) -> SafeAreaContext {
-        (safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds))
-            .ignoring(sourceElement?.ignoresSafeArea)
+        var context = safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds)
+        // The inherited regions belong to the last allocation. Measurement
+        // probes and animation frames may already use a different proposal.
+        // Keep each edge's distance from the allocation, not its old size.
+        let previous = context.layout
+        if previous != bounds {
+            func resized(_ region: Rect) -> Rect {
+                Rect(bounds.x + region.x - previous.x,
+                     bounds.y + region.y - previous.y,
+                     max(0, region.width + bounds.width - previous.width),
+                     max(0, region.height + bounds.height - previous.height))
+            }
+            context.bounds = resized(context.bounds)
+            context.container = resized(context.container)
+            context.keyboard = resized(context.keyboard)
+            context.layout = bounds
+        }
+        return context.ignoring(sourceElement?.ignoresSafeArea)
     }
 
     /// Update document arithmetic before its presenter measures; native

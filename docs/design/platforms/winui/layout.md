@@ -95,6 +95,11 @@ owning root; they do not measure that root with an invented unbounded height.
 Viewport realization includes the measurement revision, even if the viewport
 coordinates have not changed. The current ArrangeOverride bounds propagate
 safe contexts instead of reading the previous ActualSize during the callback.
+Inherited safe regions are rebased from their recorded allocation to the current
+proposal, preserving their edge distances and consumed insets. Native preparation
+at a new width and arrangement at an animated height must not reuse the previous
+allocation's safe rectangle. This also applies to native-owned content, which can
+receive a new allocation before its logical owner reports another frame.
 Lazy rows and tracks prefer the current finite width to `standsAt`; the old
 allocation is only a fallback when the parent left the width unspecified.
 Only preparation or viewport reconciliation commits row measurements,
