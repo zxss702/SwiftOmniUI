@@ -76,14 +76,15 @@ native children at the proposals selected by its placement arithmetic. Its
 children cannot remain unmeasured merely because they do not determine the
 reader's own natural size.
 
-Nothing is measured while WinUI arranges: `Measure` written on an element
-inside an arrangement marks it, the marked element is measured and arranged
-again, and eight passes that never settle end the process with a layout
-cycle. An arrangement asking a child's size is answered from what the pass
-already measured, and a marked element WinUI measures again inside its own
-arrangement is answered with what its last real measure said. The place a
-child is newly put in is measured once the pass ends, posted on the
-doorbell: the pass after measures it there, and the one after settles.
+Arithmetic size probes during Arrange read prepared measurements; an unknown
+proposal is prepared after that pass to avoid repeatedly changing native
+constraints during placement. A native `MeasureOverride` is different: XAML's
+`CUIElement::ArrangeInternal` explicitly measures a dirty child before arranging
+it, even when its parent is still arranging. The relay scopes that callback as
+measurement and restores the enclosing arrangement on return. It completes the
+child's measurement immediately, while structural edits and invalidations still
+wait until measurement ends. Returning old DesiredSize from this callback would
+leave the new subtree unprepared and schedule another repair instead.
 
 An arithmetic query that needed such an unprepared native proposal is
 provisional and is not cached. Its temporary DesiredSize cannot become a lazy
