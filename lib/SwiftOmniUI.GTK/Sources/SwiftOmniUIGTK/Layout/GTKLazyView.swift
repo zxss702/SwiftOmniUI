@@ -376,9 +376,7 @@ final class GTKLazyStackView: GTKLazyView {
     }
 
     override func tellWindow(_ span: Range<Double>) {
-        let room = span.upperBound - span.lowerBound
-        cells.show(span, realize: max(0, span.lowerBound - room)..<(span.upperBound + room),
-                   keeping: travellingIdentities, prefetch: true)
+        cells.show(span, keeping: travellingIdentities, prefetch: false)
     }
 }
 
@@ -545,10 +543,8 @@ final class GTKLazyGridView: GTKLazyView {
     }
 
     override func tellWindow(_ span: Range<Double>) {
-        let room = span.upperBound - span.lowerBound
         cells.show(span, perRun: perRun, grid: true,
-                   realize: max(0, span.lowerBound - room)..<(span.upperBound + room),
-                   keeping: travellingIdentities, prefetch: true)
+                   keeping: travellingIdentities, prefetch: false)
     }
 }
 
