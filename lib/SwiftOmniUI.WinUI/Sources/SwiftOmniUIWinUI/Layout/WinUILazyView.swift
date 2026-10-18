@@ -85,6 +85,13 @@ class WinUILazyView: WinUITravellingLayout {
     private var measurementRows: Set<String> = []
     private var measuredEmptyGeneration = -1
 
+    // A committed window can contain new rows (including empty fragments)
+    // even when its range and the document's estimated extent did not change.
+    var needsRowMeasurements: Bool {
+        !measurementRows.isEmpty || (cells.requestedItemsAreCurrent
+            && cells.element?.lazyRequestGeneration != measuredEmptyGeneration)
+    }
+
     // Row invalidation names its work directly. A viewport pass must not
     // rediscover that work by polling every surviving row's revision.
     func rowMeasurementChanged(_ view: WinUIView) {
@@ -294,7 +301,6 @@ class WinUILazyView: WinUITravellingLayout {
         invalidateMeasure()
         invalidateArrange()
         if sourceChanged, cells.total != measuredExtent { commitChangedContentExtent() }
-        measuredRevision = measurementRevision
     }
 
     func commitChangedContentExtent() {
@@ -402,7 +408,7 @@ class WinUILazyView: WinUITravellingLayout {
         guard lastTargetViewport != target || cells.window?.span != (span ?? 0..<0)
             || cells.window?.realize != (realize ?? 0..<0)
             || cells.window?.revision != revision || cells.needsWindowUpdate
-            || measuredRevision != measurementRevision || geometryChanged
+            || measuredRevision != measurementRevision || needsRowMeasurements || geometryChanged
             || cells.retained != keeping
         else { preparedViewport = nil; return }
         // Never replace native rows during a pass that cannot measure their
@@ -414,7 +420,7 @@ class WinUILazyView: WinUITravellingLayout {
         preparedViewport = nil
         let previous = lastTargetViewport
         lastTargetViewport = target
-        if !cells.needsMeasurement, !geometryChanged, !cells.animatesChanges,
+        if !cells.needsMeasurement, !needsRowMeasurements, !geometryChanged, !cells.animatesChanges,
            measuredRevision == measurementRevision, cells.window?.revision == revision,
            (axis == .vertical ? previous?.width == target.width : previous?.height == target.height),
            let span, let realize {
@@ -445,12 +451,13 @@ class WinUILazyView: WinUITravellingLayout {
                   cells.element?.handler(.realizedChanged) == nil || cells.requestedItemsAreCurrent,
                   let placed else { return }
             let provisional = WinUIView.provisionalMeasureRevision
-            if cells.built != built || measuredRevision != measurementRevision || cells.anchorShift != 0 {
+            if cells.built != built || measuredRevision != measurementRevision
+                || needsRowMeasurements || cells.anchorShift != 0 {
                 _ = contentSize(width: standsAt ?? placed.width)
                 needsArrangement = true
             }
             let after = grid ? cells.runs.revision : cells.extents.revision
-            guard cells.needsMeasurement || cells.window?.revision != after else { return }
+            guard cells.needsMeasurement || needsRowMeasurements || cells.window?.revision != after else { return }
             // A pending native proposal or a repeated range needs a layout pass,
             // not another synchronous attempt. Reentrant viewport changes are
             // handled by the existing pendingViewport handoff above.
@@ -534,7 +541,7 @@ class WinUILazyView: WinUITravellingLayout {
             if self.preparedViewport != nil || self.lastTargetViewport != self.viewport || self.cells.window == nil
                 || self.cells.needsMeasurement || self.cells.window?.span != (self.span ?? 0..<0)
                 || self.cells.window?.revision != revision
-                || self.measuredRevision != self.measurementRevision
+                || self.measuredRevision != self.measurementRevision || self.needsRowMeasurements
                 || self.cells.retained != self.travellingIdentities {
                 if let viewport = self.viewport { self.viewportChanged(viewport, effective: false) }
             }
@@ -814,7 +821,7 @@ final class WinUILazyStackView: WinUILazyView {
                 if total != measuredExtent { commitChangedContentExtent() }
             }
             measuredExtent = total
-            measuredRevision = measurementRevision
+            if !needsRowMeasurements { measuredRevision = measurementRevision }
         }
         let total = cells.total
         return axis == .vertical
@@ -1023,7 +1030,7 @@ final class WinUILazyGridView: WinUILazyView {
                 if total != measuredExtent { commitChangedContentExtent() }
             }
             measuredExtent = total
-            measuredRevision = measurementRevision
+            if !needsRowMeasurements { measuredRevision = measurementRevision }
         }
         let count = (cells.orderedIdentities.count + max(1, proposed.count) - 1) / max(1, proposed.count)
         let total = widths == columns ? cells.runs.total(count: count)
