@@ -163,10 +163,8 @@ class GTKLazyView: GTKTravellingLayout {
             if self.geometryChanged {
                 self.geometryChanged = false
                 self.invalidateMeasurements()
-                // GTK updates the adjustment's bounds during allocation. Applying an anchor now
-                // would use the previous extent and the next allocation would clamp it again.
-                // allocate schedules the next retell after the new document has been committed.
-                return
+                // Allocation will commit the new adjustment bounds. Only the
+                // anchor write waits for that; current visible rows can load now.
             }
             // No clip to narrow by means all of it stands in view - a lazy
             // container outside any scroller builds every child.
@@ -186,10 +184,10 @@ class GTKLazyView: GTKTravellingLayout {
                 // An idle callback can follow measurement but precede the frame's allocation.
                 // Keep the anchor until the adjustment contains this document's current extent;
                 // writing earlier loses it when GTK constrains the value to the old bounds.
-                guard abs(max(room, extent) - room - reach) < 1 else { return }
                 var target = scroll.scroller.standing.offset
                 var bounds = graphene_rect_t()
-                if gtk_widget_compute_bounds(self.widget, document.widget, &bounds) != 0 {
+                if abs(max(room, extent) - room - reach) < 1,
+                   gtk_widget_compute_bounds(self.widget, document.widget, &bounds) != 0 {
                     if self.axis == .vertical { target.y = Double(bounds.origin.y) + origin }
                     else { target.x = Double(bounds.origin.x) + origin }
                     self.anchorTarget = nil
