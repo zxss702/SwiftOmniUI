@@ -37,6 +37,10 @@ public enum ToolbarItemPlacement: Int32, Sendable {
 
     /// The destructive action - a sheet's "Delete".
     case destructiveAction = 9
+
+    /// The search field installed by `searchable`, after the page's actions
+    /// at the toolbar's trailing edge.
+    case search = 10
 }
 
 extension ToolbarItemPlacement: HostRepresentable {}

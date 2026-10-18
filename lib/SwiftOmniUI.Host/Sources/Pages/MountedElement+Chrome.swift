@@ -30,6 +30,7 @@ extension MountedElement {
 
         var leading: [MountedElement] = []
         var primary: [MountedElement] = []
+        var search: [MountedElement] = []
         var overflow: [MountedElement] = []
         for item in ordered {
             switch ToolbarItemPlacement(rawValue: item.value(.placement)?.enumeration ?? 0) ?? .automatic {
@@ -37,11 +38,13 @@ extension MountedElement {
                 leading.append(item)
             case .overflow:
                 overflow.append(item)
+            case .search:
+                search.append(item)
             default:
                 primary.append(item)
             }
         }
-        return (leading, primary, overflow)
+        return (leading, primary + search, overflow)
     }
 
     /// The toolbar entries under `element` - its `toolbarItems` slots'

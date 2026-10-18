@@ -41,7 +41,7 @@ private struct SearchableContent<Content: View>: View {
 
     var body: some View {
         content.toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .search) {
                 SearchField(prompt, text: text)
                     .onSubmit { if let submit { try await submit() } }
                     .frame(width: 240)
