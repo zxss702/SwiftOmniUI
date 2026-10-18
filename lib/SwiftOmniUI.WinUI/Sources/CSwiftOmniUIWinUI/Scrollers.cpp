@@ -161,28 +161,12 @@ namespace {
         bool held = false;
     };
 
-    // The program's latest move per scroller. The presenter clamps a move to the reach the compositor last
-    // committed - stale on a first frame - so a move that completes short of where it can now reach, neither
-    // superseded nor taken over by the user, is asked again.
-    std::unordered_map<void *, int32_t> latestMove;
-
     void scrollTo(controls::ScrollView const &scroller, double x, double y, bool animated) {
-        auto id = scroller.ScrollTo(x, y, controls::ScrollingScrollOptions(
+        // Completion also reports cancellation. The native presenter owns the
+        // request's lifetime; never resurrect its target from ScrollCompleted.
+        scroller.ScrollTo(x, y, controls::ScrollingScrollOptions(
             animated ? controls::ScrollingAnimationMode::Enabled : controls::ScrollingAnimationMode::Disabled,
             controls::ScrollingSnapPointsMode::Ignore));
-        latestMove[winrt::get_abi(scroller)] = id;
-        // An animation lands where its own curve ends, and the user may take it over: only a jump is asked again.
-        if (animated) return;
-        auto token = std::make_shared<winrt::event_token>();
-        *token = scroller.ScrollCompleted(guarded("handling ScrollCompleted", [=](controls::ScrollView const &self,
-                                             controls::ScrollingScrollCompletedEventArgs const &args) {
-            if (args.CorrelationId() != id) return;
-            self.ScrollCompleted(*token);
-            if (latestMove[winrt::get_abi(self)] != id || self.State() != controls::ScrollingInteractionState::Idle) return;
-            double tx = std::clamp(x, 0.0, self.ScrollableWidth()), ty = std::clamp(y, 0.0, self.ScrollableHeight());
-            if (std::abs(self.HorizontalOffset() - tx) > 0.5 || std::abs(self.VerticalOffset() - ty) > 0.5)
-                scrollTo(self, x, y, animated);
-        }));
     }
 }
 

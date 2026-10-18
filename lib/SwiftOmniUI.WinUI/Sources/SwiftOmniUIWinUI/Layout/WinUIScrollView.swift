@@ -209,17 +209,19 @@ final class WinUIScrollView: WinUILayoutView {
     /// The scroller's view changed: the program's move arriving, or the user's, joined to the moves before it until
     /// the display's next frame.
     private func scrolled(to standing: Point) {
-        guard !ProgramWrite.isWriting, standing != offset else { return }
+        guard standing != offset else { return }
+        let previous = offset
+        offset = standing
 
         if let target = programTarget {
             programTarget = nil
             if !ScrollArithmetic.differs(target, standing) {
-                offset = standing
                 return
             }
         }
-        let previous = offset
-        offset = standing
+        // Suppress binding feedback, not the native position itself. Layout
+        // anchoring can change that position while a tree patch is being applied.
+        guard !ProgramWrite.isWriting else { return }
         movement.userMoved(from: previous, to: standing)
     }
 
