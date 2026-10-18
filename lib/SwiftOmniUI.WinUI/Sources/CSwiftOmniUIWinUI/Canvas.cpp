@@ -465,6 +465,14 @@ namespace {
         Size ArrangeOverride(Size final) {
             if (final != size) {
                 size = final;
+                // Swift supplies the renderer's commands before Arrange. A new
+                // lazy row has no previous surface to display while waiting for
+                // Rendering (which may already have fired in this frame).
+                if (!surface && size.Width > 0 && size.Height > 0 && XamlRoot()) {
+                    rendering.revoke();
+                    paint();
+                    return final;
+                }
                 // Rendering follows layout. Several arrangements and command
                 // updates in this turn publish only their final surface.
                 invalidate();
