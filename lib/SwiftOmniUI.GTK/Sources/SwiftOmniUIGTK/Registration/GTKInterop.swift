@@ -186,6 +186,21 @@ public struct GTKReports<Realized: ElementContract> {
     }
 }
 
+/// The values of one element patch, available without importing host SPI.
+public struct GTKElementValues<Realized: ElementContract> {
+    private let values: ElementValues<Realized>
+
+    init(_ values: ElementValues<Realized>) { self.values = values }
+
+    public subscript<Owner: Contract, Value: HostRepresentable>(_ member: ElementProperty<Owner, Value>) -> Value? {
+        values[member]
+    }
+
+    public func changed<Owner: Contract, Value: HostRepresentable>(_ member: ElementProperty<Owner, Value>) -> Bool {
+        values.changed(member)
+    }
+}
+
 /// How an application's own element is realized on this host, member by member: the properties its control takes,
 /// and the events of its own it raises.
 @MainActor
@@ -208,6 +223,16 @@ public final class GTKRegistration<Realized: ElementContract, Made: GTKControl> 
         _ apply: @escaping (Made, Value?) -> Void
     ) {
         registration.property(member) { hosted, value in apply(hosted.control, value) }
+    }
+
+    /// Apply dependent properties once per patch, in the control's own order.
+    public func applies(
+        _ members: [any ContractMember],
+        _ apply: @escaping (Made, GTKElementValues<Realized>) -> Void
+    ) {
+        registration.applies(members) { hosted, values in
+            apply(hosted.control, GTKElementValues(values))
+        }
     }
 
     /// An event the control raises through its reports - recorded, so the core knows this host reports it.
