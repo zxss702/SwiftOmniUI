@@ -20,6 +20,14 @@ class, so a property of the wrong type, or an event of a contract the element
 does not wear, does not compile. A registered control is a leaf: this host
 arranges children only in the layouts it makes itself.
 
+A viewport control can set `contentAffectsSize` to false to keep syntax,
+selection and scroll-state updates from invalidating its ancestors' size
+caches. Properties that reallocate its native children must still be listed
+in `applies(_:invalidatingLayout:_:)`, for example a minimap visibility or
+font/wrapping setting. These writes invalidate the host's cached proposals
+and prepare the native control again at its allocated width. Native XAML
+invalidation alone cannot refresh the Swift layout's preparation cache.
+
 The application's relay reaches back through callbacks of its own, naming the
 control by a number its Swift half gave the element as it made it, held
 weakly by that number. A relay no C++ exception leaves, as the host's.

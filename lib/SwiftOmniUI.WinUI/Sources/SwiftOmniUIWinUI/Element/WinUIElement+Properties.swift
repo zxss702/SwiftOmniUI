@@ -134,7 +134,8 @@ extension WinUIElement {
         if !view.registeredPropertiesAffectSize {
             measuredChanges.subtract(taken.subtracting(MountedElement.arrangedProperties))
         }
-        if !measuredChanges.isSubset(of: MountedElement.unmeasuredProperties) {
+        let registeredLayoutChanged = !changed.isDisjoint(with: view.registeredLayoutProperties)
+        if registeredLayoutChanged || !measuredChanges.isSubset(of: MountedElement.unmeasuredProperties) {
             invalidateMeasurements(ownPlacementChanged: !changed.isDisjoint(with: MountedElement.arrangedProperties))
         }
     }

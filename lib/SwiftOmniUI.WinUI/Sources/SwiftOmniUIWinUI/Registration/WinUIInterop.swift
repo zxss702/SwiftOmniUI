@@ -246,11 +246,17 @@ public final class WinUIRegistration<Realized: ElementContract, Made: WinUIContr
 
     /// Applies related properties together, once per patch, so the control
     /// can install its content before resolving selections and navigation.
+    /// `invalidatingLayout` names properties that require fresh native
+    /// measurement even when `contentAffectsSize` is false, such as showing
+    /// a pane that reallocates space inside a scrolling control.
     public func applies(
         _ members: [any ContractMember],
+        invalidatingLayout layoutMembers: [any ContractMember] = [],
         _ apply: @escaping (Made, WinUIElementValues<Realized>) -> Void
     ) {
+        let layoutProperties = Set(layoutMembers.map { Prop($0.name) })
         registration.applies(members) { hosted, values in
+            hosted.registeredLayoutProperties.formUnion(layoutProperties)
             apply(hosted.control, WinUIElementValues(values))
         }
     }

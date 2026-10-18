@@ -18,6 +18,9 @@ class WinUIView {
     /// Native viewport controls can update their registered content without
     /// invalidating the size of their enclosing SOUI layout.
     var registeredPropertiesAffectSize: Bool { true }
+    /// Registered properties that change native child allocation even when
+    /// the enclosing control's requested size is independent of its content.
+    var registeredLayoutProperties: Set<Prop> = []
     private var blurPresenter: SwiftOmniUIObjectRef?
     private(set) var blur = 0.0
     private var inheritedBlur = 0.0
