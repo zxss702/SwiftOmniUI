@@ -361,29 +361,48 @@ class WinUILayoutView: WinUIView {
         if !preparingMeasure { forgetMeasurements() }
         _ = boxView?.measure(width: width, height: height)
         let startedAt = WinUIView.provisionalMeasureRevision
-        var preparationChanged = false
-        let size: LayoutSize
+        var size: LayoutSize
         if hasNativeProposals {
-            let queried = naturalSize(width: offered)
-            let plan: Preparation
-            if let kept = preparations.first(where: { $0.width == offered && $0.size == queried }) {
-                plan = kept
-            } else {
-                plan = Preparation(width: offered, size: queried,
-                                   proposals: Self.querySize { nativeProposals(width: offered, size: queried) })
+            func preparation(for size: LayoutSize) -> Preparation {
+                if let kept = preparations.first(where: { $0.width == offered && $0.size == size }) {
+                    return kept
+                }
+                let plan = Preparation(width: offered, size: size,
+                                       proposals: Self.querySize { nativeProposals(width: offered, size: size) })
                 if preparations.count == 4 { preparations.removeFirst() }
                 preparations.append(plan)
+                return plan
             }
-            let before = WinUIView.nativeSizeRevision
-            let querying = Self.queryingSize
-            Self.queryingSize = 0
-            for proposal in plan.proposals { proposal.view?.prepareMeasure(width: proposal.width) }
-            Self.queryingSize = querying
-            if before != WinUIView.nativeSizeRevision {
-                preparationChanged = true
+            func prepare(_ plan: Preparation) {
+                let querying = Self.queryingSize
+                Self.queryingSize = 0
+                defer { Self.queryingSize = querying }
+                for proposal in plan.proposals { proposal.view?.prepareMeasure(width: proposal.width) }
+            }
+            var plan = preparation(for: naturalSize(width: offered))
+            while true {
+                let before = WinUIView.nativeSizeRevision
+                prepare(plan)
+                size = plan.size
+                guard before != WinUIView.nativeSizeRevision else { break }
+
+                // A child's corrected size may redistribute its siblings' widths.
+                // Commit those proposals before returning this MeasureOverride,
+                // rather than arranging new arithmetic over last pass's native sizes.
                 forgetMeasurements()
-                size = naturalSize(width: offered)
-            } else { size = queried }
+                let updated = preparation(for: naturalSize(width: offered))
+                if updated.proposals.count == plan.proposals.count,
+                   zip(updated.proposals, plan.proposals).allSatisfy({
+                       $0.view === $1.view && $0.width == $1.width
+                   }) {
+                    // Arithmetic probes may have selected other native widths.
+                    // Restore the final proposals even when their geometry is unchanged.
+                    prepare(updated)
+                    size = updated.size
+                    break
+                }
+                plan = updated
+            }
         } else {
             // Lazy/custom/native layouts also commit geometry during this pass.
             // Run it once; an initial naturalSize call would duplicate the work.
@@ -393,13 +412,9 @@ class WinUILayoutView: WinUIView {
             Self.queryingSize = querying
         }
         lastSizingWidth = offered
-        hasSizing = startedAt == WinUIView.provisionalMeasureRevision && !preparationChanged
+        hasSizing = startedAt == WinUIView.provisionalMeasureRevision
         if !hasSizing {
             forgetMeasurements()
-            if preparationChanged {
-                requestNativeMeasure()
-                invalidateArrange()
-            }
         } else {
             if measurements.store(size, offering: offered) {
                 preparations.removeAll(keepingCapacity: true)
