@@ -137,6 +137,8 @@ class WinUILazyView: WinUITravellingLayout {
     var acrossWidest = WinUILazyCrossExtents()
     var geometryChanged = false
     var measuredExtent = 0.0
+    private var contentExtentRevision = 0
+    override var parentMeasurementRevision: Int { contentExtentRevision }
 
     /// A window change under way asks the run again once, not per notice.
     private var retellQueued = false
@@ -296,6 +298,9 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     func commitChangedContentExtent() {
+        // Internal row invalidation is not a changed document size. Parents
+        // observe this revision only when this layout reports a new extent.
+        contentExtentRevision &+= 1
         // Discard old arithmetic now; native requests already defer during layout.
         let scroll = clip ?? declaredScroll
         ProgramWrite.perform {

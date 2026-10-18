@@ -117,7 +117,7 @@ class WinUILayoutView: WinUIView {
     func setItems(_ items: [WinUILayoutItem]) -> Bool {
         let sameArrangement = items.count == self.items.count
             && zip(items, self.items).allSatisfy { $0.arranges(like: $1) }
-        let revisions = items.map { $0.view.measurementRevision }
+        let revisions = items.map { $0.view.parentMeasurementRevision }
         guard !sameArrangement || revisions != itemMeasurementRevisions else { return false }
 
         if !sameArrangement {

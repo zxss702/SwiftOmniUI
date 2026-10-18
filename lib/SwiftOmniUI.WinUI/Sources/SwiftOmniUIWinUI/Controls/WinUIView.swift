@@ -170,6 +170,9 @@ class WinUIView {
     var measurementRevision = 0 {
         didSet { (placingLayout as? WinUILazyView)?.rowMeasurementChanged(self) }
     }
+    /// The size revision visible to a placing parent. A virtualizing layout
+    /// can change its internal rows without changing the size it returns.
+    var parentMeasurementRevision: Int { measurementRevision }
     /// Native preparation can discover a changed answer to a previously queried
     /// proposal. Enclosing arithmetic must then discard that answer as well.
     static var nativeSizeRevision = 0
