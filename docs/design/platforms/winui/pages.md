@@ -107,8 +107,13 @@ The first presentation and reduced-motion navigation suppress transitions.
 `IsNavigationStackEnabled` is false and page caching is disabled; Swift's path
 remains the only navigation history. A view still held by an old page during a
 rapid return is released from that page before attachment to the new one.
-The panel continues to supply Swift layout and safe-area context, while the
-Frame measures and arranges its native shells and owns the transition timing.
+Frame/Page owns both the shell and the retained page's native proposal and
+placement. The page has a `nativeLayoutOwner`, not a Swift `placingLayout`,
+so its native measurement reports its real size instead of zero. The outer
+panel queries intrinsic size but does not arrange that same page a second
+time. This keeps wrapped text on the width allocated by the native page.
+Safe-area context is resolved from the outer panel at the page's allocation;
+the Frame also owns navigation transition timing.
 
 ## The way back
 

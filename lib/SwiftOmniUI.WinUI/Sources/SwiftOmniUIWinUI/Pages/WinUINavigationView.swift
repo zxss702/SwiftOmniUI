@@ -18,6 +18,31 @@ final class WinUINavigationView: WinUILayoutView {
         super.init { swiftomniui_winui_navigation_make($0) }
     }
 
+    @discardableResult
+    override func setItems(_ items: [WinUILayoutItem]) -> Bool {
+        let surviving = Set(items.map { ObjectIdentifier($0.view) })
+        for previous in self.items where !surviving.contains(ObjectIdentifier(previous.view)) {
+            release(previous.view)
+        }
+        let changed = super.setItems(items)
+        for item in items {
+            let page = item.view
+            // Frame/Page owns the native page's proposal and placement. Keeping
+            // a Swift placing parent makes its MeasureOverride return zero and
+            // allows two different widths to be arranged onto the same page.
+            page.placingLayout = nil
+            guard page.nativeLayoutOwner !== self else { continue }
+            page.nativeLayoutOwner = self
+            page.rootSafeAreaContext = { [weak self, weak page] bounds in
+                guard let self, let page else { return SafeAreaContext(bounds: bounds) }
+                return self.layoutSafeArea(in: self.allocatedBounds).child(
+                    in: bounds, preservingOutsets: page.sourceElement?.observesSafeArea == true)
+            }
+            page.safeAreaContext = nil
+        }
+        return changed
+    }
+
     override func holdNativeChildren(_ handles: [SwiftOmniUIObjectRef?]) {
         swiftomniui_winui_navigation_set(handle, boxView?.presentationHandle, items.last?.view.presentationHandle,
                                          depth > 0, items.count < depth)
@@ -29,15 +54,23 @@ final class WinUINavigationView: WinUILayoutView {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        SingleChildArithmetic.size(of: items.last, padding: EdgeInsets(0), width: width)
+        Self.querySize { SingleChildArithmetic.size(of: items.last, padding: EdgeInsets(0), width: width) }
     }
 
-    override func arrange(in bounds: Rect) {
-        guard let page = items.last else { return }
-        page.view.layout(SingleChildArithmetic.place(of: page, in: bounds, padding: EdgeInsets(0), direction: direction))
+    override func safeAreaChanged() {
+        super.safeAreaChanged()
+        items.last?.view.safeAreaChanged()
+    }
+
+    private func release(_ page: WinUIView) {
+        guard page.nativeLayoutOwner === self else { return }
+        page.nativeLayoutOwner = nil
+        page.rootSafeAreaContext = nil
+        page.safeAreaContext = nil
     }
 
     override func detach() {
+        for item in items { release(item.view) }
         super.detach()
         swiftomniui_winui_navigation_clear(handle)
     }
