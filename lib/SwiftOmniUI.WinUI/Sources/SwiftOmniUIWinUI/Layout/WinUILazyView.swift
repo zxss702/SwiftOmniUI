@@ -317,20 +317,31 @@ class WinUILazyView: WinUITravellingLayout {
             // XAML must measure the changed extent before placing the new rows.
             if needsArrangement { invalidateArrange() }
         }
-        let built = cells.built
-        tellWindow(span ?? 0..<0, realize: realize ?? 0..<0, demand: incoming)
-        // One request and, if its own patch has landed, one measurement pass.
-        // Further extent corrections continue on the next layout turn rather
-        // than monopolizing the UI thread inside this viewport callback.
-        guard WinUIView.arranging == 0, WinUIView.measuring == 0,
-              cells.element?.handler(.realizedChanged) == nil || cells.requestedItemsAreCurrent,
-              let placed else { return }
-        if cells.built != built || measuredRevision != measurementRevision || cells.anchorShift != 0 {
-            _ = contentSize(width: standsAt ?? placed.width)
-            needsArrangement = true
+        var measuredWindows: Set<Range<Int>> = []
+        while true {
+            let built = cells.built
+            tellWindow(span ?? 0..<0, realize: realize ?? 0..<0, demand: incoming)
+            // Complete only this viewport. Shorter-than-estimated rows can expose
+            // further rows; those are visible work, not next-frame prefetch.
+            guard WinUIView.arranging == 0, WinUIView.measuring == 0,
+                  cells.element?.handler(.realizedChanged) == nil || cells.requestedItemsAreCurrent,
+                  let placed else { return }
+            let provisional = WinUIView.provisionalMeasureRevision
+            if cells.built != built || measuredRevision != measurementRevision || cells.anchorShift != 0 {
+                _ = contentSize(width: standsAt ?? placed.width)
+                needsArrangement = true
+            }
+            let after = grid ? cells.runs.revision : cells.extents.revision
+            guard cells.needsMeasurement || cells.window?.revision != after else { return }
+            // A pending native proposal or a repeated range needs a layout pass,
+            // not another synchronous attempt. Reentrant viewport changes are
+            // handled by the existing pendingViewport handoff above.
+            guard provisional == WinUIView.provisionalMeasureRevision, !pendingViewport,
+                  measuredWindows.insert(cells.built).inserted else {
+                retell()
+                return
+            }
         }
-        let after = grid ? cells.runs.revision : cells.extents.revision
-        if cells.needsMeasurement || cells.window?.revision != after { retell() }
     }
 
     /// The window `rect` shows of the run, clipped to its document extent.
