@@ -23,6 +23,11 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// The children mounted now, by identity.
     private(set) var mounted: [String: WinUILayoutItem] = [:]
+    // New rows must have real arranged coordinates before the native scroller
+    // can use them as anchors. Promote them on the following measure pass.
+    private var pendingAnchors: Set<Int64> = []
+    private var placedAnchors: Set<Int64> = []
+    private var readyAnchors: Set<Int64> = []
     private var mountedSourceID: ObjectIdentifier?
     private var hasMountedSource = false
     private var lastAcknowledgedGeneration = 0
@@ -151,6 +156,9 @@ class WinUILazyView: WinUITravellingLayout {
         for (identity, previous) in mounted {
             if now[identity]?.view !== previous.view {
                 swiftomniui_winui_scroller_anchor(previous.view.presentationHandle, false)
+                pendingAnchors.remove(previous.view.number)
+                placedAnchors.remove(previous.view.number)
+                readyAnchors.remove(previous.view.number)
             }
             if now[identity]?.view !== previous.view || now[identity]?.values != previous.values {
                 measured.removeValue(forKey: identity)
@@ -166,7 +174,12 @@ class WinUILazyView: WinUITravellingLayout {
             item.item.view.placingLayout = self
             if mounted[item.identity]?.view !== item.item.view
                 || mounted[item.identity]?.departing != item.item.departing {
-                swiftomniui_winui_scroller_anchor(item.item.view.presentationHandle, !item.item.departing)
+                let view = item.item.view
+                swiftomniui_winui_scroller_anchor(view.presentationHandle, false)
+                readyAnchors.remove(view.number)
+                placedAnchors.remove(view.number)
+                if item.item.departing { pendingAnchors.remove(view.number) }
+                else { pendingAnchors.insert(view.number) }
             }
         }
         mounted = now
@@ -558,11 +571,35 @@ class WinUILazyView: WinUITravellingLayout {
     /// Measuring again, the window is re-asked: a new pass is a new chance
     /// for the places the run holds.
     override func measure(width: Double, height: Double) -> LayoutSize {
+        for item in mounted.values where !item.departing && readyAnchors.contains(item.view.number) {
+            swiftomniui_winui_scroller_anchor(item.view.presentationHandle, true)
+        }
+        readyAnchors.removeAll(keepingCapacity: true)
         retell()
         return super.measure(width: width, height: height)
     }
 
+    override func place(_ item: WinUILayoutItem, at place: Rect) {
+        super.place(item, at: place)
+        if WinUIView.arranging > 0, !item.departing, pendingAnchors.contains(item.view.number) {
+            placedAnchors.insert(item.view.number)
+        }
+    }
+
+    override func arrange(width: Double, height: Double) {
+        super.arrange(width: width, height: height)
+        readyAnchors.formUnion(placedAnchors)
+        pendingAnchors.subtract(placedAnchors)
+        placedAnchors.removeAll(keepingCapacity: true)
+    }
+
     override func detach() {
+        for item in mounted.values {
+            swiftomniui_winui_scroller_anchor(item.view.presentationHandle, false)
+        }
+        pendingAnchors.removeAll()
+        placedAnchors.removeAll()
+        readyAnchors.removeAll()
         cells.cancelPrefetch()
         super.detach()
         swiftomniui_winui_panel_watch_viewport(handle, false)
