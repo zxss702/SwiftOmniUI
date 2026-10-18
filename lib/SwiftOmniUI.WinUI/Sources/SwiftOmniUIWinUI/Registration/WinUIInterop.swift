@@ -24,6 +24,15 @@ public protocol WinUIControl: AnyObject {
     /// The WinUI element the control shows: a `UIElement`'s default interface, `AddRef`'d, as the host's own handles
     /// are.
     var element: OpaquePointer { get }
+
+    /// Whether an unbounded height proposal measures the entire content.
+    /// Return false for a control with its own vertical scrolling viewport;
+    /// its document height must not become the enclosing layout's minimum.
+    var sizesToContentHeight: Bool { get }
+}
+
+extension WinUIControl {
+    public var sizesToContentHeight: Bool { true }
 }
 
 /// The controls an application adds to this host - its own elements, each realized with a control of its own.
