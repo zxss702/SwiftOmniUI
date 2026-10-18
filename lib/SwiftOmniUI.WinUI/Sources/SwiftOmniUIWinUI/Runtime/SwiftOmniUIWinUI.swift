@@ -256,6 +256,9 @@ enum WinUICallbacks {
                           let source = WinUIView.find(view)?.sourceElement ?? host.runtime.tree.root else { return }
                     source.requestMenuContent(mount: mount == 0 ? nil : mount, in: host.runtime)
                 }
+            },
+            paneWidthChanged: { view in
+                MainActor.assumeIsolated { (WinUIView.find(view) as? WinUISidebarView)?.paneWidthChanged() }
             })
     }
 }

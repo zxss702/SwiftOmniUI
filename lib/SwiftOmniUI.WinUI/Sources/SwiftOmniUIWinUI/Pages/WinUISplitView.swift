@@ -62,6 +62,7 @@ final class WinUISplitView: WinUILayoutView {
     override init() {
         super.init()
         sidebar.placingLayout = self
+        middle.nativeLayoutOwner = self
         sidebar.onPresented = { [weak self] open in
             guard let self, open != isPresented else { return }
             isPresented = open

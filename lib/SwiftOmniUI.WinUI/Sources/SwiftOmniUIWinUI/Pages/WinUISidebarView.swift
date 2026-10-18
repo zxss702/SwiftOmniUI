@@ -33,6 +33,13 @@ final class WinUISidebarView: WinUIView {
     func clear() { swiftomniui_winui_split_clear(handle) }
     var minimumRoom: Double { swiftomniui_winui_split_minimum_width(handle) }
 
+    /// Native column resizing also invalidates Swift's cached split proposal.
+    /// XAML still owns measuring and arranging the pages at their new widths.
+    func paneWidthChanged() {
+        invalidateMeasure()
+        (placingLayout ?? nativeLayoutOwner)?.invalidateMeasurements()
+    }
+
     override func presented(_ open: Bool) {
         guard !ProgramWrite.isWriting else { return }
         onPresented?(open)

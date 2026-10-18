@@ -441,6 +441,10 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
         split.PaneBackground(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
         split.PanePlacement(trailing ? controls::SplitViewPanePlacement::Right : controls::SplitViewPanePlacement::Left);
         split.Tag(winrt::single_threaded_vector<double>({0, 256, INFINITY, 256, expandsAt, 0, INFINITY}));
+        split.RegisterPropertyChangedCallback(controls::SplitView::OpenPaneLengthProperty(),
+            guarded("changing a split column's width", [view](xaml::DependencyObject const &, xaml::DependencyProperty const &) {
+                callbacks.paneWidthChanged(view);
+            }));
         split.Content(rows({true, false}));
         controls::Grid pane;
         controls::ContentControl face;
