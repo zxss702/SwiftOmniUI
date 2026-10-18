@@ -31,6 +31,16 @@ enum WinUILayoutUpdates {
         }
     }
 
+    static func beganNativeMeasure(_ view: WinUIView) {
+        invalidated.remove(view.number)
+        pending[view.number]?.measure = false
+        view.beganNativeMeasure()
+    }
+
+    static func beganNativeArrange(_ view: WinUIView) {
+        pending[view.number]?.arrange = false
+    }
+
     static func enqueue(_ view: WinUIView, measure: Bool) -> Bool {
         guard ProgramWrite.isWriting else { return false }
         var next = pending[view.number] ?? Pending(view: view)

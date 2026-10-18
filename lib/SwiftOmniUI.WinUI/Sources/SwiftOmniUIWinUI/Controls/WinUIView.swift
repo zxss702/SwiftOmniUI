@@ -382,6 +382,10 @@ class WinUIView {
         measuredSizes.removeAll(keepingCapacity: true)
     }
 
+    /// A real MeasureOverride consumes requests made before it started.
+    /// Invalidations raised during this measurement can still enqueue a new pass.
+    func beganNativeMeasure() { nativeMeasurePending = false }
+
     func requestNativeMeasure() {
         guard Self.arranging == 0, Self.measuring == 0 else {
             guard !nativeMeasurePending else { return }

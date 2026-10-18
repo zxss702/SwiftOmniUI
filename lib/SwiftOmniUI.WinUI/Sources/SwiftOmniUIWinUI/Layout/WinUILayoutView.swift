@@ -344,7 +344,9 @@ class WinUILayoutView: WinUIView {
             _ = super.measure(width: Optional(width), height: Optional(height))
             return desiredSize
         }
-        WinUILayoutUpdates.measured(self)
+        // This is the native pass itself, rather than a request to measure.
+        // It consumes older queued invalidations without scheduling itself again.
+        WinUILayoutUpdates.beganNativeMeasure(self)
 
         Self.arithmeticMeasuring += 1
         WinUIView.measuring += 1
@@ -464,6 +466,8 @@ class WinUILayoutView: WinUIView {
 
     /// Answers WinUI's arrange: places the box and every child in `width` by `height` DIPs, inside the pass.
     func arrange(width: Double, height: Double) {
+        nativeArrangePending = false
+        WinUILayoutUpdates.beganNativeArrange(self)
         WinUIView.arranging += 1
         defer { WinUIView.arranging -= 1 }
         allocatedBounds = Rect(0, 0, width, height)
