@@ -225,23 +225,13 @@ class WinUILazyView: WinUITravellingLayout {
         announcedRect ?? effectiveViewport
     }
 
-    /// Native scroll and effective-viewport callbacks can describe the same
-    /// frame several times. Record them promptly, then reconcile the latest
-    /// window once outside the native callback/layout stack.
     func viewportReported(_ rect: Rect) {
-        guard rect.x.isFinite, rect.y.isFinite, rect.width.isFinite, rect.height.isFinite,
-              rect.width > 0, rect.height > 0 else { return }
-        watchClip()
-        effectiveViewport = rect
-        if announcedRect != nil, let scroll = watching {
-            var raw = [Double](repeating: 0, count: 6)
-            swiftomniui_winui_scroller_viewport(scroll.scroller.handle, handle, &raw)
-            announcedRect = Rect(raw[0], raw[1], rect.width, rect.height)
-        }
-        retell()
+        viewportChanged(rect)
     }
 
-    /// Native viewport changes realize the required rows before XAML measures and arranges the new window.
+    /// EffectiveViewportChanged runs after native Arrange. Request its rows now
+    /// so their layout invalidation participates in this XAML layout cycle,
+    /// rather than waiting for another dispatcher turn after the frame commits.
     /// `override` is the freshest window a scroller's own notice can name - where its
     /// pending move already stands - while `rect` is the effective viewport reported.
     func viewportChanged(_ rect: Rect, effective: Bool = true, target override: Rect? = nil,
