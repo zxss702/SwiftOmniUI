@@ -31,6 +31,7 @@ final class WinUISidebarView: WinUIView {
     }
 
     func clear() { swiftomniui_winui_split_clear(handle) }
+    func remove(_ view: WinUIView) { swiftomniui_winui_split_remove(handle, view.presentationHandle) }
     var minimumRoom: Double { swiftomniui_winui_split_minimum_width(handle) }
 
     /// Native column resizing also invalidates Swift's cached split proposal.

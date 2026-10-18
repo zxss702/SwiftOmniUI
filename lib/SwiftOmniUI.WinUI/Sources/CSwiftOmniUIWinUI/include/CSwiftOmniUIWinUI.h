@@ -976,6 +976,8 @@ void swiftomniui_winui_title_bar_set_app_menu(SwiftOmniUIObjectRef bar, SwiftOmn
 /// A native SplitView; a trailing pane holds an auxiliary detail column. A zero breakpoint keeps it inline.
 SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, double expandsAt, bool trailing);
 void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef split);
+/// Releases one changed slot while leaving the other columns attached.
+void swiftomniui_winui_split_remove(SwiftOmniUIObjectRef split, SwiftOmniUIObjectRef child);
 double swiftomniui_winui_split_minimum_width(SwiftOmniUIObjectRef split);
 
 /// Width bounds apply to the pane and remaining content. The native drag handle retains the user's width.

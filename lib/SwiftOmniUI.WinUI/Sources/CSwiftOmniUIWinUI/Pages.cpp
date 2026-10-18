@@ -523,6 +523,18 @@ extern "C" double swiftomniui_winui_split_minimum_width(SwiftOmniUIObjectRef han
     } catch (...) { report("reading split column bounds"); return 0; }
 }
 
+extern "C" void swiftomniui_winui_split_remove(SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef child) {
+    try {
+        auto split = borrow<controls::SplitView>(handle);
+        auto element = as<xaml::UIElement>(child);
+        auto face = split.Pane().as<controls::Grid>().Children().GetAt(0).as<controls::ContentControl>();
+        if (face.Content() == element) face.Content(nullptr);
+        auto children = split.Content().as<controls::Grid>().Children();
+        uint32_t index;
+        if (children.IndexOf(element, index)) children.RemoveAt(index);
+    } catch (...) { report("releasing a split slot"); }
+}
+
 extern "C" void swiftomniui_winui_split_set(
     SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef pane, SwiftOmniUIObjectRef content, SwiftOmniUIObjectRef row, bool open,
     double minimum, double ideal, double maximum, bool contentShown, double contentMinimum, double contentMaximum

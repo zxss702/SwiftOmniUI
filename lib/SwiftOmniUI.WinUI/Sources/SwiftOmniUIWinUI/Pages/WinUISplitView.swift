@@ -56,8 +56,12 @@ final class WinUISplitView: WinUILayoutView {
     private var asked = LayoutSize.zero
     private var adaptation = SidebarAdaptation()
     private var configurationPending = false
-    private var ownedPages: [WinUIView] = []
-    private var ownedThreeColumns = false
+    private struct NativeSlot {
+        let owner: WinUISidebarView
+        let position: Int // pane, toolbar row, content
+        let view: WinUIView
+    }
+    private var ownedSlots: [NativeSlot] = []
 
     override init() {
         super.init()
@@ -242,15 +246,24 @@ final class WinUISplitView: WinUILayoutView {
         }
         ProgramWrite.perform {
             let three = pages.count > 2 && SplitColumnWidth(detailWidthBounds, defaultIdeal: 320).maximum != 0
-            let views = pages.map(\.view)
-            if three != ownedThreeColumns || views.count != ownedPages.count
-                || !zip(views, ownedPages).allSatisfy({ $0 === $1 }) {
-                // Release each native owner before moving a page between two and three columns.
-                sidebar.clear()
-                middle.clear()
-                ownedPages = views
-                ownedThreeColumns = three
+            var next: [NativeSlot] = []
+            if let pane = pages.first?.view { next.append(NativeSlot(owner: sidebar, position: 0, view: pane)) }
+            if three {
+                next.append(NativeSlot(owner: sidebar, position: 2, view: middle))
+                next.append(NativeSlot(owner: middle, position: 0, view: pages[2].view))
+                next.append(NativeSlot(owner: middle, position: 2, view: pages[1].view))
+            } else if pages.count > 1 {
+                next.append(NativeSlot(owner: sidebar, position: 2, view: pages[1].view))
             }
+            if let detailRow { next.append(NativeSlot(owner: three ? middle : sidebar, position: 1, view: detailRow)) }
+            // Detach only changed slots, before attaching any moved page. Replacing
+            // the detail must not unload an unchanged pane and its scroll presenter.
+            for old in ownedSlots where !next.contains(where: {
+                $0.owner === old.owner && $0.position == old.position && $0.view === old.view
+            }) {
+                old.owner.remove(old.view)
+            }
+            ownedSlots = next
             if three {
                 let detail = SplitColumnWidth(detailWidthBounds, defaultIdeal: 320)
                 let content = SplitColumnWidth(contentPaneLength)
@@ -274,7 +287,7 @@ final class WinUISplitView: WinUILayoutView {
         for page in pages { release(page.view) }
         sidebar.clear()
         middle.clear()
-        ownedPages = []
+        ownedSlots = []
         super.detach()
         onPresentationChanged = nil
         onVisibilityChanged = nil

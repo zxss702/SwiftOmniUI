@@ -140,8 +140,10 @@ contributes no desired size or column width, and uses the native horizontal
 resize cursor on hover and during pointer capture. Minimum/ideal/maximum
 bounds choose the initial pane width and constrain resizing; unchanged bounds
 do not overwrite the user's width. Content minimum/maximum constrain the
-remaining column. Native owners release their children before a page moves
-between the two-column and three-column forms. Native column configuration
+remaining column. Native ownership is tracked by pane, toolbar, and content
+slot. Only changed slots release their children, before any moved page is
+attached to its new owner. Replacing detail content leaves the unchanged
+sidebar and its ScrollPresenter attached. Native column configuration
 is coalesced outside MeasureOverride/ArrangeOverride.
 
 Whether the sidebar shows follows the binding and native pane events. The
