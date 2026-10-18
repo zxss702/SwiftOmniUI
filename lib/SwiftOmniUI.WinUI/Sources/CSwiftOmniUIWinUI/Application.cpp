@@ -11,6 +11,7 @@
 // hosts. Keep this on the startup object so every consuming EXE receives it.
 #pragma comment(linker, "/STACK:8388608")
 
+#include <atomic>
 #include <chrono>
 #include <deque>
 #include <exception>
@@ -38,6 +39,7 @@ namespace swiftomniui {
     namespace {
         winrt::Microsoft::UI::Dispatching::DispatcherQueue queue{nullptr};
         winrt::event_token rendering{};
+        std::atomic<bool> turnQueued{false};
         bool holding = false;
         bool ownsMessageLoop = false;
 
@@ -439,13 +441,24 @@ extern "C" void swiftomniui_winui_pump(double seconds) {
 }
 
 extern "C" void swiftomniui_winui_post_turn(void) {
+    // Core wakeups can arrive again while the UI is still busy with the same
+    // batch of state writes. One queued turn drains all pending Core work.
+    if (turnQueued.exchange(true)) return;
     try {
         if (auto dispatcher = dispatcherQueue()) {
-            dispatcher.TryEnqueue(guarded("handling TryEnqueue", [] { callbacks.turn(); }));
+            if (dispatcher.TryEnqueue(guarded("handling TryEnqueue", [] {
+                // Re-arm before draining: writes during this turn must be able
+                // to schedule its successor, including deferred layout work.
+                turnQueued.store(false);
+                callbacks.turn();
+            }))) return;
         }
     } catch (...) {
+        turnQueued.store(false);
         report("posting a turn");
+        return;
     }
+    turnQueued.store(false);
 }
 
 extern "C" void swiftomniui_winui_keep_scene_alive(bool alive) {
