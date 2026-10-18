@@ -16,7 +16,9 @@
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Input.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <vector>
 #include <winrt/Microsoft.UI.Windowing.h>
 
 using namespace swiftomniui;
@@ -317,17 +319,20 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
         auto view = winrt::unbox_value<int64_t>(bar.Tag());
         auto actions = rightHeader(bar).Children().GetAt(0).as<controls::CommandBar>();
         auto leading = leftHeader(bar).Children().GetAt(2).as<controls::CommandBar>();
-        leading.PrimaryCommands().Clear();
-        leading.SecondaryCommands().Clear();
-        actions.PrimaryCommands().Clear();
-        actions.SecondaryCommands().Clear();
+        using Command = controls::ICommandBarElement;
+        using Commands = winrt::Windows::Foundation::Collections::IObservableVector<Command>;
+        std::array<Commands, 4> lists{leading.PrimaryCommands(), leading.SecondaryCommands(),
+                                     actions.PrimaryCommands(), actions.SecondaryCommands()};
+        std::array<std::vector<Command>, 4> desired;
+        std::vector<Command> previous;
+        for (auto const &list : lists)
+            for (auto const &command : list) previous.push_back(command);
         for (int32_t index = 0; index < count; ++index) {
-            auto commands = index < leadingCount ? leading.PrimaryCommands()
-                : overflows[index] ? actions.SecondaryCommands() : actions.PrimaryCommands();
+            auto &commands = desired[index < leadingCount ? 0 : overflows[index] ? 3 : 2];
             // A spacer: the platform's gap between entries, or all the room a flexible one takes - both a
             // separator here, a CommandBar having no stretchable room of its own.
             if (kinds[index] != 0) {
-                commands.Append(controls::AppBarSeparator());
+                commands.push_back(controls::AppBarSeparator());
                 continue;
             }
             // A view the item carries stands in the button's place: the bar's own button as a command, any other in
@@ -335,13 +340,23 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
             if (contents[index]) {
                 auto content = borrow<xaml::UIElement>(contents[index]);
                 if (auto command = content.try_as<controls::ICommandBarElement>()) {
-                    commands.Append(command);
+                    commands.push_back(command);
                     continue;
                 }
-                controls::AppBarElementContainer container;
-                container.VerticalContentAlignment(xaml::VerticalAlignment::Center);
-                container.Content(content);
-                commands.Append(container);
+                // Reuse the container too: an element can have only one
+                // parent. Replacing it unloads focused inputs and may leave
+                // their content attached to a discarded container.
+                controls::AppBarElementContainer container{nullptr};
+                for (auto const &old : previous) {
+                    auto candidate = old.try_as<controls::AppBarElementContainer>();
+                    if (candidate && candidate.Content() == content) { container = candidate; break; }
+                }
+                if (!container) {
+                    container = controls::AppBarElementContainer();
+                    container.VerticalContentAlignment(xaml::VerticalAlignment::Center);
+                    container.Content(content);
+                }
+                commands.push_back(container);
                 continue;
             }
             controls::AppBarButton button;
@@ -364,7 +379,28 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
             button.Click(guarded("handling Click", [view, index](IInspectable const &, xaml::RoutedEventArgs const &) {
                 callbacks.chosen(view, index);
             }));
-            commands.Append(button);
+            commands.push_back(button);
+        }
+        // Remove only departing commands before inserting their replacements.
+        // Inserting a new neighbor shifts retained inputs without unloading
+        // them, preserving keyboard focus, selection and composition.
+        for (size_t group = 0; group < lists.size(); ++group) {
+            auto const &commands = lists[group];
+            auto const &next = desired[group];
+            for (uint32_t at = 0; at < commands.Size();) {
+                if (std::find(next.begin(), next.end(), commands.GetAt(at)) == next.end()) commands.RemoveAt(at);
+                else ++at;
+            }
+        }
+        for (size_t group = 0; group < lists.size(); ++group) {
+            auto const &commands = lists[group];
+            auto const &next = desired[group];
+            for (uint32_t at = 0; at < next.size(); ++at) {
+                if (at < commands.Size() && commands.GetAt(at) == next[at]) continue;
+                uint32_t old;
+                if (commands.IndexOf(next[at], old)) commands.RemoveAt(old);
+                commands.InsertAt(at, next[at]);
+            }
         }
     } catch (...) {
         report("setting a title bar's actions");

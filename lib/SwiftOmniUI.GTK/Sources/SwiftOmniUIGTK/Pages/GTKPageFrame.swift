@@ -337,13 +337,11 @@ final class GTKPageFrame {
 }
 
 extension GTKPageFrame {
-    /// Refills `box` with `entries`' widgets - a button for an action, the
-    /// item's own view, or room for a spacer - recording the buttons.
+    /// Reconcile children in place: an unchanged item's view stays parented
+    /// and keeps its focus, caret and input-method session as neighbors change.
     private func refill(_ box: GTKWidget, entries: [GTKToolbarAction], buttons: inout [GTKButtonView]) {
-        while let child = gtk_widget_get_first_child(box) {
-            gtk_box_remove(box.of(GtkBox.self), child)
-        }
-        buttons = []
+        var widgets: [GTKWidget] = []
+        var nextButtons: [GTKButtonView] = []
         for entry in entries {
             let widget: GTKWidget
             if entry.spacer == .fixed {
@@ -354,17 +352,33 @@ extension GTKPageFrame {
                 widget = room
             } else if let view = entry.view {
                 if let parent = gtk_widget_get_parent(view.widget),
+                   parent != box,
                    g_type_check_instance_is_a(parent.of(GTypeInstance.self), gtk_box_get_type()) != 0 {
                     gtk_box_remove(parent.of(GtkBox.self), view.widget)
                 }
                 widget = view.widget
             } else {
                 let button = GTKButtonView.action(entry)
-                buttons.append(button)
+                nextButtons.append(button)
                 widget = button.widget
             }
-            gtk_box_append(box.of(GtkBox.self), widget)
+            widgets.append(widget)
         }
+        var child = gtk_widget_get_first_child(box)
+        while let existing = child {
+            child = gtk_widget_get_next_sibling(existing)
+            if !widgets.contains(existing) { gtk_box_remove(box.of(GtkBox.self), existing) }
+        }
+        var previous: GTKWidget?
+        for widget in widgets {
+            if gtk_widget_get_parent(widget) != box {
+                gtk_box_insert_child_after(box.of(GtkBox.self), widget, previous)
+            } else if gtk_widget_get_prev_sibling(widget) != previous {
+                gtk_box_reorder_child_after(box.of(GtkBox.self), widget, previous)
+            }
+            previous = widget
+        }
+        buttons = nextButtons
     }
 
     /// The menus at the bar's very end, as GNOME's applications hold theirs: a main menu holding each as a submenu.
