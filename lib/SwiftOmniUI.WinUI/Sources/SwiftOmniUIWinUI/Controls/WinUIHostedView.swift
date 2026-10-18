@@ -11,6 +11,8 @@ final class WinUIHostedView<Control: WinUIControl>: WinUIView {
     /// The application's control.
     let control: Control
 
+    override var registeredPropertiesAffectSize: Bool { control.contentAffectsSize }
+
     init(_ control: Control) {
         self.control = control
         super.init { _ in swiftomniui_winui_retain(control.element) }

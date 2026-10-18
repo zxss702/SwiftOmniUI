@@ -29,10 +29,16 @@ public protocol WinUIControl: AnyObject {
     /// Return false for a control with its own vertical scrolling viewport;
     /// its document height must not become the enclosing layout's minimum.
     var sizesToContentHeight: Bool { get }
+
+    /// Whether changing this control's registered content properties can
+    /// change the size it asks its parent for. Viewport controls may return
+    /// false: their native document layout changes inside the allocated room.
+    var contentAffectsSize: Bool { get }
 }
 
 extension WinUIControl {
     public var sizesToContentHeight: Bool { true }
+    public var contentAffectsSize: Bool { true }
 }
 
 /// The controls an application adds to this host - its own elements, each realized with a control of its own.

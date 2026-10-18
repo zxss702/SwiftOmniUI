@@ -130,7 +130,11 @@ extension WinUIElement {
         }
         if let layers = view as? WinUIZStackView { layers.placement = element.placement }
 
-        if !changed.subtracting(element.ownPlacementRun).isSubset(of: MountedElement.unmeasuredProperties) {
+        var measuredChanges = changed.subtracting(element.ownPlacementRun)
+        if !view.registeredPropertiesAffectSize {
+            measuredChanges.subtract(taken.subtracting(MountedElement.arrangedProperties))
+        }
+        if !measuredChanges.isSubset(of: MountedElement.unmeasuredProperties) {
             invalidateMeasurements(ownPlacementChanged: !changed.isDisjoint(with: MountedElement.arrangedProperties))
         }
     }

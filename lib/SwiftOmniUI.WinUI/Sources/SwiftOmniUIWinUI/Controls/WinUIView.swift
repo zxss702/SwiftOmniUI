@@ -15,6 +15,9 @@ class WinUIView {
     /// Parents attach the drawing boundary when one is needed; control APIs
     /// continue to use `handle`, preserving the actual native control identity.
     var presentationHandle: SwiftOmniUIObjectRef { blurPresenter ?? handle }
+    /// Native viewport controls can update their registered content without
+    /// invalidating the size of their enclosing SOUI layout.
+    var registeredPropertiesAffectSize: Bool { true }
     private var blurPresenter: SwiftOmniUIObjectRef?
     private(set) var blur = 0.0
     private var inheritedBlur = 0.0
