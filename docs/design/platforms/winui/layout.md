@@ -274,6 +274,13 @@ arrives stands at its estimate, at the place the arithmetic holds for it:
 skipping it leaves the frame a hole where a heavy row takes longest, and the
 pass that follows corrects it.
 
+Changing the cross-axis proposal invalidates row measurements through their
+proposal keys, not by replacing the entire extent index with 44-point rows.
+Previously measured offscreen extents remain estimates until those rows are
+realized at the new width; only never-measured rows begin at 44. Grid runs
+retain estimates while their cell grouping stays the same. A changed track
+count invalidates that grouping and resets the run index.
+
 The scroller says where its view stands through `ViewChanged`, and that the
 user holds it through `DirectManipulationStarted` and `Completed`. The user's
 movement is joined up to the display's next frame, which reports it to its

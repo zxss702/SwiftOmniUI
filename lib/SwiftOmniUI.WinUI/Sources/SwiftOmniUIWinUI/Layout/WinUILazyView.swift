@@ -759,14 +759,10 @@ final class WinUILazyStackView: WinUILazyView {
         if WinUIView.arranging == 0, WinUILayoutView.queryingSize == 0 {
             let revision = cells.extents.revision
             if measuredAcross != across {
-                cells.extents.reset()
-                // Row measurements stand across a room change: each carries the proposal it
-                // was measured at, and the loop below measures again exactly the rows whose
-                // proposal differs. Dropping them all charged one native measure per mounted
-                // row every time the query flipped - a finite proposal beside the last
-                // allocation is the same room twice - and charged it again on every scroll
-                // back over a row the window had left. A width measured in another room is
-                // no width of this one.
+                // Retain offscreen extents as estimates. Resetting them all to 44
+                // changes the scroll range before any new measurement exists.
+                // The proposal-keyed cache below still remeasures every mounted
+                // row at the new width before committing its actual extent.
                 acrossWidest = WinUILazyCrossExtents()
                 measuredAcross = across
                 measureMountedRows()
@@ -963,11 +959,13 @@ final class WinUILazyGridView: WinUILazyView {
         if WinUIView.arranging == 0, WinUILayoutView.queryingSize == 0 {
             let revision = cells.runs.revision
             if widths != columns {
+                // A different grouping invalidates run identities. A width-only
+                // change keeps their previous extents as estimates until measured.
+                if widths.count != columns.count { cells.runs.reset() }
                 columns = widths
                 // Each row is measured at its own track's width, which the proposal names: a
                 // row whose track kept its width keeps its measurement, so a track count or a
                 // width that returns to a former one costs no native measure.
-                cells.runs.reset()
                 measureMountedRows()
                 geometryChanged = true
             }
@@ -1035,7 +1033,7 @@ final class WinUILazyGridView: WinUILazyView {
             if !needsRowMeasurements { measuredRevision = measurementRevision }
         }
         let count = (cells.orderedIdentities.count + max(1, proposed.count) - 1) / max(1, proposed.count)
-        let total = widths == columns ? cells.runs.total(count: count)
+        let total = widths.count == columns.count ? cells.runs.total(count: count)
             : cells.runs.padding.head + cells.runs.padding.tail + Double(count) * cells.runs.estimate
                 + Double(max(0, count - 1)) * runSpacing
         return axis == .vertical
