@@ -407,7 +407,9 @@ class WinUIView {
         let previous = measuredSizes
         guard !previous.isEmpty else { return false }
         measuredSizes.removeAll(keepingCapacity: true)
-        invalidateNativeMeasure()
+        // Re-read XAML's answer after attachment. Native resource/property
+        // changes already invalidate its measure; forcing invalidation here
+        // makes every newly realized label repeat a completed layout pass.
         var changed = false
         for proposal in previous {
             let current = measure(width: proposal.width, height: proposal.height)
