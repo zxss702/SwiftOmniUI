@@ -39,16 +39,21 @@
 @_spi(Host) @MainActor public final class DescribedMotion {
     private let animator: Animator
     private var transitions: [DescribedKey: DescribedTransition] = [:]
+    /// Unmount only touches the properties owned by that element, including
+    /// components that have landed but are still retained for presentation.
+    private var keysByMount: [UInt64: Set<DescribedKey>] = [:]
     /// A removal's components can finish on different frames. A finished
     /// component keeps its target until the whole element leaves or revives.
     private var retainedTargets: [DescribedKey: HostValue] = [:]
     /// A callback can hide a view whose authored value differs from its final
     /// animation value. Keep that final value through this frame's presentation.
     private var landingValues: [DescribedKey: HostValue] = [:]
-    private var outputs: [DescribedOutput] = []
+    private var outputs: [DescribedOutput?] = []
+    private var outputSlots: [UInt64: [Int]] = [:]
     /// Runtime frames present the final values before a landing removes a
     /// view. Standalone advances can still complete their callbacks inline.
-    private var landings: [(key: DescribedKey, complete: () -> Void)] = []
+    private var landings: [(key: DescribedKey, complete: () -> Void)?] = []
+    private var landingSlots: [UInt64: [Int]] = [:]
 
     /// Described animation whose animations `animator` advances.
     public init(animator: Animator) {
@@ -87,7 +92,10 @@
         func arrive() -> Bool {
             // A component already at its target, or snapped there, must also
             // stay there while the other removal components finish.
-            if retainingTarget, let target { retainedTargets[key] = target }
+            if retainingTarget, let target {
+                keysByMount[key.mount, default: []].insert(key)
+                retainedTargets[key] = target
+            }
             return false
         }
 
@@ -127,6 +135,7 @@
             began: now)
 
         guard !running.arrives else { return arrive() }
+        keysByMount[key.mount, default: []].insert(key)
         transitions[key] = DescribedTransition(
             plan: plan, velocity: running.velocity, landed: landed, retainingTarget: retainingTarget)
         animator.start(running, for: .described(key))
@@ -142,6 +151,7 @@
             else { continue }
 
             let presented = transition.follow((step.value, step.velocity, step.rested))
+            outputSlots[key.mount, default: []].append(outputs.count)
             outputs.append(DescribedOutput(key: key, value: presented.value))
 
             if presented.rested {
@@ -151,6 +161,7 @@
                 if let landed = transition.landed {
                     if deferringLandings {
                         if !transition.retainingTarget { landingValues[key] = presented.value }
+                        landingSlots[key.mount, default: []].append(landings.count)
                         landings.append((key, landed))
                     } else {
                         landed()
@@ -162,30 +173,39 @@
 
     /// Drops every animation of an element that leaves.
     public func remove(mount: UInt64) {
-        transitions = transitions.filter { $0.key.mount != mount }
-        retainedTargets = retainedTargets.filter { $0.key.mount != mount }
-        landingValues = landingValues.filter { $0.key.mount != mount }
-        outputs.removeAll { $0.key.mount == mount }
-        landings.removeAll { $0.key.mount == mount }
-        animator.retain { target in
-            guard case .described(let key) = target else { return true }
-            return key.mount != mount
+        if let keys = keysByMount.removeValue(forKey: mount) {
+            for key in keys {
+                transitions.removeValue(forKey: key)
+                retainedTargets.removeValue(forKey: key)
+                landingValues.removeValue(forKey: key)
+                animator.halt(.described(key))
+            }
+        }
+        if let slots = outputSlots.removeValue(forKey: mount) {
+            for slot in slots { outputs[slot] = nil }
+        }
+        if let slots = landingSlots.removeValue(forKey: mount) {
+            for slot in slots { landings[slot] = nil }
         }
     }
 
     /// Takes the values drawn since the previous take.
     public func takeOutputs() -> [DescribedOutput] {
-        defer { outputs.removeAll(keepingCapacity: true) }
-        return outputs
+        defer {
+            outputs.removeAll(keepingCapacity: true)
+            outputSlots.removeAll(keepingCapacity: true)
+        }
+        return outputs.compactMap { $0 }
     }
 
     /// Takes the callbacks whose final values the display cycle just presented.
     public func takeLandings() -> [() -> Void] {
         defer {
             landings.removeAll(keepingCapacity: true)
+            landingSlots.removeAll(keepingCapacity: true)
             landingValues.removeAll(keepingCapacity: true)
         }
-        return landings.map { $0.complete }
+        return landings.compactMap { $0?.complete }
     }
 }
 

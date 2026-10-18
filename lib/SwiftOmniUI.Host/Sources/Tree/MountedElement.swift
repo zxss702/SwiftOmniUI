@@ -36,6 +36,7 @@ import CRT
     /// Direct child membership/order changed in this patch. A sparse descendant
     /// paint patch changes `childrenChanged`, but not a native layout's inputs.
     public private(set) var childOrderChanged = false
+    private var departureArrangementPending = false
 
     /// A content rebuild updates mounted lazy rows; their own measurement
     /// revisions decide which geometry must be measured again.
@@ -380,14 +381,22 @@ import CRT
     /// its view.
     private func departed(_ child: MountedElement) {
         children.removeAll { $0 === child }
-        native.arrangeChildren()
-        // An element with no view passes its children up: the layout that held the view drops it.
-        if !native.presentsView {
-            var holder = parent
-            while let each = holder, !each.native.presentsView { holder = each.parent }
-            holder?.native.arrangeChildren()
-        }
         tree?.arrangementChanged = true
+        guard !departureArrangementPending else { return }
+        departureArrangementPending = true
+        // All landings in this frame remove their children before the native
+        // layout collects them once, rather than after each individual row.
+        ProgramWrite.afterWrites { [weak self] in
+            guard let self, self.departureArrangementPending else { return }
+            self.departureArrangementPending = false
+            self.native.arrangeChildren()
+            // An element with no view passes its children to the nearest holder.
+            if !self.native.presentsView {
+                var holder = self.parent
+                while let each = holder, !each.native.presentsView { holder = each.parent }
+                holder?.native.arrangeChildren()
+            }
+        }
     }
 
     /// Ties this element to the channels of the states its properties wear.
@@ -403,6 +412,7 @@ import CRT
     /// Detaches this element and everything under it from the runtime as it leaves the tree.
     /// Design: docs/design/host/tree.md#leaving
     public func leave() {
+        departureArrangementPending = false
         if let tree {
             for state in wornStates { tree.stateChannels.detach(state) }
             tree.forget(self)
