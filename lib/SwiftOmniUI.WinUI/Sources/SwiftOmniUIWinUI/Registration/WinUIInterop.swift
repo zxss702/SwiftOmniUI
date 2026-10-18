@@ -196,6 +196,24 @@ public struct WinUIReports<Realized: ElementContract> {
     }
 }
 
+/// The current values of an application's element during one property patch.
+/// Read related members together without importing the core host SPI.
+public struct WinUIElementValues<Realized: ElementContract> {
+    private let values: ElementValues<Realized>
+
+    init(_ values: ElementValues<Realized>) {
+        self.values = values
+    }
+
+    public subscript<Owner: Contract, Value: HostRepresentable>(_ member: ElementProperty<Owner, Value>) -> Value? {
+        values[member]
+    }
+
+    public func changed<Owner: Contract, Value: HostRepresentable>(_ member: ElementProperty<Owner, Value>) -> Bool {
+        values.changed(member)
+    }
+}
+
 /// How an application's own element is realized on this host, member by member: the properties its control takes,
 /// and the events of its own it raises.
 @MainActor
@@ -218,6 +236,17 @@ public final class WinUIRegistration<Realized: ElementContract, Made: WinUIContr
         _ apply: @escaping (Made, Value?) -> Void
     ) {
         registration.property(member) { hosted, value in apply(hosted.control, value) }
+    }
+
+    /// Applies related properties together, once per patch, so the control
+    /// can install its content before resolving selections and navigation.
+    public func applies(
+        _ members: [any ContractMember],
+        _ apply: @escaping (Made, WinUIElementValues<Realized>) -> Void
+    ) {
+        registration.applies(members) { hosted, values in
+            apply(hosted.control, WinUIElementValues(values))
+        }
     }
 
     /// An event the control raises through its reports - recorded, so the core knows this host reports it.
