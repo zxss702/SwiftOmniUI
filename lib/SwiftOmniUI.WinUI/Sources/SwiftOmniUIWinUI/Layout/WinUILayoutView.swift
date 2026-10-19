@@ -149,6 +149,14 @@ class WinUILayoutView: WinUIView {
     var allowsNativeSafeBars = false
 
     func setChildren(_ proposed: [WinUIView]) {
+        let views = allowsNativeSafeBars ? proposed : proposed.filter { $0.nativeSafeBarOwner == nil }
+        let childrenChanged = views.count != held.count || !zip(views, held).allSatisfy({ $0 === $1 })
+        // Compare before deferring: an unchanged proposal completes no work,
+        // and a return to the mounted list cancels an older pending replacement.
+        guard boxView !== heldBox || childrenChanged else {
+            pendingChildren = nil
+            return
+        }
         if WinUIView.arranging > 0 || WinUIView.measuring > 0 {
             pendingChildren = proposed
             guard !childrenCommitPending else { return }
@@ -160,20 +168,18 @@ class WinUILayoutView: WinUIView {
                 self.pendingChildren = nil
                 guard !self.isDetached, let children else { return }
                 self.setChildren(children)
-                self.invalidateMeasurements()
-                self.invalidateArrange()
             }
             return
         }
         pendingChildren = nil
-        let views = allowsNativeSafeBars ? proposed : proposed.filter { $0.nativeSafeBarOwner == nil }
-        guard boxView !== heldBox || views.count != held.count || !zip(views, held).allSatisfy({ $0 === $1 })
-        else { return }
 
         let handles: [SwiftOmniUIObjectRef?] = (boxView.map { [$0.presentationHandle] } ?? []) + views.map(\.presentationHandle)
         holdNativeChildren(handles)
         held = views
         heldBox = boxView
+        // Native content must be attached before its size is queried again.
+        // Invalidate on an actual child change, never on a deferred no-op.
+        if childrenChanged { invalidateMeasurements() }
         invalidateArrange()
     }
 
@@ -216,7 +222,9 @@ class WinUILayoutView: WinUIView {
             if boxView?.isEllipse != ellipse { boxView = WinUIShapeView(ellipse: ellipse) }
             boxView?.paint(radius: outline.relay.radius, fill: fill, stroke: stroke, width: width)
         }
-        setChildren(held)
+        // A brush/outline update must preserve the newest structural proposal,
+        // including children waiting for the native layout pass to finish.
+        setChildren(pendingChildren ?? held)
     }
 
     /// Asks WinUI to arrange the children again: a place in the air lands in the pass it asks for.
