@@ -10,6 +10,21 @@ final class SafeAreaTests: XCTestCase {
     private let whole = Rect(x: 0, y: 0, width: 400, height: 800)
     private let safe = Rect(x: 0, y: 60, width: 400, height: 710)
 
+    func testAColumnRebasesItsEdgeContributionsWithoutClippingANewProposalToOldBounds() {
+        let window = SafeAreaContext(
+            bounds: Rect(0, -48, 800, 648), layout: Rect(0, 0, 800, 600),
+            container: Rect(0, 0, 800, 600), consumed: EdgeInsets(3))
+        let column = window.child(in: Rect(256, 0, 544, 600))
+        for proposal in [Rect(0, 0, 900, 1800), Rect(0, 0, 80, 30), Rect(0, 0, 544, 600)] {
+            let context = column.resizedLayout(to: proposal)
+            XCTAssertEqual(context.safe, proposal)
+            XCTAssertEqual(context.bounds, Rect(0, -48, proposal.width, proposal.height + 48))
+            XCTAssertEqual(context.insets, EdgeInsets(top: 48, leading: 0, bottom: 0, trailing: 0))
+            XCTAssertEqual(context.consumed, window.consumed)
+            XCTAssertEqual(context.resizedLayout(to: column.layout), column)
+        }
+    }
+
     /// Content that says nothing, or stands clear of the bars, stands in the safe area; content let under the bars
     /// reaches the window's edge on every edge it says so.
     func testContentReachesTheWindowsEdgeWhereItLetsItselfUnderTheBars() {

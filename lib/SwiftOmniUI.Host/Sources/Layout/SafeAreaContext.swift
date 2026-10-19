@@ -29,6 +29,21 @@
     /// allocation. The layout size and this environment are separate values.
     public var insets: EdgeInsets { Self.insets(of: safe, in: bounds) }
 
+    /// Apply the same edge contributions to another proposal. Regions belong
+    /// to the layout that produced them; a new proposal changes their extent,
+    /// rather than clipping itself against the previous allocation.
+    public func resizedLayout(to proposal: Rect) -> Self {
+        guard layout != proposal else { return self }
+        func resized(_ region: Rect) -> Rect {
+            Rect(proposal.x + region.x - layout.x,
+                 proposal.y + region.y - layout.y,
+                 max(0, region.width + proposal.width - layout.width),
+                 max(0, region.height + proposal.height - layout.height))
+        }
+        return Self(bounds: resized(bounds), layout: proposal,
+                    container: resized(container), keyboard: resized(keyboard), consumed: consumed)
+    }
+
     /// A child keeps the enclosing proposal's unsafe strips only at edges where
     /// it touches the safe region. A local card cannot acquire a window-wide bar.
     public func child(in frame: Rect, preservingOutsets: Bool = true) -> Self {
