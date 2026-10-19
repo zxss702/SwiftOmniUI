@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 #include <winrt/Windows.System.h>
@@ -36,13 +37,21 @@ namespace {
         }
     }
 
-    /// Tells the view `view` of each change of the box's words. TextChanging, not TextChanged: it is raised in the
-    /// write that makes it, so a program's write is known as one, where TextChanged comes later.
+    /// TextChanging only records the source of the write. It can run during
+    /// XAML layout, where reporting state and rebuilding the visual tree is
+    /// forbidden. TextChanged delivers the completed input outside that phase.
     void hearWords(controls::TextBox const &box, int64_t view) {
+        auto userChange = std::make_shared<bool>(false);
         box.TextChanging(guarded("handling TextChanging",
-            [view](controls::TextBox const &sender, controls::TextBoxTextChangingEventArgs const &args) {
+            [userChange](controls::TextBox const &, controls::TextBoxTextChangingEventArgs const &args) {
             if (!args.IsContentChanging()) return;
-            auto bytes = winrt::to_string(sender.Text());
+            *userChange = !callbacks.isProgramWriting();
+        }));
+        box.TextChanged(guarded("handling TextChanged",
+            [view, userChange](IInspectable const &sender, controls::TextChangedEventArgs const &) {
+            if (!*userChange) return;
+            *userChange = false;
+            auto bytes = winrt::to_string(sender.as<controls::TextBox>().Text());
             callbacks.textChanged(view, bytes.c_str());
         }));
     }

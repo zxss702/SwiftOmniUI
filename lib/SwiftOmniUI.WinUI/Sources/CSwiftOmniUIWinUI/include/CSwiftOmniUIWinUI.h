@@ -221,6 +221,8 @@ typedef struct {
 
     /// A native split column changed width, invalidating its owner's size calculation.
     void (*paneWidthChanged)(int64_t view);
+    /// Classifies a synchronous native change before its asynchronous notification.
+    bool (*isProgramWriting)(void);
 } SwiftOmniUIWinUICallbacks;
 
 /// What the environment is, in groups, each read at once.
