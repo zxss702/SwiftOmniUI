@@ -27,6 +27,16 @@ private final class FractionalAllocationPanel: WinUISingleChildView {
 }
 
 @MainActor
+private final class FractionalPreparationText: WinUITextView {
+    var allocations: [ProposedViewSize] = []
+
+    override func prepareMeasure(width: Double, height: Double? = nil) {
+        allocations.append(ProposedViewSize(width: width, height: height))
+        super.prepareMeasure(width: width, height: height)
+    }
+}
+
+@MainActor
 private struct FractionalAllocationTree {
     let root = FractionalAllocationPanel()
     let frame = FractionalAllocationPanel()
@@ -50,6 +60,53 @@ private struct FractionalAllocationTree {
 }
 
 final class WinUIFractionalAllocationTests: XCTestCase {
+    func testEquivalentFloatStackAllocationsKeepTheSameNativeTextProposals() {
+        onUIThread {
+            let owner = WinUISingleChildView()
+            let stack = WinUIStackView(axis: .vertical)
+            stack.spacing = 16
+            let heading = FractionalPreparationText()
+            heading.setText("Heading")
+            heading.setTextFont(size: 80, attributes: nil, family: nil)
+            let subtitle = FractionalPreparationText()
+            subtitle.setText("Subtitle")
+            subtitle.setTextFont(size: 32, attributes: nil, family: nil)
+            let row = FractionalAllocationPanel()
+            row.fixedHeight = 112
+            stack.setItems([WinUILayoutItem(view: heading), WinUILayoutItem(view: subtitle), WinUILayoutItem(view: row)])
+            owner.setItems([WinUILayoutItem(view: stack)])
+
+            // A quarter of one Float ULP changes Double stack compression,
+            // but is the very same height at the native XAML boundary.
+            let measured = Float(stack.naturalSize(width: 448).height).nextDown
+            let measuredHeight = Double(measured)
+            let logicalHeight = measuredHeight + Double(measured.ulp) / 4
+            XCTAssertNotEqual(logicalHeight, measuredHeight)
+            XCTAssertEqual(Float(logicalHeight), measured)
+            stack.prepareMeasure(width: 448, height: measuredHeight)
+            let desired = [heading.desiredSize, subtitle.desiredSize]
+            let proposals = [heading.allocations.last!, subtitle.allocations.last!]
+            let revision = stack.measurementRevision
+            let rowMeasures = row.nativeMeasures
+            heading.allocations.removeAll()
+            subtitle.allocations.removeAll()
+
+            for _ in 0..<8 {
+                owner.withNativeArrange {
+                    stack.prepareAllocation(in: Rect(0, 0, 448, logicalHeight))
+                }
+                XCTAssertEqual([heading.desiredSize, subtitle.desiredSize], desired,
+                               "equivalent native allocations cannot change a leaf's DesiredSize during Arrange")
+                stack.prepareMeasure(width: 448, height: measuredHeight)
+                XCTAssertEqual(stack.measurementRevision, revision)
+            }
+            XCTAssertTrue(heading.allocations.allSatisfy { $0 == proposals[0] })
+            XCTAssertTrue(subtitle.allocations.allSatisfy { $0 == proposals[1] },
+                          "preparation and XAML Measure must select the same compressed text height")
+            XCTAssertEqual(row.nativeMeasures, rowMeasures)
+        }
+    }
+
     func testFractionalStackCompressionDoesNotAlternateConsumedInsetsOrInvalidateItsRow() {
         onUIThread {
             let owner = WinUISingleChildView()
@@ -57,8 +114,16 @@ final class WinUIFractionalAllocationTests: XCTestCase {
             stack.spacing = 16
             let heading = FractionalAllocationPanel()
             heading.fixedHeight = 114.96000671386719
+            let headingText = FractionalPreparationText()
+            headingText.setText("Heading")
+            headingText.setTextFont(size: 160, attributes: nil, family: nil)
+            heading.setItems([WinUILayoutItem(view: headingText)])
             let subtitle = FractionalAllocationPanel()
             subtitle.fixedHeight = 45.98400115966797
+            let subtitleText = FractionalPreparationText()
+            subtitleText.setText("Subtitle")
+            subtitleText.setTextFont(size: 80, attributes: nil, family: nil)
+            subtitle.setItems([WinUILayoutItem(view: subtitleText)])
             let buttonRow = FractionalAllocationPanel()
             buttonRow.fixedHeight = 112
             var headingItem = WinUILayoutItem(view: heading)
@@ -77,6 +142,8 @@ final class WinUIFractionalAllocationTests: XCTestCase {
             stack.prepareMeasure(width: 448, height: measuredHeight)
             let revision = buttonRow.measurementRevision
             let measures = buttonRow.nativeMeasures
+            let subtitleDesired = subtitleText.desiredSize
+            let subtitleProposal = subtitleText.allocations.last!
 
             for _ in 0..<16 {
                 // The logical parent prepares the unrounded slot; XAML's
@@ -84,6 +151,8 @@ final class WinUIFractionalAllocationTests: XCTestCase {
                 owner.withNativeArrange {
                     stack.prepareAllocation(in: Rect(0, 0, 448, rawHeight))
                 }
+                XCTAssertEqual(subtitleText.desiredSize, subtitleDesired,
+                               "the log's exact Double/Float heights must not toggle the native subtitle's size")
                 XCTAssertEqual(buttonRow.safeAreaContext?.consumed, consumed)
                 stack.prepareMeasure(width: 448, height: measuredHeight)
                 XCTAssertEqual(buttonRow.safeAreaContext?.consumed, consumed)
@@ -91,6 +160,7 @@ final class WinUIFractionalAllocationTests: XCTestCase {
                                "no safe-area edge changed, so a row cannot become dirty on every phase")
                 XCTAssertEqual(buttonRow.nativeMeasures, measures)
             }
+            XCTAssertTrue(subtitleText.allocations.allSatisfy { $0 == subtitleProposal })
         }
     }
 

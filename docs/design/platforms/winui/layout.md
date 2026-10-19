@@ -19,6 +19,16 @@ are cached by both proposed axes; a different proposal never reads the last
 difference between zero, unspecified and infinite axes. Native constraints
 are normalized to XAML's single precision.
 
+Native plan bounds and child rectangles use that same single precision before
+descendant placement arithmetic runs. This also applies when an unspecified
+axis takes its natural extent, and when Arrange prepares a child's allocation
+from its parent's Double arithmetic. Two Double sizes converting to the same
+XAML size select one native plan. Otherwise a VStack can compress a text leaf
+at 304.944000244 DIPs during Measure, restore its uncompressed height using
+304.944007874 DIPs during Arrange preparation, and make XAML repeatedly measure
+the unchanged stack. Natural-size answers and shared host arithmetic remain
+Double; the conversion belongs to the native plan boundary.
+
 Stacks, grids, layers, single-child containers, safe-area bar hosts and Custom
 Layout produce a completed `LayoutPlan`. A plan contains the actual bounds,
 resolved layout values, safe-area context, child proposals, content revisions

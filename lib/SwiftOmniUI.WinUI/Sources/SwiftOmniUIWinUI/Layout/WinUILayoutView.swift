@@ -426,6 +426,7 @@ class WinUILayoutView: WinUIView {
     func prepareAllocation(in bounds: Rect) {
         precondition(!isNativeArranging, "an arranging panel prepares its plan within its own phase")
         guard hasNativeProposals else { return }
+        let bounds = Self.nativeRect(bounds)
         if hasSizing, lastSizingWidth == bounds.width, lastSizingHeight == bounds.height,
            cachedLayoutPlan(in: bounds) != nil { return }
         WinUILayoutDiagnostics.record("prepare.allocation", view: self,
@@ -504,11 +505,20 @@ class WinUILayoutView: WinUIView {
         return ProposedViewSize(width: axis(proposal.width), height: axis(proposal.height))
     }
 
+    /// A native plan describes the rectangles XAML will actually receive.
+    /// Computing descendants at a Double extent and then arranging their panel
+    /// at its Float conversion can select different compression/wrapping and
+    /// change a leaf's DesiredSize during every parent Arrange.
+    private static func nativeRect(_ rect: Rect) -> Rect {
+        Rect(Double(Float(rect.x)), Double(Float(rect.y)),
+             Double(Float(max(0, rect.width))), Double(Float(max(0, rect.height))))
+    }
+
     private func planBounds(proposal: ProposedViewSize, natural: LayoutSize) -> Rect {
         let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
         let framed = values.sized(natural, offered: proposal.width)
-        return Rect(0, 0, proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? framed.width,
-                    proposal.height.flatMap { $0.isFinite ? $0 : nil } ?? framed.height)
+        return Self.nativeRect(Rect(0, 0, proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? framed.width,
+                                    proposal.height.flatMap { $0.isFinite ? $0 : nil } ?? framed.height))
     }
 
     /// Unspecified axes follow the corrected intrinsic extent. Both a real
@@ -551,7 +561,9 @@ class WinUILayoutView: WinUIView {
             "bounds=\(WinUILayoutDiagnostics.rect(bounds)) safe=\(WinUILayoutDiagnostics.rect(context.safe)) cached=\(layoutPlans.count)")
         let previousBounds = preparingBounds
         preparingBounds = bounds
-        let proposals = Self.querySize { makeLayoutPlan(in: bounds) }
+        let proposals = Self.querySize { makeLayoutPlan(in: bounds) }.map {
+            NativeProposal(view: $0.view, place: Self.nativeRect($0.place))
+        }
         preparingBounds = previousBounds
         keepLayoutPlan(in: bounds, proposals: proposals)
         return layoutPlans.last!
@@ -670,10 +682,10 @@ class WinUILayoutView: WinUIView {
         withNativeArrange {
             nativeArrangePending = false
             WinUILayoutUpdates.beganNativeArrange(self)
-            let bounds = Rect(0, 0, width, height)
+            let bounds = Self.nativeRect(Rect(0, 0, width, height))
             allocatedBounds = bounds
             let previousHeight = measurementHeight
-            measurementHeight = height
+            measurementHeight = bounds.height
             let previousPlan = activeLayoutPlan
             defer { measurementHeight = previousHeight; activeLayoutPlan = previousPlan }
             if hasNativeProposals {
