@@ -10,7 +10,9 @@
 #include "Automation.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -145,6 +147,33 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_editor_make(int64_t view) {
     } catch (...) {
         report("making an editor");
         return nullptr;
+    }
+}
+
+extern "C" bool swiftomniui_winui_editor_intrinsic_height(SwiftOmniUIObjectRef handle, double *height) {
+    try {
+        auto editor = borrow<controls::TextBox>(handle);
+        controls::TextBlock line;
+        line.FontFamily(editor.FontFamily());
+        line.FontSize(editor.FontSize());
+        line.FontWeight(editor.FontWeight());
+        line.FontStyle(editor.FontStyle());
+        line.FontStretch(editor.FontStretch());
+        line.CharacterSpacing(editor.CharacterSpacing());
+        line.FlowDirection(editor.FlowDirection());
+        line.Text(L"Mg");
+        constexpr auto unbounded = std::numeric_limits<float>::infinity();
+        line.Measure({unbounded, unbounded});
+        auto padding = editor.Padding();
+        auto border = editor.BorderThickness();
+        auto measured = std::max(editor.MinHeight(), double(line.DesiredSize().Height)
+            + padding.Top + padding.Bottom + border.Top + border.Bottom);
+        if (!std::isfinite(measured) || measured <= 0) throw winrt::hresult_error(E_UNEXPECTED);
+        *height = measured;
+        return true;
+    } catch (...) {
+        report("measuring an editor's intrinsic line");
+        return false;
     }
 }
 

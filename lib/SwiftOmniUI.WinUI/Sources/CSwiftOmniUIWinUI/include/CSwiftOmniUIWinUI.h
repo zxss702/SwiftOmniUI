@@ -745,6 +745,10 @@ SwiftOmniUIObjectRef swiftomniui_winui_field_make(int64_t view);
 void swiftomniui_winui_field_set_style(SwiftOmniUIObjectRef field, int kind);
 SwiftOmniUIObjectRef swiftomniui_winui_editor_make(int64_t view);
 
+/// One line in the editor's native font, including its padding, border and minimum height.
+/// Writes height only on success; false reports a native measurement failure.
+bool swiftomniui_winui_editor_intrinsic_height(SwiftOmniUIObjectRef editor, double *height);
+
 /// Hides an editor's native canvas in every visual state; false restores its theme's background, without chrome.
 void swiftomniui_winui_editor_set_background_hidden(SwiftOmniUIObjectRef editor, bool hidden);
 

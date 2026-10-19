@@ -263,9 +263,12 @@ focused template's own border thickness. `scrollContentBackground(.hidden)`
 clears the canvas in every visual state; visible, automatic or unsaid restores
 the theme's background. Its native caret and selection stay. Growing with its
 words, it is measured with the room below it open and takes the height they
-take, WinUI telling its layout as they change; not growing, it is measured
-with none and keeps a line's height, whatever it holds - the height the
-layout gives it is the room it scrolls in.
+take. A scrolling editor without an allocated height asks for one line,
+measured from a separate native TextBlock with the editor's font plus its
+padding, border and native minimum height. This does not edit its text or
+selection. Every finite height, including zero, reaches native measurement
+unchanged. Its parent's allocation is the room it scrolls in; an intrinsic
+query never replaces it with a fabricated zero-height proposal.
 
 ## A search field
 

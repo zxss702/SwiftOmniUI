@@ -24,8 +24,19 @@ final class WinUITextEditorView: WinUIInputView {
         swiftomniui_winui_editor_set_background_hidden(handle, visibility == .hidden)
     }
 
-    /// Growing, the height its words take; not growing, one line's, whatever it holds.
+    /// An allocated height belongs to the parent. Without one, a scrolling
+    /// editor asks for one native line; a growing editor asks for all its words.
     override func measure(width: Double?, height: Double?) -> LayoutSize {
-        super.measure(width: width, height: growsWithText ? height : 0)
+        let offeredHeight: Double?
+        if !growsWithText, height?.isFinite != true {
+            var lineHeight = Double.nan
+            guard swiftomniui_winui_editor_intrinsic_height(handle, &lineHeight) else {
+                preconditionFailure("WinUI could not measure the editor's intrinsic line")
+            }
+            offeredHeight = lineHeight
+        } else {
+            offeredHeight = height
+        }
+        return super.measure(width: width, height: offeredHeight)
     }
 }
