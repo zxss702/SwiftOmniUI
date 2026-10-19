@@ -51,6 +51,18 @@ final class Differ {
     /// node, never the wire; the element's number is how the host asks.
     var codeObjects: [ElementId: NodeCode] = [:]
 
+    /// The nearest custom container owns its descendants' layout-value changes.
+    /// These sets last one walk and never cause unrelated layouts to rebuild.
+    var customLayoutOwners: [ElementId] = []
+    var customLayoutsWithChangedValues: Set<ElementId> = []
+
+    func withCustomLayoutOwner<Result>(_ id: ElementId?, _ body: () -> Result) -> Result {
+        guard let id else { return body() }
+        customLayoutOwners.append(id)
+        defer { customLayoutOwners.removeLast() }
+        return body()
+    }
+
     /// The handlers this walk found to run - `.onChanged`, `.onAppear` - in order.
     /// Design: docs/design/core/render.md#handlers-in-the-message
     var fired: [EventHandler] = []
@@ -106,6 +118,8 @@ final class Differ {
         describeAll: Bool = false,
         changed: Set<ObjectIdentifier> = []
     ) -> (node: RenderedNode, patch: HostPatch) {
+        customLayoutOwners.removeAll(keepingCapacity: true)
+        customLayoutsWithChangedValues.removeAll(keepingCapacity: true)
         self.describeAll = describeAll
         self.changed = changed
         affected = nil
@@ -136,6 +150,8 @@ final class Differ {
         _ rendered: RenderedNode,
         changed: Set<ObjectIdentifier>
     ) -> (node: RenderedNode, patch: HostPatch) {
+        customLayoutOwners.removeAll(keepingCapacity: true)
+        customLayoutsWithChangedValues.removeAll(keepingCapacity: true)
         describeAll = false
         self.changed = changed
         affected = Renderer.shared.affectedNodes(reading: changed)
@@ -195,6 +211,9 @@ final class Differ {
         defer { sceneRecord = outer }
 
         var patch = HostPatch(id: rendered.id, type: rendered.type)
+        let ownsLayoutValues = rendered.type == .customLayout
+        if ownsLayoutValues { customLayoutOwners.append(rendered.id) }
+        defer { if ownsLayoutValues { customLayoutOwners.removeLast() } }
 
         // A Canvas renderer reads state while drawing at its allocated size,
         // outside a view body's build. Recompute only that drawing when one of
@@ -303,10 +322,14 @@ final class Differ {
 
         }
 
+        if customLayoutsWithChangedValues.remove(rendered.id) != nil {
+            patch.customLayoutChanged = true
+        }
+
         // A layout can be carried while a descendant changes its size or joins
         // it. The write's transaction must reach that placement as well.
         if NodeType.saysMotion.contains(rendered.type), rendered.type != .app,
-           patch.layoutTransition == nil, let transaction, patch.children.hasChange {
+           patch.layoutTransition == nil, let transaction, patch.children.hasChange || patch.customLayoutChanged {
             let plan = rendered.placementPlan
             let write = plan?.transaction(under: transaction) ?? transaction
             func law(for values: AnimationValues) -> Animation {

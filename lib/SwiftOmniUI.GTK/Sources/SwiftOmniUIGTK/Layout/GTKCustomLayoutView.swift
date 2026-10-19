@@ -11,6 +11,7 @@
 final class GTKCustomLayoutView: GTKTravellingLayout {
     /// The layout object that arranges the children.
     private var arrangement: LayoutBox?
+    private var layoutRevision = -1
 
     /// The room inside the container's own edge.
     var padding = EdgeInsets(0) {
@@ -19,9 +20,13 @@ final class GTKCustomLayoutView: GTKTravellingLayout {
 
     /// A fresh set of children and the layout that arranges them.
     func setItems(_ items: [GTKLayoutItem], layout: LayoutBox?) {
+        let revision = sourceElement?.customLayoutRevision ?? 0
+        let layoutChanged = arrangement !== layout || layoutRevision != revision
+        layoutRevision = revision
         arrangement = layout
-        super.setItems(items)
+        let childrenChanged = super.setItems(items)
         layout?.update(subviews: subviews())
+        if layoutChanged && !childrenChanged { invalidateMeasurements() }
     }
 
     /// The items as the layout sees them: measured through `size(offered:)`,

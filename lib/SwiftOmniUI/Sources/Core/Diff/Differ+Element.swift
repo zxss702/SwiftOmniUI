@@ -663,8 +663,9 @@ extension Differ {
             patch.driven = .replace(driven.mapValues(HostStateBinding.init))
         }
 
-        let children = reconcileChildren(
-            of: previous, node: node, into: &patch, sizesArrive: node.childSizesArrive)
+        let children = withCustomLayoutOwner(node.type == .customLayout ? id : nil) {
+            reconcileChildren(of: previous, node: node, into: &patch, sizesArrive: node.childSizesArrive)
+        }
 
         if let source = lazySource {
             if describeAll || source.lazyRows !== previous?.lazySource?.lazyRows {
@@ -771,6 +772,16 @@ extension Differ {
         result.sceneFocusedValues = node.sceneFocusedValues
 
         // What a host pulls mid-layout: the element's code objects by its id.
+        // Replacing only a Layout value changes no serializable property or
+        // child. Keep that update in the sparse patch so hosts take the new box.
+        if previous != nil,
+           !NodeCode.sameLayoutValues(codeObjects[id]?.values ?? [:], node.layoutValues),
+           let owner = customLayoutOwners.last {
+            customLayoutsWithChangedValues.insert(owner)
+        }
+        let childLayoutValuesChanged = customLayoutsWithChangedValues.remove(id) != nil
+        let layoutObjectChanged = previous != nil && node.customLayout !== codeObjects[id]?.layout
+        patch.customLayoutChanged = layoutObjectChanged || childLayoutValuesChanged
         if node.customLayout != nil || !node.layoutValues.isEmpty || node.canvas != nil {
             codeObjects[id] = NodeCode(layout: node.customLayout, values: node.layoutValues, canvas: node.canvas)
         } else {
@@ -858,6 +869,7 @@ extension Differ {
     /// Design: docs/design/core/identity-and-diffing.md#what-the-parent-wrote
     private func sameWriting(_ node: Node, as kept: Node) -> Bool {
         guard node.props == kept.props,
+            NodeCode.sameLayoutValues(node.layoutValues, kept.layoutValues),
             node.inheritedMembers == kept.inheritedMembers,
             node.hasExplicitFontBasis == kept.hasExplicitFontBasis,
             node.lazyIdentity == kept.lazyIdentity,

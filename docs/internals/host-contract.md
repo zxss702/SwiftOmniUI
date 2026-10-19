@@ -36,6 +36,7 @@ struct HostPatch {
     var driven: HostDrivenUpdate?
     var events: HostEventUpdate?
     var animation: HostLayoutMotion?
+    var customLayoutChanged = false
     var children: HostChildrenUpdate = .unchanged
 }
 
@@ -76,6 +77,11 @@ Absence is meaningful:
 - `.arranged([])` removes every child;
 - `replace` rebuilds the native element from a complete patch for that
   identity.
+
+`customLayoutChanged` refreshes a retained Custom Layout's code and child
+layout-value inputs without changing child identity or arrangement. Hosts
+invalidate that container's measured layout even when its ordinary properties
+and child sequence are unchanged.
 
 Explicit `.id()` wins, then a `ForEach` item identity, then builder path, then
 position. Swift owns matching and diffing; a host does not infer identity from

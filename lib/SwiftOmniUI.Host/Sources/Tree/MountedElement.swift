@@ -46,6 +46,8 @@ import CRT
     /// Only a changed identity property advances this. Row and viewport patches
     /// must not make a host read and compare the complete source again.
     public private(set) var lazyItemsRevision = 0
+    /// Custom code and its child tags changed, independently of child identity.
+    public private(set) var customLayoutRevision = 0
     /// A lazy parent's data identity, kept separately from the view's explicit `.id()`.
     public private(set) var lazyIdentity: String?
     /// Shared with the renderer; hosts do not reconstruct this index from properties.
@@ -149,6 +151,7 @@ import CRT
         }
 
         if patch.lazyContentChanged { lazyContentRevision += 1 }
+        if patch.customLayoutChanged { customLayoutRevision &+= 1 }
         if let generation = patch.lazyRequestGeneration { lazyRequestGeneration = generation }
         if let identity = patch.lazyIdentity { lazyIdentity = identity }
         let previouslyShown = isPagePresented ? shownChildren : []

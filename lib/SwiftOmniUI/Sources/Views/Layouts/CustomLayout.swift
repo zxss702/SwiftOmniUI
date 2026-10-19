@@ -279,6 +279,19 @@ struct NodeCode {
 
     /// A Canvas renderer the host asks for at its allocated size.
     var canvas: CanvasBox?
+
+    /// Tags need no serialization. Compare their values before deciding whether
+    /// the nearest custom container needs a new native arrangement.
+    static func sameLayoutValues(_ first: [ObjectIdentifier: Any], _ second: [ObjectIdentifier: Any]) -> Bool {
+        guard first.keys == second.keys else { return false }
+        return first.allSatisfy { key, value in
+            guard let value = value as? any Equatable else { return false }
+            func same<Value: Equatable>(_ value: Value) -> Bool {
+                (second[key] as? Value).map { $0 == value } ?? false
+            }
+            return same(value)
+        }
+    }
 }
 
 /// The container a `callAsFunction` on a `Layout` makes: its children stand

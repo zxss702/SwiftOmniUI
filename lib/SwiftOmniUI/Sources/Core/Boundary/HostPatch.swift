@@ -29,6 +29,10 @@
     /// Hosts invalidate cached offscreen sizes when that source can have changed.
     public var lazyContentChanged = false
 
+    /// A retained custom layout has new code or changed child layout values.
+    /// Hosts refresh its arrangement even when properties and children are unchanged.
+    public var customLayoutChanged = false
+
     /// A new shared identity snapshot; nil keeps the mounted source unchanged.
     public var lazyRows: HostLazySource?
 
