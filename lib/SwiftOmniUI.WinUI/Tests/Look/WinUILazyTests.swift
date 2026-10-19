@@ -81,6 +81,43 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testViewportBeforeAttachmentRemainsPendingWithoutInventingGeometry() throws {
+        try onUIThread {
+            let host = WinUIRenderer.bare(reducesMotion: true)
+            var lazyPatch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+            lazyPatch.properties = [.items: .strings((0..<100).map(String.init))]
+            lazyPatch.children = .arranged((0..<8).map { number in
+                var row = HostPatch(id: .manual(String(number)), type: .text)
+                row.properties = [.text: .string("File \(number)"), .height: .number(28)]
+                return row
+            })
+            var patch = HostPatch(id: .manual("scroll"), type: .scrollView)
+            patch.children = .arranged([lazyPatch])
+            host.runtime.tree.apply(patch, complete: true)
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            var viewport = [Double](repeating: 123, count: 6)
+            XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &viewport),
+                           SwiftOmniUIViewportNotReady)
+            XCTAssertEqual(viewport, [Double](repeating: 123, count: 6),
+                           "pending native geometry must not be replaced by zeroes or a previous frame")
+            lazy.viewportReported(Rect(0, 0, 0, 0))
+            XCTAssertTrue(lazy.isWaitingForViewport)
+
+            WinUITestHost.window.show(scroll)
+            host.layOut()
+            WinUIDoorbell.commitPending()
+            host.layOut()
+            WinUIDoorbell.commitPending()
+            XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &viewport),
+                           SwiftOmniUIViewportReady)
+            XCTAssertGreaterThan(viewport[2], 0)
+            XCTAssertGreaterThan(viewport[3], 0)
+            XCTAssertFalse(lazy.isWaitingForViewport)
+            XCTAssertFalse(lazy.cells.built.isEmpty, "native attachment must resume the request without scrolling")
+        }
+    }
+
     func testLazyOwnFrameStillInvalidatesItsParentWithoutAChangeToRowExtent() throws {
         try onUIThread {
             let height = State(wrappedValue: 120.0)
@@ -730,7 +767,8 @@ final class WinUILazyTests: XCTestCase {
                                    original - (phase.isMultiple(of: 2) ? 24 : -24), accuracy: 1,
                                    "kind \(kind), phase \(phase): geometry must preserve the visible anchor and new input")
                     var displayed = [Double](repeating: 0, count: 6)
-                    swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &displayed)
+                    XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &displayed),
+                                   SwiftOmniUIViewportReady)
                     XCTAssertEqual(-displayed[horizontal ? 4 : 5], horizontal ? standing.x : standing.y, accuracy: 1)
                     XCTAssertFalse(lazy.mounted.isEmpty)
                 }
@@ -771,7 +809,8 @@ final class WinUILazyTests: XCTestCase {
                     var displayed = [Double](repeating: 0, count: 6)
                     // A program's move lands a few compositor ticks after it is asked (`ScrollTo`'s queue).
                     host.settle {
-                        swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &displayed)
+                        XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &displayed),
+                                       SwiftOmniUIViewportReady)
                         return abs(-displayed[horizontal ? 4 : 5] - (start + 16)) < 1
                     }
                     XCTAssertEqual(-displayed[horizontal ? 4 : 5], start + 16, accuracy: 1)
@@ -1477,7 +1516,8 @@ final class WinUILazyTests: XCTestCase {
                     let animationEar = WinUIScrollEar(owner: host) { [weak scroller = scroll.scroller, weak lazy] in
                         guard let scroller, let lazy, let move = animatedMove else { return }
                         var displayed = [Double](repeating: 0, count: 6)
-                        swiftomniui_winui_scroller_viewport(scroller.handle, lazy.handle, &displayed)
+                        XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroller.handle, lazy.handle, &displayed),
+                                       SwiftOmniUIViewportReady)
                         let along = -displayed[horizontal ? 4 : 5]
                         if abs(along - move.from) > 1, abs(along - move.to) > 1 {
                             animatedPhases.insert(move.phase)
@@ -1528,7 +1568,8 @@ final class WinUILazyTests: XCTestCase {
                             let phase = (step - 36) / 48
                             let offset = [800.0, 4_000.0, 0][phase]
                             var displayed = [Double](repeating: 0, count: 6)
-                            swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &displayed)
+                            XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &displayed),
+                                           SwiftOmniUIViewportReady)
                             animatedMove = (phase, -displayed[horizontal ? 4 : 5], offset)
                             phaseStarts.append(WinUIFrameClock.monotonic())
                             swiftomniui_winui_scroller_move(scroll.scroller.handle,
@@ -1691,7 +1732,8 @@ final class WinUILazyTests: XCTestCase {
                     let offset = native[horizontal ? 0 : 1]
                     XCTAssertEqual(offset, target, accuracy: 1, "kind \(kind)")
                     var viewport = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-                    swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &viewport)
+                    XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &viewport),
+                                   SwiftOmniUIViewportReady)
                     let room = viewport[horizontal ? 2 : 3]
                     let run = Int(((offset + room / 2) / extent).rounded(.down))
                     let row = run * perRun

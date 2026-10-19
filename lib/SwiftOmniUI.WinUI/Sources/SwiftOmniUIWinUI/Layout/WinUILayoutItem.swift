@@ -31,25 +31,41 @@ struct WinUILayoutItem: LayoutChild {
 
     /// The view's size for the width offered it, margin taken out (`LayoutValues.offer`, `sized`).
     func size(offered width: Double?) -> LayoutSize {
-        let offer = values.offer(width)
-        // A layout of SwiftOmniUI's is measured at the width it stands at; its size for any width is the arithmetic's.
-        // Design: docs/design/platforms/winui/layout.md#measured-every-pass
+        size(offered: ProposedViewSize(width: width))
+    }
+
+    func size(offered proposal: ProposedViewSize) -> LayoutSize {
+        let offer = values.offer(proposal.width)
+        let height: Double?
+        if let stated = values.height {
+            height = values.boundedHeight(stated, available: proposal.height)
+        } else {
+            height = [proposal.height, values.maximumHeight].compactMap { $0 }.min()
+        }
+        let offered = ProposedViewSize(width: offer, height: height)
         var measured: LayoutSize
         if let layout = view as? WinUILayoutView {
-            measured = layout.naturalSize(width: offer)
-            if WinUIView.arranging == 0, WinUILayoutView.queryingSize == 0 {
+            measured = height == nil ? layout.naturalSize(width: offer) : layout.naturalSize(proposal: offered)
+            if WinUILayoutView.queryingSize == 0 {
                 let expands = values.flex != nil || values.expandingAxes == .horizontal || values.expandingAxes == .both
                 let allocated = Extent.of(option: expands ? 3 : values.horizontal, stated: values.width,
-                                          natural: measured.width, available: width ?? measured.width,
+                                          natural: measured.width, available: proposal.width ?? measured.width,
                                           minimum: values.minimumWidth, maximum: values.maximumWidth)
-                layout.prepareMeasure(width: allocated)
-                measured = layout.naturalSize(width: offer)
+                layout.prepareMeasure(width: allocated, height: height)
+                measured = height == nil ? layout.naturalSize(width: offer) : layout.naturalSize(proposal: offered)
             }
         } else {
-            measured = view.measure(width: offer, height: nil)
+            measured = view.measure(width: offer, height: height)
         }
-
-        return values.sized(measured, offered: width)
+        var sized = values.sized(measured, offered: proposal.width)
+        if values.height == nil, let height = proposal.height, height.isFinite {
+            let expands = values.expandingAxes == .vertical || values.expandingAxes == .both
+            let scrolls = values.scrollAxes == .vertical || values.scrollAxes == .both
+            if expands || scrolls || values.minimumHeight != nil || values.maximumHeight != nil {
+                sized.height = values.boundedHeight(height)
+            }
+        }
+        return sized
     }
 
     /// Whether a parent would place this item as it places `other`.

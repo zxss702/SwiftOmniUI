@@ -9,33 +9,88 @@ import CSwiftOmniUIWinUI
 /// Design: docs/design/platforms/winui/layout.md#a-layout-is-a-panel
 @MainActor
 class WinUILayoutView: WinUIView {
-    /// The sizes measured in the pass under way, by the width offered.
+    /// Intrinsic answers by width; height-sensitive queries use proposedSizes.
     let measurements = MeasurementCache()
-    private var arithmeticMeasurementPass: UInt64?
 
     /// XAML keeps only its last native proposal. Arithmetic probes can select
     /// another width without invalidating Swift's size answers by proposal.
     private var lastSizingWidth: Double?
     private var lastSizingHeight: Double?
     private var hasSizing = false
+    private var nativePreparationDepth = 0
+    private var preparingUnchangedProposal = false
+    private var validatedArithmeticEpoch: UInt64?
+    private static var validationSequence: UInt64 = 0
+    static var nativeValidationEpoch: UInt64?
 
     struct NativeProposal {
         weak var view: WinUIView?
         let place: Rect
     }
-    private struct Preparation {
-        let width: Double?
-        let size: LayoutSize
-        let bounds: Rect
-        let proposals: [NativeProposal]
+    private struct Dependency {
+        weak var view: WinUIView?
+        let revision: Int
+        let hierarchy: Int
+        let attached: Bool
+
+        init(_ view: WinUIView) {
+            self.view = view
+            revision = view.parentMeasurementRevision
+            hierarchy = view.hierarchyRevision
+            attached = view.isAttached
+        }
+
+        var isCurrent: Bool {
+            guard let view, !view.isDetached else { return false }
+            return revision == view.parentMeasurementRevision && hierarchy == view.hierarchyRevision
+                && attached == view.isAttached
+        }
     }
-    private var preparations: [Preparation] = []
+
+    private struct LayoutPlan {
+        let bounds: Rect
+        let revision: Int
+        let hierarchy: Int
+        let values: LayoutValues
+        let safeArea: SafeAreaContext
+        let proposals: [NativeProposal]
+        let dependencies: [Dependency]
+    }
+    private var layoutPlans: [LayoutPlan] = []
+    private var activeLayoutPlan: LayoutPlan?
+    private var proposedSizes: [(proposal: ProposedViewSize, size: LayoutSize)] = []
 
     /// Layouts with placement arithmetic can prepare XAML directly from those
     /// proposals. Specialized layouts with measurement side effects keep their
     /// contentSize pass until they provide this contract explicitly.
     var hasNativeProposals: Bool { false }
     func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] { [] }
+
+    /// Only height-sensitive arithmetic needs distinct intrinsic answers for
+    /// each height. Every native allocation and placement still uses both axes.
+    var contentSizeDependsOnHeight: Bool { false }
+
+    /// Both axes reach author-defined layouts; existing arithmetic uses width.
+    func contentSize(proposal: ProposedViewSize) -> LayoutSize {
+        contentSize(width: proposal.width.flatMap { $0.isFinite ? $0 : nil })
+    }
+
+    func makeLayoutPlan(in bounds: Rect) -> [NativeProposal] {
+        nativeProposals(width: bounds.width, size: LayoutSize(width: bounds.width, height: bounds.height))
+    }
+
+    /// Placement consumes the completed plan selected by the native callback.
+    func preparedLayoutPlan(in bounds: Rect) -> [NativeProposal] {
+        precondition(activeLayoutPlan?.bounds == bounds, "placement requires a plan for its actual bounds")
+        return activeLayoutPlan!.proposals
+    }
+
+    /// Specialized safe-area layouts restore context when reusing a plan.
+    func restoreLayoutContext(in bounds: Rect, proposals: [NativeProposal]) {}
+
+    func forgetLayoutPlans() {
+        layoutPlans.removeAll(keepingCapacity: true)
+    }
 
     /// Arithmetic probes do not select the native subtree's layout proposal.
     static var queryingSize = 0
@@ -178,7 +233,10 @@ class WinUILayoutView: WinUIView {
         pendingChildren = nil
 
         let handles: [SwiftOmniUIObjectRef?] = (boxView.map { [$0.presentationHandle] } ?? []) + views.map(\.presentationHandle)
+        let previous = held
         holdNativeChildren(handles)
+        for view in previous where !views.contains(where: { $0 === view }) { view.nativeParentChanged() }
+        for view in views where !previous.contains(where: { $0 === view }) { view.nativeParentChanged() }
         held = views
         heldBox = boxView
         // Native content must be attached before its size is queried again.
@@ -309,7 +367,8 @@ class WinUILayoutView: WinUIView {
     /// Forgets the sizes this layout keeps.
     func forgetMeasurements() {
         measurements.invalidate()
-        preparations.removeAll(keepingCapacity: true)
+        layoutPlans.removeAll(keepingCapacity: true)
+        proposedSizes.removeAll(keepingCapacity: true)
         forgetNativePreparation()
     }
 
@@ -322,176 +381,186 @@ class WinUILayoutView: WinUIView {
         hasSizing = false
     }
 
-    /// Restores the allocated native proposal. XAML decides whether its
-    /// measurement is still valid, including changes from native descendants.
+    /// Restore the real allocation without discarding other intrinsic proposals.
     override func prepareMeasure(width: Double, height: Double? = nil) {
-        guard WinUIView.arranging == 0, Self.queryingSize == 0 else { return }
-        let width = Double(Float(width))
-        let height = height.map { Double(Float($0)) }
-        let currentSizing = hasSizing && lastSizingWidth == (width.isFinite ? width : nil)
-            && lastSizingHeight == height.flatMap { $0.isFinite ? $0 : nil }
-
-        // A speculative width can have measured the children since this panel's last
-        // native pass. Even if XAML still holds this width, that subtree must be prepared again.
+        precondition(!isNativeArranging, "an arranging panel cannot measure itself")
+        let proposal = Self.normalized(ProposedViewSize(
+            width: width.isFinite ? width : nil, height: height.flatMap { $0.isFinite ? $0 : nil }))
+        let currentSizing = hasSizing && lastSizingWidth == proposal.width && lastSizingHeight == proposal.height
         if !currentSizing { swiftomniui_winui_invalidate_measure(presentationHandle) }
-        // Always enter XAML Measure: unchanged constraints are already a native
-        // fast path. Our revision cannot see native dirty paths, template changes
-        // or a subtree returning from Collapsed, so it cannot skip that check.
+        // XAML still checks native dirtiness at an unchanged proposal. Reusing
+        // arithmetic here does not skip preparing its native descendants.
+        let previousPreparation = preparingUnchangedProposal
+        preparingUnchangedProposal = currentSizing
+        nativePreparationDepth += 1
+        defer { nativePreparationDepth -= 1; preparingUnchangedProposal = previousPreparation }
         super.prepareMeasure(width: width, height: height)
     }
 
-    /// Prepares the children and reports their size within the native proposal.
-    /// Logical placement ownership must not change XAML's DesiredSize contract.
-    /// Design: docs/design/platforms/winui/layout.md#desired-size
+    /// A genuine native Measure owns this view's phase, even beneath an
+    /// ancestor's Arrange. Global depths continue to protect tree mutations.
     func measure(width: Double, height: Double) -> LayoutSize {
-        // Arrange may invoke Measure for a dirty child. Its previous DesiredSize
-        // is provisional; preserve the proposal through the shared deferred-measure path.
-        guard WinUIView.arranging == 0 else {
-            _ = super.measure(width: Optional(width), height: Optional(height))
-            return desiredSize
-        }
-        // This is the native pass itself, rather than a request to measure.
-        // It consumes older queued invalidations without scheduling itself again.
-        WinUILayoutUpdates.beganNativeMeasure(self)
-        let previousHeight = measurementHeight
-        measurementHeight = height.isFinite ? height : nil
-        defer { measurementHeight = previousHeight }
-
-        Self.arithmeticMeasuring += 1
-        if Self.arithmeticMeasuring == 1 { Self.measurementPass &+= 1 }
-        WinUIView.measuring += 1
-        defer {
-            Self.arithmeticMeasuring -= 1
-            WinUIView.measuring -= 1
-        }
-
-        let offered = width.isFinite ? width : nil
-        let previous = measurements.cachedSize(offering: offered)
-            ?? (measured?.offered == offered ? measured?.size : nil)
-        // Reaching MeasureOverride means XAML rejected its previous result.
-        // That applies equally to an explicit preparation and a native pass;
-        // keeping arithmetic here would answer a new measure with old content.
-        forgetMeasurements()
-        _ = boxView?.measure(width: width, height: height)
-        let startedAt = WinUIView.provisionalMeasureRevision
-        var contentRevision = measurementRevision
-        var size: LayoutSize
-        if hasNativeProposals {
-            func preparation(for size: LayoutSize) -> Preparation {
-                let framed = sourceElement?.winUI.resolvedLayoutValues.sized(size, offered: offered) ?? size
-                let bounds = Rect(0, 0, offered ?? framed.width, height.isFinite ? height : framed.height)
-                if let kept = preparations.first(where: { $0.width == offered && $0.size == size && $0.bounds == bounds }) {
-                    return kept
-                }
-                let previousBounds = preparingBounds
-                preparingBounds = bounds
-                defer { preparingBounds = previousBounds }
-                let plan = Preparation(width: offered, size: size, bounds: bounds,
-                                       proposals: Self.querySize { nativeProposals(width: offered, size: LayoutSize(width: bounds.width, height: bounds.height)) })
-                if preparations.count == 4 { preparations.removeFirst() }
-                preparations.append(plan)
-                return plan
+        withNativeMeasure {
+            WinUILayoutUpdates.beganNativeMeasure(self)
+            let proposal = Self.normalized(ProposedViewSize(
+                width: width.isFinite ? width : nil, height: height.isFinite ? height : nil))
+            let previousHeight = measurementHeight
+            let previousValidation = Self.nativeValidationEpoch
+            // An independent XAML pass, or a dirty callback at unchanged
+            // constraints, must validate native-only resource changes too.
+            // A new allocation alone retains its intrinsic answers.
+            if previousValidation == nil, nativePreparationDepth == 0 || preparingUnchangedProposal {
+                Self.validationSequence &+= 1
+                Self.nativeValidationEpoch = Self.validationSequence
             }
-            func prepare(_ plan: Preparation) {
+            measurementHeight = proposal.height
+            Self.arithmeticMeasuring += 1
+            defer {
+                measurementHeight = previousHeight
+                Self.nativeValidationEpoch = previousValidation
+                Self.arithmeticMeasuring -= 1
+            }
+
+            let previous = (measured?.proposal == proposal ? measured?.size : nil)
+                ?? (proposal.height == nil ? measurements.cachedSize(offering: proposal.width)
+                    : proposedSizes.first(where: { $0.proposal == proposal })?.size)
+            // Independent XAML measurement can originate in native resources.
+            // Explicit preparation keeps proposal-keyed arithmetic, then checks
+            // every selected native child and refines any changed answer.
+            if nativePreparationDepth == 0 { forgetMeasurements() }
+            _ = boxView?.measure(width: width, height: height)
+            var size: LayoutSize
+            if hasNativeProposals {
+                while true {
+                    size = naturalSize(proposal: proposal)
+                    let bounds = planBounds(proposal: proposal, natural: size)
+                    _ = prepareLayoutPlan(in: bounds)
+                    let current = naturalSize(proposal: proposal)
+                    if planBounds(proposal: proposal, natural: current) == bounds {
+                        size = current
+                        break
+                    }
+                }
+            } else {
+                // Lazy/native containers commit their own measurement geometry.
                 let querying = Self.queryingSize
                 Self.queryingSize = 0
-                let previousBounds = preparingBounds
-                preparingBounds = plan.bounds
-                defer { Self.queryingSize = querying; preparingBounds = previousBounds }
-                for proposal in plan.proposals {
-                    guard let view = proposal.view else { continue }
-                    if view.nativeSafeBarOwner == nil {
-                        view.safeAreaContext = context(for: view, at: proposal.place).ignoring(view.sourceElement?.ignoresSafeArea)
-                    }
-                    let room = view.wordsRoom ?? proposal.place
-                    view.prepareMeasure(width: room.width, height: room.height)
-                }
+                size = contentSize(proposal: proposal)
+                Self.queryingSize = querying
             }
-            var plan = preparation(for: naturalSize(width: offered))
-            while true {
-                let before = WinUIView.nativeSizeRevision
-                contentRevision = measurementRevision
-                prepare(plan)
-                size = plan.size
-                guard before != WinUIView.nativeSizeRevision || contentRevision != measurementRevision else { break }
+            lastSizingWidth = proposal.width
+            lastSizingHeight = proposal.height
+            hasSizing = true
+            if !contentSizeDependsOnHeight || proposal.height == nil { measurements.store(size, offering: proposal.width) }
+            if let previous, previous != size { WinUIView.nativeSizeRevision &+= 1 }
+            recordMeasurement(size, proposal: proposal, previous: previous)
+            let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
+            let framed = values.sized(size, offered: proposal.width)
+            return LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
+        }
+    }
 
-                // A child's corrected size may redistribute its siblings' widths.
-                // Commit those proposals before returning this MeasureOverride,
-                // rather than arranging new arithmetic over last pass's native sizes.
-                forgetMeasurements()
-                let updated = preparation(for: naturalSize(width: offered))
-                if updated.proposals.count == plan.proposals.count,
-                   zip(updated.proposals, plan.proposals).allSatisfy({
-                       $0.view === $1.view && $0.place == $1.place
-                   }) {
-                    // Arithmetic probes may have selected other native widths.
-                    // Restore the final proposals even when their geometry is unchanged.
-                    prepare(updated)
-                    size = updated.size
-                    break
-                }
-                plan = updated
+    static func normalized(_ proposal: ProposedViewSize) -> ProposedViewSize {
+        func axis(_ value: Double?) -> Double? {
+            value.map {
+                precondition(!$0.isNaN, "a layout proposal cannot contain NaN")
+                return Double(Float(max(0, $0)))
             }
-        } else {
-            // Lazy/custom/native layouts also commit geometry during this pass.
-            // Run it once; an initial naturalSize call would duplicate the work.
-            let querying = Self.queryingSize
-            Self.queryingSize = 0
-            size = contentSize(width: offered)
-            Self.queryingSize = querying
         }
-        lastSizingWidth = offered
-        lastSizingHeight = height.isFinite ? height : nil
-        hasSizing = startedAt == WinUIView.provisionalMeasureRevision && contentRevision == measurementRevision
-        if !hasSizing {
+        return ProposedViewSize(width: axis(proposal.width), height: axis(proposal.height))
+    }
+
+    private func planBounds(proposal: ProposedViewSize, natural: LayoutSize) -> Rect {
+        let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
+        let framed = values.sized(natural, offered: proposal.width)
+        return Rect(0, 0, proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? framed.width,
+                    proposal.height.flatMap { $0.isFinite ? $0 : nil } ?? framed.height)
+    }
+
+    private func keepLayoutPlan(in bounds: Rect, proposals: [NativeProposal]) {
+        layoutPlans.removeAll { $0.bounds == bounds }
+        if layoutPlans.count == 4 { layoutPlans.removeFirst() }
+        layoutPlans.append(LayoutPlan(
+            bounds: bounds, revision: measurementRevision, hierarchy: hierarchyRevision,
+            values: sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues(),
+            safeArea: layoutSafeArea(in: bounds), proposals: proposals,
+            dependencies: proposals.compactMap { $0.view.map(Dependency.init) }))
+    }
+
+    private func completedLayoutPlan(in bounds: Rect) -> LayoutPlan {
+        let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
+        let context = layoutSafeArea(in: bounds)
+        if let plan = layoutPlans.first(where: {
+            $0.bounds == bounds && $0.revision == measurementRevision && $0.hierarchy == hierarchyRevision
+                && $0.values == values && $0.safeArea == context && $0.dependencies.allSatisfy(\.isCurrent)
+        }) { return plan }
+        let previousBounds = preparingBounds
+        preparingBounds = bounds
+        let proposals = Self.querySize { makeLayoutPlan(in: bounds) }
+        preparingBounds = previousBounds
+        keepLayoutPlan(in: bounds, proposals: proposals)
+        return layoutPlans.last!
+    }
+
+    private func prepareLayoutPlan(in bounds: Rect) -> LayoutPlan {
+        var plan = completedLayoutPlan(in: bounds)
+        while true {
+            let before = WinUIView.nativeSizeRevision
+            let revision = measurementRevision
+            prepareChildren(plan)
+            if before == WinUIView.nativeSizeRevision && revision == measurementRevision
+                && plan.dependencies.allSatisfy(\.isCurrent) {
+                keepLayoutPlan(in: bounds, proposals: plan.proposals)
+                return layoutPlans.last!
+            }
+            // Preparation may resolve an attached template or inherited font.
+            // Recompute before giving those child rectangles to Arrange.
             forgetMeasurements()
-        } else {
-            if measurements.store(size, offering: offered) {
-                preparations.removeAll(keepingCapacity: true)
+            plan = completedLayoutPlan(in: bounds)
+        }
+    }
+
+    private func prepareChildren(_ plan: LayoutPlan) {
+        let querying = Self.queryingSize
+        let previousBounds = preparingBounds
+        Self.queryingSize = 0
+        preparingBounds = plan.bounds
+        restoreLayoutContext(in: plan.bounds, proposals: plan.proposals)
+        defer { Self.queryingSize = querying; preparingBounds = previousBounds }
+        for proposal in plan.proposals {
+            guard let view = proposal.view else { continue }
+            if view.nativeSafeBarOwner == nil {
+                view.safeAreaContext = context(for: view, at: proposal.place).ignoring(view.sourceElement?.ignoresSafeArea)
             }
+            let room = view.wordsRoom ?? proposal.place
+            view.prepareMeasure(width: room.width, height: room.height)
         }
-        if let previous, previous != size { WinUIView.nativeSizeRevision &+= 1 }
-        recordMeasurement(size, offered: offered, previous: previous)
-        // Report a real DesiredSize even with a logical placing parent. Native
-        // presenters and effect wrappers also consume this result. Bounding it
-        // by the prepared proposal keeps XAML from arranging a larger subtree.
-        let framed = sourceElement?.layoutValues.sized(size, offered: offered) ?? size
-        if hasSizing {
-            recordNativeMeasurement(width: offered ?? framed.width, height: height.isFinite ? height : framed.height)
-        }
-        return LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
     }
 
     /// How many SwiftOmniUI layouts are measuring, one inside another.
     private static var arithmeticMeasuring = 0
-    private static var measurementPass: UInt64 = 0
-
-    /// A native pass can be caused by XAML alone (text, templates, visibility),
-    /// without a SOUI property revision. Validate queried descendants in that
-    /// pass before reusing their arithmetic; no subtree walk is needed.
-    static var currentMeasurementPass: UInt64? {
-        arithmeticMeasuring > 0 ? measurementPass : nil
-    }
 
     /// The width of the place this layout was last put in; nil before its first.
     var standsAt: Double?
 
-    /// The natural size last measured, and the width it was offered.
-    private var measured: (offered: Double?, size: LayoutSize)?
+    /// The natural size last measured and its complete native proposal.
+    private var measured: (proposal: ProposedViewSize, size: LayoutSize)?
     private var measuredSizeCommitPending = false
 
     /// Retains the natural-size revision used by logical row caches. XAML
     /// propagates native DesiredSize changes after MeasureOverride returns;
     /// invalidating the parent here would restart the pass still computing it.
-    private func recordMeasurement(_ size: LayoutSize, offered: Double?, previous: LayoutSize?) {
-        defer { measured = (offered, size) }
+    private func recordMeasurement(_ size: LayoutSize, proposal: ProposedViewSize, previous: LayoutSize?) {
+        defer { measured = (proposal, size) }
         guard !(self is WinUILazyView), placingLayout != nil,
               Self.arithmeticMeasuring == 1, let previous, previous != size
         else { return }
 
         measurementRevision &+= 1
-        // This native measurement ran outside the placing parent's measure.
-        // Its arithmetic still holds the previous answer. Publish the change
+        // A parent actively completing its plan consumes the correction now.
+        guard placingLayout?.isNativeMeasuring != true, placingLayout?.isNativeArranging != true else { return }
+        // An independent native measurement leaves idle logical arithmetic
+        // holding the previous answer. Publish the change
         // after XAML exits Measure, without invalidating the active native pass.
         guard !measuredSizeCommitPending else { return }
         measuredSizeCommitPending = true
@@ -503,29 +572,36 @@ class WinUILayoutView: WinUIView {
         }
     }
 
-    /// The room the children take for the width offered, in DIPs, kept until a change beneath marks the layout.
+    /// Intrinsic answers and native allocation are separate. Cache both axes
+    /// for Custom Layout without changing width-based shared arithmetic.
     func naturalSize(width: Double?) -> LayoutSize {
+        naturalSize(proposal: ProposedViewSize(width: width))
+    }
+
+    func naturalSize(proposal: ProposedViewSize) -> LayoutSize {
         WinUILayoutUpdates.measured(self)
-        if let pass = Self.currentMeasurementPass, arithmeticMeasurementPass != pass {
+        let proposal = Self.normalized(proposal)
+        if let epoch = Self.nativeValidationEpoch, validatedArithmeticEpoch != epoch {
             measurements.invalidate()
-            preparations.removeAll(keepingCapacity: true)
-            arithmeticMeasurementPass = pass
+            proposedSizes.removeAll(keepingCapacity: true)
+            layoutPlans.removeAll(keepingCapacity: true)
+            validatedArithmeticEpoch = epoch
         }
-        let width = width.map { Double(Float($0)) }
-        return measurements.size(offering: width) {
+        func compute() -> LayoutSize {
             Self.sizings += 1
-            Self.queryingSize += 1
-            defer { Self.queryingSize -= 1 }
-            let startedAt = WinUIView.provisionalMeasureRevision
-            let size = contentSize(width: width)
-            if startedAt != WinUIView.provisionalMeasureRevision {
-                // The next deferred proposal completes this result. Do not
-                // let a previous DesiredSize become a row's natural extent.
-                measurements.invalidate()
-                forgetNativePreparation()
-            }
-            return size
+            return Self.querySize { contentSize(proposal: proposal) }
         }
+        if !contentSizeDependsOnHeight || proposal.height == nil {
+            return measurements.size(offering: proposal.width, measure: compute)
+        }
+        if let kept = proposedSizes.first(where: { $0.proposal == proposal }) { return kept.size }
+        let revision = measurementRevision
+        let size = compute()
+        if revision == measurementRevision {
+            if proposedSizes.count == 4 { proposedSizes.removeFirst() }
+            proposedSizes.append((proposal, size))
+        }
+        return size
     }
 
     /// How many times a layout has sized its children - what a test counts.
@@ -533,16 +609,25 @@ class WinUILayoutView: WinUIView {
 
     /// Answers WinUI's arrange: places the box and every child in `width` by `height` DIPs, inside the pass.
     func arrange(width: Double, height: Double) {
-        nativeArrangePending = false
-        WinUILayoutUpdates.beganNativeArrange(self)
-        WinUIView.arranging += 1
-        defer { WinUIView.arranging -= 1 }
-        prepareAllocationAfterPass(width: width, height: height)
-        allocatedBounds = Rect(0, 0, width, height)
-        boxView?.layout(backgroundBounds(in: Rect(0, 0, width, height)))
-        writeCut(width: width, height: height)
-        arrange(in: Rect(x: 0, y: 0, width: width, height: height))
-        holdDeparting()
+        withNativeArrange {
+            nativeArrangePending = false
+            WinUILayoutUpdates.beganNativeArrange(self)
+            let bounds = Rect(0, 0, width, height)
+            allocatedBounds = bounds
+            let previousHeight = measurementHeight
+            measurementHeight = height
+            let previousPlan = activeLayoutPlan
+            defer { measurementHeight = previousHeight; activeLayoutPlan = previousPlan }
+            if hasNativeProposals {
+                // Native-owned roots can receive new final bounds without a
+                // Measure. Prepare only descendants, never this active panel.
+                activeLayoutPlan = prepareLayoutPlan(in: bounds)
+            }
+            boxView?.layout(backgroundBounds(in: bounds))
+            writeCut(width: width, height: height)
+            arrange(in: bounds)
+            holdDeparting()
+        }
     }
 
     /// Stands every child riding its removal transition where it last stood: it takes no room, but WinUI

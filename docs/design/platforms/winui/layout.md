@@ -13,139 +13,79 @@ asking: a child is placed only inside its parent's arrangement
 
 ## Measured every pass
 
-WinUI keeps each element's measure itself, and a child left unmeasured in a
-pass that marked it stays marked, which sets the pass going again - a pass
-that does not settle ends the process. So each measure the panel answers
-measures every shown child; WinUI answers a child it measured at the same
-size from what it kept, and measures one it did not.
+Intrinsic answers and native allocations are separate. Native leaf answers
+are cached by both proposed axes; a different proposal never reads the last
+`DesiredSize` as its answer. Authored Custom Layout proposals retain the
+difference between zero, unspecified and infinite axes. Native constraints
+are normalized to XAML's single precision.
 
-A native control is measured at each width the arithmetic offers it. A
-layout of SwiftOmniUI's is prepared at its allocated width and height and
-reports its content's size within that proposal. WinUI measures it again
-where a change beneath marked it. Put in a place of another width, it is measured there first, which
-measures its own children at the widths its arrangement then gives them - a
-control arranged at a width other than the one it was last measured at would
-mark its layout again. Its size at any other width is the arithmetic's, kept
-per width until WinUI measures it again or a change forgets it on the way up.
-Measured at every width asked of it, a layout forgot its sizes each time and
-measured its whole subtree again: some seven hundred sizings for one word six
-grids deep, and 2910 measures - 150 ms of a debug build's frame - for one
-card of the home page's run turned.
+Stacks, grids, layers, single-child containers, safe-area bar hosts and Custom
+Layout produce a completed `LayoutPlan`. A plan contains the actual bounds,
+resolved layout values, safe-area context, child proposals, content revisions
+and native attachment dependencies. Plans are bounded and hold views weakly.
+Measure prepares the selected native children and refines the plan if a
+native answer changes. Arrange consumes those same child rectangles rather
+than rerunning placement arithmetic against unrelated native measurements.
+Cached ZStack inset context is restored from the recorded bar rectangle.
+Custom Layout forwards both axes through size, dimensions and placement.
+Replacing the layout object invalidates its plan even with unchanged children.
+Changes to a child's layout-value tags notify its nearest Custom Layout through
+`HostPatch.customLayoutChanged`; the mounted revision invalidates that
+container even when its LayoutBox and child identities remain unchanged.
 
-Arithmetic queries and native preparation have separate scopes. A
-`naturalSize` query can measure native leaves to answer a new proposal, but
-does not recursively prepare panels or replace lazy row geometry. Stacks,
-grids, single-child containers and layers also calculate their child places in a
-query scope, then prepare only the selected places during native measurement.
-Repeated leaf probes read width-keyed answers without selecting another
-native proposal. A new leaf probe marks its placing ancestors' native
-preparation stale, while retaining their arithmetic answers. The selected
-places prepare native leaves as well as panels before arrangement.
-They read the resulting sizes again before answering, so an initially
-estimated lazy extent is not retained as the parent's completed size.
+A selected native allocation always enters XAML Measure so native dirtiness,
+resource changes and template attachment are observed. An explicit preparation
+can reuse proposal-keyed arithmetic while still checking its native children.
+An independent native Measure, or a dirty native callback at unchanged
+constraints, validates queried descendants within one scoped native epoch.
+Only the visited dependency paths refresh; moving to a different allocation
+alone reuses intrinsic answers. Ordinary arithmetic ignores proposed height
+and retains its width cache; height-sensitive Custom Layout keeps both axes.
+If a native child changes its answer at the same proposal, its old intrinsic answers are
+discarded and the enclosing plan is recomputed before placement. Merely
+selecting a different proposal is not a content revision and does not clear
+answers at other widths or heights.
 
-Stacks, grids, layers and single-child containers cache the selected child
-proposals beside their width-keyed arithmetic. Native preparation replays those
-proposals without running `contentSize` again. If preparing a child changes an
-answer to the same proposal, the enclosing arithmetic is recomputed. Specialized
-layouts that commit geometry while measuring, including Lazy, retain one
-`contentSize` pass. Preparation records are bounded and hold children weakly.
+Layout phases belong to each view. An ancestor can be arranging while a child
+that has not entered Arrange is synchronously measured. The global native
+layout depths remain active to protect structural changes; callbacks do not
+reset them. A panel must not call native Measure, InvalidateMeasure or
+UpdateLayout on itself or an arranging ancestor. A native-owned page receiving
+new final bounds synchronously computes and prepares its child plan for those
+bounds without reentering its own native Measure.
 
-`ProgramWrite` ends each patch/frame's native invalidation batch. Swift caches
-are cleared immediately, shared ancestors once until a measurement consumes
-them; another write after that measurement invalidates them again. Native
-measure/arrange requests are coalesced until the batch ends. Row invalidations
-stop at the Lazy panel. Only changes to its returned extent propagate to the
-scroll document; changing the widest visible row in a fixed-width vertical
-stack is not such a change. The first measurement also reports its replacement
-of the estimated scroll extent. Window content constraints reuse their sizing
-while the queried views' measurement revisions and window constraints agree.
+There is no provisional DesiredSize, deferred unknown-proposal measurement or
+old animation allocation to repair on a later dispatcher turn. A presentation
+frame records the latest place and requests the parent's Arrange; that pass
+prepares the latest slot before arranging the child. Text's destination room
+continues to control wrapping while its presentation travels.
 
-Preparation restores native child proposals even when their arithmetic
-answers are cached. Changing the native proposal preserves the other
-width-keyed answers; only changed content, a changed answer or provisional
-measurement discards them. An independent measure from XAML still refreshes
-the arithmetic and returns its new DesiredSize. Repeating a preparation
-still enters XAML Measure, whose native cache checks whether the subtree is
-dirty; Swift's arithmetic revision cannot establish that. This avoids the former alternating
-ideal/allocated-width queries clearing and rebuilding nested caches.
-Only a completed native measure records the prepared subtree's width;
-an arithmetic cache miss cannot overwrite that record.
-GeometryReader retains its independent ideal size, but still prepares its
-native children at the proposals selected by its placement arithmetic. Its
-children cannot remain unmeasured merely because they do not determine the
-reader's own natural size.
+Native child attachment, blur-boundary ownership and invalidation of an active
+native view wait until layout ends. Deferred structural work requests the
+next native layout itself. It never depends on another keystroke or scroll.
+`ProgramWrite` coalesces shared ancestor invalidations until measurement consumes
+their caches, and a later write can invalidate them again. Native input clears
+logical size answers before its state report can render a new tree. An idle
+logical owner is notified when an independent native measurement changes its
+answer; a parent already completing a plan consumes the correction directly.
 
-Arithmetic size probes during Arrange read prepared measurements; an unknown
-proposal is prepared after that pass to avoid repeatedly changing native
-constraints during placement. A native `MeasureOverride` is different: XAML's
-`CUIElement::ArrangeInternal` explicitly measures a dirty child before arranging
-it, even when its parent is still arranging. The relay scopes that callback as
-measurement and restores the enclosing arrangement on return. It completes the
-child's measurement immediately, while structural edits and invalidations still
-wait until measurement ends. Returning old DesiredSize from this callback would
-leave the new subtree unprepared and schedule another repair instead.
+GeometryReader keeps its independent ideal size but prepares its children at
+the allocations selected by its plan. Safe regions are rebased to current
+bounds, preserving edge distances and consumed insets. Native-owned content
+uses the actual column's allocation, including changes from sidebar toggles.
+Promoted bars retain their logical identity and native ownership dependency.
 
-An arithmetic query that needed such an unprepared native proposal is
-provisional and is not cached. Its temporary DesiredSize cannot become a lazy
-row's committed natural extent. Native invalidation and child attachment are
-also deferred when MeasureOverride or ArrangeOverride is active. Deferred
-changes clear affected arithmetic and request native measure/arrange at the
-owning root; they do not measure that root with an invented unbounded height.
-Viewport realization includes the measurement revision, even if the viewport
-coordinates have not changed. The current ArrangeOverride bounds propagate
-safe contexts instead of reading the previous ActualSize during the callback.
-Inherited safe regions are rebased from their recorded allocation to the current
-proposal, preserving their edge distances and consumed insets. Native preparation
-at a new width and arrangement at an animated height must not reuse the previous
-allocation's safe rectangle. This also applies to native-owned content, which can
-receive a new allocation before its logical owner reports another frame.
-Lazy rows and tracks prefer the current finite width to `standsAt`; the old
-allocation is only a fallback when the parent left the width unspecified.
-Only preparation or viewport reconciliation commits row measurements,
-tracks and anchor corrections. Window minimum-size and ideal-size queries
-read the committed geometry; a query for different grid tracks uses estimates
-for those tracks without resetting the visible grid.
-Writing an unchanged child place between passes does not invalidate its
-parent again. ArrangeOverride still arranges every native child it holds.
+Lazy containers retain estimates only for unmeasured offscreen extents. Every
+mounted visible row is measured at the current proposal before Stack or Grid
+places it; neither an estimated frame nor a skipped cell substitutes for that
+measurement. Native tree updates requested by a viewport callback complete
+after the active pass, and their own invalidation resumes layout. Realization
+follows actual scrolling and clipped viewport geometry; program destinations
+remain a separate preparation request.
 
-A run whose change still waits for its rows' own measurements holds its
-arrangement for them, and not past a bound: a row kept alive by a window of its
-own, or one that left the room of a native pass, would otherwise hold the
-change's arrangement - and with it the change's law and the retention it
-stands - for good.
-
-Lazy viewport realization requests the estimated window as one batch, as
-GTK does. The former one-unknown-run policy performed a synchronous core
-render for each incoming row; reconciliation revisited the growing mounted
-window, and each iteration arranged that window again. This multiplied
-initialization work and restarted placement decisions before the fill had
-settled. The viewport callback now waits for the requested render, refines
-coverage from measured geometry, and commits one final arrangement. A
-callback during native Measure or Arrange resumes after the pass. Native
-proposal preparation, row revisions and the scroll look-ahead stay intact.
-The realized window follows the actual ViewChanged offset, not an animated
-scroll's final endpoint. It releases rows behind its look-ahead while a
-scroll is still active; it does not keep the continuous path from the first
-viewport to the eventual endpoint mounted until Idle. Program jumps still
-announce and realize their destination before moving the native scroller.
-ViewChanged supplies the current position for both realization and anchor
-selection. EffectiveViewport supplies the clipped dimensions; once scroll
-notices have begun, an effective-viewport event reads the current native offset
-instead of restoring an old reported position. This also picks up a descendant
-moved by layout. Anchor corrections shift both viewport records together.
-Program-jump preparation translates the target scroll offset into descendant
-coordinates; it does not publish that future position as an already visible
-anchor before the native move.
-
-GeometryReader accepts a safe allocation while retaining the remaining
-environment. Native window chrome that already sits outside the content row
-remains in that environment as an outside strip, read from committed metrics.
-ScrollView can extend its viewport behind it; native chrome has an explicit
-drawing order above that viewport. Geometry carries these remaining insets
-beside the existing ten-number physical report. Unloaded views report no
-geometry, so a retained navigation page cannot publish a false zero frame.
-Native Image/Viewbox content is prepared at its intrinsic size rather than 0x0.
+GeometryReader and frame feeds report committed native geometry on a display
+frame, outside native layout. Unloaded views publish no false zero frame.
+Native Image/Viewbox content is prepared at its intrinsic size.
 
 ## A place between passes
 
@@ -259,8 +199,17 @@ Margin commits run on initial loading, changed insets, and template/theme
 changes. Template changes use one LayoutUpdated notification, then remove
 the handler; unrelated window layouts do not traverse every scroller's
 template again. Unchanged resolved margins post no new commit.
-Native scroller proposals first encountered during arrangement are prepared
-after the pass. Size feedback to a placing layout is deferred as well.
+A scroller's allocation is prepared before its native Arrange. The viewport
+bridge distinguishes ready, not ready and failed queries, writing geometry
+only on success. A not-ready request waits through weak native Loaded and
+LayoutUpdated subscriptions and resumes when the native viewport exists;
+there is no guessed native-room rectangle or dispatcher retry loop. Ready
+rectangles are the current native intersection of ancestor scroll presenters
+and clipping bounds, transformed into the descendant's coordinates. An empty
+intersection is an offscreen window, not an attachment failure. Effective
+viewport notifications trigger a fresh complete read instead of mixing an
+old event's size with a new origin. Failed queries report an explicit native
+error and do not register a pending retry.
 
 A lazy run under the scroller answers the document's cross size with the
 widest row measured in the room it was given, and keeps that width for as
@@ -268,10 +217,10 @@ long as that is the room: the rows a moving window leaves behind do not
 narrow it. A cross size that follows the window toggles the document's
 extent - and the scroller's cross bar with it - between two states while the
 list scrolls along its own axis, so a widened extent is committed to the
-document once, when it grows. A row mounted before its own measurement
-arrives stands at its estimate, at the place the arithmetic holds for it:
-skipping it leaves the frame a hole where a heavy row takes longest, and the
-pass that follows corrects it.
+document once, when it grows. A newly mounted row completes its own native
+proposal before receiving a visible frame. Estimates contribute to the
+unmeasured offscreen extent, while visible Stack and Grid cells follow the
+same measurement requirement.
 
 Changing the cross-axis proposal invalidates row measurements through their
 proposal keys, not by replacing the entire extent index with 44-point rows.

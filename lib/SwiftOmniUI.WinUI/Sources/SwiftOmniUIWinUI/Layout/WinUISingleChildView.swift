@@ -24,9 +24,7 @@ class WinUISingleChildView: WinUILayoutView {
     }
 
     override func arrange(in bounds: Rect) {
-        guard let item = items.first, item.isShown else { return }
-
-        item.view.layout(childPlace(item, in: bounds))
+        for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
     }
 
     private func childPlace(_ item: WinUILayoutItem, in bounds: Rect) -> Rect {

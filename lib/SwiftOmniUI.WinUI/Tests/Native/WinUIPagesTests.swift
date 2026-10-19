@@ -9,6 +9,65 @@ import SwiftOmniUIConformance
 import XCTest
 
 final class WinUIPagesTests: XCTestCase {
+    func testSidebarTogglesKeepLazyStackAndGridVisibleWithoutScrolling() throws {
+        try onUIThread {
+            for grid in [false, true] {
+                let open = State(wrappedValue: true)
+                let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                    NavigationSplitView(open.projectedValue) {
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(0..<60) { Text("Sidebar \($0)").frame(height: 28) }
+                            }.id("sidebar-rows")
+                        }
+                    } detail: {
+                        ScrollView {
+                            if grid {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 0) {
+                                    ForEach(0..<120) { Text("Detail \($0)").frame(height: 36) }
+                                }.id("detail-rows")
+                            } else {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(0..<120) { Text("Detail \($0)").frame(height: 36) }
+                                }.id("detail-rows")
+                            }
+                        }
+                    }
+                }
+                let sidebar = try XCTUnwrap(host.views(WinUILazyView.self).first {
+                    $0.sourceElement?.id == .manual("sidebar-rows")
+                })
+                let detail = try XCTUnwrap(host.views(WinUILazyView.self).first {
+                    $0.sourceElement?.id == .manual("detail-rows")
+                })
+                for shown in [false, true, false, true] {
+                    open.wrappedValue = shown
+                    host.runtime.pump.turn()
+                    // Drain native layout and its realization handoff; no user
+                    // input or scroll event is supplied to repair the window.
+                    host.layOut()
+                    WinUIDoorbell.commitPending()
+                    host.layOut()
+                    WinUIDoorbell.commitPending()
+                    host.layOut()
+                    XCTAssertTrue(host.views(WinUILazyView.self).contains { $0 === sidebar })
+                    XCTAssertTrue(host.views(WinUILazyView.self).contains { $0 === detail })
+                    for lazy in shown ? [sidebar, detail] : [detail] {
+                        XCTAssertFalse(lazy.isWaitingForViewport)
+                        XCTAssertFalse(lazy.mounted.isEmpty)
+                        XCTAssertNotNil(lazy.span)
+                        for (identity, item) in lazy.mounted where !item.departing {
+                            XCTAssertNotNil(lazy.measured[identity])
+                            XCTAssertEqual(lazy.measuredRevisions[identity], item.view.measurementRevision)
+                            XCTAssertGreaterThan(item.view.laidOutFrame.width, 0)
+                            XCTAssertGreaterThan(item.view.laidOutFrame.height, 0)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Hiding the toolbar removes its native row, while the complete client area keeps the window's own colour.
     func testHiddenWindowToolbarUsesTheFullClientAreaAndRestoresDynamically() throws {
         try onUIThread {

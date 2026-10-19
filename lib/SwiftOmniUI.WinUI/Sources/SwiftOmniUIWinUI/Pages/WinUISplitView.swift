@@ -171,7 +171,6 @@ final class WinUISplitView: WinUILayoutView {
     /// intrinsic queries. A previous allocation is not a measurement constraint.
     /// Design: docs/design/platforms/winui/pages.md#a-native-arrangement
     override func measure(width: Double, height: Double) -> LayoutSize {
-        guard WinUIView.arranging == 0 else { return super.measure(width: width, height: height) }
         asked = sidebar.measure(width: width, height: height)
         return super.measure(width: width, height: height)
     }

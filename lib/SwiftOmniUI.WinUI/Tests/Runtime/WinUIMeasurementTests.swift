@@ -22,6 +22,53 @@ private final class CountedMeasureLayout: WinUILayoutView {
     }
 }
 
+/// Lets a real XAML ArrangeOverride ask a descendant for a new measurement.
+private final class NativeArrangementMeasureProbe: WinUILayoutView {
+    var onArrange: ((Rect) -> Void)?
+
+    override func contentSize(width: Double?) -> LayoutSize {
+        LayoutSize(width: width ?? 400, height: 240)
+    }
+
+    override func arrange(in bounds: Rect) { onArrange?(bounds) }
+}
+
+/// Records the proposals delivered through the same panel callbacks as an
+/// authored layout, without replacing the native Measure entry point.
+private final class NativeProposalMeasureProbe: WinUILayoutView {
+    override var contentSizeDependsOnHeight: Bool { true }
+    var proposals: [ProposedViewSize] = []
+    var onMeasure: ((ProposedViewSize) -> Void)?
+
+    override func contentSize(proposal: ProposedViewSize) -> LayoutSize {
+        proposals.append(proposal)
+        onMeasure?(proposal)
+        return LayoutSize(width: proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 80,
+                          height: proposal.height.flatMap { $0.isFinite ? $0 : nil } ?? 40)
+    }
+}
+
+private final class NativeOwnedArrangeProbe: WinUISingleChildView {
+    var finiteMeasurements = 0
+
+    override func measure(width: Double, height: Double) -> LayoutSize {
+        if width.isFinite, height.isFinite { finiteMeasurements += 1 }
+        return super.measure(width: width, height: height)
+    }
+}
+
+private final class DistinctProposalTestLayout: Layout, @unchecked Sendable {
+    typealias Cache = Void
+    var proposals: [ProposedViewSize] = []
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> Size {
+        proposals.append(proposal)
+        return proposal == .infinity ? Size(width: 180, height: 140) : Size(width: 80, height: 40)
+    }
+
+    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {}
+}
+
 /// Words `depth` grids deep, each grid with words and a stack of its own beside them.
 @MainActor
 private func nest(_ depth: Int, _ words: String) -> Node {
@@ -353,6 +400,8 @@ final class WinUIMeasurementTests: XCTestCase {
             let label = WinUILabelView()
             label.setText("Animate me")
             label.setTextFont(size: 17, attributes: nil, family: nil)
+            let ancestor = NativeArrangementMeasureProbe()
+            ancestor.setItems([WinUILayoutItem(view: label)])
             let unconstrained = label.measure(width: nil, height: nil)
             let wide = label.measure(width: 400, height: nil)
             let narrow = label.measure(width: 40, height: nil)
@@ -361,18 +410,27 @@ final class WinUIMeasurementTests: XCTestCase {
             let clipped = label.measure(width: 400, height: 1)
             XCTAssertLessThan(clipped.height, wide.height)
 
-            WinUIView.arranging += 1
-            defer { WinUIView.arranging -= 1 }
-            XCTAssertEqual(label.measure(width: nil, height: nil), unconstrained)
-            XCTAssertEqual(label.measure(width: 400, height: nil), wide)
-            XCTAssertEqual(label.measure(width: 399.7142857, height: nil), wide,
-                           "native rounding must not fall back to the narrow or clipped measurement")
-            XCTAssertEqual(label.measure(width: 40, height: nil), narrow)
-            XCTAssertEqual(label.desiredSize, clipped, "reading a proposal must not remeasure XAML inside Arrange")
+            var queried = false
+            ancestor.onArrange = { _ in
+                queried = true
+                XCTAssertTrue(ancestor.isNativeArranging)
+                XCTAssertFalse(label.isNativeArranging)
+                XCTAssertEqual(label.measure(width: nil, height: nil), unconstrained)
+                XCTAssertEqual(label.measure(width: 400, height: nil), wide)
+                XCTAssertEqual(label.measure(width: 399.7142857, height: nil), wide,
+                               "the exact rounded proposal is measured before this Arrange returns")
+                XCTAssertEqual(label.measure(width: 40, height: nil), narrow)
+                XCTAssertEqual(label.desiredSize, narrow,
+                               "the child commits the final requested proposal during its ancestor's Arrange")
+            }
+            ancestor.prepareMeasure(width: 500, height: 240)
+            swiftomniui_winui_arrange(ancestor.handle, 0, 0, 500, 240)
+            XCTAssertTrue(queried)
+            ancestor.onArrange = nil
         }
     }
 
-    func testANewArrangementWidthRepairsItsAncestorsAfterThePass() {
+    func testANewArrangementWidthCompletesItsAncestorsDuringThePass() {
         onUIThread {
             let label = WinUILabelView()
             label.setText("Animate me")
@@ -383,25 +441,162 @@ final class WinUIMeasurementTests: XCTestCase {
             parent.setItems([item])
             let grandparent = WinUIStackView(axis: .vertical)
             grandparent.setItems([WinUILayoutItem(view: parent)])
+            let ancestor = NativeArrangementMeasureProbe()
+            ancestor.setItems([WinUILayoutItem(view: grandparent)])
             let narrow = grandparent.naturalSize(width: 88)
 
-            WinUIView.arranging += 1
-            // This proposal has not been measured. Both ancestors must forget the provisional result,
-            // even if repeated layout calculations asked for it more than once in the same pass.
-            _ = grandparent.naturalSize(width: 448)
-            _ = parent.naturalSize(width: 448)
-            WinUIView.arranging -= 1
-            WinUIDoorbell.turn()
-
-            WinUIView.arranging += 1
-            let wide = grandparent.naturalSize(width: 448)
-            WinUIView.arranging -= 1
-            XCTAssertGreaterThan(wide.width, narrow.width)
-            XCTAssertLessThan(wide.height, narrow.height)
-            let sizings = WinUILayoutView.sizings
-            WinUIDoorbell.turn()
+            var wide: LayoutSize?
+            ancestor.onArrange = { _ in
+                XCTAssertTrue(ancestor.isNativeArranging)
+                let measured = grandparent.naturalSize(width: 448)
+                wide = measured
+                XCTAssertGreaterThan(measured.width, narrow.width)
+                XCTAssertLessThan(measured.height, narrow.height)
+                XCTAssertEqual(parent.naturalSize(width: 448), measured)
+                let sizings = WinUILayoutView.sizings
+                XCTAssertEqual(grandparent.naturalSize(width: 448), measured)
+                XCTAssertEqual(WinUILayoutView.sizings, sizings,
+                               "the new proposal is already complete without a dispatcher repair")
+            }
+            ancestor.prepareMeasure(width: 500, height: 240)
+            swiftomniui_winui_arrange(ancestor.handle, 0, 0, 500, 240)
+            XCTAssertNotNil(wide)
             XCTAssertEqual(grandparent.naturalSize(width: 448), wide)
-            XCTAssertEqual(WinUILayoutView.sizings, sizings, "a known proposal must settle without another turn")
+            ancestor.onArrange = nil
+        }
+    }
+
+    func testChildMeasureRetainsTheAncestorsArrangePhase() {
+        onUIThread {
+            let child = NativeProposalMeasureProbe()
+            let ancestor = NativeArrangementMeasureProbe()
+            ancestor.setItems([WinUILayoutItem(view: child)])
+            var measuredDuringArrangement = false
+            child.onMeasure = { proposal in
+                measuredDuringArrangement = true
+                XCTAssertEqual(proposal, ProposedViewSize(width: 160, height: 80))
+                XCTAssertGreaterThan(WinUIView.arranging, 0,
+                                     "native hierarchy mutation remains forbidden while an ancestor arranges")
+                XCTAssertTrue(ancestor.isNativeArranging)
+                XCTAssertTrue(child.isNativeMeasuring)
+                XCTAssertFalse(child.isNativeArranging)
+            }
+            ancestor.onArrange = { _ in
+                child.prepareMeasure(width: 160, height: 80)
+                XCTAssertFalse(child.isNativeMeasuring)
+                XCTAssertTrue(ancestor.isNativeArranging)
+            }
+
+            ancestor.prepareMeasure(width: 500, height: 240)
+            swiftomniui_winui_arrange(ancestor.handle, 0, 0, 500, 240)
+
+            XCTAssertTrue(measuredDuringArrangement)
+            XCTAssertFalse(ancestor.isNativeArranging)
+            XCTAssertFalse(child.isNativeMeasuring)
+            child.onMeasure = nil
+            ancestor.onArrange = nil
+        }
+    }
+
+    func testNativeOwnedRootPreparesChildrenAtItsFirstActualAllocation() {
+        onUIThread {
+            let child = WinUILabelView()
+            child.setText("A native-owned page")
+            let root = NativeOwnedArrangeProbe()
+            root.setItems([WinUILayoutItem(view: child)])
+
+            // Model a native owner's ArrangeOverride callback directly. Calling
+            // UIElement.Arrange here could first invoke XAML Measure for us.
+            root.arrange(width: 300, height: 100)
+            XCTAssertEqual(root.finiteMeasurements, 0)
+            XCTAssertEqual(child.placedFrame, Rect(0, 0, 300, 100))
+            XCTAssertEqual(child.laidOutFrame.width, 300, accuracy: 0.5)
+            XCTAssertEqual(child.laidOutFrame.height, 100, accuracy: 0.5)
+
+            root.arrange(width: 480, height: 160)
+            XCTAssertEqual(root.finiteMeasurements, 0)
+            XCTAssertEqual(child.placedFrame, Rect(0, 0, 480, 160))
+            XCTAssertEqual(child.laidOutFrame.width, 480, accuracy: 0.5)
+            XCTAssertEqual(child.laidOutFrame.height, 160, accuracy: 0.5)
+        }
+    }
+
+    func testNativePreparationCorrectionReflowsThePlanAtUnchangedBounds() {
+        onUIThread {
+            let words = WinUILabelView()
+            words.setText("Short")
+            words.setTextFont(size: 17, attributes: nil, family: nil)
+            let trailing = WinUILabelView()
+            trailing.setText("End")
+            var fixed = WinUILayoutItem(view: trailing)
+            fixed.values.width = 40
+            let root = WinUIStackView(axis: .horizontal)
+            root.spacing = 0
+            root.setItems([WinUILayoutItem(view: words), fixed])
+            root.arrange(width: 320, height: 100)
+            XCTAssertLessThan(words.placedFrame.width, 280)
+            let revision = words.measurementRevision
+
+            // A native template/content change can invalidate XAML without a
+            // Swift property patch. Keep the prior arithmetic deliberately.
+            words.setText(String(repeating: "Native words changed ", count: 20))
+            XCTAssertEqual(words.measurementRevision, revision)
+            // Model the native dirty parent pass, bypassing Swift invalidation.
+            swiftomniui_winui_invalidate_measure(root.handle)
+            _ = root.measure(width: 320, height: 100)
+            root.arrange(width: 320, height: 100)
+
+            XCTAssertEqual(words.placedFrame, Rect(0, 0, 280, 100),
+                           "native preparation must rebuild stale rectangles before stamping their dependencies")
+            XCTAssertEqual(trailing.placedFrame, Rect(280, 0, 40, 100))
+            XCTAssertEqual(words.laidOutFrame.width, 280, accuracy: 0.5)
+            XCTAssertEqual(trailing.laidOutFrame.width, 40, accuracy: 0.5)
+            root.arrange(width: 320, height: 100)
+            XCTAssertEqual(trailing.placedFrame.x, 280)
+        }
+    }
+
+    func testHeightBoundsReachTheChildBeforeNativeMeasurement() {
+        onUIThread {
+            let child = NativeProposalMeasureProbe()
+            var item = WinUILayoutItem(view: child)
+            item.values.height = 120
+            item.values.maximumHeight = 80
+
+            let explicit = item.size(offered: ProposedViewSize(width: 200, height: 160))
+            XCTAssertEqual(explicit.height, 80)
+            XCTAssertFalse(child.proposals.isEmpty)
+            XCTAssertTrue(child.proposals.allSatisfy { $0.height == 80 },
+                          "an explicit height is bounded before either arithmetic or native measurement")
+
+            child.invalidateMeasure()
+            child.proposals.removeAll()
+            item.values.height = nil
+            let bounded = item.size(offered: ProposedViewSize(width: 200, height: 160))
+            XCTAssertEqual(bounded.height, 80)
+            XCTAssertFalse(child.proposals.isEmpty)
+            XCTAssertTrue(child.proposals.allSatisfy { $0.height == 80 },
+                          "a maximum height also caps an otherwise unspecified child height")
+        }
+    }
+
+    func testCustomChildDistinguishesInfiniteAndUnspecifiedProposals() {
+        onUIThread {
+            let layout = DistinctProposalTestLayout()
+            let child = WinUICustomLayoutView()
+            child.setItems([], layout: LayoutBox(layout))
+            let item = WinUILayoutItem(view: child)
+
+            let ideal = WinUILayoutView.querySize { item.size(offered: ProposedViewSize.unspecified) }
+            let maximum = WinUILayoutView.querySize { item.size(offered: ProposedViewSize.infinity) }
+
+            XCTAssertEqual(ideal, LayoutSize(width: 80, height: 40))
+            XCTAssertEqual(maximum, LayoutSize(width: 180, height: 140))
+            XCTAssertTrue(layout.proposals.contains(.unspecified))
+            XCTAssertTrue(layout.proposals.contains(.infinity),
+                          "the author's Layout must receive infinity independently of its ideal-size query")
+            XCTAssertEqual(WinUILayoutView.querySize { item.size(offered: ProposedViewSize.unspecified) }, ideal)
+            XCTAssertEqual(WinUILayoutView.querySize { item.size(offered: ProposedViewSize.infinity) }, maximum)
         }
     }
 
@@ -410,6 +605,8 @@ final class WinUIMeasurementTests: XCTestCase {
             let label = WinUILabelView()
             label.setText("short")
             label.setTextFont(size: 12, attributes: nil, family: nil)
+            let ancestor = NativeArrangementMeasureProbe()
+            ancestor.setItems([WinUILayoutItem(view: label)])
             let before = label.measure(width: 400, height: nil)
             label.setText("Words changed after both wide and narrow proposals were cached")
             label.setTextFont(size: 24, attributes: nil, family: nil)
@@ -423,13 +620,17 @@ final class WinUIMeasurementTests: XCTestCase {
             let expected = reference.measure(width: 400, height: nil)
             XCTAssertNotEqual(expected, before)
 
-            WinUIView.arranging += 1
-            _ = label.measure(width: 400, height: nil)
-            WinUIView.arranging -= 1
-            WinUIDoorbell.turn()
-            WinUIView.arranging += 1
-            defer { WinUIView.arranging -= 1 }
-            XCTAssertEqual(label.measure(width: 400, height: nil), expected)
+            var queried = false
+            ancestor.onArrange = { _ in
+                queried = true
+                XCTAssertEqual(label.measure(width: 400, height: nil), expected)
+                XCTAssertEqual(label.desiredSize, expected,
+                               "changed content has the requested native size before Arrange returns")
+            }
+            ancestor.prepareMeasure(width: 500, height: 240)
+            swiftomniui_winui_arrange(ancestor.handle, 0, 0, 500, 240)
+            XCTAssertTrue(queried)
+            ancestor.onArrange = nil
         }
     }
 

@@ -84,16 +84,8 @@ enum WinUICallbacks {
                 nonisolated(unsafe) let size = size
                 MainActor.assumeIsolated {
                     guard let layout = WinUIView.find(view) as? WinUILayoutView, let size else { return }
-                    // XAML can measure a dirty child inside its parent's Arrange.
-                    // This native MeasureOverride owns the current phase; it must
-                    // prepare the subtree now, rather than return stale DesiredSize.
-                    let enclosingArrangement = WinUIView.arranging
-                    WinUIView.arranging = 0
-                    WinUIView.measuring += 1
-                    defer {
-                        WinUIView.measuring -= 1
-                        WinUIView.arranging = enclosingArrangement
-                    }
+                    // Keep the enclosing Arrange visible to structural safety
+                    // checks. The measured child has its own phase scope.
                     let measured = layout.measure(width: width, height: height)
                     size[0] = measured.width
                     size[1] = measured.height

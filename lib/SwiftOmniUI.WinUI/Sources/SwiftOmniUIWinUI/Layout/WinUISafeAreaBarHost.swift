@@ -56,17 +56,23 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        let item = WinUILayoutItem(view: bar, values: bar.sourceElement?.layoutValues ?? LayoutValues())
+        let item = WinUILayoutItem(view: bar, values: bar.sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues())
         let size = SingleChildArithmetic.size(of: item, padding: EdgeInsets(0), width: width)
         return LayoutSize(width: size.width, height: size.height + spacing)
     }
 
+    override var hasNativeProposals: Bool { true }
+
+    override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
+        let item = WinUILayoutItem(view: bar, values: bar.sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues())
+        let bounds = Rect(0, 0, width ?? size.width, max(0, size.height - spacing))
+        return [NativeProposal(view: bar, place: SingleChildArithmetic.place(
+            of: item, in: bounds, padding: EdgeInsets(0), direction: direction))]
+    }
+
     override func arrange(in bounds: Rect) {
         bar.updateSafeBarDrawing()
-        let item = WinUILayoutItem(view: bar, values: bar.sourceElement?.layoutValues ?? LayoutValues())
-        bar.layout(SingleChildArithmetic.place(of: item,
-            in: Rect(0, 0, bounds.width, max(0, bounds.height - spacing)),
-            padding: EdgeInsets(0), direction: direction))
+        for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
     }
 
     /// Detach from the native toolbar before returning ownership to the

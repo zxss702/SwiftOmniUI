@@ -14,6 +14,8 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <winrt/Microsoft.UI.Composition.h>
+#include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Windows.Foundation.h>
@@ -27,13 +29,141 @@ namespace {
         winrt::weak_ref<NativeScrollBar> bar;
         xaml::Thickness original{}, applied{};
     };
+    struct ViewportRequest {
+        winrt::weak_ref<xaml::FrameworkElement> element;
+        winrt::event_token loaded{};
+    };
     struct ScrollerInsets {
+        int64_t view = 0;
         xaml::Thickness region{};
         std::vector<IndicatorMargin> indicators;
         bool pending = false;
         winrt::event_token templateLayout{};
+        std::vector<ViewportRequest> viewportRequests;
+        winrt::event_token viewportLayout{};
     };
     std::unordered_map<void *, std::weak_ptr<ScrollerInsets>> insetStates;
+
+    bool isDescendantOf(xaml::DependencyObject const &element, xaml::DependencyObject const &ancestor) {
+        for (auto at = element; at; at = xaml::Media::VisualTreeHelper::GetParent(at))
+            if (at == ancestor) return true;
+        return false;
+    }
+
+    SwiftOmniUIViewportStatus readViewport(controls::ScrollView const &scroller,
+                                          xaml::FrameworkElement const &element, double *viewport) {
+        try {
+            auto content = scroller.Content().try_as<xaml::UIElement>();
+            auto presenter = scroller.ScrollPresenter();
+            if (!content || !scroller.IsLoaded() || !element.IsLoaded()
+                || !scroller.XamlRoot() || scroller.XamlRoot() != element.XamlRoot()
+                || !presenter) return SwiftOmniUIViewportNotReady;
+            if (!isDescendantOf(element, content)) return SwiftOmniUIViewportNotReady;
+            auto width = scroller.ViewportWidth(), height = scroller.ViewportHeight();
+            if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0)
+                return SwiftOmniUIViewportNotReady;
+            auto parent = xaml::Media::VisualTreeHelper::GetParent(content).try_as<xaml::UIElement>();
+            if (!parent) return SwiftOmniUIViewportNotReady;
+            auto displayed = element.TransformToVisual(parent).TransformPoint({0, 0});
+            auto initial = presenter.TransformToVisual(element).TransformBounds(
+                winrt::Windows::Foundation::Rect(0, 0, static_cast<float>(width), static_cast<float>(height)));
+            double left = initial.X, top = initial.Y;
+            double right = left + initial.Width, bottom = top + initial.Height;
+            auto intersect = [&](xaml::UIElement const &clipper, double across, double down) {
+                auto bounds = clipper.TransformToVisual(element).TransformBounds(
+                    winrt::Windows::Foundation::Rect(0, 0, static_cast<float>(across), static_cast<float>(down)));
+                if (!std::isfinite(bounds.X) || !std::isfinite(bounds.Y)
+                    || !std::isfinite(bounds.Width) || !std::isfinite(bounds.Height))
+                    throw winrt::hresult_error(E_UNEXPECTED);
+                left = std::max(left, double(bounds.X));
+                top = std::max(top, double(bounds.Y));
+                right = std::min(right, double(bounds.X) + bounds.Width);
+                bottom = std::min(bottom, double(bounds.Y) + bounds.Height);
+            };
+            // Every rectangle belongs to this same native geometry snapshot.
+            // A nested scroller exposes only the part its ancestors display;
+            // retelling its rows must not expand that part to its full viewport.
+            for (xaml::DependencyObject at = element; at; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
+                auto visual = at.try_as<xaml::UIElement>();
+                if (!visual) continue;
+                if (visual.Visibility() == xaml::Visibility::Collapsed) return SwiftOmniUIViewportNotReady;
+                if (auto presenter = visual.try_as<controls::ScrollPresenter>()) {
+                    auto across = presenter.ViewportWidth(), down = presenter.ViewportHeight();
+                    if (!std::isfinite(across) || !std::isfinite(down) || across <= 0 || down <= 0)
+                        return SwiftOmniUIViewportNotReady;
+                    intersect(visual, across, down);
+                }
+                auto composition = xaml::Hosting::ElementCompositionPreview::GetElementVisual(visual);
+                if (visual.Clip() || composition.Clip()) {
+                    // SOUI's geometric clips are authored in the view's bounds.
+                    // Their bounding rectangle also bounds a nonrectangular path.
+                    auto size = visual.ActualSize();
+                    if (!std::isfinite(size.x) || !std::isfinite(size.y) || size.x < 0 || size.y < 0)
+                        return SwiftOmniUIViewportNotReady;
+                    intersect(visual, size.x, size.y);
+                }
+            }
+            double values[]{left, top, std::max(0.0, right - left), std::max(0.0, bottom - top), displayed.X, displayed.Y};
+            if (!std::all_of(std::begin(values), std::end(values), [](double value) { return std::isfinite(value); }))
+                return SwiftOmniUIViewportNotReady;
+            std::copy(std::begin(values), std::end(values), viewport);
+            return SwiftOmniUIViewportReady;
+        } catch (...) {
+            report("reading a descendant's scroll viewport");
+            return SwiftOmniUIViewportFailed;
+        }
+    }
+
+    void resumeViewportRequests(controls::ScrollView const &scroller, std::shared_ptr<ScrollerInsets> const &state) {
+        bool completed = false;
+        state->viewportRequests.erase(std::remove_if(state->viewportRequests.begin(), state->viewportRequests.end(),
+            [&](auto const &request) {
+                auto element = request.element.get();
+                if (!element) return true;
+                auto content = scroller.Content().try_as<xaml::DependencyObject>();
+                if (element.IsLoaded() && content && !isDescendantOf(element, content)) {
+                    // A retained page can be promoted or reparented to another
+                    // native owner. Its old scroller no longer owns the request.
+                    element.Loaded(request.loaded);
+                    return true;
+                }
+                double viewport[6];
+                if (readViewport(scroller, element, viewport) == SwiftOmniUIViewportNotReady) return false;
+                element.Loaded(request.loaded);
+                completed = true;
+                return true;
+            }), state->viewportRequests.end());
+        if (state->viewportRequests.empty() && state->viewportLayout.value != 0) {
+            scroller.LayoutUpdated(state->viewportLayout);
+            state->viewportLayout = {};
+        }
+        // Ready and Failed both complete a pending request. Existing scroll
+        // ears read the explicit result; a failure never becomes a retry loop.
+        if (completed) callbacks.scrolled(state->view, scroller.HorizontalOffset(), scroller.VerticalOffset());
+    }
+
+    void awaitViewport(controls::ScrollView const &scroller, xaml::FrameworkElement const &element) {
+        auto found = insetStates.find(winrt::get_abi(scroller));
+        if (found == insetStates.end()) return;
+        auto state = found->second.lock();
+        if (!state) return;
+        auto weak = winrt::make_weak(scroller);
+        if (std::none_of(state->viewportRequests.begin(), state->viewportRequests.end(),
+                        [&](auto const &request) { return request.element.get() == element; })) {
+            ViewportRequest request{winrt::make_weak(element)};
+            std::weak_ptr<ScrollerInsets> weakState = state;
+            request.loaded = element.Loaded(guarded("attaching a pending scroll viewport", [weak, weakState](auto const &, auto const &) {
+                if (auto scroller = weak.get()) {
+                    if (auto state = weakState.lock()) resumeViewportRequests(scroller, state);
+                }
+            }));
+            state->viewportRequests.push_back(request);
+        }
+        if (state->viewportLayout.value != 0) return;
+        state->viewportLayout = scroller.LayoutUpdated(guarded("resuming a ready scroll viewport", [weak, state](auto const &, auto const &) {
+            if (auto scroller = weak.get()) resumeViewportRequests(scroller, state);
+        }));
+    }
 
     bool sameMargin(xaml::Thickness const &a, xaml::Thickness const &b) {
         return a.Left == b.Left && a.Top == b.Top && a.Right == b.Right && a.Bottom == b.Bottom;
@@ -174,12 +304,15 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
     try {
         controls::ScrollView scroller;
         auto insets = std::make_shared<ScrollerInsets>();
+        insets->view = view;
         for (auto at = insetStates.begin(); at != insetStates.end();) {
             if (at->second.expired()) at = insetStates.erase(at); else ++at;
         }
         insetStates[winrt::get_abi(scroller)] = insets;
         scroller.Loaded(guarded("preparing scroller margins", [insets](IInspectable const &sender, auto const &) {
-            queueInsets(sender.as<controls::ScrollView>(), insets);
+            auto scroller = sender.as<controls::ScrollView>();
+            queueInsets(scroller, insets);
+            resumeViewportRequests(scroller, insets);
         }));
         scroller.RegisterPropertyChangedCallback(controls::Control::TemplateProperty(),
             guarded("refreshing scroller template margins", [insets](xaml::DependencyObject const &sender,
@@ -378,25 +511,17 @@ extern "C" void swiftomniui_winui_scroller_insets(
     }
 }
 
-extern "C" void swiftomniui_winui_scroller_viewport(
+extern "C" SwiftOmniUIViewportStatus swiftomniui_winui_scroller_viewport(
     SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef descendant, double *viewport
 ) {
-    std::fill_n(viewport, 6, 0);
     try {
         auto scroller = borrow<controls::ScrollView>(handle);
-        auto content = scroller.Content().try_as<xaml::UIElement>();
-        if (!content) return;
-        auto element = as<xaml::UIElement>(descendant);
-        auto corner = element.TransformToVisual(content).TransformPoint({0, 0});
-        viewport[0] = scroller.HorizontalOffset() - corner.X;
-        viewport[1] = scroller.VerticalOffset() - corner.Y;
-        viewport[2] = scroller.ViewportWidth();
-        viewport[3] = scroller.ViewportHeight();
-        auto parent = xaml::Media::VisualTreeHelper::GetParent(content).as<xaml::UIElement>();
-        auto displayed = element.TransformToVisual(parent).TransformPoint({0, 0});
-        viewport[4] = displayed.X;
-        viewport[5] = displayed.Y;
+        auto element = as<xaml::FrameworkElement>(descendant);
+        auto status = readViewport(scroller, element, viewport);
+        if (status == SwiftOmniUIViewportNotReady) awaitViewport(scroller, element);
+        return status;
     } catch (...) {
         report("reading a descendant's scroll viewport");
+        return SwiftOmniUIViewportFailed;
     }
 }

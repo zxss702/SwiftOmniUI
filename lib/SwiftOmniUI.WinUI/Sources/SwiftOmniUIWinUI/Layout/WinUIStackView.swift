@@ -43,10 +43,10 @@ final class WinUIStackView: WinUITravellingLayout {
 
     override func arrange(in bounds: Rect) {
         beginArrangement(width: bounds.width)
-        let places = StackArithmetic.places(
-            of: items, axis: axis, spacing: spacing, padding: padding, in: bounds, direction: direction)
-        for (item, place) in zip(items, places) {
-            if let place { self.place(item, at: place) }
+        let byView = Dictionary(uniqueKeysWithValues: items.map { ($0.view.number, $0) })
+        for proposal in preparedLayoutPlan(in: bounds) {
+            guard let view = proposal.view, let item = byView[view.number] else { continue }
+            place(item, at: proposal.place)
         }
     }
 }

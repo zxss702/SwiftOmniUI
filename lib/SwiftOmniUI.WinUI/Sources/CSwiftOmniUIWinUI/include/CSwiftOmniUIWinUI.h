@@ -877,9 +877,17 @@ void swiftomniui_winui_scroller_place_for(SwiftOmniUIObjectRef scroller, SwiftOm
 /// Where the scroller's view stands, then the farthest it reaches across and down, in DIPs: four values.
 void swiftomniui_winui_scroller_offset(SwiftOmniUIObjectRef scroller, double *offset);
 
-/// Six DIPs: document-relative viewport x, y, width, height, then the descendant's displayed x, y
-/// relative to the native scroll content presenter. The last pair preserves ancestor clipping.
-void swiftomniui_winui_scroller_viewport(SwiftOmniUIObjectRef scroller, SwiftOmniUIObjectRef descendant, double *viewport);
+/// Six DIPs: the visible viewport x, y, width, height in the descendant's coordinates, intersected with
+/// ancestor scroll presenters and clipping bounds, then its displayed x, y relative to the native presenter.
+/// Only Ready writes values; an offscreen intersection can be empty. NotReady retains a weak request,
+/// resumed by native attachment/layout. Failed reports a native error and registers no pending request.
+typedef enum {
+    SwiftOmniUIViewportFailed = -1,
+    SwiftOmniUIViewportNotReady = 0,
+    SwiftOmniUIViewportReady = 1
+} SwiftOmniUIViewportStatus;
+SwiftOmniUIViewportStatus swiftomniui_winui_scroller_viewport(
+    SwiftOmniUIObjectRef scroller, SwiftOmniUIObjectRef descendant, double *viewport);
 
 /// The room the bars floating over the scroller keep from its indicators, in DIPs: each indicator's track is
 /// inset past a bar's extent on its own edge, the document's room untouched.

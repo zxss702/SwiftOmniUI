@@ -9,8 +9,12 @@
 /// through this view's items and placing through `place(_:at:)`.
 @MainActor
 final class WinUICustomLayoutView: WinUITravellingLayout {
+    override var hasNativeProposals: Bool { true }
+    override var contentSizeDependsOnHeight: Bool { true }
+
     /// The layout object that arranges the children.
     private var arrangement: LayoutBox?
+    private var layoutRevision = -1
 
     /// The room inside the container's own edge.
     var padding = EdgeInsets(0) {
@@ -19,26 +23,30 @@ final class WinUICustomLayoutView: WinUITravellingLayout {
 
     /// A fresh set of children and the layout that arranges them.
     func setItems(_ items: [WinUILayoutItem], layout: LayoutBox?) {
+        let revision = sourceElement?.customLayoutRevision ?? 0
+        let layoutChanged = arrangement !== layout || layoutRevision != revision
+        layoutRevision = revision
         arrangement = layout
-        super.setItems(items)
+        let childrenChanged = super.setItems(items)
         layout?.update(subviews: subviews())
+        if layoutChanged && !childrenChanged { invalidateMeasurements() }
     }
 
     /// The items as the layout sees them: measured through `size(offered:)`,
     /// placed through this view's arrangement, their `.layoutValue` tags and
     /// guides read back over the boundary.
-    private func subviews() -> LayoutSubviews {
+    private func subviews(placing: ((WinUILayoutItem, Rect) -> Void)? = nil) -> LayoutSubviews {
         // A child riding its removal transition is no subview: it stands where it last stood.
         LayoutSubviews(items.filter { !$0.departing }.map { item in
             LayoutSubview(
                 layoutValues: item.codeId.map { CoreLink().layoutValues(for: $0) } ?? [:],
                 priority: item.values.priority,
                 measureSize: { proposal in
-                    let measured = item.size(offered: proposal.width)
+                    let measured = item.size(offered: proposal)
                     return SwiftOmniUICore.Size(width: measured.width, height: measured.height)
                 },
                 measureDimensions: { proposal in
-                    let measured = item.size(offered: proposal.width)
+                    let measured = item.size(offered: proposal)
                     var guides: [Int32: Double] = [:]
                     var explicit: Set<Int32> = []
                     if let guide = item.values.horizontalGuide {
@@ -53,10 +61,9 @@ final class WinUICustomLayoutView: WinUITravellingLayout {
                         width: measured.width, height: measured.height,
                         guides: guides, explicitSlots: explicit)
                 },
-                placeView: { [weak self] position, anchor, proposal in
-                    guard let self else { return }
-                    let measured = item.size(offered: proposal.width)
-                    self.place(item, at: Rect(
+                placeView: { position, anchor, proposal in
+                    let measured = item.size(offered: proposal)
+                    placing?(item, Rect(
                         x: position.x - anchor.x * measured.width,
                         y: position.y - anchor.y * measured.height,
                         width: measured.width, height: measured.height))
@@ -65,25 +72,48 @@ final class WinUICustomLayoutView: WinUITravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
+        contentSize(proposal: ProposedViewSize(width: width))
+    }
+
+    override func contentSize(proposal: ProposedViewSize) -> LayoutSize {
         guard let arrangement else { return .zero }
-        let offered = width.map { max(0, $0 - padding.left - padding.right) }
+        let offered = ProposedViewSize(
+            width: proposal.width.map { max(0, $0 - padding.left - padding.right) },
+            height: proposal.height.map { max(0, $0 - padding.top - padding.bottom) })
         let measured = arrangement.measure(
-            proposal: ProposedViewSize(width: offered), subviews: subviews())
+            proposal: offered, subviews: subviews())
         return LayoutSize(
             width: measured.width + padding.left + padding.right,
             height: measured.height + padding.top + padding.bottom)
     }
 
-    override func arrange(in bounds: Rect) {
-        guard let arrangement else { return }
-        beginArrangement(width: bounds.width)
+    /// User layout code runs during Measure, where its child proposals can be
+    /// committed to XAML before any native arrangement begins.
+    override func makeLayoutPlan(in bounds: Rect) -> [NativeProposal] {
+        guard let arrangement else { return [] }
         let room = Rect(
             x: bounds.x + padding.left, y: bounds.y + padding.top,
             width: max(0, bounds.width - padding.left - padding.right),
             height: max(0, bounds.height - padding.top - padding.bottom))
+        var plan: [NativeProposal] = []
         arrangement.place(
             in: room,
             proposal: ProposedViewSize(width: room.width, height: room.height),
-            subviews: subviews())
+            subviews: subviews { item, place in
+                plan.append(NativeProposal(view: item.view, place: place))
+            })
+        return plan
+    }
+
+    override func arrange(in bounds: Rect) {
+        beginArrangement(width: bounds.width)
+        let arrangedItems = Dictionary(uniqueKeysWithValues: items.filter { !$0.departing }.map {
+            (ObjectIdentifier($0.view), $0)
+        })
+        for proposal in preparedLayoutPlan(in: bounds) {
+            guard let view = proposal.view,
+                  let item = arrangedItems[ObjectIdentifier(view)] else { continue }
+            place(item, at: proposal.place)
+        }
     }
 }

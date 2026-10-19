@@ -5,6 +5,12 @@
 @_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIWinUI
 
+enum WinUIScrollViewport {
+    case ready(Rect)
+    case notReady
+    case failed
+}
+
 /// WinUI's `ScrollViewer`, which a ScrollView stands over its whole room around the document it moves.
 /// Design: docs/design/platforms/winui/layout.md#scrolling
 @MainActor
@@ -76,6 +82,20 @@ final class WinUIScrollerView: WinUIView {
         var values = [0.0, 0.0, 0.0, 0.0]
         swiftomniui_winui_scroller_offset(handle, &values)
         return (Point(x: values[0], y: values[1]), Point(x: values[2], y: values[3]))
+    }
+
+    /// A missing native viewport is pending work, never a zero or previous frame.
+    /// The relay resumes the scroll ears after a native layout makes it ready.
+    func viewport(of descendant: WinUIView) -> WinUIScrollViewport {
+        var values = [Double](repeating: .nan, count: 6)
+        switch swiftomniui_winui_scroller_viewport(handle, descendant.handle, &values) {
+        case SwiftOmniUIViewportReady:
+            return .ready(Rect(values[0], values[1], values[2], values[3]))
+        case SwiftOmniUIViewportNotReady:
+            return .notReady
+        default:
+            return .failed
+        }
     }
 
     /// The presenter inside measures and arranges again too: it picks the anchor it holds the view by before the

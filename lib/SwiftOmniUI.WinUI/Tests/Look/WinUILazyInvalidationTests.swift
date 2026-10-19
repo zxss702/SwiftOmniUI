@@ -34,7 +34,7 @@ private struct HoverWorkRow: View {
 }
 
 final class WinUILazyInvalidationTests: XCTestCase {
-    func testAnEarlyArrangeDoesNotConsumePendingRowAnimation() throws {
+    func testArrangeMeasuresRowsBeforeConsumingPendingAnimation() throws {
         try onUIThread {
             for grid in [false, true] {
                 let host = WinUIRenderer.running(clock: TestClock()) {
@@ -52,20 +52,19 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 for _ in 0..<16 { host.step(); host.frame() }
                 let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
                 let identity = try XCTUnwrap(lazy.mounted.keys.first)
-                let measurement = try XCTUnwrap(lazy.measured.removeValue(forKey: identity))
-                let revision = try XCTUnwrap(lazy.measuredRevisions.removeValue(forKey: identity))
+                lazy.measured.removeValue(forKey: identity)
+                lazy.measuredRevisions.removeValue(forKey: identity)
                 lazy.cells.animatesChanges = true
                 lazy.cells.inserting.insert(identity)
                 lazy.places.patchArrived()
 
                 lazy.arrange(width: 240, height: 200)
-                XCTAssertTrue(lazy.cells.animatesChanges,
-                              "an unmeasured row must not consume the structural change's animation")
-                XCTAssertTrue(lazy.cells.inserting.contains(identity))
-
-                lazy.measured[identity] = measurement
-                lazy.measuredRevisions[identity] = revision
-                lazy.arrange(width: 240, height: 200)
+                let row = try XCTUnwrap(lazy.mounted[identity]?.view)
+                let measured = try XCTUnwrap(lazy.measured[identity])
+                XCTAssertEqual(lazy.measuredRevisions[identity], row.measurementRevision)
+                XCTAssertEqual(measured.size.height, 32, accuracy: 1)
+                XCTAssertGreaterThan(row.laidOutFrame.width, 0)
+                XCTAssertEqual(row.laidOutFrame.height, 32, accuracy: 1)
                 XCTAssertFalse(lazy.cells.animatesChanges)
                 XCTAssertFalse(lazy.cells.inserting.contains(identity))
             }
