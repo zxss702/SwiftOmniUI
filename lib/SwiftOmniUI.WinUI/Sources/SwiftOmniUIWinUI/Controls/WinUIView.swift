@@ -213,7 +213,10 @@ class WinUIView {
 
     /// Native sizes by proposal. DesiredSize alone belongs only to the last Measure call: a grid can ask for
     /// both an unconstrained size and a wrapped size before arranging either one.
-    private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize, validation: UInt64?)] = []
+    /// Only changed dependencies discard these answers; entering another
+    /// native layout pass must not force an intrinsic probe to replace a
+    /// descendant's prepared allocation again.
+    private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize)] = []
     private var nativeMeasurePending = false
     /// Changes when properties or a native size change invalidate this view, not on a repeated Measure query.
     var measurementRevision = 0 {
@@ -500,10 +503,9 @@ class WinUIView {
         // produced by an unrelated width or height.
         let width = width.map { Double(Float($0)) }
         let height = height.map { Double(Float($0)) }
-        let validation = WinUILayoutView.nativeValidationEpoch
         if WinUILayoutView.queryingSize > 0,
            let measured = measuredSizes.first(where: {
-               $0.width == width && $0.height == height && (validation == nil || $0.validation == validation)
+               $0.width == width && $0.height == height
            }) {
             return measured.size
         }
@@ -543,7 +545,7 @@ class WinUIView {
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.
         if measuredSizes.count == 8 { measuredSizes.removeFirst() }
-        measuredSizes.append((width, height, measured, validation))
+        measuredSizes.append((width, height, measured))
         return measured
     }
 

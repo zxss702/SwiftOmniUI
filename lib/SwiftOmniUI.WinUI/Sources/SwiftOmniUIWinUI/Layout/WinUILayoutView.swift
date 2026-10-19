@@ -18,10 +18,6 @@ class WinUILayoutView: WinUIView {
     private var lastSizingHeight: Double?
     private var hasSizing = false
     private var nativePreparationDepth = 0
-    private var preparingUnchangedProposal = false
-    private var validatedArithmeticEpoch: UInt64?
-    private static var validationSequence: UInt64 = 0
-    static var nativeValidationEpoch: UInt64?
 
     struct NativeProposal {
         weak var view: WinUIView?
@@ -387,14 +383,11 @@ class WinUILayoutView: WinUIView {
         precondition(!isNativeArranging, "an arranging panel cannot measure itself")
         let proposal = Self.normalized(ProposedViewSize(
             width: width.isFinite ? width : nil, height: height.flatMap { $0.isFinite ? $0 : nil }))
-        let currentSizing = hasSizing && lastSizingWidth == proposal.width && lastSizingHeight == proposal.height
         // Measure already observes new constraints and native dirtiness. A
         // proposal change is not content invalidation: explicitly invalidating
         // here also dirties an ancestor that may currently be arranging us.
-        let previousPreparation = preparingUnchangedProposal
-        preparingUnchangedProposal = currentSizing
         nativePreparationDepth += 1
-        defer { nativePreparationDepth -= 1; preparingUnchangedProposal = previousPreparation }
+        defer { nativePreparationDepth -= 1 }
         super.prepareMeasure(width: width, height: height)
         if hasNativeProposals,
            !hasSizing || lastSizingWidth != proposal.width || lastSizingHeight != proposal.height {
@@ -420,28 +413,19 @@ class WinUILayoutView: WinUIView {
             let proposal = Self.normalized(ProposedViewSize(
                 width: width.isFinite ? width : nil, height: height.isFinite ? height : nil))
             let previousHeight = measurementHeight
-            let previousValidation = Self.nativeValidationEpoch
-            // An independent XAML pass, or a dirty callback at unchanged
-            // constraints, must validate native-only resource changes too.
-            // A new allocation alone retains its intrinsic answers.
-            if previousValidation == nil, nativePreparationDepth == 0 || preparingUnchangedProposal {
-                Self.validationSequence &+= 1
-                Self.nativeValidationEpoch = Self.validationSequence
-            }
             measurementHeight = proposal.height
             Self.arithmeticMeasuring += 1
             defer {
                 measurementHeight = previousHeight
-                Self.nativeValidationEpoch = previousValidation
                 Self.arithmeticMeasuring -= 1
             }
 
             let previous = (measured?.proposal == proposal ? measured?.size : nil)
                 ?? (proposal.height == nil ? measurements.cachedSize(offering: proposal.width)
                     : proposedSizes.first(where: { $0.proposal == proposal })?.size)
-            // Independent XAML measurement can originate in native resources.
-            // Explicit preparation keeps proposal-keyed arithmetic, then checks
-            // every selected native child and refines any changed answer.
+            // Recompute this native caller, retaining unchanged descendants'
+            // proposal-keyed answers. Preparation still asks XAML to measure
+            // every selected allocation and refines genuinely changed sizes.
             if nativePreparationDepth == 0 { forgetMeasurements() }
             _ = boxView?.measure(width: width, height: height)
             var size: LayoutSize
@@ -602,12 +586,6 @@ class WinUILayoutView: WinUIView {
     func naturalSize(proposal: ProposedViewSize) -> LayoutSize {
         WinUILayoutUpdates.measured(self)
         let proposal = Self.normalized(proposal)
-        if let epoch = Self.nativeValidationEpoch, validatedArithmeticEpoch != epoch {
-            measurements.invalidate()
-            proposedSizes.removeAll(keepingCapacity: true)
-            layoutPlans.removeAll(keepingCapacity: true)
-            validatedArithmeticEpoch = epoch
-        }
         func compute() -> LayoutSize {
             Self.sizings += 1
             return Self.querySize { contentSize(proposal: proposal) }
