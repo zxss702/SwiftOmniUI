@@ -35,7 +35,10 @@ final class WinUINavigationView: WinUILayoutView {
             page.nativeLayoutOwner = self
             page.rootSafeAreaContext = { [weak self, weak page] bounds in
                 guard let self, let page else { return SafeAreaContext(bounds: bounds) }
-                return self.layoutSafeArea(in: self.allocatedBounds).child(
+                // The native page fills this frame's current proposal. Using
+                // its previous allocation clips a first or resized Measure to
+                // old bounds and invents unsafe strips along otherwise safe edges.
+                return self.layoutSafeArea(in: bounds).child(
                     in: bounds, preservingOutsets: page.sourceElement?.observesSafeArea == true)
             }
             page.safeAreaContext = nil
