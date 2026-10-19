@@ -72,13 +72,21 @@ final class WinUITabbedView: WinUILayoutView {
             row: rowHeight(width: width))
     }
 
-    override func arrange(in bounds: Rect) {
-        let (rowRoom, room) = RowEdge.top.split(
-            Rect(x: 0, y: 0, width: bounds.width, height: bounds.height), row: rowHeight(width: bounds.width))
-        if !tabsShownByWindow { row.layout(rowRoom) }
-        guard let page = selectedItem else { return }
+    override var hasNativeProposals: Bool { true }
 
-        page.view.layout(SingleChildArithmetic.place(of: page, in: room, padding: EdgeInsets(0), direction: direction))
+    override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
+        let (rowRoom, room) = RowEdge.top.split(
+            Rect(0, 0, width ?? size.width, size.height), row: rowHeight(width: width))
+        var proposals = tabsShownByWindow ? [] : [NativeProposal(view: row, place: rowRoom)]
+        if let page = selectedItem {
+            proposals.append(NativeProposal(view: page.view, place: SingleChildArithmetic.place(
+                of: page, in: room, padding: EdgeInsets(0), direction: direction)))
+        }
+        return proposals
+    }
+
+    override func arrange(in bounds: Rect) {
+        for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
     }
 
     /// The own row's height for `width` DIPs; none where the window shows the tabs.

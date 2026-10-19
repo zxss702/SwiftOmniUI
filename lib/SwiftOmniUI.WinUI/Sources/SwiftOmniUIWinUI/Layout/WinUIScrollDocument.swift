@@ -48,12 +48,7 @@ final class WinUIScrollDocument: WinUILayoutView {
 
     /// Its own size is the document's: never smaller than the viewport, which the scroller sees to.
     override func arrange(in bounds: Rect) {
-        guard let item = items.first, item.isShown else { return }
-
-        let arranged = ScrollArithmetic.arrange(
-            item, padding: layoutPadding, orientation: orientation,
-            in: LayoutSize(width: bounds.width, height: bounds.height))
-        item.view.layout(arranged.place)
+        for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
     }
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
         // The document's margins consumed the viewport's contributions.

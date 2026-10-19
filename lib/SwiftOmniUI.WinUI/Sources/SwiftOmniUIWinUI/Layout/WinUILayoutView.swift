@@ -388,14 +388,28 @@ class WinUILayoutView: WinUIView {
         let proposal = Self.normalized(ProposedViewSize(
             width: width.isFinite ? width : nil, height: height.flatMap { $0.isFinite ? $0 : nil }))
         let currentSizing = hasSizing && lastSizingWidth == proposal.width && lastSizingHeight == proposal.height
-        if !currentSizing { swiftomniui_winui_invalidate_measure(presentationHandle) }
-        // XAML still checks native dirtiness at an unchanged proposal. Reusing
-        // arithmetic here does not skip preparing its native descendants.
+        // Measure already observes new constraints and native dirtiness. A
+        // proposal change is not content invalidation: explicitly invalidating
+        // here also dirties an ancestor that may currently be arranging us.
         let previousPreparation = preparingUnchangedProposal
         preparingUnchangedProposal = currentSizing
         nativePreparationDepth += 1
         defer { nativePreparationDepth -= 1; preparingUnchangedProposal = previousPreparation }
         super.prepareMeasure(width: width, height: height)
+        if hasNativeProposals,
+           !hasSizing || lastSizingWidth != proposal.width || lastSizingHeight != proposal.height {
+            // An intrinsic probe can change a descendant's last native
+            // proposal without changing this panel's own cached Measure.
+            // Restore its child plan directly instead of forcing another
+            // MeasureOverride and invalidating the native ancestor chain.
+            let previousHeight = measurementHeight
+            measurementHeight = proposal.height
+            defer { measurementHeight = previousHeight }
+            _ = prepareNaturalLayout(proposal: proposal)
+            lastSizingWidth = proposal.width
+            lastSizingHeight = proposal.height
+            hasSizing = true
+        }
     }
 
     /// A genuine native Measure owns this view's phase, even beneath an
@@ -432,16 +446,7 @@ class WinUILayoutView: WinUIView {
             _ = boxView?.measure(width: width, height: height)
             var size: LayoutSize
             if hasNativeProposals {
-                while true {
-                    size = naturalSize(proposal: proposal)
-                    let bounds = planBounds(proposal: proposal, natural: size)
-                    _ = prepareLayoutPlan(in: bounds)
-                    let current = naturalSize(proposal: proposal)
-                    if planBounds(proposal: proposal, natural: current) == bounds {
-                        size = current
-                        break
-                    }
-                }
+                size = prepareNaturalLayout(proposal: proposal)
             } else {
                 // Lazy/native containers commit their own measurement geometry.
                 let querying = Self.queryingSize
@@ -476,6 +481,18 @@ class WinUILayoutView: WinUIView {
         let framed = values.sized(natural, offered: proposal.width)
         return Rect(0, 0, proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? framed.width,
                     proposal.height.flatMap { $0.isFinite ? $0 : nil } ?? framed.height)
+    }
+
+    /// Unspecified axes follow the corrected intrinsic extent. Both a real
+    /// MeasureOverride and a cached Measure restore the same completed plan.
+    private func prepareNaturalLayout(proposal: ProposedViewSize) -> LayoutSize {
+        while true {
+            let size = naturalSize(proposal: proposal)
+            let bounds = planBounds(proposal: proposal, natural: size)
+            _ = prepareLayoutPlan(in: bounds)
+            let current = naturalSize(proposal: proposal)
+            if planBounds(proposal: proposal, natural: current) == bounds { return current }
+        }
     }
 
     private func keepLayoutPlan(in bounds: Rect, proposals: [NativeProposal]) {
