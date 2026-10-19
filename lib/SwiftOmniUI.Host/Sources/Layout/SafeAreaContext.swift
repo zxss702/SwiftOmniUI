@@ -35,10 +35,13 @@
     public func resizedLayout(to proposal: Rect) -> Self {
         guard layout != proposal else { return self }
         func resized(_ region: Rect) -> Rect {
-            Rect(proposal.x + region.x - layout.x,
-                 proposal.y + region.y - layout.y,
-                 max(0, region.width + proposal.width - layout.width),
-                 max(0, region.height + proposal.height - layout.height))
+            // Preserve the region's edge contribution before applying a new
+            // extent. (old + new) - old can differ from new by an ULP even
+            // when the old region and layout are exactly the same rectangle.
+            Rect(proposal.x + (region.x - layout.x),
+                 proposal.y + (region.y - layout.y),
+                 max(0, proposal.width + (region.width - layout.width)),
+                 max(0, proposal.height + (region.height - layout.height)))
         }
         return Self(bounds: resized(bounds), layout: proposal,
                     container: resized(container), keyboard: resized(keyboard), consumed: consumed)
@@ -48,23 +51,43 @@
     /// it touches the safe region. A local card cannot acquire a window-wide bar.
     public func child(in frame: Rect, preservingOutsets: Bool = true) -> Self {
         let safe = self.safe
+        let frameRight = frame.x + frame.width
+        let frameBottom = frame.y + frame.height
         let left = frame.x <= safe.x ? min(frame.x, bounds.x) : frame.x
         let top = frame.y <= safe.y ? min(frame.y, bounds.y) : frame.y
-        let right = frame.x + frame.width >= safe.x + safe.width
-            ? max(frame.x + frame.width, bounds.x + bounds.width) : frame.x + frame.width
-        let bottom = frame.y + frame.height >= safe.y + safe.height
-            ? max(frame.y + frame.height, bounds.y + bounds.height) : frame.y + frame.height
+        let right = frameRight >= safe.x + safe.width
+            ? max(frameRight, bounds.x + bounds.width) : frameRight
+        let bottom = frameBottom >= safe.y + safe.height
+            ? max(frameBottom, bounds.y + bounds.height) : frameBottom
         func local(_ rect: Rect) -> Rect {
             Rect(rect.x - frame.x, rect.y - frame.y, rect.width, rect.height)
         }
-        let extended = Rect(left, top, max(0, right - left), max(0, bottom - top))
-        let used = preservingOutsets ? EdgeInsets(0) : EdgeInsets(
-            top: frame.y - extended.y, leading: frame.x - extended.x,
-            bottom: extended.y + extended.height - frame.y - frame.height,
-            trailing: extended.x + extended.width - frame.x - frame.width)
-        return Self(bounds: local(preservingOutsets ? extended : frame),
+        // Compare the original endpoints. Reconstructing an unchanged bottom
+        // as top + (bottom - top) invents a consumed inset at fractional origins
+        // and can make Measure/Arrange invalidate each other indefinitely.
+        let outsets = EdgeInsets(
+            top: frame.y - top, leading: frame.x - left,
+            bottom: bottom - frameBottom, trailing: right - frameRight)
+        let extended = Rect(left, top,
+                            max(0, frame.width + outsets.left + outsets.right),
+                            max(0, frame.height + outsets.top + outsets.bottom))
+        let used = preservingOutsets ? EdgeInsets(0) : outsets
+        let proposal = preservingOutsets ? extended : frame
+        // A region covering an entire child axis has zero unsafe contribution
+        // there. Keep that axis exactly equal to the child's proposal instead
+        // of retaining distant parent endpoints whose cancellation changes on
+        // resize. Preserve actual unsafe edges, including offscreen regions.
+        func localRegion(_ region: Rect) -> Rect {
+            let across = region.x <= proposal.x && region.x + region.width >= proposal.x + proposal.width
+            let down = region.y <= proposal.y && region.y + region.height >= proposal.y + proposal.height
+            return Rect((across ? proposal.x : region.x) - frame.x,
+                        (down ? proposal.y : region.y) - frame.y,
+                        across ? proposal.width : region.width,
+                        down ? proposal.height : region.height)
+        }
+        return Self(bounds: local(proposal),
                     layout: Rect(0, 0, frame.width, frame.height),
-                    container: local(container), keyboard: local(keyboard), consumed: consumed + used)
+                    container: localRegion(container), keyboard: localRegion(keyboard), consumed: consumed + used)
     }
 
     public func padding(_ insets: EdgeInsets) -> Self {
@@ -122,14 +145,23 @@
     public static func insets(of safe: Rect, in frame: Rect) -> EdgeInsets {
         EdgeInsets(top: min(frame.height, max(0, safe.y - frame.y)),
                    leading: min(frame.width, max(0, safe.x - frame.x)),
-                   bottom: min(frame.height, max(0, frame.y + frame.height - safe.y - safe.height)),
-                   trailing: min(frame.width, max(0, frame.x + frame.width - safe.x - safe.width)))
+                   bottom: min(frame.height, max(0, (frame.y + frame.height) - (safe.y + safe.height))),
+                   trailing: min(frame.width, max(0, (frame.x + frame.width) - (safe.x + safe.width))))
     }
 
     public static func intersection(_ lhs: Rect, _ rhs: Rect) -> Rect {
         let x = max(lhs.x, rhs.x), y = max(lhs.y, rhs.y)
-        return Rect(x, y, max(0, min(lhs.x + lhs.width, rhs.x + rhs.width) - x),
-                    max(0, min(lhs.y + lhs.height, rhs.y + rhs.height) - y))
+        func extent(_ first: Double, _ firstExtent: Double, _ second: Double, _ secondExtent: Double) -> Double {
+            // A contained interval already has its exact extent. Rebuilding
+            // that extent from its endpoints can shrink it by an ULP.
+            if first == second { return max(0, min(firstExtent, secondExtent)) }
+            let firstEnd = first + firstExtent, secondEnd = second + secondExtent
+            if first > second, firstEnd <= secondEnd { return max(0, firstExtent) }
+            if second > first, secondEnd <= firstEnd { return max(0, secondExtent) }
+            return max(0, min(firstEnd, secondEnd) - max(first, second))
+        }
+        return Rect(x, y, extent(lhs.x, lhs.width, rhs.x, rhs.width),
+                    extent(lhs.y, lhs.height, rhs.y, rhs.height))
     }
 }
 

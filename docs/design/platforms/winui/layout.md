@@ -87,6 +87,14 @@ bounds, preserving edge distances and consumed insets. Native-owned content
 uses the actual column's allocation, including changes from sidebar toggles.
 Promoted bars retain their logical identity and native ownership dependency.
 
+Safe-area arithmetic preserves exact zero contributions at fractional origins.
+Consumed outsets compare original endpoints, and fully contained intervals
+retain their original extents. A region covering a whole child axis uses that
+child's exact local extent; unsafe and offscreen edges keep their coordinates.
+Resizing applies region/layout differences before adding the new extent.
+These identities prevent floating-point cancellation from repeatedly dirtying
+unchanged content without discarding real subpixel safe-area contributions.
+
 Lazy containers retain estimates only for unmeasured offscreen extents. Every
 mounted visible row is measured at the current proposal before Stack or Grid
 places it; neither an estimated frame nor a skipped cell substitutes for that

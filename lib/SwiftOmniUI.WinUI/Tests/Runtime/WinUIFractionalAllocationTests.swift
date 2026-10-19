@@ -50,6 +50,50 @@ private struct FractionalAllocationTree {
 }
 
 final class WinUIFractionalAllocationTests: XCTestCase {
+    func testFractionalStackCompressionDoesNotAlternateConsumedInsetsOrInvalidateItsRow() {
+        onUIThread {
+            let owner = WinUISingleChildView()
+            let stack = WinUIStackView(axis: .vertical)
+            stack.spacing = 16
+            let heading = FractionalAllocationPanel()
+            heading.fixedHeight = 114.96000671386719
+            let subtitle = FractionalAllocationPanel()
+            subtitle.fixedHeight = 45.98400115966797
+            let buttonRow = FractionalAllocationPanel()
+            buttonRow.fixedHeight = 112
+            var headingItem = WinUILayoutItem(view: heading)
+            headingItem.values.width = 180
+            var subtitleItem = WinUILayoutItem(view: subtitle)
+            subtitleItem.values.width = 448
+            var buttonItem = WinUILayoutItem(view: buttonRow)
+            buttonItem.values.width = 320
+            stack.setItems([headingItem, subtitleItem, buttonItem])
+            owner.setItems([WinUILayoutItem(view: stack)])
+
+            let rawHeight = 304.94400787353516
+            let measuredHeight = Double(Float(rawHeight))
+            let consumed = EdgeInsets(top: 48, leading: 0, bottom: 0, trailing: 0)
+            stack.safeAreaContext = SafeAreaContext(bounds: Rect(0, 0, 448, rawHeight), consumed: consumed)
+            stack.prepareMeasure(width: 448, height: measuredHeight)
+            let revision = buttonRow.measurementRevision
+            let measures = buttonRow.nativeMeasures
+
+            for _ in 0..<16 {
+                // The logical parent prepares the unrounded slot; XAML's
+                // native Measure uses the single-precision height in the log.
+                owner.withNativeArrange {
+                    stack.prepareAllocation(in: Rect(0, 0, 448, rawHeight))
+                }
+                XCTAssertEqual(buttonRow.safeAreaContext?.consumed, consumed)
+                stack.prepareMeasure(width: 448, height: measuredHeight)
+                XCTAssertEqual(buttonRow.safeAreaContext?.consumed, consumed)
+                XCTAssertEqual(buttonRow.measurementRevision, revision,
+                               "no safe-area edge changed, so a row cannot become dirty on every phase")
+                XCTAssertEqual(buttonRow.nativeMeasures, measures)
+            }
+        }
+    }
+
     func testFirstFractionalArrangeKeepsNativeDesiredSizeAndPlacesTheCompleteSubtree() {
         onUIThread {
             let tree = FractionalAllocationTree()
