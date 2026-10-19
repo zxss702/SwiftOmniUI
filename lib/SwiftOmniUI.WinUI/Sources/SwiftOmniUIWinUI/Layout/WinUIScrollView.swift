@@ -147,9 +147,15 @@ final class WinUIScrollView: WinUILayoutView {
 
     override var hasNativeProposals: Bool { true }
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
-        guard width != nil, measurementHeight != nil else { return [] }
         let viewport = resolve(in: Rect(0, 0, width ?? size.width, size.height))
         return [NativeProposal(view: scroller, place: viewport)]
+    }
+
+    override func restoreLayoutContext(in bounds: Rect, proposals: [NativeProposal]) {
+        // Cached plans still restore the document's inherited insets before
+        // its native presenter measures. The plan's finite bounds already
+        // resolve an unspecified axis to its natural extent.
+        _ = resolve(in: bounds)
     }
 
     override func backgroundBounds(in bounds: Rect) -> Rect {
@@ -196,8 +202,7 @@ final class WinUIScrollView: WinUILayoutView {
     /// their region. Descendants receive a consumed context, independent of
     /// the document's moving origin and of any enclosing scroller.
     override func arrange(in bounds: Rect) {
-        let viewport = resolve(in: bounds)
-        scroller.layout(viewport)
+        for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
         // Initial offsets/anchors wait for the resolved document extent.
         guard document.padding == document.layoutPadding else { return }
         if let target = writtenOffset.laidOutNow() {
