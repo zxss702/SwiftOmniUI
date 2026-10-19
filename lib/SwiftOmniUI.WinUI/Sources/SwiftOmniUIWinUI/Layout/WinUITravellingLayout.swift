@@ -33,7 +33,10 @@ class WinUITravellingLayout: WinUILayoutView {
     }
 
     func beginArrangement(width: Double) {
-        places.begin(width: width)
+        if let motion = takeArrivalMotion() { places.animation = motion }
+        // Native layout may refine a patch more than once. Only the patch starts
+        // a new motion; another arrangement preserves the motion already running.
+        places.begin(width: width, refining: true)
     }
 
     /// Stands `item` at `place`, or on its way there.
