@@ -12,12 +12,10 @@ class WinUILayoutView: WinUIView {
     /// The sizes measured in the pass under way, by the width offered.
     let measurements = MeasurementCache()
 
-    /// XAML keeps only its last native proposal. Reuse preparation while the arithmetic
-    /// and its children's native measures still stand at that same width and revision.
-    private var preparedMeasure: (width: Double, revision: Int)?
+    /// XAML keeps only its last native proposal. Arithmetic probes can select
+    /// another width without invalidating Swift's size answers by proposal.
     private var lastSizingWidth: Double?
     private var hasSizing = false
-    private var preparingMeasure = false
 
     struct NativeProposal {
         weak var view: WinUIView?
@@ -319,27 +317,23 @@ class WinUILayoutView: WinUIView {
     }
 
     func forgetNativePreparation() {
-        preparedMeasure = nil
         hasSizing = false
     }
 
-    /// Marks this panel measured at its allocated width without discarding the natural
-    /// sizes the arithmetic just computed. An independent XAML measure still refreshes them.
+    /// Restores the allocated native proposal. XAML decides whether its
+    /// measurement is still valid, including changes from native descendants.
     override func prepareMeasure(width: Double) {
         guard WinUIView.arranging == 0, Self.queryingSize == 0 else { return }
         let width = Double(Float(width))
         let currentSizing = hasSizing && lastSizingWidth == (width.isFinite ? width : nil)
-        guard preparedMeasure?.width != width || preparedMeasure?.revision != measurementRevision || !currentSizing
-        else { return }
 
         // A speculative width can have measured the children since this panel's last
         // native pass. Even if XAML still holds this width, that subtree must be prepared again.
         if !currentSizing { swiftomniui_winui_invalidate_measure(presentationHandle) }
-        let wasPreparing = preparingMeasure
-        preparingMeasure = true
-        defer { preparingMeasure = wasPreparing }
+        // Always enter XAML Measure: unchanged constraints are already a native
+        // fast path. Our revision cannot see native dirty paths, template changes
+        // or a subtree returning from Collapsed, so it cannot skip that check.
         _ = super.measure(width: width, height: nil)
-        preparedMeasure = (width, measurementRevision)
     }
 
     /// Answers WinUI's measure, every child measured again: no room where a SwiftOmniUI layout places this one, which
@@ -366,7 +360,10 @@ class WinUILayoutView: WinUIView {
         let offered = width.isFinite ? width : nil
         let previous = measurements.cachedSize(offering: offered)
             ?? (measured?.offered == offered ? measured?.size : nil)
-        if !preparingMeasure { forgetMeasurements() }
+        // Reaching MeasureOverride means XAML rejected its previous result.
+        // That applies equally to an explicit preparation and a native pass;
+        // keeping arithmetic here would answer a new measure with old content.
+        forgetMeasurements()
         _ = boxView?.measure(width: width, height: height)
         let startedAt = WinUIView.provisionalMeasureRevision
         var size: LayoutSize
@@ -478,7 +475,7 @@ class WinUILayoutView: WinUIView {
                 // The next deferred proposal completes this result. Do not
                 // let a previous DesiredSize become a row's natural extent.
                 measurements.invalidate()
-                preparedMeasure = nil
+                forgetNativePreparation()
             }
             return size
         }
