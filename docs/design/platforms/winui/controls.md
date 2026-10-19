@@ -293,8 +293,8 @@ Direct2D's SVG parser and renderer, the same system engine underlying
 ordinary Image uses no asynchronous source setter, URI loading or completion
 callback. It is its own size, whatever room its layout offers: an SVG the size
 it declares - its width and height, or its viewBox - and a bitmap its pixels.
-The host reads that intrinsic size itself, and the image asks WinUI for no room
-([no room asked](layout.md#no-room-asked)): it is drawn in the place its
+The host reads that intrinsic size itself; the image's private drawing panel
+asks WinUI for no room. It is drawn in the place its
 layout gives it, with no later decode changing its ancestors' first size.
 
 The native image and symbol Viewbox stand in a private Panel whose desired size

@@ -167,8 +167,8 @@ extension WinUIElement {
             element = each.parent
         }
 
-        // Native panels report zero DesiredSize; marking only a changed descendant can skip the
-        // placing parents even after their Swift arithmetic was discarded.
+        // Logical placement can include extra layouts outside the mounted
+        // ancestry. Their arithmetic caches must observe the same change.
         if view is WinUILazyView, !ownPlacementChanged { return }
         var layout = (view ?? parent?.nearestView)?.placingLayout
         while let parent = layout {

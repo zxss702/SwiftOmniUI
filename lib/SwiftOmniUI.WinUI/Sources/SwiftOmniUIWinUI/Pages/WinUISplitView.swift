@@ -51,8 +51,7 @@ final class WinUISplitView: WinUILayoutView {
     private var pages: [WinUILayoutItem] = []
     private(set) weak var detailRow: WinUIView?
 
-    /// The size WinUI's split view was last arranged at, which it is measured at too; and what it last asked.
-    private var arranged: LayoutSize?
+    /// The size requested by the native split for the current proposal.
     private var asked = LayoutSize.zero
     private var adaptation = SidebarAdaptation()
     private var configurationPending = false
@@ -168,22 +167,16 @@ final class WinUISplitView: WinUILayoutView {
         asked
     }
 
-    /// Measures at the current finite proposal; a previous allocation only
-    /// supplies axes left unspecified by a speculative parent measurement.
+    /// Measures the native split at the current proposal, including unbounded
+    /// intrinsic queries. A previous allocation is not a measurement constraint.
     /// Design: docs/design/platforms/winui/pages.md#a-native-arrangement
     override func measure(width: Double, height: Double) -> LayoutSize {
         guard WinUIView.arranging == 0 else { return super.measure(width: width, height: height) }
-        let size = LayoutSize(width: width.isFinite ? width : arranged?.width ?? width,
-                              height: height.isFinite ? height : arranged?.height ?? height)
-        asked = sidebar.measure(width: size.width, height: size.height)
+        asked = sidebar.measure(width: width, height: height)
         return super.measure(width: width, height: height)
     }
 
     override func arrange(in bounds: Rect) {
-        let size = LayoutSize(width: bounds.width, height: bounds.height)
-        if size != arranged {
-            arranged = size
-        }
         adaptToFirstRoom(width: bounds.width)
         sidebar.layout(bounds)
     }

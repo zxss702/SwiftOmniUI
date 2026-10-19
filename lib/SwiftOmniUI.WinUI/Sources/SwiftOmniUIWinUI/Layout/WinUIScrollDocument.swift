@@ -52,7 +52,6 @@ final class WinUIScrollDocument: WinUILayoutView {
     override func measure(width: Double, height: Double) -> LayoutSize {
         guard WinUIView.arranging == 0 else {
             _ = super.measure(width: Optional(width), height: Optional(height))
-            guard placingLayout == nil else { return .zero }
             let size = naturalSize(width: width.isFinite ? width : nil)
             return LayoutSize(width: min(size.width, width), height: min(size.height, height))
         }

@@ -259,16 +259,12 @@ class WinUILayoutView: WinUIView {
     /// affected layout while ordinary changes still recurse as above.
     func invalidateOwnMeasurements() {
         invalidateMeasure()
-        // These panels report zero DesiredSize to their placing parents.
-        // New content still needs new places when the native size stays zero.
-        invalidateArrange()
         // A promoted bar keeps its logical placingLayout, but its actual XAML
         // parent has an independent size cache. Invalidate both ownership paths
         // when descendants change, even before a new logical place is reported.
         (nativeSafeBarOwner as? WinUISafeAreaBarHost)?.invalidateOwnMeasurements()
-        // Native page owners do not appear in placingLayout. A change of
-        // intrinsic size (not just replacing children) must arrange their
-        // content again even when XAML still sees zero DesiredSize here.
+        // Native page owners do not appear in placingLayout. Their placement
+        // arithmetic must also refresh when a page's intrinsic size changes.
         nativeLayoutOwner?.invalidateArrange()
     }
 
@@ -343,9 +339,9 @@ class WinUILayoutView: WinUIView {
         super.prepareMeasure(width: width, height: height)
     }
 
-    /// Answers WinUI's measure, every child measured again: no room where a SwiftOmniUI layout places this one, which
-    /// reads its size from `naturalSize(width:)`, and otherwise the room the children take, within the room offered.
-    /// Design: docs/design/platforms/winui/layout.md#no-room-asked
+    /// Prepares the children and reports their size within the native proposal.
+    /// Logical placement ownership must not change XAML's DesiredSize contract.
+    /// Design: docs/design/platforms/winui/layout.md#desired-size
     func measure(width: Double, height: Double) -> LayoutSize {
         // Arrange may invoke Measure for a dirty child. Its previous DesiredSize
         // is provisional; preserve the proposal through the shared deferred-measure path.
@@ -453,11 +449,10 @@ class WinUILayoutView: WinUIView {
             }
         }
         if let previous, previous != size { WinUIView.nativeSizeRevision &+= 1 }
-        reportChange(of: size, offered: offered, previous: previous)
-        guard placingLayout == nil else { return .zero }
-        // Native content presenters do not have a LayoutItem to apply the
-        // root frame's bounds. A label's own fixed frame must still survive
-        // when a button, page or native container measures this panel directly.
+        recordMeasurement(size, offered: offered, previous: previous)
+        // Report a real DesiredSize even with a logical placing parent. Native
+        // presenters and effect wrappers also consume this result. Bounding it
+        // by the prepared proposal keeps XAML from arranging a larger subtree.
         let framed = sourceElement?.layoutValues.sized(size, offered: offered) ?? size
         return LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
     }
@@ -471,21 +466,16 @@ class WinUILayoutView: WinUIView {
     /// The natural size last measured, and the width it was offered.
     private var measured: (offered: Double?, size: LayoutSize)?
 
-    /// A natural size that changed outside the placing layout's own measure - a picture loaded, a word changed -
-    /// asks that layout to measure again: WinUI hears no change from a layout that asks it for no room.
-    /// Design: docs/design/platforms/winui/layout.md#a-change-told-upward
-    private func reportChange(of size: LayoutSize, offered: Double?, previous: LayoutSize?) {
+    /// Retains the natural-size revision used by logical row caches. XAML
+    /// propagates native DesiredSize changes after MeasureOverride returns;
+    /// invalidating the parent here would restart the pass still computing it.
+    private func recordMeasurement(_ size: LayoutSize, offered: Double?, previous: LayoutSize?) {
         defer { measured = (offered, size) }
-        guard !(self is WinUILazyView), let placingLayout,
+        guard !(self is WinUILazyView), placingLayout != nil,
               Self.arithmeticMeasuring == 1, let previous, previous != size
         else { return }
 
         measurementRevision &+= 1
-        // A query later in this pass must not see the old parent's arithmetic.
-        // Native requests still defer until MeasureOverride has returned.
-        ProgramWrite.perform {
-            placingLayout.invalidateMeasurements()
-        }
     }
 
     /// The room the children take for the width offered, in DIPs, kept until a change beneath marks the layout.

@@ -20,9 +20,9 @@ measures every shown child; WinUI answers a child it measured at the same
 size from what it kept, and measures one it did not.
 
 A native control is measured at each width the arithmetic offers it. A
-layout of SwiftOmniUI's asks for no room, so it is measured at the width of the
-place it stands in: WinUI measures it again only where a change beneath
-marked it. Put in a place of another width, it is measured there first, which
+layout of SwiftOmniUI's is prepared at its allocated width and height and
+reports its content's size within that proposal. WinUI measures it again
+where a change beneath marked it. Put in a place of another width, it is measured there first, which
 measures its own children at the widths its arrangement then gives them - a
 control arranged at a width other than the one it was last measured at would
 mark its layout again. Its size at any other width is the arithmetic's, kept
@@ -65,9 +65,9 @@ Preparation restores native child proposals even when their arithmetic
 answers are cached. Changing the native proposal preserves the other
 width-keyed answers; only changed content, a changed answer or provisional
 measurement discards them. An independent measure from XAML still refreshes
-the arithmetic and reports a changed size upward. Repeating a preparation
-at the same width and revision does nothing unless a fresh query has changed
-the subtree's native proposals. This avoids the former alternating
+the arithmetic and returns its new DesiredSize. Repeating a preparation
+still enters XAML Measure, whose native cache checks whether the subtree is
+dirty; Swift's arithmetic revision cannot establish that. This avoids the former alternating
 ideal/allocated-width queries clearing and rebuilding nested caches.
 Only a completed native measure records the prepared subtree's width;
 an arithmetic cache miss cannot overwrite that record.
@@ -173,18 +173,15 @@ SwiftOmniUI layout decides the place itself. So every element the host holds is
 told to stretch across whatever place it is arranged in, once, as it is made:
 the layout's place is the control's size.
 
-## No room asked
+## Desired size
 
-WinUI arranges an element at no less than the size it last asked for in
-`Measure`, and cuts it to the place it was given - so a child placed smaller
-than its content would be laid out at its content's size and clipped, where
-SwiftOmniUI places it at its place and lets it draw past its edges. A SwiftOmniUI
-layout that another SwiftOmniUI layout places therefore asks WinUI for no room:
-its parent reads its size from the core's arithmetic (`naturalSize`), and
-WinUI arranges it exactly where the parent puts it. A layout WinUI itself
-places - the window's content, a scroller's document - answers with the room
-its children take, within the room offered. A native control keeps its own
-measure, and WinUI clips it as it clips any control given too little room.
+Every panel reports its measured content size, with its frame applied and
+bounded by the native proposal. A logical `placingLayout` does not make its
+native desired size zero: XAML content presenters and effect wrappers also
+consume that result. Native preparation measures the subtree at its selected
+allocation before arrangement, so XAML does not retain an oversized intrinsic
+proposal and enlarge the arranged subtree to match it. The logical parent
+continues to read `naturalSize` for its own arithmetic.
 
 Measuring a child again inside an arrangement, at its place, is no answer: the
 child's new size tells its parent to measure again, the next measure asks for
@@ -192,22 +189,19 @@ the whole content, and the pass never settles.
 
 ## A change told upward
 
-WinUI hears of a child's new size only as a change in what the child asks
-for, and a SwiftOmniUI layout placed by another asks for no room, as a picture
-does. So a layout WinUI measures by itself - a picture read below it, words
-changed - whose natural size has changed tells the layout placing it, which
-measures again, and so on up; a layout measured inside its parent's own
-measure is read there and tells nothing. A picture read after its layouts
-were measured tells the layout holding it through the relay.
+XAML observes a panel's changed DesiredSize when its measure completes.
+The panel records its natural-size revision for logical row caches, without
+explicitly invalidating its parent from inside MeasureOverride. State and
+native resource changes still discard affected logical arithmetic before
+requesting a native measure. A picture read after its layouts were measured
+tells the layout holding it through the relay.
 
 A lazy run's changed content extent reaches the scroll document even where the
 run is not yet placed: the write names the scroller the run's own tree declares
 where no placing layout reaches one, so a document first measured at the
 estimates is not left standing under a bar while the rows stand at their
-measures. Content, child membership or layout-property changes also invalidate
-native arrangement along the affected placing chain. A panel's zero DesiredSize can
-remain unchanged while its children's places change; remeasurement alone is
-not a reliable request for new child arrangements. Child attachment likewise
+measures. Content and layout-property changes invalidate native measurement;
+the completed measure also invalidates arrangement. Child attachment
 requests arrangement after committing the new native child list. No synchronous
 `UpdateLayout` or window-wide redraw is needed for this handoff.
 
