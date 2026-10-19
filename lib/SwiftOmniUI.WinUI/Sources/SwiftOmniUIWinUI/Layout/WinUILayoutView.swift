@@ -547,6 +547,9 @@ class WinUILayoutView: WinUIView {
         defer { Self.queryingSize = querying; preparingBounds = previousBounds }
         for proposal in plan.proposals {
             guard let view = proposal.view else { continue }
+            // A promoted bar remains an arithmetic dependency of its logical
+            // page. Its actual XAML owner alone selects the native proposal.
+            guard view.nativeSafeBarOwner == nil || view.nativeSafeBarOwner === self else { continue }
             if view.nativeSafeBarOwner == nil {
                 view.safeAreaContext = context(for: view, at: proposal.place).ignoring(view.sourceElement?.ignoresSafeArea)
             }

@@ -200,6 +200,10 @@ extern "C" void swiftomniui_winui_window_set_safe_area_bars(
         if (!layer) {
             layer = controls::Grid();
             layer.Tag(winrt::box_value(L"safeAreaBars"));
+            // The page's native column has not supplied a frame yet. A
+            // visible zero-width host would measure live controls at a
+            // competing constraint before that first frame can be committed.
+            layer.Visibility(xaml::Visibility::Collapsed);
             layer.VerticalAlignment(xaml::VerticalAlignment::Top);
             controls::Grid::SetRow(layer, 3);
             controls::Canvas::SetZIndex(layer, 1);
@@ -254,10 +258,17 @@ extern "C" void swiftomniui_winui_window_set_safe_area_bar_frame(
         for (auto const &child : root(borrow<xaml::Window>(handle)).Children()) {
             auto layer = child.try_as<controls::Grid>();
             if (!layer || winrt::unbox_value_or<winrt::hstring>(layer.Tag(), L"") != L"safeAreaBars") continue;
+            if (width == 0) {
+                layer.Visibility(xaml::Visibility::Collapsed);
+                return;
+            }
             layer.HorizontalAlignment(xaml::HorizontalAlignment::Left);
             auto margin = xaml::Thickness{x, y, 0, 0};
             if (layer.Margin() != margin) layer.Margin(margin);
             if (layer.Width() != width) layer.Width(width);
+            // Keep the same subtree, and expose it only after its complete
+            // native frame is ready. Hiding does not discard editor state.
+            layer.Visibility(xaml::Visibility::Visible);
             return;
         }
     } catch (...) { report("placing the page's safe area bars"); }

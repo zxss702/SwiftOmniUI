@@ -158,7 +158,13 @@ class WinUIZStackView: WinUITravellingLayout {
         for index in 0..<count {
             let placement = placements[index]
             let view = items[index].view
-            view.layout(placement.place)
+            if view.nativeSafeBarOwner != nil, view !== insetBase,
+               sourceElement?.safeAreaInsetEdge != nil {
+                let place = placement.place
+                view.recordSafeBarPlace(place, context: SafeAreaContext(bounds: Rect(0, 0, place.width, place.height)))
+            } else {
+                view.layout(placement.place)
+            }
             view.setPlacedDrawing(placement.drawing, opacity: placement.drawnOpacity)
             (view as? WinUIGridView)?.setShadeOpacity(placement.drawnShade)
         }
