@@ -553,14 +553,9 @@ class WinUIView {
         if nativeSafeBarOwner == nil { placed = place }
         if Self.arranging > 0 {
             let room = wordsRoom ?? place
-            // Arithmetic caches answer size queries, but XAML retains only its
-            // last Measure proposal. Commit this child's actual allocation before
-            // its Arrange, even if an earlier query measured the same width.
-            // The ancestor is arranging; this child has not begun arranging yet.
-            let arranging = Self.arranging
-            Self.arranging = 0
-            prepareMeasure(width: room.width)
-            Self.arranging = arranging
+            // Native proposals are committed by MeasureOverride. Keep the real
+            // Arrange depth here: preparing again can invalidate Measure while
+            // XAML is arranging this tree and restart the same layout cycle.
             if let layout = self as? WinUILayoutView, placingLayout != nil {
                 layout.standsAt = place.width
             }
