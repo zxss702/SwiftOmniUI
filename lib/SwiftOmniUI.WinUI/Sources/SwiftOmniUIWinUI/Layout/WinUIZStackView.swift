@@ -44,8 +44,12 @@ class WinUIZStackView: WinUITravellingLayout {
 
     override var hasNativeProposals: Bool { true }
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
-        let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
-        let places = ZStackArithmetic.places(of: items, in: room, padding: padding, direction: direction)
+        if let placements = placement?.placements, !placements.isEmpty {
+            return zip(items, placements).map { item, placement in
+                NativeProposal(view: item.view, width: placement.place.width)
+            }
+        }
+        let places = childPlaces(in: Rect(0, 0, width ?? size.width, size.height))
         return zip(items, places).compactMap { item, place in
             place.map { NativeProposal(view: item.view, width: $0.width) }
         }
@@ -58,6 +62,20 @@ class WinUIZStackView: WinUITravellingLayout {
 
         beginArrangement(width: bounds.width)
         for item in items where item.view.nativeSafeBarOwner == nil { item.view.setPlacedDrawing(nil, opacity: 1) }
+        let places = childPlaces(in: bounds)
+        for (item, place) in zip(items, places) {
+            guard let place else { continue }
+            if item.view.nativeSafeBarOwner != nil, item.view !== insetBase,
+               sourceElement?.safeAreaInsetEdge != nil {
+                item.view.recordSafeBarPlace(place, context: SafeAreaContext(bounds: Rect(0, 0, place.width, place.height)))
+            } else {
+                self.place(item, at: place)
+            }
+        }
+    }
+
+    /// Native preparation and placement must use the same safe-area widths.
+    private func childPlaces(in bounds: Rect) -> [Rect?] {
         insetContext = nil
         insetBase = nil
         let current = items.filter { !$0.departing }
@@ -65,21 +83,13 @@ class WinUIZStackView: WinUITravellingLayout {
             let basePlace = SafeAreaArithmetic.base(of: base, boundary: base.element?.preservesSafeAreaProposal == true,
                                                    ignores: base.element?.ignoresSafeArea,
                                                    in: next, direction: direction)
-            self.place(base, at: basePlace)
-            if bar.isShown {
-                if bar.view.nativeSafeBarOwner != nil {
-                    bar.view.recordSafeBarPlace(barPlace, context: SafeAreaContext(bounds: Rect(0, 0, barPlace.width, barPlace.height)))
-                } else {
-                    self.place(bar, at: barPlace)
-                }
+            return items.map { item in
+                if item.view === base.view { return basePlace }
+                if item.view === bar.view, bar.isShown { return barPlace }
+                return nil
             }
-            return
         }
-        let room = Rect(x: 0, y: 0, width: bounds.width, height: bounds.height)
-        let places = ZStackArithmetic.places(of: items, in: room, padding: padding, direction: direction)
-        for (item, place) in zip(items, places) {
-            if let place { self.place(item, at: place) }
-        }
+        return ZStackArithmetic.places(of: items, in: bounds, padding: padding, direction: direction)
     }
 
     /// An animated placement still needs the current inset as layout input.

@@ -19,16 +19,18 @@ class WinUISingleChildView: WinUILayoutView {
     override var hasNativeProposals: Bool { true }
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
         guard let item = items.first, item.isShown else { return [] }
-        let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
-        let place = SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction)
+        let place = childPlace(item, in: Rect(0, 0, width ?? size.width, size.height))
         return [NativeProposal(view: item.view, width: place.width)]
     }
 
     override func arrange(in bounds: Rect) {
         guard let item = items.first, item.isShown else { return }
 
-        let context = layoutSafeArea(in: bounds)
-        let room = item.element?.preservesSafeAreaProposal == true ? bounds : context.safe
-        item.view.layout(SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction))
+        item.view.layout(childPlace(item, in: bounds))
+    }
+
+    private func childPlace(_ item: WinUILayoutItem, in bounds: Rect) -> Rect {
+        let room = item.element?.preservesSafeAreaProposal == true ? bounds : layoutSafeArea(in: bounds).safe
+        return SingleChildArithmetic.place(of: item, in: room, padding: padding, direction: direction)
     }
 }
