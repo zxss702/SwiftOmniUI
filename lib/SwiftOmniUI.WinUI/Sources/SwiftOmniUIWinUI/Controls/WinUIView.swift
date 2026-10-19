@@ -182,7 +182,7 @@ class WinUIView {
 
     /// Native sizes by proposal. DesiredSize alone belongs only to the last Measure call: a grid can ask for
     /// both an unconstrained size and a wrapped size before arranging either one.
-    private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize)] = []
+    private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize, pass: UInt64?)] = []
     private var pendingMeasures: [(width: Double?, height: Double?)] = []
     /// The allocation prepared in XAML, separately from cached intrinsic answers.
     private var nativeMeasurement: LayoutSize?
@@ -462,6 +462,10 @@ class WinUIView {
     /// Commit the actual allocation, separately from a control's intrinsic-size query.
     func prepareMeasure(width: Double, height: Double? = nil) {
         guard Self.arranging == 0, WinUILayoutView.queryingSize == 0 else { return }
+        // The placing parent has supplied a newer allocation. A repair queued
+        // by an earlier Arrange/animation frame must not overwrite this one.
+        pendingMeasures.removeAll(keepingCapacity: true)
+        pendingAllocation = nil
         _ = measureNative(width: width, height: height)
     }
 
@@ -526,8 +530,9 @@ class WinUIView {
         // travelling through Measure and Arrange does not become two different proposals.
         let width = width.map { Double(Float($0)) }
         let height = height.map { Double(Float($0)) }
+        let pass = WinUILayoutView.currentMeasurementPass
         if WinUILayoutView.queryingSize > 0,
-           let measured = measuredSizes.first(where: { $0.width == width && $0.height == height }) {
+           let measured = measuredSizes.first(where: { $0.width == width && $0.height == height && $0.pass == pass }) {
             return measured.size
         }
         if Self.arranging > 0 {
@@ -588,7 +593,7 @@ class WinUIView {
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.
         if measuredSizes.count == 8 { measuredSizes.removeFirst() }
-        measuredSizes.append((width, height, measured))
+        measuredSizes.append((width, height, measured, pass))
         return measured
     }
 

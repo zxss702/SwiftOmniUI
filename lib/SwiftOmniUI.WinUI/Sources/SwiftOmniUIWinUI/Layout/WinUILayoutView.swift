@@ -11,6 +11,7 @@ import CSwiftOmniUIWinUI
 class WinUILayoutView: WinUIView {
     /// The sizes measured in the pass under way, by the width offered.
     let measurements = MeasurementCache()
+    private var arithmeticMeasurementPass: UInt64?
 
     /// XAML keeps only its last native proposal. Arithmetic probes can select
     /// another width without invalidating Swift's size answers by proposal.
@@ -357,6 +358,7 @@ class WinUILayoutView: WinUIView {
         defer { measurementHeight = previousHeight }
 
         Self.arithmeticMeasuring += 1
+        if Self.arithmeticMeasuring == 1 { Self.measurementPass &+= 1 }
         WinUIView.measuring += 1
         defer {
             Self.arithmeticMeasuring -= 1
@@ -462,6 +464,14 @@ class WinUILayoutView: WinUIView {
 
     /// How many SwiftOmniUI layouts are measuring, one inside another.
     private static var arithmeticMeasuring = 0
+    private static var measurementPass: UInt64 = 0
+
+    /// A native pass can be caused by XAML alone (text, templates, visibility),
+    /// without a SOUI property revision. Validate queried descendants in that
+    /// pass before reusing their arithmetic; no subtree walk is needed.
+    static var currentMeasurementPass: UInt64? {
+        arithmeticMeasuring > 0 ? measurementPass : nil
+    }
 
     /// The width of the place this layout was last put in; nil before its first.
     var standsAt: Double?
@@ -496,6 +506,11 @@ class WinUILayoutView: WinUIView {
     /// The room the children take for the width offered, in DIPs, kept until a change beneath marks the layout.
     func naturalSize(width: Double?) -> LayoutSize {
         WinUILayoutUpdates.measured(self)
+        if let pass = Self.currentMeasurementPass, arithmeticMeasurementPass != pass {
+            measurements.invalidate()
+            preparations.removeAll(keepingCapacity: true)
+            arithmeticMeasurementPass = pass
+        }
         let width = width.map { Double(Float($0)) }
         return measurements.size(offering: width) {
             Self.sizings += 1
