@@ -552,20 +552,18 @@ class WinUIView {
         let resized = placed.map { $0.width != place.width || $0.height != place.height } ?? true
         if nativeSafeBarOwner == nil { placed = place }
         if Self.arranging > 0 {
-            // A layout of SwiftOmniUI's is measured at the width it stands at; a new width is measured once the
-            // pass ends - measuring an element while WinUI arranges marks it for another pass, for ever.
-            // Design: docs/design/platforms/winui/layout.md#measured-every-pass
+            let room = wordsRoom ?? place
+            // Arithmetic caches answer size queries, but XAML retains only its
+            // last Measure proposal. Commit this child's actual allocation before
+            // its Arrange, even if an earlier query measured the same width.
+            // The ancestor is arranging; this child has not begun arranging yet.
+            let arranging = Self.arranging
+            Self.arranging = 0
+            prepareMeasure(width: room.width)
+            Self.arranging = arranging
             if let layout = self as? WinUILayoutView, placingLayout != nil {
-                if layout.standsAt != place.width,
-                   !measuredSizes.contains(where: { $0.width == Double(Float(place.width)) && $0.height == nil }) {
-                    WinUIDoorbell.afterPass { [weak self] in
-                        guard let self, let layout = self as? WinUILayoutView, layout.standsAt != nil else { return }
-                        layout.commitMeasurementChange()
-                    }
-                }
                 layout.standsAt = place.width
             }
-            let room = wordsRoom ?? place
             swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
         } else if moved {
             placingLayout?.invalidateArrange()
