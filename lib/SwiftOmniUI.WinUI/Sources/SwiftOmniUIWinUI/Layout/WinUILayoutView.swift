@@ -446,6 +446,14 @@ class WinUILayoutView: WinUIView {
             recordMeasurement(size, proposal: proposal, previous: previous)
             let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
             let framed = values.sized(size, offered: proposal.width)
+            if nativeLayoutOwner != nil || rootSafeAreaContext != nil {
+                // A native page/window has already allocated these finite
+                // axes. Its DesiredSize must describe that allocation, just
+                // as its plan does. SOUI parents query naturalSize separately.
+                // Returning intrinsic extent here lets XAML choose another
+                // slot and then remeasure the page during its own Arrange.
+                return LayoutSize(width: proposal.width ?? framed.width, height: proposal.height ?? framed.height)
+            }
             return LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
         }
     }

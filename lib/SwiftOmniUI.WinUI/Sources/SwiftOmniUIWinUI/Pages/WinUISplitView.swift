@@ -51,8 +51,6 @@ final class WinUISplitView: WinUILayoutView {
     private var pages: [WinUILayoutItem] = []
     private(set) weak var detailRow: WinUIView?
 
-    /// The size requested by the native split for the current proposal.
-    private var asked = LayoutSize.zero
     private var adaptation = SidebarAdaptation()
     private var configurationPending = false
     private struct NativeSlot {
@@ -162,22 +160,28 @@ final class WinUISplitView: WinUILayoutView {
         configure()
     }
 
-    /// What WinUI's split view asked, never its pages' own sizes: WinUI measures them in the room it gives them.
+    override var contentSizeDependsOnHeight: Bool { true }
+
+    /// Each intrinsic query measures this native split at that complete
+    /// proposal. A result from its last native callback belongs to another
+    /// query, and is zero before the first callback has even run.
     override func contentSize(width: Double?) -> LayoutSize {
-        asked
+        contentSize(proposal: ProposedViewSize(width: width))
     }
 
-    /// Measures the native split at the current proposal, including unbounded
-    /// intrinsic queries. A previous allocation is not a measurement constraint.
-    /// Design: docs/design/platforms/winui/pages.md#a-native-arrangement
-    override func measure(width: Double, height: Double) -> LayoutSize {
-        asked = sidebar.measure(width: width, height: height)
-        return super.measure(width: width, height: height)
+    override func contentSize(proposal: ProposedViewSize) -> LayoutSize {
+        sidebar.measure(width: proposal.width, height: proposal.height)
+    }
+
+    override var hasNativeProposals: Bool { true }
+
+    override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
+        [NativeProposal(view: sidebar, place: Rect(0, 0, width ?? size.width, size.height))]
     }
 
     override func arrange(in bounds: Rect) {
         adaptToFirstRoom(width: bounds.width)
-        sidebar.layout(bounds)
+        for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
     }
 
     /// A newly created window already knows its client width before activation.

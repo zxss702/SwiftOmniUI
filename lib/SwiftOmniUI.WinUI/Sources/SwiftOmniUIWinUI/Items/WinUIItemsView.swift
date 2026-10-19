@@ -122,24 +122,16 @@ final class WinUIItemsView: WinUILayoutView {
         LayoutSize(width: width ?? 0, height: 0)
     }
 
-    /// Measures WinUI's list in the room it stands in, none before it stands anywhere: its scroller's viewport is the
-    /// room it is measured in.
-    /// Design: docs/design/platforms/winui/items.md#its-room
-    override func measure(width: Double, height: Double) -> LayoutSize {
-        _ = list.measure(width: list.placed?.width ?? 0, height: list.placed?.height ?? 0)
-        return super.measure(width: width, height: height)
+    override var hasNativeProposals: Bool { true }
+
+    /// The list is a viewport. Prepare the current allocation in Measure,
+    /// including its very first frame, rather than its previous placed size.
+    override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
+        [NativeProposal(view: list, place: Rect(0, 0, width ?? size.width, size.height))]
     }
 
     override func arrange(in bounds: Rect) {
-        // The list is measured again at the room it stands in once the pass ends: measuring an element while
-        // WinUI arranges marks it, and the marked element is measured and arranged again for ever - a cycle.
-        if list.placed?.width != bounds.width || list.placed?.height != bounds.height {
-            WinUIDoorbell.afterPass { [weak self] in
-                guard let self, let placed = list.placed else { return }
-                _ = list.measure(width: placed.width, height: placed.height)
-            }
-        }
-        list.layout(bounds)
+        for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
     }
 
     // MARK: - What the list says
