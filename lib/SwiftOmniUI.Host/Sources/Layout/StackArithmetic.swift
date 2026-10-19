@@ -185,75 +185,89 @@
         }
     }
 
-    /// Each shown child's extent along `axis`: its natural one, and for a flexible child a share of
-    /// the room left over, never under the length it named - the others keep theirs where the room
-    /// runs short.
+    /// Each shown child's extent along `axis`: flexible children accept the
+    /// remaining room before intrinsic siblings give up their natural sizes.
     @MainActor
     private static func alongs<Child: LayoutChild>(
         _ items: [Child], naturals: [LayoutSize], axis: Axis, spacing: Double?, in content: Rect
     ) -> [Double] {
-        var extents = zip(items, naturals).map { item, natural -> Double in
-            guard item.isShown else { return 0 }
-            let base = axis == .vertical
-                ? item.values.boundedHeight(natural.height)
-                : item.values.boundedWidth(natural.width)
-            guard let minimum = item.values.flex else { return base }
-            return axis == .vertical
-                ? item.values.boundedHeight(max(minimum, base))
-                : item.values.boundedWidth(max(minimum, base))
+        let minima = items.map { item in
+            let minimum = axis == .vertical ? item.values.minimumHeight : item.values.minimumWidth
+            return max(max(0, minimum ?? 0), item.values.flex ?? 0)
+        }
+        let maxima = items.indices.map { index in
+            let maximum = axis == .vertical ? items[index].values.maximumHeight : items[index].values.maximumWidth
+            return max(minima[index], maximum ?? .greatestFiniteMagnitude)
+        }
+        let flexible = items.indices.filter { index in
+            let values = items[index].values
+            let stated = axis == .vertical ? values.height : values.width
+            let scrolls = values.scrollAxes == .both
+                || (axis == .vertical ? values.scrollAxes == .vertical : values.scrollAxes == .horizontal)
+            let expands = values.expandingAxes == .both
+                || (axis == .vertical ? values.expandingAxes == .vertical : values.expandingAxes == .horizontal)
+            return items[index].isShown && stated == nil && (values.flex != nil || scrolls || expands)
+        }
+        let flexibleIndices = Set(flexible)
+        var extents = items.indices.map { index -> Double in
+            guard items[index].isShown else { return 0 }
+            let values = items[index].values
+            let stated = axis == .vertical ? values.height : values.width
+            let natural = axis == .vertical ? naturals[index].height : naturals[index].width
+            return Extent.bounded(stated ?? natural, minimum: minima[index], maximum: maxima[index])
         }
         var taken = gaps(of: items, axis: axis, spacing: spacing).reduce(0, +)
         for (item, extent) in zip(items, extents) where item.isShown {
             let margin = item.values.margin
             taken += extent + (axis == .vertical ? margin.top + margin.bottom : margin.left + margin.right)
         }
-        var room = (axis == .vertical ? content.height : content.width) - taken
+        let room = (axis == .vertical ? content.height : content.width) - taken
 
-        // Short of room, the children that speak the least keep what is left:
-        // each priority group below the loudest gives up its natural size in
-        // turn, lowest first, until the deficit is made or they reach nothing.
-        // A stated size is not negotiated: `.frame(height: 60)` means sixty,
-        // and what it cannot take it overflows, as SwiftUI's does.
+        // Each iteration either reaches the requested amount or removes at
+        // least one child at its bound. A saturated child gives its unused
+        // share to the remaining children in the same group.
+        func distribute(_ indices: [Int], amount: Double, growing: Bool) -> Double {
+            func capacity(_ index: Int) -> Double {
+                growing ? maxima[index] - extents[index] : extents[index] - minima[index]
+            }
+            var active = indices.filter { capacity($0) > 0 }
+            var remaining = amount
+            while remaining > 0, !active.isEmpty {
+                let share = remaining / Double(active.count)
+                let saturated = active.filter { capacity($0) <= share }
+                if saturated.isEmpty {
+                    for index in active { extents[index] += growing ? share : -share }
+                    return 0
+                }
+                for index in saturated {
+                    remaining = max(0, remaining - capacity(index))
+                    extents[index] = growing ? maxima[index] : minima[index]
+                }
+                active.removeAll { capacity($0) <= 0 }
+            }
+            return remaining
+        }
+
+        // Lower priorities give up room first. Within one priority, an input,
+        // scroller or spacer accepts a smaller slot before an intrinsic button
+        // or label does. Explicit sizes and all declared minima remain intact.
         if room < 0 {
             let shown = items.indices.filter {
-                items[$0].isShown && items[$0].values.flex == nil
+                items[$0].isShown
                     && (axis == .vertical ? items[$0].values.height == nil
                                           : items[$0].values.width == nil)
             }
             var deficit = -room
-            var priorities = shown.map { items[$0].values.priority }.sorted()
-            while deficit > 0, let lowest = priorities.first {
-                let group = shown.filter { items[$0].values.priority == lowest }
-                let part = deficit / Double(group.count)
-                for index in group {
-                    let minimum = axis == .vertical
-                        ? items[index].values.minimumHeight : items[index].values.minimumWidth
-                    let gave = min(part, max(0, extents[index] - (minimum ?? 0)))
-                    extents[index] -= gave
-                    deficit -= gave
-                }
-                priorities = priorities.filter { $0 > lowest }
+            for priority in Set(shown.map { items[$0].values.priority }).sorted() {
+                guard deficit > 0 else { break }
+                let group = shown.filter { items[$0].values.priority == priority }
+                deficit = distribute(group.filter { flexibleIndices.contains($0) }, amount: deficit, growing: false)
+                deficit = distribute(group.filter { !flexibleIndices.contains($0) }, amount: deficit, growing: false)
             }
-            room = 0
+            return extents
         }
 
-        let flexible = items.indices.filter {
-            let values = items[$0].values
-            let scrolls = values.scrollAxes == .both
-                || (axis == .vertical ? values.scrollAxes == .vertical : values.scrollAxes == .horizontal)
-            let expands = values.expandingAxes == .both
-                || (axis == .vertical ? values.expandingAxes == .vertical : values.expandingAxes == .horizontal)
-            return items[$0].isShown && (values.flex != nil
-                || ((scrolls || expands) && (axis == .vertical ? values.height == nil : values.width == nil)))
-        }
-        guard room > 0, !flexible.isEmpty else { return extents }
-
-        let share = room / Double(flexible.count)
-        for index in flexible {
-            extents[index] = axis == .vertical
-                ? items[index].values.boundedHeight(extents[index] + share)
-                : items[index].values.boundedWidth(extents[index] + share)
-        }
+        if room > 0 { _ = distribute(flexible, amount: room, growing: true) }
         return extents
     }
 

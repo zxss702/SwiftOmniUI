@@ -101,8 +101,13 @@ wrapped text is measured at the width it will have. A horizontal stack first
 asks for ideal widths, distributes its finite proposal, then measures heights
 at those assigned widths. With no finite proposal the ideal widths stand.
 Measurement and placement use the same distribution; declared minima survive
-compression. A hidden child takes no
-room and no spacing.
+compression. Lower layout priorities give up room first. Within one priority,
+an expanding input, scroll viewport or spacer shrinks before an intrinsic
+button or label. A spacer keeps its declared minimum, and explicit main-axis
+sizes are never negotiated. Once a child reaches its minimum or maximum, its
+unused share is distributed among the remaining children in that group.
+Unsatisfied explicit sizes and minima can overflow the stack. A hidden child
+takes no room and no spacing.
 
 An explicit spacing, including zero, is used directly. A nil spacing follows
 the opposing edge preferences of each adjacent visible pair. Desktop hosts
