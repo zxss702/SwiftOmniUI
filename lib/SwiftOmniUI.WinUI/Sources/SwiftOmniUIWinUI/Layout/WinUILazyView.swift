@@ -149,10 +149,6 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// A window change under way asks the run again once, not per notice.
     private var retellQueued = false
-    /// How many passes an arrival has stood waiting for its own rows' measurements: the
-    /// change's arrangement, and with it the change's law and retention, is not held
-    /// past a bound (`canArrangeRows`).
-    private var arrivalHeld = 0
     /// WinUI's effective viewport is the compositor's window in this panel's coordinates.
     private var effectiveViewport: Rect?
     private var lastTargetViewport: Rect?
@@ -233,7 +229,6 @@ class WinUILazyView: WinUITravellingLayout {
                 acrossWidest = WinUILazyCrossExtents()
             }
             measureMountedRows()
-            arrivalHeld = 0
             if cells.total != measuredExtent { commitChangedContentExtent() }
         }
         if sourceChanged || requestAcknowledged { retell() }
@@ -649,20 +644,9 @@ class WinUILazyView: WinUITravellingLayout {
                 || measuredRevisions[entry.key] != entry.value.view.measurementRevision
         }
         guard !waiting else {
-            // The rows of a change are measured in the pass before its arrangement. A row
-            // whose own measure never lands - a view that left the room of a native pass, a
-            // row kept alive by a window of its own - must not hold the change's
-            // arrangement, and with it the change's law and the retention it stands, for
-            // good: past the bound its place is the one the arithmetic holds for it.
-            guard arrivalHeld < 2 else {
-                arrivalHeld = 0
-                return true
-            }
-            arrivalHeld += 1
             retell()
             return false
         }
-        arrivalHeld = 0
         return true
     }
 
@@ -676,9 +660,12 @@ class WinUILazyView: WinUITravellingLayout {
         if cells.animatesChanges, let motion { places.animation = motion }
         places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges && ready,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                         axis == .vertical ? cells.anchorShift : 0), refining: true)
-        if ready { cells.animatesChanges = false }
-        cells.anchorShift = 0
+                                         axis == .vertical ? cells.anchorShift : 0), refining: true,
+                     consumingPatch: ready)
+        if ready {
+            cells.animatesChanges = false
+            cells.anchorShift = 0
+        }
         retell()
     }
 
@@ -727,7 +714,6 @@ class WinUILazyView: WinUITravellingLayout {
         preparedViewport = nil
         watching = nil
         scrollEar = nil
-        arrivalHeld = 0
     }
 }
 
