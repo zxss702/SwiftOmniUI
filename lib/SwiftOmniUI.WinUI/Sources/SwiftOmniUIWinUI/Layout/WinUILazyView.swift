@@ -580,7 +580,7 @@ class WinUILazyView: WinUITravellingLayout {
     /// Update anchor bookkeeping; only native viewport reports establish the visible coordinates.
     /// Native scroll anchoring adjusts the offset after layout commits the new extent.
     func commitAnchor(perRun: Int = 1, grid: Bool = false) {
-        cells.correctedOrigin(perRun: perRun, grid: grid)
+        _ = cells.correctedOrigin(perRun: perRun, grid: grid)
     }
 
     /// Recomputes the places when the scroller's window moved.
