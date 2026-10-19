@@ -468,6 +468,7 @@ class WinUILayoutView: WinUIView {
 
     /// The natural size last measured, and the width it was offered.
     private var measured: (offered: Double?, size: LayoutSize)?
+    private var measuredSizeCommitPending = false
 
     /// Retains the natural-size revision used by logical row caches. XAML
     /// propagates native DesiredSize changes after MeasureOverride returns;
@@ -479,6 +480,17 @@ class WinUILayoutView: WinUIView {
         else { return }
 
         measurementRevision &+= 1
+        // This native measurement ran outside the placing parent's measure.
+        // Its arithmetic still holds the previous answer. Publish the change
+        // after XAML exits Measure, without invalidating the active native pass.
+        guard !measuredSizeCommitPending else { return }
+        measuredSizeCommitPending = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.measuredSizeCommitPending = false
+            guard !self.isDetached else { return }
+            self.placingLayout?.commitMeasurementChange()
+        }
     }
 
     /// The room the children take for the width offered, in DIPs, kept until a change beneath marks the layout.
