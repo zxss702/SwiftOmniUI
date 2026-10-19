@@ -216,6 +216,10 @@ namespace swiftomniui {
         /// Design: docs/design/platforms/winui/runtime.md#an-application-with-no-xaml
         struct SwiftOmniUIApplication : xaml::ApplicationT<SwiftOmniUIApplication, xaml::Markup::IXamlMetadataProvider> {
             explicit SwiftOmniUIApplication(bool embedded) : embedded(embedded) {
+                // Emit XAML's offending elements and constraints before an
+                // imminent layout-cycle failure, including release builds
+                // launched under LLDB. Ordinary launches keep default settings.
+                if (IsDebuggerPresent()) DebugSettings().LayoutCycleTracingLevel(xaml::LayoutCycleTracingLevel::High);
                 UnhandledException([](IInspectable const &, xaml::UnhandledExceptionEventArgs const &args) {
                     auto message = winrt::to_string(args.Message());
                     std::fprintf(stderr, "SwiftOmniUI: unhandled XAML exception HRESULT=0x%08lx: %s\n",

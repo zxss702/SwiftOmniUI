@@ -268,7 +268,11 @@ namespace {
     };
 
     struct SwiftOmniUIPanel : controls::PanelT<SwiftOmniUIPanel> {
-        explicit SwiftOmniUIPanel(int64_t view) : view(view) {}
+        explicit SwiftOmniUIPanel(int64_t view) : view(view) {
+            // XAML's cycle trace includes Name. Keep the callback identity in
+            // that trace so otherwise identical Panel instances are distinct.
+            if (IsDebuggerPresent()) Name(winrt::hstring(std::wstring(L"SOUI_") + std::to_wstring(view)));
+        }
 
         peers::AutomationPeer OnCreateAutomationPeer() {
             IInspectable self = *this;
