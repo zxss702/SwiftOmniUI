@@ -27,6 +27,7 @@ class WinUILayoutView: WinUIView {
         weak var view: WinUIView?
         let place: Rect
     }
+    @MainActor
     private struct Dependency {
         weak var view: WinUIView?
         let revision: Int
@@ -484,7 +485,7 @@ class WinUILayoutView: WinUIView {
             bounds: bounds, revision: measurementRevision, hierarchy: hierarchyRevision,
             values: sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues(),
             safeArea: layoutSafeArea(in: bounds), proposals: proposals,
-            dependencies: proposals.compactMap { $0.view.map(Dependency.init) }))
+            dependencies: proposals.compactMap { $0.view.map { Dependency($0) } }))
     }
 
     private func completedLayoutPlan(in bounds: Rect) -> LayoutPlan {
@@ -492,7 +493,7 @@ class WinUILayoutView: WinUIView {
         let context = layoutSafeArea(in: bounds)
         if let plan = layoutPlans.first(where: {
             $0.bounds == bounds && $0.revision == measurementRevision && $0.hierarchy == hierarchyRevision
-                && $0.values == values && $0.safeArea == context && $0.dependencies.allSatisfy(\.isCurrent)
+                && $0.values == values && $0.safeArea == context && $0.dependencies.allSatisfy({ $0.isCurrent })
         }) { return plan }
         let previousBounds = preparingBounds
         preparingBounds = bounds
@@ -509,7 +510,7 @@ class WinUILayoutView: WinUIView {
             let revision = measurementRevision
             prepareChildren(plan)
             if before == WinUIView.nativeSizeRevision && revision == measurementRevision
-                && plan.dependencies.allSatisfy(\.isCurrent) {
+                && plan.dependencies.allSatisfy({ $0.isCurrent }) {
                 keepLayoutPlan(in: bounds, proposals: plan.proposals)
                 return layoutPlans.last!
             }
