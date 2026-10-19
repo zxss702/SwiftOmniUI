@@ -186,6 +186,7 @@ class WinUIView {
     private var pendingMeasures: [(width: Double?, height: Double?)] = []
     /// The allocation prepared in XAML, separately from cached intrinsic answers.
     private var nativeMeasurement: LayoutSize?
+    private var arrangingAllocation: LayoutSize?
     private var pendingAllocation: LayoutSize?
     private var measurementCommitPending = false
     private var nativeMeasurePending = false
@@ -473,7 +474,11 @@ class WinUIView {
     /// Arrange must reconcile its actual allocation even when placement did
     /// not need an intrinsic size query, including native-owned page roots.
     func prepareAllocationAfterPass(width: Double, height: Double) {
-        let allocation = LayoutSize(width: Double(Float(width)), height: Double(Float(height)))
+        // ArrangeCore can enlarge its override's size to UnclippedDesiredSize.
+        // Preserve the parent's slot while its native Arrange is on the stack;
+        // that enlarged render size must not overwrite the requested proposal.
+        let allocation = arrangingAllocation
+            ?? LayoutSize(width: Double(Float(width)), height: Double(Float(height)))
         pendingAllocation = nativeMeasurement == allocation ? nil : allocation
         if pendingAllocation != nil { commitMeasurementsAfterPass() }
     }
@@ -614,6 +619,9 @@ class WinUIView {
             if let layout = self as? WinUILayoutView, placingLayout != nil {
                 layout.standsAt = place.width
             }
+            let previousAllocation = arrangingAllocation
+            arrangingAllocation = LayoutSize(width: Double(Float(room.width)), height: Double(Float(room.height)))
+            defer { arrangingAllocation = previousAllocation }
             swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
         } else if moved {
             // Animation/placement frames arrive outside XAML layout. Arrange
