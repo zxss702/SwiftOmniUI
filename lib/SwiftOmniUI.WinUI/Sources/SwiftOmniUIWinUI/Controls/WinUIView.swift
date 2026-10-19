@@ -482,6 +482,13 @@ class WinUIView {
         _ = measureNative(width: width, height: height)
     }
 
+    /// XAML arranges native controls and their templates from the completed
+    /// Measure result. A different final slot is not another Measure proposal:
+    /// measuring a SplitView, scroller or list here changes its DesiredSize
+    /// and restarts the parent that is currently arranging it. SOUI panels
+    /// override this to prepare their descendant placement plans instead.
+    func prepareAllocation(in bounds: Rect) {}
+
     /// The element's size for the room offered, in DIPs; nil offers any.
     /// Design: docs/design/platforms/winui/layout.md#measured-every-pass
     func measure(width: Double?, height: Double?) -> LayoutSize {
@@ -570,14 +577,9 @@ class WinUIView {
             let room = wordsRoom ?? place
             WinUILayoutDiagnostics.record("place", view: self,
                 "frame=\(WinUILayoutDiagnostics.rect(place)) measureRoom=\(WinUILayoutDiagnostics.rect(room)) resized=\(resized)")
-            // SOUI panels prepare their child plans for the actual allocation
-            // in ArrangeOverride. Measuring the panel itself here rewrites its
-            // DesiredSize during the parent's Arrange and can restart layout
-            // forever when native rounding supplies a different final slot.
-            // Native controls still need their own content prepared.
-            if !(self is WinUILayoutView) {
-                prepareMeasure(width: room.width, height: room.height)
-            }
+            // Complete placement input, preserving the native Measure result.
+            // The same contract applies to SOUI and native XAML containers.
+            prepareAllocation(in: Rect(0, 0, room.width, room.height))
             if let layout = self as? WinUILayoutView, placingLayout != nil {
                 layout.standsAt = place.width
             }

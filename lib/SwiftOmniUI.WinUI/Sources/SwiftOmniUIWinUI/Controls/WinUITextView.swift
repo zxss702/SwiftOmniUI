@@ -141,6 +141,14 @@ class WinUITextView: WinUIView {
 
     override var wordsRoom: Rect? { bound }
 
+    /// Animated text wraps at its destination throughout the motion. That is
+    /// a text-content proposal, independent of the parent's presentation slot;
+    /// native containers do not use this exception to remeasure their subtree.
+    override func prepareAllocation(in bounds: Rect) {
+        guard let bound else { return }
+        prepareMeasure(width: bound.width, height: bound.height)
+    }
+
     /// WinUI spaces letters in thousandths of an em and lines in DIPs: both measured against the font's size.
     private func writeSpacing() {
         let size = look.size ?? Self.platformFontSize

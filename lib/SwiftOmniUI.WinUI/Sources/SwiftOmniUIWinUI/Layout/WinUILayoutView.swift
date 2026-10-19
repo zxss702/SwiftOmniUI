@@ -423,7 +423,7 @@ class WinUILayoutView: WinUIView {
     /// dirties the parent whose Arrange is still in progress. At fractional
     /// display scales the parent then measures at its original constraint and
     /// repeats that change indefinitely.
-    func prepareAllocation(in bounds: Rect) {
+    override func prepareAllocation(in bounds: Rect) {
         precondition(!isNativeArranging, "an arranging panel prepares its plan within its own phase")
         guard hasNativeProposals else { return }
         let bounds = Self.nativeRect(bounds)
@@ -605,8 +605,8 @@ class WinUILayoutView: WinUIView {
                 view.safeAreaContext = context(for: view, at: proposal.place).ignoring(view.sourceElement?.ignoresSafeArea)
             }
             let room = view.wordsRoom ?? proposal.place
-            if preparation == .allocation, let layout = view as? WinUILayoutView {
-                layout.prepareAllocation(in: Rect(0, 0, room.width, room.height))
+            if preparation == .allocation {
+                view.prepareAllocation(in: Rect(0, 0, room.width, room.height))
             } else {
                 view.prepareMeasure(width: room.width, height: room.height)
             }

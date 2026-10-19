@@ -64,11 +64,14 @@ UpdateLayout on itself or an arranging ancestor. A native-owned page receiving
 new final bounds synchronously computes and prepares its child plan for those
 bounds without reentering its own native Measure.
 
-Preparing an Arrange allocation also preserves each descendant SOUI panel's
-native Measure result. It recursively prepares those panels' child plans and
-measures native controls where required, without calling native Measure on the
-panels themselves. Native-owned containers prepare their pages when XAML
-arranges them. `WinUIView.layout` likewise arranges SOUI panels directly.
+Preparing an Arrange allocation preserves native Measure results for both
+SOUI panels and native XAML controls. It recursively prepares SOUI panels'
+child plans. SplitView, scroll and item containers consume their completed
+measurements and let XAML arrange their templates and pages at the final slot.
+`WinUIView.layout` uses the same `prepareAllocation` contract before Arrange;
+it does not remeasure native controls just because their final slot differs.
+Animated text alone prepares its independent destination wrapping proposal,
+which does not follow the changing presentation slot.
 For example, a native Grid can measure a page at 792 DIPs but arrange it at
 792.5714 DIPs on a 175% display. Measuring the page's framed child again at the
 latter height changes its DesiredSize, dirties that same parent and repeats
@@ -229,7 +232,8 @@ Margin commits run on initial loading, changed insets, and template/theme
 changes. Template changes use one LayoutUpdated notification, then remove
 the handler; unrelated window layouts do not traverse every scroller's
 template again. Unchanged resolved margins post no new commit.
-A scroller's allocation is prepared before its native Arrange. The viewport
+A scroller's Measure proposal is prepared before native Arrange; its final
+allocation does not explicitly call Measure on the scroller again. The viewport
 bridge distinguishes ready, not ready and failed queries, writing geometry
 only on success. A not-ready request waits through weak native Loaded and
 LayoutUpdated subscriptions and resumes when the native viewport exists;
