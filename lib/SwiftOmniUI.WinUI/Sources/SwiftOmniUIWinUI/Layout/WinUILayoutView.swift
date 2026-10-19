@@ -523,8 +523,7 @@ class WinUILayoutView: WinUIView {
     func backgroundBounds(in bounds: Rect) -> Rect { bounds }
 
     private struct SafeAreaInput: Equatable {
-        let safe: Rect
-        let layout: Rect
+        let insets: EdgeInsets
         let consumed: EdgeInsets
     }
     private var lastSafeAreaInput: SafeAreaInput?
@@ -534,8 +533,12 @@ class WinUILayoutView: WinUIView {
         // Arrange rectangle. A page swap can change it at the same size. Ask
         // this panel to propagate the new region even when no resize occurs.
         // Do not invalidate ancestors: the parent has already supplied it.
-        let context = layoutSafeArea(in: allocatedBounds)
-        let input = SafeAreaInput(safe: context.safe, layout: context.layout, consumed: context.consumed)
+        // The inherited context describes the incoming allocation, whereas
+        // allocatedBounds still describes the previous Arrange. Allocation size
+        // is already a measurement proposal; only changed insets invalidate it.
+        let context = layoutSafeArea(in: safeAreaContext?.layout ?? allocatedBounds)
+        let input = SafeAreaInput(insets: SafeAreaContext.insets(of: context.safe, in: context.layout),
+                                  consumed: context.consumed)
         guard input != lastSafeAreaInput else { return }
         lastSafeAreaInput = input
         forgetMeasurements()
