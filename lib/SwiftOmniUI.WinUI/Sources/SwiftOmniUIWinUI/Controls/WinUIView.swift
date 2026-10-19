@@ -570,10 +570,14 @@ class WinUIView {
             let room = wordsRoom ?? place
             WinUILayoutDiagnostics.record("place", view: self,
                 "frame=\(WinUILayoutDiagnostics.rect(place)) measureRoom=\(WinUILayoutDiagnostics.rect(room)) resized=\(resized)")
-            // Fill placements need no intrinsic query, and animation/native
-            // templates can allocate a different size from the measure plan.
-            // Such allocations must not silently keep another native proposal.
-            prepareMeasure(width: room.width, height: room.height)
+            // SOUI panels prepare their child plans for the actual allocation
+            // in ArrangeOverride. Measuring the panel itself here rewrites its
+            // DesiredSize during the parent's Arrange and can restart layout
+            // forever when native rounding supplies a different final slot.
+            // Native controls still need their own content prepared.
+            if !(self is WinUILayoutView) {
+                prepareMeasure(width: room.width, height: room.height)
+            }
             if let layout = self as? WinUILayoutView, placingLayout != nil {
                 layout.standsAt = place.width
             }

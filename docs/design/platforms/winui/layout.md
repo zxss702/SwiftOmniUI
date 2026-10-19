@@ -33,14 +33,14 @@ Changes to a child's layout-value tags notify its nearest Custom Layout through
 `HostPatch.customLayoutChanged`; the mounted revision invalidates that
 container even when its LayoutBox and child identities remain unchanged.
 
-A selected native allocation always enters XAML Measure so native dirtiness,
-resource changes and template attachment are observed. An explicit preparation
-can reuse proposal-keyed arithmetic while still checking its native children.
-An independent native Measure, or a dirty native callback at unchanged
-constraints, validates queried descendants within one scoped native epoch.
-Only the visited dependency paths refresh; moving to a different allocation
-alone reuses intrinsic answers. Ordinary arithmetic ignores proposed height
-and retains its width cache; height-sensitive Custom Layout keeps both axes.
+A selected Measure proposal enters XAML so native dirtiness, resource changes
+and template attachment are observed. An explicit preparation can reuse
+proposal-keyed arithmetic while still checking its native children. A dirty
+native callback refreshes its own arithmetic and retains unchanged descendants'
+proposal-keyed answers. Only the affected dependency paths refresh; moving to
+a different allocation alone reuses intrinsic answers. Ordinary arithmetic
+ignores proposed height and retains its width cache; height-sensitive Custom
+Layout keeps both axes.
 If a native child changes its answer at the same proposal, its old intrinsic answers are
 discarded and the enclosing plan is recomputed before placement. Merely
 selecting a different proposal is not a content revision and does not clear
@@ -53,6 +53,18 @@ reset them. A panel must not call native Measure, InvalidateMeasure or
 UpdateLayout on itself or an arranging ancestor. A native-owned page receiving
 new final bounds synchronously computes and prepares its child plan for those
 bounds without reentering its own native Measure.
+
+Preparing an Arrange allocation also preserves each descendant SOUI panel's
+native Measure result. It recursively prepares those panels' child plans and
+measures native controls where required, without calling native Measure on the
+panels themselves. Native-owned containers prepare their pages when XAML
+arranges them. `WinUIView.layout` likewise arranges SOUI panels directly.
+For example, a native Grid can measure a page at 792 DIPs but arrange it at
+792.5714 DIPs on a 175% display. Measuring the page's framed child again at the
+latter height changes its DesiredSize, dirties that same parent and repeats
+the original Measure forever. Allocation plans carry the actual rectangles
+without rewriting the native measure contract. A valid prepared allocation
+can be reused only while its complete plan dependencies still match.
 
 There is no provisional DesiredSize, deferred unknown-proposal measurement or
 old animation allocation to repair on a later dispatcher turn. A presentation

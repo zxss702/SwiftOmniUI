@@ -12,12 +12,18 @@ class WinUILayoutView: WinUIView {
     /// Intrinsic answers by width; height-sensitive queries use proposedSizes.
     let measurements = MeasurementCache()
 
-    /// XAML keeps only its last native proposal. Arithmetic probes can select
-    /// another width without invalidating Swift's size answers by proposal.
+    /// The last subtree preparation, separate from this panel's own XAML
+    /// Measure constraint. Arrange can prepare another allocation without
+    /// changing the DesiredSize already returned to its native parent.
     private var lastSizingWidth: Double?
     private var lastSizingHeight: Double?
     private var hasSizing = false
     private var nativePreparationDepth = 0
+
+    private enum Preparation: Equatable {
+        case measure
+        case allocation
+    }
 
     struct NativeProposal {
         weak var view: WinUIView?
@@ -412,6 +418,27 @@ class WinUILayoutView: WinUIView {
         }
     }
 
+    /// A new Arrange slot changes the child plan, not this panel's native
+    /// measure contract. Remeasuring the panel here changes DesiredSize and
+    /// dirties the parent whose Arrange is still in progress. At fractional
+    /// display scales the parent then measures at its original constraint and
+    /// repeats that change indefinitely.
+    func prepareAllocation(in bounds: Rect) {
+        precondition(!isNativeArranging, "an arranging panel prepares its plan within its own phase")
+        guard hasNativeProposals else { return }
+        if hasSizing, lastSizingWidth == bounds.width, lastSizingHeight == bounds.height,
+           cachedLayoutPlan(in: bounds) != nil { return }
+        WinUILayoutDiagnostics.record("prepare.allocation", view: self,
+            "bounds=\(WinUILayoutDiagnostics.rect(bounds))")
+        let previousHeight = measurementHeight
+        measurementHeight = bounds.height
+        defer { measurementHeight = previousHeight }
+        _ = prepareLayoutPlan(in: bounds, for: .allocation)
+        lastSizingWidth = bounds.width
+        lastSizingHeight = bounds.height
+        hasSizing = true
+    }
+
     /// A genuine native Measure owns this view's phase, even beneath an
     /// ancestor's Arrange. Global depths continue to protect tree mutations.
     func measure(width: Double, height: Double) -> LayoutSize {
@@ -508,13 +535,18 @@ class WinUILayoutView: WinUIView {
             dependencies: proposals.compactMap { $0.view.map { Dependency($0) } }))
     }
 
-    private func completedLayoutPlan(in bounds: Rect) -> LayoutPlan {
+    private func cachedLayoutPlan(in bounds: Rect) -> LayoutPlan? {
         let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
         let context = layoutSafeArea(in: bounds)
-        if let plan = layoutPlans.first(where: {
+        return layoutPlans.first(where: {
             $0.bounds == bounds && $0.revision == measurementRevision && $0.hierarchy == hierarchyRevision
                 && $0.values == values && $0.safeArea == context && $0.dependencies.allSatisfy({ $0.isCurrent })
-        }) { return plan }
+        })
+    }
+
+    private func completedLayoutPlan(in bounds: Rect) -> LayoutPlan {
+        if let plan = cachedLayoutPlan(in: bounds) { return plan }
+        let context = layoutSafeArea(in: bounds)
         WinUILayoutDiagnostics.record("plan.build", view: self,
             "bounds=\(WinUILayoutDiagnostics.rect(bounds)) safe=\(WinUILayoutDiagnostics.rect(context.safe)) cached=\(layoutPlans.count)")
         let previousBounds = preparingBounds
@@ -525,12 +557,12 @@ class WinUILayoutView: WinUIView {
         return layoutPlans.last!
     }
 
-    private func prepareLayoutPlan(in bounds: Rect) -> LayoutPlan {
+    private func prepareLayoutPlan(in bounds: Rect, for preparation: Preparation = .measure) -> LayoutPlan {
         var plan = completedLayoutPlan(in: bounds)
         while true {
             let before = WinUIView.nativeSizeRevision
             let revision = measurementRevision
-            prepareChildren(plan)
+            prepareChildren(plan, for: preparation)
             if before == WinUIView.nativeSizeRevision && revision == measurementRevision
                 && plan.dependencies.allSatisfy({ $0.isCurrent }) {
                 keepLayoutPlan(in: bounds, proposals: plan.proposals)
@@ -545,7 +577,7 @@ class WinUILayoutView: WinUIView {
         }
     }
 
-    private func prepareChildren(_ plan: LayoutPlan) {
+    private func prepareChildren(_ plan: LayoutPlan, for preparation: Preparation) {
         let querying = Self.queryingSize
         let previousBounds = preparingBounds
         Self.queryingSize = 0
@@ -561,7 +593,11 @@ class WinUILayoutView: WinUIView {
                 view.safeAreaContext = context(for: view, at: proposal.place).ignoring(view.sourceElement?.ignoresSafeArea)
             }
             let room = view.wordsRoom ?? proposal.place
-            view.prepareMeasure(width: room.width, height: room.height)
+            if preparation == .allocation, let layout = view as? WinUILayoutView {
+                layout.prepareAllocation(in: Rect(0, 0, room.width, room.height))
+            } else {
+                view.prepareMeasure(width: room.width, height: room.height)
+            }
         }
     }
 
@@ -641,9 +677,13 @@ class WinUILayoutView: WinUIView {
             let previousPlan = activeLayoutPlan
             defer { measurementHeight = previousHeight; activeLayoutPlan = previousPlan }
             if hasNativeProposals {
-                // Native-owned roots can receive new final bounds without a
-                // Measure. Prepare only descendants, never this active panel.
-                activeLayoutPlan = prepareLayoutPlan(in: bounds)
+                // Final bounds can differ from Measure, including one physical
+                // pixel of native Grid rounding. Prepare descendants' slots
+                // without replacing any SOUI panel's native measure result.
+                activeLayoutPlan = prepareLayoutPlan(in: bounds, for: .allocation)
+                lastSizingWidth = bounds.width
+                lastSizingHeight = bounds.height
+                hasSizing = true
             }
             boxView?.layout(backgroundBounds(in: bounds))
             writeCut(width: width, height: height)
