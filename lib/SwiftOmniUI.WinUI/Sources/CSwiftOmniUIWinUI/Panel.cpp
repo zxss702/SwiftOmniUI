@@ -268,7 +268,10 @@ namespace {
     };
 
     struct SwiftOmniUIPanel : controls::PanelT<SwiftOmniUIPanel> {
-        explicit SwiftOmniUIPanel(int64_t view) : view(view) {}
+        explicit SwiftOmniUIPanel(int64_t view) : view(view) {
+            // Correlate WinUI's layout-cycle trace with Swift view numbers.
+            Name(winrt::hstring(std::wstring(L"SOUI_") + std::to_wstring(view)));
+        }
 
         peers::AutomationPeer OnCreateAutomationPeer() {
             IInspectable self = *this;
@@ -279,14 +282,32 @@ namespace {
             if (alphaMask) alphaMask->measure(available);
             double size[2] = {0, 0};
             callbacks.measure(view, available.Width, available.Height, size);
-            if (navigation) navigation.Measure(available);
+            if (navigation) {
+                char line[192]{};
+                std::snprintf(line, sizeof(line), "frame.measure.begin view=%lld proposal=%gx%g swiftDesired=%gx%g",
+                              static_cast<long long>(view), available.Width, available.Height, size[0], size[1]);
+                traceLayout(line);
+                navigation.Measure(available);
+                auto desired = navigation.DesiredSize();
+                std::snprintf(line, sizeof(line), "frame.measure.end view=%lld desired=%gx%g",
+                              static_cast<long long>(view), desired.Width, desired.Height);
+                traceLayout(line);
+            }
             return Size(static_cast<float>(size[0]), static_cast<float>(size[1]));
         }
 
         Size ArrangeOverride(Size final) {
             if (alphaMask) alphaMask->arrange(final);
             callbacks.arrange(view, final.Width, final.Height);
-            if (navigation) navigation.Arrange(Rect(0, 0, final.Width, final.Height));
+            if (navigation) {
+                char line[128]{};
+                std::snprintf(line, sizeof(line), "frame.arrange.begin view=%lld bounds=%gx%g",
+                              static_cast<long long>(view), final.Width, final.Height);
+                traceLayout(line);
+                navigation.Arrange(Rect(0, 0, final.Width, final.Height));
+                std::snprintf(line, sizeof(line), "frame.arrange.end view=%lld", static_cast<long long>(view));
+                traceLayout(line);
+            }
             return final;
         }
 

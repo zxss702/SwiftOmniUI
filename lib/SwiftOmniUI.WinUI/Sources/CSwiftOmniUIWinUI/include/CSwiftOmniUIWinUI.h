@@ -97,6 +97,9 @@ typedef struct {
     int64_t length;
 } SwiftOmniUIFileDialog;
 
+/// Records a layout diagnostic in the relay's bounded startup log. Does not invalidate or flush layout.
+void swiftomniui_winui_layout_trace(char const *message);
+
 /// What the relay calls on the UI thread. Every one is set: the relay calls them unchecked.
 typedef struct {
     /// WinUI stands on the thread: the host's first render.

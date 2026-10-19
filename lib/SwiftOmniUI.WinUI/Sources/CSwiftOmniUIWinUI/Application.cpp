@@ -215,7 +215,16 @@ namespace swiftomniui {
         /// The application: WinUI's control resources and their type information, with no XAML file.
         /// Design: docs/design/platforms/winui/runtime.md#an-application-with-no-xaml
         struct SwiftOmniUIApplication : xaml::ApplicationT<SwiftOmniUIApplication, xaml::Markup::IXamlMetadataProvider> {
-            explicit SwiftOmniUIApplication(bool embedded) : embedded(embedded) {}
+            explicit SwiftOmniUIApplication(bool embedded) : embedded(embedded) {
+                traceLayout(embedded ? "application.created embedded=true" : "application.created embedded=false");
+                DebugSettings().LayoutCycleTracingLevel(xaml::LayoutCycleTracingLevel::High);
+                UnhandledException([](IInspectable const &, xaml::UnhandledExceptionEventArgs const &args) {
+                    auto message = winrt::to_string(args.Message());
+                    traceLayoutFailure(static_cast<int32_t>(args.Exception()), message.c_str());
+                    // Keep the original exception unhandled. Logging must not
+                    // hide the failure or resume an inconsistent layout tree.
+                });
+            }
 
             void OnLaunched(xaml::LaunchActivatedEventArgs const &) {
                 if (embedded) return;

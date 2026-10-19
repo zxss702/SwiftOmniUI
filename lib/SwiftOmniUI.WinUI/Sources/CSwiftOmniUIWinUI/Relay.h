@@ -36,6 +36,10 @@ namespace swiftomniui {
     /// The host's callbacks, set once by run or embed.
     extern SwiftOmniUIWinUICallbacks callbacks;
 
+    /// Bounded startup diagnostics; these functions perform no XAML work.
+    void traceLayout(char const *message) noexcept;
+    void traceLayoutFailure(int32_t code, char const *message) noexcept;
+
     /// Runs `work` on the UI thread, in its turn; from any thread.
     void post(void (*work)());
 
@@ -120,6 +124,10 @@ namespace swiftomniui {
         }
         // As UTF-8: `%ls` stops at the first letter outside ASCII, the rest of the line with it.
         std::fprintf(stderr, "SwiftOmniUI WinUI: %s failed: 0x%08x %s\n", where, static_cast<unsigned>(code), words.c_str());
+        char diagnostic[1024]{};
+        std::snprintf(diagnostic, sizeof(diagnostic), "native.error operation=%s HRESULT=0x%08x message=%s",
+                      where, static_cast<unsigned>(code), words.c_str());
+        traceLayout(diagnostic);
         std::fflush(stderr);
         return code;
     }
