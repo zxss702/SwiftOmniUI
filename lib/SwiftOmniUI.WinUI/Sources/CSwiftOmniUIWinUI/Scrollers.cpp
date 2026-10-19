@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 #include <winrt/Microsoft.UI.Composition.h>
+#include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -87,7 +88,7 @@ namespace {
                 auto visual = at.try_as<xaml::UIElement>();
                 if (!visual) continue;
                 if (visual.Visibility() == xaml::Visibility::Collapsed) return SwiftOmniUIViewportNotReady;
-                if (auto presenter = visual.try_as<controls::ScrollPresenter>()) {
+                if (auto presenter = visual.try_as<controls::Primitives::ScrollPresenter>()) {
                     auto across = presenter.ViewportWidth(), down = presenter.ViewportHeight();
                     if (!std::isfinite(across) || !std::isfinite(down) || across <= 0 || down <= 0)
                         return SwiftOmniUIViewportNotReady;
