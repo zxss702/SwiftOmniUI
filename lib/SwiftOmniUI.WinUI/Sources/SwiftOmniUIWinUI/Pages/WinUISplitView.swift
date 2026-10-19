@@ -191,14 +191,19 @@ final class WinUISplitView: WinUILayoutView {
     private func safeArea(for page: WinUIView, in bounds: Rect) -> SafeAreaContext {
         // TransformToVisual has no useful coordinate before both native views
         // are attached. The page will read this closure again when arranged.
-        guard isAttached, page.isAttached,
-              allocatedBounds.width > 0, allocatedBounds.height > 0 else {
-            return SafeAreaContext(bounds: bounds)
+        let preservingOutsets = page.sourceElement?.observesSafeArea == true
+        let actual = page.laidOutFrame
+        guard isAttached, page.isAttached, allocatedBounds.width > 0, allocatedBounds.height > 0,
+              actual.width > 0, actual.height > 0 else {
+            return layoutSafeArea(in: bounds).child(in: bounds, preservingOutsets: preservingOutsets)
         }
         let parent = origin, child = page.origin
-        let place = Rect(child.x - parent.x, child.y - parent.y, bounds.width, bounds.height)
+        // Native position and extent must come from the same allocation.
+        // Mixing the previous column's origin with a new intrinsic proposal
+        // invents right/bottom unsafe strips and feeds them back into sizing.
+        let place = Rect(child.x - parent.x, child.y - parent.y, actual.width, actual.height)
         return layoutSafeArea(in: allocatedBounds).child(
-            in: place, preservingOutsets: page.sourceElement?.observesSafeArea == true)
+            in: place, preservingOutsets: preservingOutsets).resizedLayout(to: bounds)
     }
 
     override func safeAreaChanged() {
