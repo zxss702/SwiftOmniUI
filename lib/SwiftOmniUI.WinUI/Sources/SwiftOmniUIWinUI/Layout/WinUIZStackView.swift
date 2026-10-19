@@ -45,13 +45,16 @@ class WinUIZStackView: WinUITravellingLayout {
     override var hasNativeProposals: Bool { true }
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
         if let placements = placement?.placements, !placements.isEmpty {
+            insetContext = nil
+            insetBase = nil
+            _ = resolveInset(in: Rect(0, 0, width ?? size.width, size.height), items: items.filter { !$0.departing })
             return zip(items, placements).map { item, placement in
-                NativeProposal(view: item.view, width: placement.place.width)
+                NativeProposal(view: item.view, place: placement.place)
             }
         }
         let places = childPlaces(in: Rect(0, 0, width ?? size.width, size.height))
         return zip(items, places).compactMap { item, place in
-            place.map { NativeProposal(view: item.view, width: $0.width) }
+            place.map { NativeProposal(view: item.view, place: $0) }
         }
     }
 

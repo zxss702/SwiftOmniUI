@@ -450,15 +450,19 @@ class WinUIView {
         return changed
     }
 
-    /// Restore the selected native proposal after arithmetic has probed other widths.
-    func prepareMeasure(width: Double) {
+    /// Commit the actual allocation, separately from a control's intrinsic-size query.
+    func prepareMeasure(width: Double, height: Double? = nil) {
         guard Self.arranging == 0, WinUILayoutView.queryingSize == 0 else { return }
-        _ = measure(width: width, height: nil)
+        _ = measureNative(width: width, height: height)
     }
 
     /// The element's size for the room offered, in DIPs; nil offers any.
     /// Design: docs/design/platforms/winui/layout.md#measured-every-pass
     func measure(width: Double?, height: Double?) -> LayoutSize {
+        measureNative(width: width, height: height)
+    }
+
+    private func measureNative(width: Double?, height: Double?) -> LayoutSize {
         WinUILayoutUpdates.measured(self)
         // An arrangement asking a child's size reads what this proposal measured: measuring an element
         // while WinUI arranges marks it, and the marked element is measured and arranged again for ever -
@@ -506,7 +510,13 @@ class WinUIView {
             }
             return desiredSize
         }
+        if nativeMeasurePending {
+            // Consume the queued request before this Measure, not after it completed.
+            nativeMeasurePending = false
+            invalidateNativeMeasure()
+        }
         let startedAt = Self.provisionalMeasureRevision
+        let contentRevision = measurementRevision
         var size = [0.0, 0.0]
         Self.measuring += 1
         defer { Self.measuring -= 1 }
@@ -525,7 +535,7 @@ class WinUIView {
                 parent = (layout as? WinUIScrollDocument)?.scrollView ?? layout.placingLayout
             }
         }
-        guard startedAt == Self.provisionalMeasureRevision else { return measured }
+        guard startedAt == Self.provisionalMeasureRevision, contentRevision == measurementRevision else { return measured }
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.
         if measuredSizes.count == 8 { measuredSizes.removeFirst() }
@@ -565,7 +575,8 @@ class WinUIView {
             // alone keeps the previous native proposal, even at a new width.
             // Prepare here, before requesting Arrange, never inside that pass.
             if resized, Self.measuring == 0, nativeSafeBarOwner == nil {
-                prepareMeasure(width: (wordsRoom ?? place).width)
+                let room = wordsRoom ?? place
+                prepareMeasure(width: room.width, height: room.height)
             }
             placingLayout?.invalidateArrange()
         }

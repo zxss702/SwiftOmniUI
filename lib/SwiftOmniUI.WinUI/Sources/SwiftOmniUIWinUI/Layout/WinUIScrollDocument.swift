@@ -38,6 +38,14 @@ final class WinUIScrollDocument: WinUILayoutView {
         ScrollArithmetic.contentSize(of: items.first, padding: layoutPadding, orientation: orientation, width: width)
     }
 
+    override var hasNativeProposals: Bool { true }
+    override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
+        guard let item = items.first, item.isShown else { return [] }
+        let arranged = ScrollArithmetic.arrange(item, padding: layoutPadding, orientation: orientation,
+                                                in: LayoutSize(width: width ?? size.width, height: size.height))
+        return [NativeProposal(view: item.view, place: arranged.place)]
+    }
+
     /// The scroller's presenter asks this size as it arranges - inside the pass, where a layout answers only
     /// what it last measured: the run's size is arithmetic already counted, safe to answer inside a pass, and
     /// the extent the presenter reads is the run's, not the room it stood in last.

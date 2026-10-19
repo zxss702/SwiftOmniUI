@@ -20,7 +20,7 @@ class WinUISingleChildView: WinUILayoutView {
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
         guard let item = items.first, item.isShown else { return [] }
         let place = childPlace(item, in: Rect(0, 0, width ?? size.width, size.height))
-        return [NativeProposal(view: item.view, width: place.width)]
+        return [NativeProposal(view: item.view, place: place)]
     }
 
     override func arrange(in bounds: Rect) {

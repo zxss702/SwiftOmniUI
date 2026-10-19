@@ -145,6 +145,13 @@ final class WinUIScrollView: WinUILayoutView {
         return document.contentSize(width: width)
     }
 
+    override var hasNativeProposals: Bool { true }
+    override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
+        guard width != nil, measurementHeight != nil else { return [] }
+        let viewport = resolve(in: Rect(0, 0, width ?? size.width, size.height))
+        return [NativeProposal(view: scroller, place: viewport)]
+    }
+
     override func backgroundBounds(in bounds: Rect) -> Rect {
         box.clips ? bounds : layoutSafeArea(in: bounds).viewport(in: bounds, axes: orientation)
     }
@@ -166,7 +173,7 @@ final class WinUIScrollView: WinUILayoutView {
         let padding = SafeAreaArithmetic.physicalInsets(writtenPadding, direction: direction) + insets
         if document.layoutPadding != padding {
             document.layoutPadding = padding
-            document.forgetMeasurements()
+            document.invalidateOwnMeasurements()
             wrapper.forgetMeasurements()
         }
         if barsInsets != insets || document.padding != padding { pendingInsets = insets }
@@ -190,8 +197,6 @@ final class WinUIScrollView: WinUILayoutView {
     /// the document's moving origin and of any enclosing scroller.
     override func arrange(in bounds: Rect) {
         let viewport = resolve(in: bounds)
-        // Unknown native proposals are prepared after this pass by WinUIView.
-        _ = scroller.measure(width: viewport.width, height: viewport.height)
         scroller.layout(viewport)
         // Initial offsets/anchors wait for the resolved document extent.
         guard document.padding == document.layoutPadding else { return }

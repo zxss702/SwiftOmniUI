@@ -51,7 +51,7 @@ final class WinUIGridView: WinUITravellingLayout {
         let bounds = Rect(0, 0, width ?? size.width, size.height)
         let places = childPlaces(in: bounds)
         return zip(items, places).compactMap { item, place in
-            place.map { NativeProposal(view: item.view, width: $0.width) }
+            place.map { NativeProposal(view: item.view, place: $0) }
         }
     }
 
@@ -92,7 +92,7 @@ final class WinUIGridView: WinUITravellingLayout {
             direction: direction, flow: flowColumns)
     }
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
-        let context = layoutSafeArea(in: allocatedBounds)
+        let context = layoutSafeArea(in: contextBounds)
             .padding(SafeAreaArithmetic.physicalInsets(sourceElement?.safeAreaPadding ?? EdgeInsets(0), direction: direction))
         return context.child(in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
     }

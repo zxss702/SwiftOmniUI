@@ -37,7 +37,7 @@ final class WinUIStackView: WinUITravellingLayout {
         let places = StackArithmetic.places(of: items, axis: axis, spacing: spacing, padding: padding,
                                            in: room, direction: direction)
         return zip(items, places).compactMap { item, place in
-            place.map { NativeProposal(view: item.view, width: $0.width) }
+            place.map { NativeProposal(view: item.view, place: $0) }
         }
     }
 
