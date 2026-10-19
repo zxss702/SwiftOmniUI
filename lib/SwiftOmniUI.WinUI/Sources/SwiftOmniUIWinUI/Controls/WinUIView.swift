@@ -184,6 +184,10 @@ class WinUIView {
     /// both an unconstrained size and a wrapped size before arranging either one.
     private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize)] = []
     private var pendingMeasures: [(width: Double?, height: Double?)] = []
+    /// The allocation prepared in XAML, separately from cached intrinsic answers.
+    private var nativeMeasurement: LayoutSize?
+    private var pendingAllocation: LayoutSize?
+    private var measurementCommitPending = false
     private var nativeMeasurePending = false
     /// Any arithmetic that encountered an unprepared native proposal is
     /// provisional; ancestors must not retain it as a completed measurement.
@@ -402,11 +406,15 @@ class WinUIView {
     func discardMeasurementResults() {
         measurementRevision &+= 1
         measuredSizes.removeAll(keepingCapacity: true)
+        nativeMeasurement = nil
     }
 
     /// A real MeasureOverride consumes requests made before it started.
     /// Invalidations raised during this measurement can still enqueue a new pass.
-    func beganNativeMeasure() { nativeMeasurePending = false }
+    func beganNativeMeasure() {
+        nativeMeasurePending = false
+        nativeMeasurement = nil
+    }
 
     func requestNativeMeasure() {
         guard Self.arranging == 0, Self.measuring == 0 else {
@@ -456,6 +464,48 @@ class WinUIView {
         _ = measureNative(width: width, height: height)
     }
 
+    /// Panels record the finite bounds prepared by their native callback.
+    /// Controls record the proposal selected through measureNative.
+    func recordNativeMeasurement(width: Double, height: Double) {
+        nativeMeasurement = LayoutSize(width: Double(Float(width)), height: Double(Float(height)))
+    }
+
+    /// Arrange must reconcile its actual allocation even when placement did
+    /// not need an intrinsic size query, including native-owned page roots.
+    func prepareAllocationAfterPass(width: Double, height: Double) {
+        let allocation = LayoutSize(width: Double(Float(width)), height: Double(Float(height)))
+        pendingAllocation = nativeMeasurement == allocation ? nil : allocation
+        if pendingAllocation != nil { commitMeasurementsAfterPass() }
+    }
+
+    /// Intrinsic queries run first; the latest allocation is the final native
+    /// proposal. Both paths share one commit, outside Measure/Arrange.
+    private func commitMeasurementsAfterPass() {
+        guard !measurementCommitPending else { return }
+        measurementCommitPending = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.measurementCommitPending = false
+            let proposals = self.pendingMeasures
+            let allocation = self.pendingAllocation
+            self.pendingMeasures.removeAll(keepingCapacity: true)
+            self.pendingAllocation = nil
+            guard !self.isDetached else { return }
+            for proposal in proposals {
+                _ = self.measure(width: proposal.width, height: proposal.height)
+            }
+            // A native Arrange can itself measure a dirty panel. Recheck after
+            // the pass so that a completed proposal posts no further layout.
+            if let allocation, self.nativeMeasurement != allocation {
+                self.prepareMeasure(width: allocation.width, height: allocation.height)
+                let owner = (self.nativeSafeBarOwner as? WinUILayoutView)
+                    ?? self.placingLayout ?? self.nativeLayoutOwner
+                owner?.invalidateArrange()
+            }
+            if !proposals.isEmpty { self.placingLayout?.commitMeasurementChange() }
+        }
+    }
+
     /// The element's size for the room offered, in DIPs; nil offers any.
     /// Design: docs/design/platforms/winui/layout.md#measured-every-pass
     func measure(width: Double?, height: Double?) -> LayoutSize {
@@ -494,19 +544,8 @@ class WinUIView {
             // proposals for this view into one turn; once measured, the same arrangement posts nothing.
             Self.provisionalMeasureRevision &+= 1
             if !pendingMeasures.contains(where: { $0.width == width && $0.height == height }) {
-                let scheduled = !pendingMeasures.isEmpty
                 pendingMeasures.append((width, height))
-                if !scheduled {
-                    WinUIDoorbell.afterPass { [weak self] in
-                        guard let self else { return }
-                        let proposals = self.pendingMeasures
-                        self.pendingMeasures.removeAll(keepingCapacity: true)
-                        for proposal in proposals {
-                            _ = self.measure(width: proposal.width, height: proposal.height)
-                        }
-                        self.placingLayout?.commitMeasurementChange()
-                    }
-                }
+                commitMeasurementsAfterPass()
             }
             return desiredSize
         }
@@ -536,6 +575,11 @@ class WinUIView {
             }
         }
         guard startedAt == Self.provisionalMeasureRevision, contentRevision == measurementRevision else { return measured }
+        // Panels know their prepared bounds even for unbounded proposals.
+        // Their callback records that allocation; do not replace it with infinity.
+        if !(self is WinUILayoutView) {
+            recordNativeMeasurement(width: width ?? .infinity, height: height ?? .infinity)
+        }
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.
         if measuredSizes.count == 8 { measuredSizes.removeFirst() }
@@ -563,9 +607,10 @@ class WinUIView {
         if nativeSafeBarOwner == nil { placed = place }
         if Self.arranging > 0 {
             let room = wordsRoom ?? place
-            // Native proposals are committed by MeasureOverride. Keep the real
-            // Arrange depth here: preparing again can invalidate Measure while
-            // XAML is arranging this tree and restart the same layout cycle.
+            // Fill placements need no intrinsic query, and animation/native
+            // templates can allocate a different size from the measure plan.
+            // Such allocations must not silently keep another native proposal.
+            prepareAllocationAfterPass(width: room.width, height: room.height)
             if let layout = self as? WinUILayoutView, placingLayout != nil {
                 layout.standsAt = place.width
             }

@@ -454,6 +454,9 @@ class WinUILayoutView: WinUIView {
         // presenters and effect wrappers also consume this result. Bounding it
         // by the prepared proposal keeps XAML from arranging a larger subtree.
         let framed = sourceElement?.layoutValues.sized(size, offered: offered) ?? size
+        if hasSizing {
+            recordNativeMeasurement(width: offered ?? framed.width, height: height.isFinite ? height : framed.height)
+        }
         return LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
     }
 
@@ -507,6 +510,7 @@ class WinUILayoutView: WinUIView {
         WinUILayoutUpdates.beganNativeArrange(self)
         WinUIView.arranging += 1
         defer { WinUIView.arranging -= 1 }
+        prepareAllocationAfterPass(width: width, height: height)
         allocatedBounds = Rect(0, 0, width, height)
         boxView?.layout(backgroundBounds(in: Rect(0, 0, width, height)))
         writeCut(width: width, height: height)
