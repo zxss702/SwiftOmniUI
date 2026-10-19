@@ -15,7 +15,15 @@ extension WinUIElement {
 
     /// A value the user changed in the view; a radio button's peers turned off on their own buttons.
     func report(_ property: Prop, _ event: Event, _ value: HostValue) {
-        guard let host else { return }
+        guard let host, !ProgramWrite.isWriting, element.isEnabled else { return }
+        // Native input has already changed XAML. Its state report may be
+        // acknowledged without another property write, so invalidate Swift's
+        // size answers before that report can trigger layout of the new tree.
+        if !MountedElement.unmeasuredProperties.contains(property) {
+            ProgramWrite.perform {
+                invalidateMeasurements(ownPlacementChanged: MountedElement.arrangedProperties.contains(property))
+            }
+        }
         element.reportUserChange(property, event, value, in: host.runtime) { peer in
             ((peer.native as? WinUIElement)?.view as? WinUIToggleView)?.setOn(false)
         }
