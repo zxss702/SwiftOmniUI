@@ -561,6 +561,12 @@ class WinUIView {
             }
             swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
         } else if moved {
+            // Animation/placement frames arrive outside XAML layout. Arrange
+            // alone keeps the previous native proposal, even at a new width.
+            // Prepare here, before requesting Arrange, never inside that pass.
+            if resized, Self.measuring == 0, nativeSafeBarOwner == nil {
+                prepareMeasure(width: (wordsRoom ?? place).width)
+            }
             placingLayout?.invalidateArrange()
         }
         if resized, transform != .identity || placedDrawing != nil { writeTransform() }
