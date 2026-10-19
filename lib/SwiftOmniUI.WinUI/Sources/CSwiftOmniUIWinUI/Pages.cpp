@@ -149,7 +149,14 @@ namespace {
         bool resizable = widths.GetAt(0) < widths.GetAt(2);
         bool beside = widths.GetAt(4) == 0 || alone
             || width >= std::max(widths.GetAt(4), widths.GetAt(0) + widths.GetAt(5));
-        split.DisplayMode(beside ? controls::SplitViewDisplayMode::Inline : controls::SplitViewDisplayMode::Overlay);
+        auto mode = beside ? controls::SplitViewDisplayMode::Inline : controls::SplitViewDisplayMode::Overlay;
+        if (split.DisplayMode() != mode) {
+            // Inline columns reveal the window surface. An overlay needs the
+            // native themed pane brush to cover the detail behind it.
+            if (beside) split.PaneBackground(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+            else split.ClearValue(controls::SplitView::PaneBackgroundProperty());
+            split.DisplayMode(mode);
+        }
         bool handleShown = split.IsPaneOpen() && beside && !alone && resizable;
         grip.Visibility(handleShown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
         auto length = std::clamp(widths.GetAt(3), widths.GetAt(0), widths.GetAt(2));
@@ -438,7 +445,6 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
         split.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
         split.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
         split.CompactPaneLength(0);
-        split.PaneBackground(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
         split.PanePlacement(trailing ? controls::SplitViewPanePlacement::Right : controls::SplitViewPanePlacement::Left);
         split.Tag(winrt::single_threaded_vector<double>({0, 256, INFINITY, 256, expandsAt, 0, INFINITY}));
         split.RegisterPropertyChangedCallback(controls::SplitView::OpenPaneLengthProperty(),
@@ -485,18 +491,13 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
             sizeSplit(sender.as<controls::SplitView>());
         }));
         split.PaneOpening(guarded("handling PaneOpening",
-            [view](controls::SplitView const &sender, IInspectable const &) {
-                sender.Pane().as<controls::Grid>().Children().GetAt(0).Visibility(xaml::Visibility::Visible);
+            [view](controls::SplitView const &, IInspectable const &) {
                 callbacks.presented(view, true);
             }));
         split.PaneClosing(guarded("handling PaneClosing",
             [view](controls::SplitView const &, controls::SplitViewPaneClosingEventArgs const &) {
                 callbacks.presented(view, false);
             }));
-        split.PaneClosed(guarded("handling PaneClosed", [](controls::SplitView const &sender, IInspectable const &) {
-            if (!sender.IsPaneOpen())
-                sender.Pane().as<controls::Grid>().Children().GetAt(0).Visibility(xaml::Visibility::Collapsed);
-        }));
         return detach(split);
     } catch (...) {
         report("making a split view");
@@ -551,9 +552,9 @@ extern "C" void swiftomniui_winui_split_set(
         widths.SetAt(5, contentMinimum);
         widths.SetAt(6, contentMaximum);
         auto face = split.Pane().as<controls::Grid>().Children().GetAt(0).as<controls::ContentControl>();
-        bool anew = face.Content() != (pane ? as<xaml::UIElement>(pane) : xaml::UIElement{nullptr});
         fill(face, pane);
-        if (open || anew || !split.IsLoaded()) face.Visibility(open ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+        // IsPaneOpen and the SplitView template own pane visibility. Collapsing
+        // its content separately adds another layout/visibility lifecycle.
         auto detail = split.Content().as<controls::Grid>();
         detail.MinWidth(contentMinimum);
         detail.MaxWidth(contentMaximum);
