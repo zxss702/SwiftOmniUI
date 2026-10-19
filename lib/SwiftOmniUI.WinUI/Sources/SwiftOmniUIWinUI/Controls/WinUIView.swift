@@ -168,6 +168,7 @@ class WinUIView {
     }
 
     func nativeParentChanged() {
+        WinUILayoutDiagnostics.record("parent.changed", view: self)
         hierarchyRevision &+= 1
         discardMeasurementResults()
     }
@@ -410,7 +411,9 @@ class WinUIView {
     }
 
     /// Asks WinUI to measure this element again, and every panel above it.
-    func invalidateMeasure() {
+    func invalidateMeasure(file: StaticString = #fileID, line: UInt = #line) {
+        WinUILayoutDiagnostics.record("invalidate.measure", view: self, "programWrite=\(ProgramWrite.isWriting)",
+                                      file: file, line: line)
         guard WinUILayoutUpdates.invalidate(self) else { return }
         discardMeasurementResults()
         guard !WinUILayoutUpdates.enqueue(self, measure: true) else { return }
@@ -429,6 +432,7 @@ class WinUIView {
     }
 
     func requestNativeMeasure() {
+        WinUILayoutDiagnostics.record("invalidate.native.request", view: self, "pending=\(nativeMeasurePending)")
         guard Self.arranging == 0, Self.measuring == 0 else {
             guard !nativeMeasurePending else { return }
             nativeMeasurePending = true
@@ -446,6 +450,7 @@ class WinUIView {
     /// Native invalidation is separate from discarding Swift's arithmetic:
     /// a viewport notice may update the tree inside ArrangeOverride.
     func invalidateNativeMeasure() {
+        WinUILayoutDiagnostics.record("invalidate.native.commit", view: self)
         swiftomniui_winui_invalidate_measure(presentationHandle)
     }
 
@@ -494,6 +499,8 @@ class WinUIView {
            let measured = measuredSizes.first(where: {
                $0.width == width && $0.height == height
            }) {
+            WinUILayoutDiagnostics.record("probe.cached", view: self,
+                "proposal=\(WinUILayoutDiagnostics.proposal(width: width, height: height)) answer=\(WinUILayoutDiagnostics.size(measured.size))")
             return measured.size
         }
         precondition(!isNativeArranging, "native size probes cannot reenter an arranging view")
@@ -503,17 +510,22 @@ class WinUIView {
             invalidateNativeMeasure()
         }
         let contentRevision = measurementRevision
+        let trace = WinUILayoutDiagnostics.begin("native.measure", view: self,
+            "proposal=\(WinUILayoutDiagnostics.proposal(width: width, height: height))")
         var size = [0.0, 0.0]
         withNativeMeasure {
             swiftomniui_winui_measure(presentationHandle, width ?? .infinity, height ?? .infinity, &size)
         }
         let measured = LayoutSize(width: size[0], height: size[1])
+        WinUILayoutDiagnostics.end(trace, view: self, "desired=\(WinUILayoutDiagnostics.size(measured))")
         guard contentRevision == measurementRevision else {
             measuredSizes.removeAll(keepingCapacity: true)
             return measured
         }
         if let previous = measuredSizes.first(where: { $0.width == width && $0.height == height }),
            previous.size != measured {
+            WinUILayoutDiagnostics.record("probe.corrected", view: self,
+                "proposal=\(WinUILayoutDiagnostics.proposal(width: width, height: height)) previous=\(WinUILayoutDiagnostics.size(previous.size)) current=\(WinUILayoutDiagnostics.size(measured))")
             // A changed answer at the same proposal invalidates all intrinsic
             // answers for the old native content, not just this allocation.
             measuredSizes.removeAll(keepingCapacity: true)
@@ -556,6 +568,8 @@ class WinUIView {
         if nativeSafeBarOwner == nil { placed = place }
         if Self.arranging > 0 {
             let room = wordsRoom ?? place
+            WinUILayoutDiagnostics.record("place", view: self,
+                "frame=\(WinUILayoutDiagnostics.rect(place)) measureRoom=\(WinUILayoutDiagnostics.rect(room)) resized=\(resized)")
             // Fill placements need no intrinsic query, and animation/native
             // templates can allocate a different size from the measure plan.
             // Such allocations must not silently keep another native proposal.

@@ -93,6 +93,8 @@ extension WinUIElement {
     /// registration's first, then what every element takes.
     /// Design: docs/design/host/patches.md#program-write
     func applyProperties(changed: Set<Prop>) {
+        WinUILayoutDiagnostics.record("properties", view: view,
+            "element=\(type) changed=\(changed.map { String(describing: $0) }.sorted())")
         guard let view else {
             if !changed.isDisjoint(with: MountedElement.arrangedProperties) { parent?.invalidateMeasurements() }
             return
