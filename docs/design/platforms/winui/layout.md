@@ -74,8 +74,15 @@ new final bounds synchronously computes and prepares its child plan for those
 bounds without reentering its own native Measure.
 
 Preparing an Arrange allocation preserves native Measure results for both
-SOUI panels and native XAML containers. It recursively prepares SOUI panels'
-child plans. SplitView, scroll and item containers consume their completed
+SOUI panels and native XAML containers. It prepares that panel's plan and
+safe-area context without recursively preparing children at their layout
+destinations. Animation may still select a different presentation slot for
+a child. `WinUIView.layout` prepares that actual slot immediately before the
+child's own native Arrange, and each SOUI child panel then prepares its plan.
+Measuring descendants first at the destination and again at the presentation
+width in every Arrange would keep XAML's ancestors dirty indefinitely, even
+when the animation sample has not changed.
+SplitView, scroll and item containers consume their completed
 measurements and let XAML arrange their templates and pages at the final slot.
 `WinUIView.layout` uses the same `prepareAllocation` contract before Arrange;
 it does not remeasure native containers just because their final slot differs.

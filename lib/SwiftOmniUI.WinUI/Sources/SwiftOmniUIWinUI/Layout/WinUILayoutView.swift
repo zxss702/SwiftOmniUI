@@ -620,6 +620,14 @@ class WinUILayoutView: WinUIView {
         preparingBounds = plan.bounds
         restoreLayoutContext(in: plan.bounds, proposals: plan.proposals)
         defer { Self.queryingSize = querying; preparingBounds = previousBounds }
+        // These rectangles are layout destinations. TravellingPlaces may
+        // select a different presentation slot when the child is placed.
+        // Recursing into that destination here, then preparing the actual
+        // slot in WinUIView.layout, alternates a TextBox's native Measure
+        // constraint on every Arrange and keeps XAML's ancestors dirty.
+        // Allocation prepares this panel's plan and context only; each child
+        // prepares its actual slot immediately before its own native Arrange.
+        guard preparation == .measure else { return }
         for proposal in plan.proposals {
             guard let view = proposal.view else { continue }
             // A promoted bar remains an arithmetic dependency of its logical
@@ -629,11 +637,7 @@ class WinUILayoutView: WinUIView {
                 view.setLayoutContext(context(for: view, at: proposal.place).ignoring(view.sourceElement?.ignoresSafeArea))
             }
             let room = view.wordsRoom ?? proposal.place
-            if preparation == .allocation {
-                view.prepareAllocation(in: Rect(0, 0, room.width, room.height))
-            } else {
-                view.prepareMeasure(width: room.width, height: room.height)
-            }
+            view.prepareMeasure(width: room.width, height: room.height)
         }
     }
 
