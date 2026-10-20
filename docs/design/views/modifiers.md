@@ -216,6 +216,11 @@ one-value form sends a single `.enumeration`.
 
 ## Composed modifiers
 
+Padding on a transparent `Group`, `TupleView` or `ForEach` wraps each emitted
+view separately. The group remains transparent to its parent layout; its rows
+never share one frame's grid cell. Lazy row sources retain their identity index
+and build the padding wrapper only when a row is requested.
+
 A modifier whose effect is a *shape*, not a value - `.overlay { }`,
 `.background { }`, `.tag` on a picker's choices - is written over the
 composition machinery rather than a member: the overlay and the background

@@ -216,8 +216,10 @@ extension ViewProperties {
     public func padding(_ value: EdgeInsets) -> Modified {
         modified { node in
             if Self.self is any View.Type {
-                node.wrapPadding()
-                node.props[.contentPadding] = value.propValue
+                node = node.mappingLayoutLeaves {
+                    $0.wrapPadding()
+                    $0.props[.contentPadding] = value.propValue
+                }
             } else {
                 node.write(ViewContract.padding, value)
             }
@@ -263,8 +265,10 @@ extension ViewProperties {
     @_spi(Host) public func padding(_ state: Binding<EdgeInsets>) -> Modified {
         modified { node in
             if Self.self is any View.Type {
-                node.wrapPadding()
-                node.driveJourney(.contentPadding, by: state)
+                node = node.mappingLayoutLeaves {
+                    $0.wrapPadding()
+                    $0.driveJourney(.contentPadding, by: state)
+                }
             } else {
                 node.driveJourney(ViewContract.padding, by: state)
             }
@@ -402,8 +406,10 @@ extension View {
     @_disfavoredOverload
     public func padding(_ value: EdgeInsets) -> ModifiedContent {
         revised { node in
-            node.wrapPadding()
-            node.props[.contentPadding] = value.propValue
+            node = node.mappingLayoutLeaves {
+                $0.wrapPadding()
+                $0.props[.contentPadding] = value.propValue
+            }
         }
     }
 
@@ -445,8 +451,10 @@ extension View {
     @_disfavoredOverload
     @_spi(Host) public func padding(_ state: Binding<EdgeInsets>) -> ModifiedContent {
         revised { node in
-            node.wrapPadding()
-            node.driveJourney(.contentPadding, by: state)
+            node = node.mappingLayoutLeaves {
+                $0.wrapPadding()
+                $0.driveJourney(.contentPadding, by: state)
+            }
         }
     }
 

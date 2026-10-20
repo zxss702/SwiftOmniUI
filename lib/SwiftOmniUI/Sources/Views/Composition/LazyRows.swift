@@ -50,6 +50,36 @@ final class LazyRowReadings {
 }
 
 extension Node {
+    /// Layout modifiers on a transparent group belong to each view it emits.
+    /// Keep row sources deferred so padding a ForEach does not build its rows
+    /// or turn them into overlapping children of one frame's grid cell.
+    @MainActor func mappingLayoutLeaves(_ change: @escaping @MainActor (inout Node) -> Void) -> Node {
+        guard type == .fragment else {
+            var result = self
+            change(&result)
+            return result
+        }
+        var result = Node(type: .fragment)
+        result.id = id
+        result.key = key
+        if let elements = lazyElements {
+            let mapped: [Element] = elements.map { element in
+                if let rows = element as? any LazyRows {
+                    return LayoutModifiedRows(rows: rows, change: change)
+                }
+                return LayoutModifiedElement(element: element, change: change)
+            }
+            result.lazyContent = .elements(mapped)
+            result.producer = { mapped.flatMap { $0.node.asChildren } }
+        } else {
+            let source = self
+            result.producer = {
+                source.asChildren.map { $0.mappingLayoutLeaves(change) }
+            }
+        }
+        return result
+    }
+
     /// Opens transparent composition without expanding a row source. The fragment's
     /// writes are retained on each piece, including content added as a slot.
     @MainActor var lazyElements: [Element]? {
@@ -81,6 +111,48 @@ extension Node {
             return child.lazyElements ?? child.asChildren.map { $0 as Element }
         }
         return elements
+    }
+}
+
+private struct LayoutModifiedElement: Element {
+    let element: any Element
+    let change: @MainActor (inout Node) -> Void
+
+    var node: Node { element.node.mappingLayoutLeaves(change) }
+}
+
+/// Retains the original identity index; only requested rows gain the wrapper.
+private struct LayoutModifiedRows: LazyRows {
+    let rows: any LazyRows
+    let change: @MainActor (inout Node) -> Void
+
+    var node: Node {
+        var node = Node(type: .fragment)
+        node.lazyContent = .rows(self)
+        node.producer = { self.lazyChildren }
+        return node
+    }
+
+    var lazyChildren: [Node] {
+        rows.lazyChildren.flatMap { $0.mappingLayoutLeaves(change).asChildren }
+    }
+    var lazyRowCount: Int { rows.lazyRowCount }
+    func lazyRowIdentity(at index: Int) -> String? { rows.lazyRowIdentity(at: index) }
+    func lazyRowID(at index: Int) -> AnyHashable? { rows.lazyRowID(at: index) }
+
+    func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
+        guard let other = other as? Self else { return false }
+        return rows.hasSameLazyIdentities(as: other.rows)
+    }
+
+    func changedLazyIdentityRanges(comparedTo other: any LazyRows)
+        -> (before: Range<Int>, after: Range<Int>)? {
+        guard let other = other as? Self else { return nil }
+        return rows.changedLazyIdentityRanges(comparedTo: other.rows)
+    }
+
+    func lazyRow(at index: Int) -> any Element {
+        rows.lazyRow(at: index).node.mappingLayoutLeaves(change)
     }
 }
 
