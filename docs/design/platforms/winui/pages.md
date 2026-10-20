@@ -153,15 +153,16 @@ and `.doubleColumn` do not briefly open before the application closes them.
 The known initial client width selects Inline/Overlay before activation;
 detached configuration at ActualWidth zero does not select another mode.
 
-Presentation has a preparation phase before native visibility. The current
-window allocation is propagated through layouts, navigation pages and scroll
-documents. Lazy containers request that allocation's identities, wait for the
-normal patch acknowledgement, and measure attached rows. Only a completed
-preparation commits `IsPaneOpen` or first window activation. Split column
-widths come from the same pure arithmetic used by the native configuration.
-Changing a request replaces the pending preparation; old viewport notices do
-not replace it. An animated clip changes drawing without retiring layout rows.
-There are no PaneOpened/PaneClosed repair passes or completion callbacks.
+The declared sidebar state is committed directly to `IsPaneOpen`. Native
+Measure and Arrange select the real column allocations; there is no second
+window-wide layout before visibility, nor a separate committed-open state.
+Lazy rows are requested through that native allocation's normal viewport and
+patch acknowledgement. A drawing clip does not retire layout rows. There are
+no PaneOpened/PaneClosed repair passes or completion callbacks.
+
+A native page's safe region uses its Arrange offset relative to the split,
+accumulated from `ActualOffset`, with its native layout extent. Render and
+composition translations belong to presentation and cannot consume safe width.
 The shared page path includes every visible column for appearance/disappearance.
 
 ## A native arrangement

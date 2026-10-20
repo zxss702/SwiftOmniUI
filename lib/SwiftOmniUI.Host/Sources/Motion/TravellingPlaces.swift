@@ -25,6 +25,7 @@
     private var arrangedHeight: Double?
 
     private var arrangement = Arrangement()
+    private var presentedItems: [UInt64: AnimationLanes] = [:]
     private var commitsArrangement = true
     private var anchorOffset = Point.zero
 
@@ -41,7 +42,8 @@
     /// `anchorOffset` compensates a changed viewport origin without moving any layout destination.
     /// An unfinished layout places native views without consuming its patch or registering animation seats.
     public func begin(width: Double, animating: Bool = true, anchorOffset: Point = .zero, refining: Bool = false,
-                      consumingPatch: Bool = true, height: Double? = nil, followingPresentation: Bool = false) {
+                      consumingPatch: Bool = true, height: Double? = nil, followingPresentation: Bool = false,
+                      presentedLanes: AnimationLanes = [], presentedItems: [UInt64: AnimationLanes] = [:]) {
         let said = consumingPatch && patched && arrangedWidth != nil
         commitsArrangement = consumingPatch
         let resized = (arrangedWidth.map { abs($0 - width) > 0.5 } ?? false)
@@ -52,11 +54,18 @@
             arrangedHeight = height
         }
         self.anchorOffset = resized || framesRead ? .zero : anchorOffset
+        self.presentedItems = presentedItems
 
         arrangement = layoutMotion?.arrangement(
             said: said && animating, resized: resized, animation: animation, framesRead: framesRead) ?? Arrangement()
-        arrangement.refines = refining && !(said && animating) && !resized && !framesRead
-        arrangement.followsPresentation = followingPresentation
+        // Described geometry owns only the axes that depend on it. The same
+        // business patch can still animate unrelated layout lanes and fades.
+        arrangement.lanes.subtract(presentedLanes)
+        arrangement.refines = refining && !(said && animating) && !resized && !framesRead && presentedLanes.isEmpty
+        // A business patch can move other children independently of a
+        // described geometry channel. Only its subsequent samples translate
+        // those journeys without starting a second animation.
+        arrangement.followsPresentation = followingPresentation && !said
     }
 
     /// Stands `view`, the mounted element `mount`'s, at `place`, or on its way there; its `values` say which sides
@@ -74,8 +83,12 @@
         var stated: AnimationLanes = []
         if values.width != nil { stated.insert(.width) }
         if values.height != nil { stated.insert(.height) }
+        var placement = arrangement
+        let presented = presentedItems[mount] ?? []
+        placement.lanes.subtract(presented)
+        placement.refines = placement.refines && presented.isEmpty
         layoutMotion.place(view, mount: mount, at: place, stated: stated,
                            fadeIn: fadeIn, arrivedFrom: arrivedFrom,
-                           anchorOffset: anchorOffset, in: arrangement)
+                           anchorOffset: anchorOffset, in: placement)
     }
 }

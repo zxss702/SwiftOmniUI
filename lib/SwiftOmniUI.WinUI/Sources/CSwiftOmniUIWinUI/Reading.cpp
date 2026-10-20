@@ -390,6 +390,11 @@ namespace {
             if (what == "step") return number(box.SmallChange());
         }
         if (auto picker = object.try_as<controls::ComboBox>()) {
+            if (what == "displayedText") {
+                auto presenter = first<controls::ContentPresenter>(picker, L"ContentPresenter");
+                auto text = presenter ? first<controls::TextBlock>(presenter) : controls::TextBlock{nullptr};
+                return text ? narrow(text.Text()) : "";
+            }
             if (what == "placeholder") return narrow(picker.PlaceholderText());
             if (what == "contentAlignment") return number(static_cast<int32_t>(picker.HorizontalContentAlignment()));
         }

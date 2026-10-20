@@ -409,6 +409,8 @@ namespace {
     /// full path; changing the application's picture folder cannot redirect an
     /// already visible image's next size or DPI adjustment.
     struct PicturePanel : controls::PanelT<PicturePanel> {
+        explicit PicturePanel(int64_t view) : view(view) {}
+        int64_t view;
         std::wstring path;
         bool svg = false;
         int32_t aspect = -1;
@@ -423,6 +425,7 @@ namespace {
         }
 
         winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) {
+            if (callbacks.arrange) callbacks.arrange(view, final.Width, final.Height);
             for (auto const &child : Children()) {
                 auto element = child.as<xaml::FrameworkElement>();
                 auto desired = child.DesiredSize();
@@ -454,9 +457,9 @@ namespace {
     }
 }
 
-extern "C" SwiftOmniUIObjectRef swiftomniui_winui_image_make(void) {
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_image_make(int64_t view) {
     try {
-        auto grid = winrt::make<PicturePanel>().as<controls::Panel>();
+        auto grid = winrt::make<PicturePanel>(view).as<controls::Panel>();
         grid.Children().Append(controls::Image());
         controls::Viewbox box;
         // FontIcon uses WinUI's current SymbolThemeFontFamily and its native

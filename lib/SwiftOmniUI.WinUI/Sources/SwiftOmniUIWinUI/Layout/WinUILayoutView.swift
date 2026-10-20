@@ -437,37 +437,6 @@ class WinUILayoutView: WinUIView {
         hasSizing = true
     }
 
-    override func preparePresentation(in bounds: Rect, viewport: Rect?) -> Bool {
-        precondition(WinUIView.measuring == 0 && WinUIView.arranging == 0,
-                     "presentation content is prepared before entering native layout")
-        let bounds = Self.nativeRect(bounds)
-        let previous = preparingBounds
-        preparingBounds = bounds
-        defer { preparingBounds = previous }
-        while true {
-            prepareLayoutContent(in: bounds, measuringNative: false)
-            let plan = completedLayoutPlan(in: bounds)
-            restoreLayoutContext(in: bounds, proposals: plan.proposals)
-            var ready = true
-            for proposal in plan.proposals {
-                guard let view = proposal.view else { continue }
-                guard view.nativeSafeBarOwner == nil || view.nativeSafeBarOwner === self else { continue }
-                view.setLayoutContext(context(for: view, at: proposal.place).ignoring(view.sourceElement?.ignoresSafeArea))
-                let localViewport = viewport.map {
-                    Rect($0.x - proposal.place.x, $0.y - proposal.place.y, $0.width, $0.height)
-                }
-                if !view.preparePresentation(in: Rect(0, 0, proposal.place.width, proposal.place.height),
-                                             viewport: localViewport) { ready = false }
-            }
-            // A request waits for its real patch acknowledgement, never another
-            // synchronous attempt. Changed measured extents refine this plan now.
-            guard ready else { return false }
-            if plan.revision == measurementRevision, plan.hierarchy == hierarchyRevision,
-               plan.dependencies.allSatisfy({ $0.isCurrent }) { return true }
-            forgetLayoutPlans()
-        }
-    }
-
     /// A genuine native Measure owns this view's phase, even beneath an
     /// ancestor's Arrange. Global depths continue to protect tree mutations.
     func measure(width: Double, height: Double) -> LayoutSize {
@@ -677,10 +646,16 @@ class WinUILayoutView: WinUIView {
 
     /// Answers WinUI's arrange: places the box and every child in `width` by `height` DIPs, inside the pass.
     func arrange(width: Double, height: Double) {
+        let bounds = Self.nativeRect(Rect(0, 0, width, height))
+        let nativeRoomChanged = !isNativeArranging && placingLayout == nil
+            && allocatedBounds.width > 0 && allocatedBounds.height > 0
+            && (allocatedBounds.width != bounds.width || allocatedBounds.height != bounds.height)
+        if nativeRoomChanged { WinUIView.allocatingNativeRoom += 1 }
+        defer { if nativeRoomChanged { WinUIView.allocatingNativeRoom -= 1 } }
+        commitNativeAllocation(width: width, height: height)
         withNativeArrange {
             nativeArrangePending = false
             WinUILayoutUpdates.beganNativeArrange(self)
-            let bounds = Self.nativeRect(Rect(0, 0, width, height))
             allocatedBounds = bounds
             let previousHeight = measurementHeight
             measurementHeight = bounds.height

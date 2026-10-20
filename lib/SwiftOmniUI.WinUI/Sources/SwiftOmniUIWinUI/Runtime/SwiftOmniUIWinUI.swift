@@ -101,6 +101,8 @@ enum WinUICallbacks {
                             "bounds=\(WinUILayoutDiagnostics.proposal(width: width, height: height))")
                         layout.arrange(width: width, height: height)
                         WinUILayoutDiagnostics.end(call, view: layout)
+                    } else {
+                        WinUIView.find(view)?.commitNativeAllocation(width: width, height: height)
                     }
                     WinUIRenderer.shared?.runtime.frames.laidOut()
                 }

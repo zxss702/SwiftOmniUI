@@ -48,6 +48,32 @@ final class WinUIGeometryCommitTests: XCTestCase {
         }
     }
 
+    func testNativeOwnedLayoutCommitsItsOwnGeometryOnTheFirstArrange() {
+        onUIThread {
+            let layout = NativeMeasurementProbe()
+            var brushes: [LayoutSize] = []
+            layout.paint("probe", followsSize: true) { brushes.append($0) }
+            let revision = layout.measurementRevision
+            layout.arrange(width: 300, height: 200)
+            XCTAssertEqual(layout.committedFrame, Rect(0, 0, 300, 200))
+            XCTAssertEqual(brushes.last, LayoutSize(width: 300, height: 200))
+            layout.arrange(width: 600, height: 200)
+            XCTAssertEqual(brushes.last, LayoutSize(width: 600, height: 200))
+            XCTAssertEqual(layout.measurementRevision, revision,
+                           "a committed allocation is output, not another content invalidation")
+        }
+    }
+
+    func testNativeOwnedDrawingCommitsBeforeItsNativeChildrenAreArranged() {
+        onUIThread {
+            let view = GeometryCommitProbe()
+            view.prepareMeasure(width: 240, height: 80)
+            swiftomniui_winui_arrange(view.handle, 0, 0, 240, 80)
+            XCTAssertEqual(view.committedFrame, Rect(0, 0, 240, 80))
+            XCTAssertEqual(view.commits, [Rect(0, 0, 240, 80)])
+        }
+    }
+
     func testAllocationMeasurementsDoNotPublishAnotherContentInvalidation() {
         onUIThread {
             let parent = WinUIStackView(axis: .vertical)

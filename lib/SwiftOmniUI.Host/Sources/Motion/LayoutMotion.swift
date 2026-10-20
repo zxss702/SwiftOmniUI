@@ -35,8 +35,8 @@ extension PlacedView {
 
     /// Measurement refinement may retarget an existing journey without starting a new one.
     public var refines: Bool
-    /// Child geometry already follows a parent's described animation frame.
-    /// It must not acquire a second layout animation toward that frame.
+    /// This arrangement follows a described geometry sample. It translates
+    /// existing journeys without changing their timing or starting another.
     public var followsPresentation: Bool = false
 
     /// An arrangement that animates `lanes` under `law`, fading in a joining child when `fades`.
@@ -59,6 +59,7 @@ extension PlacedView {
     private struct Seat {
         weak var view: (any PlacedView)?
         var standing: Rect?
+        var target: Rect?
     }
 
     private let animator: Animator
@@ -125,7 +126,7 @@ extension PlacedView {
         // `matchedGeometry` match left it a frame to fly from; one joining a
         // standing layout fades in.
         if seats[mount] == nil {
-            seats[mount] = Seat(view: view)
+            seats[mount] = Seat(view: view, target: target)
             guard let arrivedFrom, !arrangement.lanes.isEmpty, Self.isReal(arrivedFrom) else {
                 view.placedFrame = target
                 if arrangement.fades { fadeIn?(arrangement.law, target) }
@@ -136,17 +137,53 @@ extension PlacedView {
 
         let seat = seats[mount]!
         seats[mount]?.view = view
-        if arrangement.followsPresentation {
-            arrive(view, at: target, mount: mount)
-            return
-        }
+        seats[mount]?.target = target
         let key = AnimationTarget.placed(mount)
         let destination = Self.lanes(target)
         let running = animator.animation(for: key)
 
+        if reducesMotion() {
+            arrive(view, at: target, mount: mount)
+            return
+        }
+
         // The same place asked for again keeps its animation rather than starting it over.
         if let running, running.destination == destination, !arrangement.framesRead, anchorOffset == .zero {
             if let standing = seat.standing { view.placedFrame = standing }
+            return
+        }
+
+        if arrangement.followsPresentation, !arrangement.framesRead, anchorOffset == .zero, !reducesMotion() {
+            guard let running, let previous = seat.target else {
+                arrive(view, at: target, mount: mount)
+                return
+            }
+            // The arithmetic target moved with another geometry channel.
+            // Translate this child's independent journey by that delta; its
+            // original progress, velocity and deadline still belong to it.
+            let previousLanes = Self.lanes(previous)
+            var from = running.from
+            var end = running.destination
+            for index in destination.indices {
+                let delta = destination[index] - previousLanes[index]
+                from[index] += delta
+                end[index] += delta
+            }
+            let translated = RunningAnimation(from: from, destination: end,
+                                              velocity: running.velocity, animation: running.animation,
+                                              began: running.began, segmentBegan: running.segmentBegan)
+            // DisplayCycle already sampled every channel at one instant.
+            // Arrange translates that sample; it must not advance another
+            // channel at a later wall-clock time after expensive measurement.
+            var standing = Self.lanes(seat.standing ?? view.placedFrame)
+            for index in standing.indices {
+                standing[index] += destination[index] - previousLanes[index]
+            }
+            animator.start(translated, for: key)
+            let frame = Self.rect(standing)
+            seats[mount]?.standing = frame
+            view.travels(to: Self.rect(end))
+            view.placedFrame = frame
             return
         }
 
@@ -245,6 +282,11 @@ extension PlacedView {
             var frame = seat.standing ?? view.placedFrame
             frame.x += offset.x
             frame.y += offset.y
+            if var target = seat.target {
+                target.x += offset.x
+                target.y += offset.y
+                seats[mount]?.target = target
+            }
             let key = AnimationTarget.placed(mount)
             if let running = animator.animation(for: key) {
                 var start = running.from
@@ -294,6 +336,8 @@ extension PlacedView {
     }
 
     private static func rect(_ lanes: [Double]) -> Rect {
-        Rect(x: lanes[0], y: lanes[1], width: lanes[2], height: lanes[3])
+        // Spring overshoot and a translated size journey may cross zero.
+        // Native allocations have nonnegative extents throughout the journey.
+        Rect(x: lanes[0], y: lanes[1], width: max(0, lanes[2]), height: max(0, lanes[3]))
     }
 }

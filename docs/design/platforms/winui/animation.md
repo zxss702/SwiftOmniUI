@@ -53,10 +53,17 @@ passes, and the place lands in the arrangement it asks for
 ([a place between passes](layout.md#a-place-between-passes)); that
 arrangement asks for the same places and keeps the running animation.
 
-When described geometry already supplies a presentation frame, dependent
-layouts follow that frame directly. They do not start another placement
-animation toward each intermediate size. The marker is retained through patch
-and native preparation until the arrangement that consumes it.
+When described geometry supplies a presentation frame, dependent layout lanes
+follow it directly. A described height owns vertical placement and height
+along its containing branch; other children and lanes in the same patch can
+still animate. Subsequent samples translate
+existing independent journeys by the change in the arithmetic target,
+preserving their sampled frame and original clock. Arrange never samples a
+new animation time, and an unchanged target never cancels a sibling's motion.
+The consumed marker describes that update, not an active descendant's entire
+animation lifetime. A changed allocation from a native window or page owner
+is a new room; a coincident descendant animation sample cannot turn that
+external resize into another presentation journey.
 
 By the host layer's rule ([showing and
 hiding](../../host/animation.md#showing-and-hiding)), a child that joins a

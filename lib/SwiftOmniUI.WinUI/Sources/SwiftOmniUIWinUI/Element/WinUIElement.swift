@@ -52,28 +52,24 @@ final class WinUIElement: NativeElement {
         return values
     }
 
-    func layoutItemChanged(followingPresentation: Bool = false) {
+    func layoutItemChanged(followingPresentation: Bool = false, presentedLanes: AnimationLanes = []) {
         cachedLayoutValues = nil
-        let geometry = followingPresentation ? Set(Self.layoutInputs.filter { property in
-            if let binding = element.driven[property], binding.mode != .in {
-                return host?.runtime.animator.animation(for: .state(binding.state)) != nil
-            }
-            return host?.runtime.animator.animation(
-                for: .described(DescribedKey(mount: element.mount, property: property))) != nil
-        }) : []
-        if followingPresentation {
-            (view as? WinUITravellingLayout)?.followsPresentationFrame()
-            (view as? WinUITravellingLayout)?.followPresentation(of: element, properties: geometry)
+        if followingPresentation || !presentedLanes.isEmpty {
+            (view as? WinUITravellingLayout)?.followsPresentationFrame(lanes: presentedLanes, sample: followingPresentation)
         }
         var owners: [WinUIElement] = []
+        // Only the branch whose intrinsic extent depends on this property
+        // gives up its geometry lanes. A sibling can reorder on the same axis.
+        var branch = view != nil ? element.mount : layoutItem?.mount
         var owner = parent
         while let each = owner {
             each.layoutItemsDirty = true
             each.cachedLayoutValues = nil
-            if followingPresentation {
-                (each.view as? WinUITravellingLayout)?.followsPresentationFrame()
-                (each.view as? WinUITravellingLayout)?.followPresentation(of: element, properties: geometry)
+            if followingPresentation || !presentedLanes.isEmpty {
+                (each.view as? WinUITravellingLayout)?.followsPresentationFrame(
+                    lanes: presentedLanes, sample: followingPresentation, item: branch)
             }
+            if each.view != nil { branch = each.element.mount }
             owners.append(each)
             owner = each.parent
         }
@@ -158,16 +154,22 @@ final class WinUIElement: NativeElement {
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {
         if !wasDescribed || element.childOrderChanged || !changed.isDisjoint(with: Self.layoutInputs) {
-            // The explicit geometry channel already owns this motion, starting
-            // with the patch's first presentation. Ancestors derive their
-            // occupied space from it instead of animating that space again.
-            let followsGeometry = changed.contains { property in
-                guard Self.layoutInputs.contains(property) else { return false }
-                if let binding = element.driven[property], binding.mode != .in { return true }
-                return host?.runtime.animator.animation(
-                    for: .described(DescribedKey(mount: element.mount, property: property))) != nil
+            // A described height owns dependent vertical geometry, not every
+            // sibling's animation. Width may also reflow height; other layout
+            // inputs can affect both axes.
+            var presented: AnimationLanes = []
+            for property in changed where Self.layoutInputs.contains(property) {
+                let driven = element.driven[property].map { binding in
+                    binding.mode != .in && host?.runtime.animator.animation(for: .state(binding.state)) != nil
+                } ?? false
+                guard driven || host?.runtime.animator.animation(
+                    for: .described(DescribedKey(mount: element.mount, property: property))) != nil else { continue }
+                switch property {
+                case .height, .minimumHeight, .maximumHeight: presented.formUnion([.y, .height])
+                default: presented.formUnion(.all)
+                }
             }
-            layoutItemChanged(followingPresentation: followsGeometry)
+            layoutItemChanged(presentedLanes: presented)
         }
         if wasDescribed, changed.contains(.isVisible) { crossVisibility() }
         applyProperties(changed: changed)

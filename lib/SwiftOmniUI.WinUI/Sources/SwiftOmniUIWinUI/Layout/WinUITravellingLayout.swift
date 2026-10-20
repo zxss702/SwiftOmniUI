@@ -19,45 +19,28 @@ class WinUITravellingLayout: WinUILayoutView {
     /// here in between.
     private var arrivalMotion: HostLayoutMotion?
     private var pendingPresentationFrame = false
-    private struct GeometryDriver {
-        weak var element: MountedElement?
-        var properties: Set<Prop>
+    private var pendingPresentedLanes: AnimationLanes = []
+    private var pendingPresentedItems: [UInt64: AnimationLanes] = [:]
+
+    func followsPresentationFrame(lanes: AnimationLanes = [], sample: Bool = true, item: UInt64? = nil) {
+        pendingPresentationFrame = pendingPresentationFrame || sample
+        if let item { pendingPresentedItems[item, default: []].formUnion(lanes) }
+        else { pendingPresentedLanes.formUnion(lanes) }
     }
-    private var geometryDrivers: [UInt64: GeometryDriver] = [:]
 
-    func followsPresentationFrame() { pendingPresentationFrame = true }
+    func takePresentedItems() -> [UInt64: AnimationLanes] {
+        defer { pendingPresentedItems.removeAll(keepingCapacity: true) }
+        return pendingPresentedItems
+    }
 
-    /// Ownership lasts as long as the geometry channel, including content
-    /// patches arriving between its frames. A one-frame marker cannot express
-    /// that dependency and lets a second layout animation take over mid-flight.
-    func followPresentation(of element: MountedElement, properties: Set<Prop>) {
-        guard !properties.isEmpty else { return }
-        let previous = geometryDrivers[element.mount]?.properties ?? []
-        geometryDrivers[element.mount] = GeometryDriver(element: element, properties: previous.union(properties))
-        pendingPresentationFrame = true
+    func takePresentedLanes() -> AnimationLanes {
+        defer { pendingPresentedLanes = [] }
+        return pendingPresentedLanes
     }
 
     func takePresentationFrame() -> Bool {
         defer { pendingPresentationFrame = false }
-        var active = false
-        for (mount, driver) in geometryDrivers {
-            guard let element = driver.element, let animator = element.winUI.host?.runtime.animator else {
-                geometryDrivers[mount] = nil
-                continue
-            }
-            let properties = driver.properties.filter { property in
-                if let binding = element.driven[property], binding.mode != .in {
-                    return animator.animation(for: .state(binding.state)) != nil
-                }
-                return animator.animation(for: .described(DescribedKey(mount: mount, property: property))) != nil
-            }
-            if properties.isEmpty { geometryDrivers[mount] = nil }
-            else {
-                geometryDrivers[mount] = GeometryDriver(element: element, properties: properties)
-                active = true
-            }
-        }
-        return pendingPresentationFrame || active
+        return pendingPresentationFrame && WinUIView.allocatingNativeRoom == 0
     }
 
     /// Keeps the motion a patch named. A patch that names none leaves the last one standing:
@@ -78,7 +61,8 @@ class WinUITravellingLayout: WinUILayoutView {
         // Native layout may refine a patch more than once. Only the patch starts
         // a new motion; another arrangement preserves the motion already running.
         places.begin(width: bounds.width, refining: true, height: bounds.height,
-                     followingPresentation: takePresentationFrame())
+                     followingPresentation: takePresentationFrame(), presentedLanes: takePresentedLanes(),
+                     presentedItems: takePresentedItems())
     }
 
     /// Stands `item` at `place`, or on its way there.

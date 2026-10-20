@@ -534,22 +534,6 @@ extern "C" void swiftomniui_winui_split_prepare_room(SwiftOmniUIObjectRef handle
     } catch (...) { report("preparing a split view's initial room"); }
 }
 
-extern "C" bool swiftomniui_winui_split_room(
-    SwiftOmniUIObjectRef handle, double width, bool open, bool contentShown, double *sizes
-) {
-    try {
-        auto split = borrow<controls::SplitView>(handle);
-        auto room = splitRoom(split, width, !contentShown);
-        bool trailing = split.PanePlacement() == controls::SplitViewPanePlacement::Right;
-        auto occupied = open && room.beside ? room.length : 0;
-        sizes[0] = trailing ? std::max(0.0, width - room.length) : 0;
-        sizes[1] = room.length;
-        sizes[2] = trailing ? 0 : occupied;
-        sizes[3] = std::max(0.0, width - occupied);
-        return true;
-    } catch (...) { report("planning split columns"); return false; }
-}
-
 extern "C" void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef handle) {
     try {
         auto split = borrow<controls::SplitView>(handle);

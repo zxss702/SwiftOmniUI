@@ -80,6 +80,7 @@ namespace {
         }
 
         Size ArrangeOverride(Size final) {
+            if (callbacks.arrange) callbacks.arrange(view, final.Width, final.Height);
             for (auto const &child : Children()) {
                 auto wanted = child.DesiredSize();
                 child.Arrange({0, 0, std::max(final.Width, wanted.Width), std::max(final.Height, wanted.Height)});

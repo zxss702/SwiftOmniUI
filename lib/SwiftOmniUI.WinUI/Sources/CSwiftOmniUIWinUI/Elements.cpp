@@ -141,11 +141,50 @@ extern "C" void swiftomniui_winui_origin(SwiftOmniUIObjectRef handle, double *or
     }
 }
 
+extern "C" bool swiftomniui_winui_layout_offset(
+    SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef ancestor, double *offset
+) {
+    try {
+        auto target = as<xaml::DependencyObject>(ancestor);
+        auto current = as<xaml::DependencyObject>(handle);
+        double x = 0, y = 0;
+        while (current && current != target) {
+            if (auto element = current.try_as<xaml::UIElement>()) {
+                auto at = element.ActualOffset();
+                x += at.x;
+                y += at.y;
+            }
+            current = xaml::Media::VisualTreeHelper::GetParent(current);
+        }
+        if (!current) return false;
+        offset[0] = x;
+        offset[1] = y;
+        return true;
+    } catch (...) {
+        report("reading a relative layout offset");
+        return false;
+    }
+}
+
 extern "C" void swiftomniui_winui_invalidate_arrange(SwiftOmniUIObjectRef handle) {
     try {
         as<xaml::UIElement>(handle).InvalidateArrange();
     } catch (...) {
         report("invalidating an arrangement");
+    }
+}
+
+extern "C" void swiftomniui_winui_on_size_changed(
+    SwiftOmniUIObjectRef handle, int64_t view, void (*changed)(int64_t, double, double)
+) {
+    try {
+        as<xaml::FrameworkElement>(handle).SizeChanged(guarded("observing a native allocation",
+            [view, changed](IInspectable const &, xaml::SizeChangedEventArgs const &args) {
+                auto size = args.NewSize();
+                changed(view, size.Width, size.Height);
+            }));
+    } catch (...) {
+        report("observing a native allocation");
     }
 }
 

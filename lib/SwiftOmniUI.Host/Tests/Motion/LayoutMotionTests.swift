@@ -30,16 +30,121 @@ final class LayoutMotionTests: XCTestCase {
         XCTAssertFalse(layout.animator.isMoving, "repeated measurement cannot extend the business animation")
     }
 
-    func testParentPresentationFrameStopsASecondChildGeometryAnimation() {
+    func testPresentationSamplesKeepIndependentMotionAndItsOriginalDeadline() throws {
         let layout = HandWoundLayout()
         let moved = Placed()
         layout.arrange([(moved, 1, Self.row(0, x: 80))])
         layout.arrange([(moved, 1, Self.row(0, x: 40))])
         layout.frame(at: 50)
-        let target = Self.row(0, x: 40)
-        layout.arrange([(moved, 1, target)], patched: false, followingPresentation: true)
-        XCTAssertEqual(moved.placedFrame, target)
-        XCTAssertFalse(layout.animator.isMoving, "even an unchanged target must follow its parent's current frame")
+        let unchanged = moved.placedFrame
+        layout.arrange([(moved, 1, Self.row(0, x: 40))], patched: false, followingPresentation: true)
+        XCTAssertEqual(moved.placedFrame, unchanged, "another channel cannot finish an unchanged journey")
+        let shifted = Self.row(0, x: 40, y: 20)
+        layout.arrange([(moved, 1, shifted)], patched: false, followingPresentation: true)
+        XCTAssertEqual(moved.placedFrame.x, 70, accuracy: 1e-9)
+        XCTAssertEqual(moved.placedFrame.y, 20, accuracy: 1e-9)
+        let running = try XCTUnwrap(layout.animator.animation(for: .placed(1)))
+        XCTAssertEqual(running.began, 0)
+        XCTAssertEqual(running.segmentBegan, 0)
+        layout.frame(at: 100)
+        XCTAssertEqual(moved.placedFrame.x, 60, accuracy: 1e-9)
+        XCTAssertEqual(moved.placedFrame.y, 20, accuracy: 1e-9)
+        layout.frame(at: 200)
+        XCTAssertEqual(moved.placedFrame, shifted)
+        XCTAssertFalse(layout.animator.isMoving)
+    }
+
+    func testShiftAndPresentationDeltaUseTheSameTargetCoordinateSystem() {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Self.row(0, x: 80))])
+        layout.arrange([(moved, 1, Self.row(0, x: 40))])
+        layout.frame(at: 50)
+        layout.animation.shift(mounts: [1], by: Point(-10, -20))
+        layout.arrange([(moved, 1, Self.row(0, x: 30, y: -15))], patched: false, followingPresentation: true)
+        XCTAssertEqual(moved.placedFrame.x, 60, accuracy: 1e-9)
+        XCTAssertEqual(moved.placedFrame.y, -15, accuracy: 1e-9)
+        layout.frame(at: 200)
+        XCTAssertEqual(moved.placedFrame, Self.row(0, x: 30, y: -15))
+    }
+
+    func testPresentationContractionNeverAllocatesNegativeSizes() throws {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Rect(80, 0, 100, 40))], measured: [1])
+        layout.arrange([(moved, 1, Rect(40, 0, 200, 40))], measured: [1])
+        layout.frame(at: 100)
+        layout.arrange([(moved, 1, Rect(40, 0, 20, 40))], patched: false,
+                       measured: [1], followingPresentation: true)
+        XCTAssertEqual(moved.placedFrame.x, 60, accuracy: 1e-9)
+        XCTAssertGreaterThanOrEqual(moved.placedFrame.width, 0)
+        XCTAssertEqual(try XCTUnwrap(layout.animator.animation(for: .placed(1))).began, 0)
+        for time in [120.0, 160, 200] {
+            layout.frame(at: time)
+            XCTAssertGreaterThanOrEqual(moved.placedFrame.width, 0)
+        }
+        XCTAssertEqual(moved.placedFrame, Rect(40, 0, 20, 40))
+    }
+
+    func testBusinessPatchDuringPresentationCanStartItsOwnMotion() {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Self.row(0, x: 80))])
+        layout.arrange([(moved, 1, Self.row(0, x: 40))], followingPresentation: true)
+        layout.frame(at: 100)
+        XCTAssertEqual(moved.placedFrame.x, 60, accuracy: 1e-9)
+        layout.reducesMotion = true
+        layout.arrange([(moved, 1, Self.row(0, x: 40))], patched: false, followingPresentation: true)
+        XCTAssertEqual(moved.placedFrame.x, 40)
+        XCTAssertFalse(layout.animator.isMoving)
+    }
+
+    func testPresentationRebaseDoesNotResampleAtArrangeTime() {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Self.row(0, x: 80))])
+        layout.arrange([(moved, 1, Self.row(0, x: 40))])
+        layout.frame(at: 50)
+        layout.setClock(to: 150)
+        layout.arrange([(moved, 1, Self.row(0, x: 40, y: 10))], patched: false, followingPresentation: true)
+        XCTAssertEqual(moved.placedFrame.x, 70, accuracy: 1e-9,
+                       "Arrange must preserve the display cycle's shared sample")
+        XCTAssertEqual(moved.placedFrame.y, 10, accuracy: 1e-9)
+        layout.frame(at: 200)
+        XCTAssertEqual(moved.placedFrame, Self.row(0, x: 40, y: 10))
+    }
+
+    func testDescribedHeightOwnsVerticalGeometryWhileThePatchMovesHorizontally() {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Self.row(0, x: 80))])
+        layout.arrange([(moved, 1, Self.row(0, x: 40, height: 64))], presentedLanes: [.y, .height])
+        XCTAssertEqual(moved.placedFrame.x, 80, accuracy: 1e-9)
+        XCTAssertEqual(moved.placedFrame.height, 64, accuracy: 1e-9)
+        layout.frame(at: 100)
+        layout.arrange([(moved, 1, Self.row(0, x: 40, height: 84))], patched: false, followingPresentation: true)
+        XCTAssertEqual(moved.placedFrame.x, 60, accuracy: 1e-9)
+        XCTAssertEqual(moved.placedFrame.height, 84, accuracy: 1e-9)
+        layout.frame(at: 200)
+        XCTAssertEqual(moved.placedFrame.x, 40, accuracy: 1e-9)
+    }
+
+    func testDescribedChildHeightDoesNotDisableASiblingsVerticalReorder() {
+        let layout = HandWoundLayout()
+        let editor = Placed(), sibling = Placed()
+        layout.arrange([(editor, 1, Self.row(0)), (sibling, 2, Self.row(3))])
+        layout.arrange([(editor, 1, Self.row(0, height: 64)), (sibling, 2, Self.row(1))],
+                       presentedItems: [1: [.y, .height]])
+        XCTAssertEqual(editor.placedFrame.height, 64, accuracy: 1e-9)
+        XCTAssertEqual(sibling.placedFrame.y, 120, accuracy: 1e-9)
+        layout.frame(at: 100)
+        layout.arrange([(editor, 1, Self.row(0, height: 84)), (sibling, 2, Self.row(1, y: 60))],
+                       patched: false, followingPresentation: true)
+        XCTAssertEqual(editor.placedFrame.height, 84, accuracy: 1e-9)
+        XCTAssertEqual(sibling.placedFrame.y, 100, accuracy: 1e-9,
+                       "the sibling keeps halfway progress plus the described height delta")
+        layout.frame(at: 200)
+        XCTAssertEqual(sibling.placedFrame.y, 60, accuracy: 1e-9)
     }
 
     func testARefinementAfterTheOriginalDeadlineArrivesOnItsFirstCommit() {
@@ -422,10 +527,12 @@ private final class HandWoundLayout {
         patched: Bool = true,
         heights: [UInt64: Double] = [:],
         measured: Set<UInt64> = [], refining: Bool = false, height: Double? = nil,
-        followingPresentation: Bool = false
+        followingPresentation: Bool = false, presentedLanes: AnimationLanes = [],
+        presentedItems: [UInt64: AnimationLanes] = [:]
     ) {
         if patched { places.patchArrived() }
-        places.begin(width: width, refining: refining, height: height, followingPresentation: followingPresentation)
+        places.begin(width: width, refining: refining, height: height,
+                     followingPresentation: followingPresentation, presentedLanes: presentedLanes, presentedItems: presentedItems)
         for child in children {
             var values = LayoutValues()
             values.width = measured.contains(child.mount) ? nil : 100
@@ -435,6 +542,8 @@ private final class HandWoundLayout {
             }
         }
     }
+
+    func setClock(to time: Double) { now = time }
 
     /// A display frame at `time`.
     func frame(at time: Double) {

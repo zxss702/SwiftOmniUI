@@ -162,31 +162,6 @@ class WinUILazyView: WinUITravellingLayout {
         return cells.orderedIdentities[cells.built].filter { mounted[$0] == nil }
     }
 
-    override func preparePresentation(in bounds: Rect, viewport: Rect?) -> Bool {
-        precondition(WinUIView.measuring == 0 && WinUIView.arranging == 0)
-        presentationPreparationPending = true
-        presentationPrepared = false
-        // Track grouping and measured rows use this allocation before choosing
-        // the requested identities. No native Loaded/visual transform is needed.
-        while true {
-            prepareLayoutContent(in: bounds, measuringNative: false)
-            let revision = self is WinUILazyGridView ? cells.runs.revision : cells.extents.revision
-            if let viewport {
-                let span = windowSpan(in: viewport, extent: axis == .vertical ? bounds.height : bounds.width)
-                tellWindow(span ?? 0..<0, realize: span ?? 0..<0, demand: span)
-            } else { cells.tellAll() }
-            guard cells.built.isEmpty && mounted.isEmpty
-                || cells.element?.handler(.realizedChanged) == nil || cells.requestedItemsAreCurrent else { return false }
-            guard super.preparePresentation(in: bounds, viewport: viewport) else { return false }
-            if revision == (self is WinUILazyGridView ? cells.runs.revision : cells.extents.revision) {
-                presentationPrepared = true
-                // Commit this panel's plan even if its enclosing native slot
-                // is unchanged and XAML could otherwise reuse its Arrange.
-                invalidateArrange()
-                return true
-            }
-        }
-    }
     // New rows must have real arranged coordinates before the native scroller
     // can use them as anchors. Promote them on the following measure pass.
     private var pendingAnchors: Set<Int64> = []
@@ -218,8 +193,6 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// A window change under way asks the run again once, not per notice.
     private var retellQueued = false
-    private var presentationPreparationPending = false
-    private var presentationPrepared = false
     /// WinUI's effective viewport is the compositor's window in this panel's coordinates.
     private var effectiveViewport: Rect?
     private var diagnosticViewport: WinUIScrollViewport?
@@ -454,7 +427,6 @@ class WinUILazyView: WinUITravellingLayout {
     /// Program jumps supply their explicit target separately.
     func viewportChanged(_ reported: Rect, effective: Bool = true, target override: Rect? = nil,
                          bring: Point = .zero) {
-        guard !presentationPreparationPending else { return }
         guard clip != nil else { return }
         watchClip()
         let rect: Rect
@@ -574,7 +546,7 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     /// The window `rect` shows of the run, clipped to its document extent.
-    private func windowSpan(in rect: Rect, extent: Double? = nil) -> Range<Double>? {
+    private func windowSpan(in rect: Rect) -> Range<Double>? {
         guard !cells.orderedIdentities.isEmpty, rect.width > 0, rect.height > 0 else { return nil }
         let start = axis == .vertical ? rect.y : rect.x
         let room = axis == .vertical ? rect.height : rect.width
@@ -585,7 +557,7 @@ class WinUILazyView: WinUITravellingLayout {
         // a sixty-fourth, one place stands either in or out of it, not both.
         let grain = 1.0 / 64.0
         let low = (max(0, start) / grain).rounded() * grain
-        let high = (min(extent ?? allocatedExtent, start + room) / grain).rounded() * grain
+        let high = (min(allocatedExtent, start + room) / grain).rounded() * grain
         guard high > low else { return nil }
         return low..<high
     }
@@ -599,13 +571,11 @@ class WinUILazyView: WinUITravellingLayout {
     /// which places a span holds. No scroller to narrow by means all of them.
     /// One retell a pass, once the layout under way is over.
     private func retell() {
-        guard !presentationPreparationPending else { return }
         guard !retellQueued else { return }
         retellQueued = true
         WinUIDoorbell.afterPass { [weak self] in
             guard let self else { return }
             self.retellQueued = false
-            guard !self.presentationPreparationPending else { return }
             self.watchClip()
             if self.geometryChanged {
                 self.geometryChanged = false
@@ -743,7 +713,6 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     override func arrange(in bounds: Rect) {
-        if presentationPrepared { presentationPreparationPending = false }
         // A change's motion stands until the arrangement that can place its rows: a run that
         // holds its children by a window mounts those rows in a later patch, which names no
         // timing of its own. The first ready arrangement takes the kept motion, so none outlives
@@ -755,7 +724,9 @@ class WinUILazyView: WinUITravellingLayout {
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
                                          axis == .vertical ? cells.anchorShift : 0), refining: true,
                      consumingPatch: ready, height: axis == .vertical ? bounds.height : bounds.width,
-                     followingPresentation: ready ? takePresentationFrame() : false)
+                     followingPresentation: ready ? takePresentationFrame() : false,
+                     presentedLanes: ready ? takePresentedLanes() : [],
+                     presentedItems: ready ? takePresentedItems() : [:])
         if ready {
             cells.animatesChanges = false
             cells.anchorShift = 0

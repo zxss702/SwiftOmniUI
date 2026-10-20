@@ -463,6 +463,7 @@ namespace {
         }
 
         Size ArrangeOverride(Size final) {
+            if (callbacks.arrange) callbacks.arrange(view, final.Width, final.Height);
             if (final != size) {
                 size = final;
                 // Swift supplies the renderer's commands before Arrange. A new

@@ -273,20 +273,22 @@ prepared sidebar. Nested scroll presenters still intersect their actual
 allocated windows, so an inner scroller outside its outer scroll viewport
 remains virtualized. Viewport queries never acquire a handout Visual.
 
-Before a window or pane is revealed, presentation preparation propagates its
-current allocation independently of native Loaded/EffectiveViewport events.
-It runs outside Measure/Arrange so requested rows can be mounted. Pending
-requests resume only through their patch acknowledgements. Content extents
-refine the same plan before it commits; the preparation never substitutes a
-previous native frame for the incoming allocation.
+A window or pane commits declared visibility directly. Measure/Arrange and
+the native viewport select the current allocation; a separate visibility
+preparation pass must not overwrite live contexts, native desired sizes or
+lazy extents with a window size that differs from the actual column slot.
+Pending row requests resume through their normal patch acknowledgements.
 
 A layout's Measure outputs do not increment its content revision or enqueue another
 ancestor measure. Real property and native-resource changes invalidate their
 dependencies; native size corrections refine an active plan synchronously.
-Geometry animations retain their ownership across intervening content
-patches. Paths, canvases, images, brushes and transform pivots commit their
-size-dependent drawing with the actual native Arrange, rather than when an
-animation first samples the next rectangle.
+A described height owns vertical geometry along its containing item branch;
+it does not disable a sibling's independent layout animation on the same axis. Presentation samples translate an existing
+placement journey without changing its clock or resampling during Arrange.
+Paths, canvases, images, brushes and transform pivots commit size-dependent
+drawing with actual native Arrange, including native-owned roots and control
+content that do not pass through a Swift placing layout. System control size
+notifications publish drawing geometry only, without invalidating layout.
 
 A lazy run under the scroller answers the document's cross size with the
 widest row measured in the room it was given, and keeps that width for as

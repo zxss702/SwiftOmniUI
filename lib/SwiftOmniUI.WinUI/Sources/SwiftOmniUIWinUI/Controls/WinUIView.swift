@@ -70,17 +70,6 @@ class WinUIView {
         (placingLayout as? WinUILazyView)?.rowMeasurementChanged(self)
     }
     var rootSafeAreaContext: ((Rect) -> SafeAreaContext)?
-    private var presentationContext: SafeAreaContext?
-
-    /// Native pages keep their live root provider. A predicted allocation's
-    /// context exists only while preparing that allocation.
-    func withPresentationContext<Result>(_ context: SafeAreaContext, _ body: () -> Result) -> Result {
-        let previous = presentationContext
-        presentationContext = context
-        defer { presentationContext = previous }
-        return body()
-    }
-
     /// A native toolbar owns the widget, while the source modifier still owns
     /// its layout contribution, animation ancestry and parent-space report.
     weak var nativeSafeBarOwner: AnyObject? {
@@ -162,7 +151,7 @@ class WinUIView {
     }
 
     func layoutSafeArea(in bounds: Rect) -> SafeAreaContext {
-        let context = presentationContext ?? safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds)
+        let context = safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds)
         // The inherited regions belong to the last allocation. Measurement
         // probes and animation frames may already use a different proposal.
         // Keep each edge's distance from the allocation, not its old size.
@@ -191,6 +180,9 @@ class WinUIView {
     /// How deep the layout passes under way stand: a place written inside one lands at once.
     static var arranging = 0
     static var measuring = 0
+    /// A native owner changed its allocated room, independently of the Swift
+    /// animation sample. Descendants follow that proposal immediately.
+    static var allocatingNativeRoom = 0
 
     private var nativeMeasureDepth = 0
     private var nativeArrangeDepth = 0
@@ -279,6 +271,15 @@ class WinUIView {
         // A control's style aligns it inside its place; a SwiftOmniUI layout decides the place, so it fills it.
         // Design: docs/design/platforms/winui/layout.md#a-place-filled
         swiftomniui_winui_fill_place(handle)
+        // System controls do not expose ArrangeOverride to Swift. Their
+        // committed size notification publishes drawing geometry directly;
+        // SOUI-owned slots have already committed it during parent Arrange.
+        swiftomniui_winui_on_size_changed(handle, number) { number, width, height in
+            MainActor.assumeIsolated {
+                guard let view = WinUIView.find(number), view.placingLayout == nil else { return }
+                view.commitNativeAllocation(width: width, height: height)
+            }
+        }
     }
 
     isolated deinit {
@@ -634,21 +635,11 @@ class WinUIView {
             if let layout = self as? WinUILayoutView, placingLayout != nil {
                 layout.standsAt = place.width
             }
-            committedFrame = place
             if resized, sourceElement?.type == .textEditor {
                 WinUILayoutDiagnostics.record("editor.commit", view: self,
                     "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room))")
             }
-            // Paths, brushes and transform pivots belong to this allocation.
-            // A sampled animation frame must not draw at its new size while
-            // XAML still holds the previous frame's native rectangle.
-            commitGeometry(in: place)
-            if resized, transform != .identity || placedDrawing != nil { writeTransform() }
-            if resized {
-                for what in paintsBySize.keys.sorted() {
-                    paintsBySize[what]?(LayoutSize(width: place.width, height: place.height))
-                }
-            }
+            commitAllocationGeometry(in: place)
             withNativeArrange {
                 swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
             }
@@ -659,12 +650,32 @@ class WinUIView {
         }
     }
 
+    /// A native owner can arrange this view without going through `layout`.
+    /// SOUI placement has already committed its presentation size before
+    /// entering XAML, which can use a different destination room for words.
+    func commitNativeAllocation(width: Double, height: Double) {
+        guard !isNativeArranging else { return }
+        let bounds = Rect(0, 0, width, height)
+        guard committedFrame != bounds else { return }
+        withNativeArrange { commitAllocationGeometry(in: bounds) }
+    }
+
+    /// Publishes drawing geometry only: never measures, arranges or invalidates
+    /// ancestors. Both native ownership and SOUI placement enter here.
+    private func commitAllocationGeometry(in bounds: Rect) {
+        let resized = committedFrame.map { $0.width != bounds.width || $0.height != bounds.height } ?? true
+        committedFrame = bounds
+        commitGeometry(in: bounds)
+        if resized, transform != .identity || placedDrawing != nil { writeTransform() }
+        if resized {
+            for what in paintsBySize.keys.sorted() {
+                paintsBySize[what]?(LayoutSize(width: bounds.width, height: bounds.height))
+            }
+        }
+    }
+
     /// Size-dependent drawing committed with the actual native Arrange.
     func commitGeometry(in bounds: Rect) {}
-
-    /// Prepare logical content before its native owner makes it visible.
-    /// This phase may request/mount rows and never runs inside native layout.
-    func preparePresentation(in bounds: Rect, viewport: Rect?) -> Bool { true }
 
     /// Paints `what` with `paint` at the view's size now, and again at each new size where its brushes follow the
     /// size of what they paint (`WinUIBrush.followsSize`).
@@ -686,6 +697,14 @@ class WinUIView {
         var corner = [0.0, 0.0]
         swiftomniui_winui_origin(handle, &corner)
         return Point(x: corner[0], y: corner[1])
+    }
+
+    /// The position produced by Arrange relative to a native ancestor.
+    /// RenderTransform and composition animations do not change layout input.
+    func layoutOffset(relativeTo ancestor: WinUIView) -> Point? {
+        var offset = [0.0, 0.0]
+        guard swiftomniui_winui_layout_offset(handle, ancestor.handle, &offset) else { return nil }
+        return Point(offset[0], offset[1])
     }
 
     /// Where the view stands, in DIPs: its frame in its parent, its place in the window, and the frame the

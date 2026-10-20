@@ -14,8 +14,6 @@
 final class WinUISplitView: WinUILayoutView {
     /// Whether the sidebar shows.
     private(set) var isPresented = false
-    private var committedPresentation = false
-    var needsPresentationPreparation: Bool { committedPresentation != isPresented }
     var automaticallyOpensSidebar = true
 
     /// What the split does when the sidebar shows or hides of its own accord - its first room, a click beside it,
@@ -69,7 +67,6 @@ final class WinUISplitView: WinUILayoutView {
         middle.nativeLayoutOwner = self
         sidebar.onPresented = { [weak self] open in
             guard let self, open != isPresented else { return }
-            committedPresentation = open
             isPresented = open
             if let visibility = effectiveVisibility {
                 onVisibilityChanged?(visibility)
@@ -199,68 +196,19 @@ final class WinUISplitView: WinUILayoutView {
         if width >= WinUISidebarView.expandsAt { adaptToFirstRoom(width: width) }
     }
 
-    override func preparePresentation(in bounds: Rect, viewport: Rect?) -> Bool {
-        precondition(WinUIView.measuring == 0 && WinUIView.arranging == 0)
-        sidebar.prepareFirstRoom(width: bounds.width)
-        let outer = sidebar.room(width: bounds.width, open: isPresented)
-        let context = layoutSafeArea(in: bounds)
-        var ready = true
-        @MainActor func prepare(_ view: WinUIView, frame: Rect) {
-            let pageContext = context.child(in: frame, preservingOutsets: view.sourceElement?.observesSafeArea == true)
-            let prepared = view.withPresentationContext(pageContext) {
-                let bounds = Rect(0, 0, frame.width, frame.height)
-                guard view.preparePresentation(in: bounds, viewport: nil) else { return false }
-                // Complete native preparation under the same page context,
-                // then check corrected extents before committing visibility.
-                view.prepareMeasure(width: frame.width, height: frame.height)
-                return view.preparePresentation(in: bounds, viewport: nil)
-            }
-            if !prepared { ready = false }
-        }
-        if isPresented, let pane = pages.first?.view {
-            prepare(pane, frame: Rect(outer.pane.x, 0, outer.pane.width, bounds.height))
-        }
-        let three = pages.count > 2 && SplitColumnWidth(detailWidthBounds, defaultIdeal: 320).maximum != 0
-        let columns = three
-            ? middle.room(width: outer.content.width, open: true, contentShown: isContentPresented)
-            : (pane: Rect(0, 0, 0, 0), content: Rect(0, 0, outer.content.width, 0))
-        let rowHeight = detailRow.map { row in
-            Self.querySize { row.measure(width: columns.content.width, height: nil).height }
-        } ?? 0
-        if let detailRow, !three || isContentPresented {
-            prepare(detailRow, frame: Rect(outer.content.x + columns.content.x, 0, columns.content.width, rowHeight))
-        }
-        if pages.count > 1, !three || isContentPresented {
-            prepare(pages[1].view, frame: Rect(outer.content.x + columns.content.x, rowHeight,
-                                              columns.content.width, max(0, bounds.height - rowHeight)))
-        }
-        if three {
-            prepare(pages[2].view, frame: Rect(outer.content.x + columns.pane.x, 0, columns.pane.width, bounds.height))
-        }
-        guard ready else { return false }
-        // Requests have been acknowledged and their controls prepared before
-        // native pane visibility can reveal this allocation.
-        if committedPresentation != isPresented {
-            committedPresentation = isPresented
-            configure()
-        }
-        return true
-    }
-
     private func safeArea(for page: WinUIView, in bounds: Rect) -> SafeAreaContext {
-        // TransformToVisual has no useful coordinate before both native views
-        // are attached. The page will read this closure again when arranged.
+        // A page has no column position until it joins the native tree. Its
+        // first Measure uses the incoming allocation's safe region.
         let preservingOutsets = page.sourceElement?.observesSafeArea == true
         let actual = page.laidOutFrame
         guard isAttached, page.isAttached, allocatedBounds.width > 0, allocatedBounds.height > 0,
-              actual.width > 0, actual.height > 0 else {
+              actual.width > 0, actual.height > 0, let offset = page.layoutOffset(relativeTo: self) else {
             return layoutSafeArea(in: bounds).child(in: bounds, preservingOutsets: preservingOutsets)
         }
-        let parent = origin, child = page.origin
-        // Native position and extent must come from the same allocation.
-        // Mixing the previous column's origin with a new intrinsic proposal
-        // invents right/bottom unsafe strips and feeds them back into sizing.
-        let place = Rect(child.x - parent.x, child.y - parent.y, actual.width, actual.height)
+        // Pair layout size with layout offset. TransformToVisual includes a
+        // native transition's translation; interpreting it as an unsafe strip
+        // feeds animated drawing back into the next layout's available width.
+        let place = Rect(offset.x, offset.y, actual.width, actual.height)
         return layoutSafeArea(in: allocatedBounds).child(
             in: place, preservingOutsets: preservingOutsets).resizedLayout(to: bounds)
     }
@@ -305,7 +253,7 @@ final class WinUISplitView: WinUILayoutView {
             return
         }
         WinUILayoutDiagnostics.record("split.configure", view: self,
-            "open=\(isPresented) committed=\(committedPresentation) content=\(isContentPresented) automatic=\(automaticallyOpensSidebar) pages=\(pages.map { $0.view.number })")
+            "open=\(isPresented) content=\(isContentPresented) automatic=\(automaticallyOpensSidebar) pages=\(pages.map { $0.view.number })")
         ProgramWrite.perform {
             let three = pages.count > 2 && SplitColumnWidth(detailWidthBounds, defaultIdeal: 320).maximum != 0
             var next: [NativeSlot] = []
@@ -334,12 +282,12 @@ final class WinUISplitView: WinUILayoutView {
                     widths: detail, contentShown: isContentPresented, contentWidths: content)
                 sidebar.set(
                     sidebar: pages.first?.view, detail: middle, row: nil,
-                    open: committedPresentation, widths: SplitColumnWidth(sidebarPaneLength),
+                    open: isPresented, widths: SplitColumnWidth(sidebarPaneLength),
                     contentWidths: SplitColumnWidth([middle.minimumRoom, -1, -1]))
             } else {
                 sidebar.set(
                     sidebar: pages.first?.view, detail: pages.dropFirst().first?.view, row: detailRow,
-                    open: committedPresentation, widths: SplitColumnWidth(sidebarPaneLength),
+                    open: isPresented, widths: SplitColumnWidth(sidebarPaneLength),
                     contentWidths: SplitColumnWidth(contentPaneLength))
             }
         }

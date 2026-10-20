@@ -352,6 +352,10 @@ void swiftomniui_winui_set_tooltip(SwiftOmniUIObjectRef element, char const *utf
 /// Where `element`'s top left corner stands in its window's content, in DIPs, into `origin` (x, y).
 void swiftomniui_winui_origin(SwiftOmniUIObjectRef element, double *origin);
 
+/// Arrange offsets relative to an actual visual ancestor, excluding presentation transforms.
+/// Returns false if the element has not been attached beneath that ancestor.
+bool swiftomniui_winui_layout_offset(SwiftOmniUIObjectRef element, SwiftOmniUIObjectRef ancestor, double *offset);
+
 /// Where WinUI laid the element out in its parent: x, y, width, height, in DIPs.
 void swiftomniui_winui_frame(SwiftOmniUIObjectRef element, double *frame);
 /// Whether the element is loaded in a live XAML tree; detached pages report no geometry.
@@ -388,6 +392,9 @@ bool swiftomniui_winui_projection(SwiftOmniUIObjectRef element, double *matrix);
 
 /// Asks WinUI to arrange the element again - a place in the air lands only in a pass.
 void swiftomniui_winui_invalidate_arrange(SwiftOmniUIObjectRef element);
+
+/// Reports committed native size changes, without measuring or flushing layout.
+void swiftomniui_winui_on_size_changed(SwiftOmniUIObjectRef element, int64_t view, void (*changed)(int64_t, double, double));
 
 /// Reports a changed committed native height, without measuring or flushing layout.
 void swiftomniui_winui_on_height_changed(SwiftOmniUIObjectRef element, int64_t view, void (*changed)(int64_t));
@@ -997,8 +1004,6 @@ void swiftomniui_winui_title_bar_set_app_menu(SwiftOmniUIObjectRef bar, SwiftOmn
 SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, double expandsAt, bool trailing);
 /// Selects the initial display mode from a known client allocation before activation.
 void swiftomniui_winui_split_prepare_room(SwiftOmniUIObjectRef split, double width);
-/// Pure allocation using the same constraints as native layout: pane x/width, content x/width.
-bool swiftomniui_winui_split_room(SwiftOmniUIObjectRef split, double width, bool open, bool contentShown, double *sizes);
 void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef split);
 /// Releases one changed slot while leaving the other columns attached.
 void swiftomniui_winui_split_remove(SwiftOmniUIObjectRef split, SwiftOmniUIObjectRef child);
@@ -1166,7 +1171,7 @@ void swiftomniui_winui_set_pictures(char const *folder);
 /// SwiftOmniUI's Aspect says: fit, fill, stretch, centre. Answers whether a picture was found, or none was named;
 /// `size` takes the size an SVG declares, in DIPs, and zero for a bitmap, whose size WinUI knows once it has read
 /// it.
-SwiftOmniUIObjectRef swiftomniui_winui_image_make(void);
+SwiftOmniUIObjectRef swiftomniui_winui_image_make(int64_t view);
 bool swiftomniui_winui_image_set(SwiftOmniUIObjectRef image, char const *const *names, int32_t count, int32_t aspect,
                              double *size);
 

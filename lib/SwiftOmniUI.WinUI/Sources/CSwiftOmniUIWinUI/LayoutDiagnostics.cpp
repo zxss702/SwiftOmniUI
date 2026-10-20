@@ -47,7 +47,7 @@ namespace swiftomniui {
                              static_cast<unsigned long>(GetCurrentProcessId()));
                 std::fflush(stderr);
                 if (file) {
-                    std::fprintf(file, "SOUI layout diagnostics v3 pid=%lu; sizes in DIPs; no input text\n",
+                    std::fprintf(file, "SOUI layout diagnostics v4 pid=%lu; sizes in DIPs; no input text\n",
                                  static_cast<unsigned long>(GetCurrentProcessId()));
                     std::fflush(file);
                     snapshotTimer = CreateThreadpoolTimer([](PTP_CALLBACK_INSTANCE, void *context, PTP_TIMER) {
@@ -88,7 +88,7 @@ namespace swiftomniui {
                 std::fprintf(file, "\n--- state history; snapshot=%s; event=%llu ---\n", reason,
                              static_cast<unsigned long long>(sequence));
                 for (auto const &state : states) std::fprintf(file, "%s\n", state.c_str());
-                std::fprintf(file, "--- pane and editor presentation history ---\n");
+                std::fprintf(file, "--- pane, editor and picker presentation history ---\n");
                 for (auto const &state : presentations) std::fprintf(file, "%s\n", state.c_str());
                 auto count = static_cast<size_t>(std::min<uint64_t>(sequence, capacity));
                 auto begin = sequence < capacity ? size_t{0} : next;
@@ -123,7 +123,7 @@ namespace swiftomniui {
                 auto const &line = recent[next];
                 std::string_view event = message ? message : "";
                 if (event.substr(0, 6) == "split." || event.substr(0, 14) == "editor.commit "
-                    || event.substr(0, 21) == "presentation.prepare " || event.substr(0, 8) == "runtime.") {
+                    || event.substr(0, 7) == "picker." || event.substr(0, 8) == "runtime.") {
                     if (presentations.size() == 512) presentations.pop_front();
                     presentations.push_back(line);
                 }

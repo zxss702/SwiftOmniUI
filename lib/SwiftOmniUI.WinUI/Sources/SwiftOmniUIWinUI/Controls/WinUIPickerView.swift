@@ -22,18 +22,25 @@ final class WinUIPickerView: WinUIView {
     /// Whose the list's opening and closing are.
     private var showing = WinUIShowing()
 
-    private var closedSizes: [(width: Double?, height: Double?, size: LayoutSize)] = []
+    private var closedSizes: [(width: Double?, height: Double?, revision: Int, size: LayoutSize)] = []
+
+    override func discardMeasurementResults() {
+        super.discardMeasurementResults()
+        closedSizes.removeAll(keepingCapacity: true)
+    }
 
     override func measure(width: Double?, height: Double?) -> LayoutSize {
         let width = width.map { Double(Float($0)) }, height = height.map { Double(Float($0)) }
-        if isOpen, let measured = closedSizes.last(where: { $0.width == width && $0.height == height }) {
+        if isOpen, let measured = closedSizes.last(where: {
+            $0.width == width && $0.height == height && $0.revision == measurementRevision
+        }) {
             return measured.size
         }
         let size = super.measure(width: width, height: height)
         if !isOpen, WinUIView.arranging == 0 {
             closedSizes.removeAll { $0.width == width && $0.height == height }
             if closedSizes.count == 8 { closedSizes.removeFirst() }
-            closedSizes.append((width, height, size))
+            closedSizes.append((width, height, measurementRevision, size))
         }
         return size
     }
@@ -52,6 +59,10 @@ final class WinUIPickerView: WinUIView {
             }
         }
         swiftomniui_winui_picker_set(handle, Int32(clamping: write.chosen ?? -1), write.writesChoice, title)
+        if write.choices != nil || write.writesChoice {
+            WinUILayoutDiagnostics.record("picker.write", view: self,
+                "choices=\(choices.count) requested=\(chosen) native=\(self.chosen) optionsChanged=\(write.choices != nil)")
+        }
     }
 
     /// Where the choices stand across the picker.

@@ -57,7 +57,9 @@ final class WinUIImageViewTests: XCTestCase {
             let second = WinUIImageView()
             for image in [first, second] {
                 image.apply(source: ImageSource("test_halves.svg"), aspect: .fit, resizable: true)
-                image.layout(Rect(x: 0, y: 0, width: 80, height: 40))
+                image.prepareMeasure(width: 80, height: 40)
+                swiftomniui_winui_arrange(image.handle, 0, 0, 80, 40)
+                XCTAssertEqual(image.committedFrame, Rect(0, 0, 80, 40))
             }
             XCTAssertTrue(swiftomniui_winui_images_share_source(first.handle, second.handle))
             var font = TextLook()
@@ -77,7 +79,9 @@ final class WinUIImageViewTests: XCTestCase {
         try onUIThread {
             let image = WinUIImageView()
             image.apply(source: ImageSource("test_halves.svg"), aspect: .stretch, resizable: true)
-            image.layout(Rect(x: 0, y: 0, width: 80, height: 80))
+            image.prepareMeasure(width: 80, height: 80)
+            swiftomniui_winui_arrange(image.handle, 0, 0, 80, 80)
+            XCTAssertEqual(image.committedFrame, Rect(0, 0, 80, 80))
             let data = try Self.decoded(image)
             XCTAssertEqual(data.width, 80)
             XCTAssertEqual(data.height, 80)
