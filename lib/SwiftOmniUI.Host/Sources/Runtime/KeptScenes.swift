@@ -70,11 +70,14 @@
     /// key, and its windows of a kind of their own. A scene retained after a programmatic close is not an open
     /// window session to restore on the next launch.
     @MainActor public init(of root: MountedElement?, values: [String: [String: HostValue]]) {
-        scenes = Self.scenes(of: root).filter { !$0.windows.isEmpty }.map { scene in
+        scenes = Self.scenes(of: root).filter {
+            $0.windows.contains { $0.value(.allowsRestoration)?.bool != false }
+        }.map { scene in
             Scene(
                 values: values[Self.key(of: scene)] ?? [:],
                 windows: scene.windows.compactMap { window in
-                    window.value(.windowType)?.name.map { WindowScene(kind: $0, value: window.value(.windowValue)?.string) }
+                    guard window.value(.allowsRestoration)?.bool != false else { return nil }
+                    return window.value(.windowType)?.name.map { WindowScene(kind: $0, value: window.value(.windowValue)?.string) }
                 })
         }
     }

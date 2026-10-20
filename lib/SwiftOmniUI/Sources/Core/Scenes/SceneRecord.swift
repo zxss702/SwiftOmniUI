@@ -10,10 +10,15 @@ final class SceneRecord: @unchecked Sendable {
     /// What it has open beside its main window, in the order they opened.
     @State var windows: [OpenedWindow] = []
 
-    /// A named primary Window can close independently and reopen by its ID.
-    @State var mainIsOpen = true
+    /// The legacy unnamed main window; named windows live in `windows`.
+    @State var mainIsOpen = false
     var mainWindowType: WindowType?
     var declaresMainWindow = false
+
+    /// Launch is requested once on connection, then only by explicit activation.
+    var launchRequested = true
+    var activationWindowKey: String?
+    var pendingRestoredWindows: [(kind: String, value: String?)] = []
 
     /// Its session - what a view in the scene resolves as `SceneSession`.
     let session: SceneSession
@@ -62,7 +67,9 @@ final class SceneRecord: @unchecked Sendable {
         if type == mainWindowType { mainIsOpen = true; return }
         guard !windows.contains(where: { $0.type == type }) else { throw WindowError.alreadyOpen }
 
-        windows.append(OpenedWindow(type: type, serial: nextSerial(), value: nil, text: nil))
+        windows.append(OpenedWindow(
+            type: type, serial: nextSerial(), value: nil, text: nil,
+            singleton: declared[type]?.isSingleton == true))
     }
 
     /// Opens the window for a value.
@@ -78,7 +85,8 @@ final class SceneRecord: @unchecked Sendable {
         }
 
         windows.append(
-            OpenedWindow(type: type, serial: nextSerial(), value: key, text: try ValueText.write(value)))
+            OpenedWindow(type: type, serial: nextSerial(), value: key, text: try ValueText.write(value),
+                singleton: declared[type]?.isSingleton == true))
     }
 
     /// Opens the window `\.openWindow` asks for - the type-erased spelling of
@@ -89,10 +97,12 @@ final class SceneRecord: @unchecked Sendable {
         guard Scenes.opensWindows else { throw WindowError.unsupported }
         if type == mainWindowType, value == nil { mainIsOpen = true; return }
         guard !windows.contains(where: { $0.type == type && $0.value == value }) else {
-            throw WindowError.alreadyOpen
+            return
         }
 
-        windows.append(OpenedWindow(type: type, serial: nextSerial(), value: value, text: text))
+        windows.append(OpenedWindow(
+            type: type, serial: nextSerial(), value: value, text: text,
+            singleton: declared[type]?.isSingleton == true))
     }
 
     /// Closes the window of a group that opens one.
@@ -137,6 +147,20 @@ final class SceneRecord: @unchecked Sendable {
         closed(key: key)
     }
 
+    /// A named dismissal is independent of the caller's navigation presentation.
+    /// Dismissing a window that is not open is a no-op, as in SwiftUI.
+    func dismissWindows(type: WindowType?, valueType: Any.Type?, value: AnyHashable?) {
+        let types = Set(declared.compactMap { kind, shape -> WindowType? in
+            if let type, type != kind { return nil }
+            if let valueType, !shape.takes(valueType) { return nil }
+            return kind
+        })
+        if let mainWindowType, types.contains(mainWindowType), value == nil {
+            mainIsOpen = false
+        }
+        windows.removeAll { types.contains($0.type) && (value == nil || $0.value == value) }
+    }
+
     /// Makes one of its windows about another value - the window's own binding.
     func retarget<Value: Codable & Hashable>(_ serial: Int, to value: Value) {
         guard let index = windows.firstIndex(where: { $0.serial == serial }) else { return }
@@ -159,13 +183,14 @@ final class SceneRecord: @unchecked Sendable {
     func restored(kind name: String, text: String?) {
         let type = WindowType(name)
 
-        guard let shape = declared[type] else { return }
+        guard let shape = declared[type], shape.restorationBehavior != .disabled else { return }
         if type == mainWindowType, text == nil { mainIsOpen = true; return }
 
         guard let text else {
             guard shape.valueType == nil, !windows.contains(where: { $0.type == type }) else { return }
 
-            windows.append(OpenedWindow(type: type, serial: nextSerial(), value: nil, text: nil))
+            windows.append(OpenedWindow(
+                type: type, serial: nextSerial(), value: nil, text: nil, singleton: shape.isSingleton))
             return
         }
 
@@ -173,7 +198,47 @@ final class SceneRecord: @unchecked Sendable {
             !windows.contains(where: { $0.type == type && $0.value == value })
         else { return }
 
-        windows.append(OpenedWindow(type: type, serial: nextSerial(), value: value, text: text))
+        windows.append(OpenedWindow(
+            type: type, serial: nextSerial(), value: value, text: text,
+            singleton: declared[type]?.isSingleton == true))
+    }
+
+    /// Resolves the default window after declarations and restored windows are known.
+    /// Ordinary body updates only update the policy; they never request presentation.
+    @MainActor func applyLaunchPolicy(_ windows: Windows) {
+        let named = windows.groups.first {
+            $0.valueType == nil && $0.launchBehavior == .presented
+        } ?? windows.groups.first {
+            $0.isLaunchCandidate && $0.launchBehavior == .automatic
+        }
+        let presentsMain = windows.main != nil && windows.launchBehavior == .presented
+        let usesMain = presentsMain || (named?.launchBehavior != .presented
+            && windows.main != nil && windows.launchBehavior != .suppressed)
+        declaresMainWindow = usesMain || named != nil
+
+        guard launchRequested else { return }
+        launchRequested = false
+        activationWindowKey = nil
+
+        let needsWindow = !mainIsOpen && self.windows.isEmpty
+        if usesMain {
+            // Legacy unnamed main windows anchor their restored secondary windows.
+            // Named SwiftUI-style Windows use independent groups and do not take this path.
+            if needsWindow || windows.launchBehavior == .automatic { mainIsOpen = true }
+            if mainIsOpen { activationWindowKey = SceneElement.mainKey }
+        } else if let named {
+            if needsWindow {
+                // The initial window is allowed even on a host that cannot open
+                // additional windows. Explicit openWindow still checks that capability.
+                self.windows.append(OpenedWindow(
+                    type: named.type, serial: nextSerial(), value: nil, text: nil,
+                    singleton: declared[named.type]?.isSingleton == true))
+            }
+            activationWindowKey = self.windows.first(where: { $0.type == named.type && $0.value == nil })?.key
+        }
+        if activationWindowKey == nil {
+            activationWindowKey = mainIsOpen ? SceneElement.mainKey : self.windows.first?.key
+        }
     }
 
     /// The session of one of its windows, made once and kept.
@@ -259,6 +324,8 @@ struct GroupShape {
 
     /// A value read back out of the text it was written down as.
     let restore: (String) -> AnyHashable?
+    var restorationBehavior: SceneRestorationBehavior = .automatic
+    var isSingleton = false
 
     /// Whether this shape takes a value of `type` - nothing meaning none.
     func takes(_ type: Any.Type?) -> Bool {
@@ -285,8 +352,11 @@ struct OpenedWindow: Equatable {
     /// That value written down, the way the platform keeps it.
     var text: String?
 
+    /// Named singleton windows retain an identity distinct from every other window.
+    var singleton = false
+
     /// What the tree knows it by.
-    var key: String { "\(type.name) \(serial)" }
+    var key: String { singleton ? "window \(type.name)" : "\(type.name) \(serial)" }
 }
 
 /// A state box a scene may keep - one declared with a `SceneKey`, which the

@@ -18,22 +18,19 @@
     /// Nothing kept yet.
     public init() {}
 
-    /// Brings back the scenes `kept` holds - one new scene where it holds none - each connected with its values
-    /// before its first render, then offers each the windows it had open, each rendered before the next.
+    /// Connects kept scenes with their values and windows before the first render,
+    /// so restoration is resolved before automatic launch chooses any additional window.
     public func restore(_ kept: KeptScenes, in runtime: HostRuntime) {
         let scenes = kept.scenes.isEmpty ? [KeptScenes.Scene()] : kept.scenes
-        for scene in scenes { runtime.core.connectScene(restoring: scene.values) }
+        for scene in scenes {
+            runtime.core.connectScene(
+                restoring: scene.values, windows: scene.windows.map { (kind: $0.kind, value: $0.value) })
+        }
         runtime.pump.turn()
 
         for (scene, element) in zip(scenes, KeptScenes.scenes(of: runtime.tree.root)) {
             values[KeptScenes.key(of: element)] = scene.values
-            guard let handler = element.handler(.windowRestored) else { continue }
-            for window in scene.windows {
-                let payload: [HostValue] = [.string(window.kind)] + (window.value.map { [.string($0)] } ?? [])
-                runtime.pump.handlers.enqueuePhase(handler, payload: payload)
-            }
         }
-        runtime.pump.turn()
     }
 
     /// Keeps a scene's value as the act `persistSceneValue` carries it - the scene's key, the value's key, then the

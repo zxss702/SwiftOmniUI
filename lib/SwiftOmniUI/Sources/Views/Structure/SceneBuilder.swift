@@ -9,9 +9,8 @@
 ///         WindowGroup(for: URL.self) { $url in EditorWindow(url: url) }
 ///     }
 ///
-/// SwiftUI reads each entry a scene of its own; SwiftOmniUI builds one scene
-/// of them - the first to declare a main window supplies it, and every
-/// scene's groups, commands and environments stand beside it.
+/// SwiftUI reads each entry as a scene of its own; SwiftOmniUI merges their
+/// window declarations, retaining each window's launch and restoration policies.
 @resultBuilder
 public enum SceneBuilder {
     /// A scene passes through as itself.
@@ -77,9 +76,9 @@ public struct ConditionalScene: Scene {
     public var windows: Windows { wrapped.windows }
 }
 
-/// The several scenes an app's `body` declares, as one: the first scene's
-/// main window is the scene's own, and every scene's groups - so its kinds
-/// of window - answer `openWindow` together.
+/// The scenes an app's `body` declares, merged without losing window policies.
+/// Named windows stay independent; the legacy unnamed main window remains
+/// the scene's main, and all groups answer `openWindow` together.
 ///
 /// Window defaults stay with the scene that declared them; commands and
 /// offered environments collect across the scenes.
@@ -91,6 +90,8 @@ public struct TupleScene: Scene {
     public var windows: Windows {
         var groups: [WindowGroup] = []
         var main: WindowScene?
+        var mainLaunch: SceneLaunchBehavior = .automatic
+        var mainRestoration: SceneRestorationBehavior = .automatic
         var environments: [(key: ObjectIdentifier, object: AnyObject)] = []
         var environmentEdits: [(inout EnvironmentValues) -> Void] = []
         var commands: [any Commands] = []
@@ -105,8 +106,12 @@ public struct TupleScene: Scene {
             }
 
             let windows = scene.windows
-            if main == nil, let window = windows.main {
+            if let window = windows.main,
+                main == nil || (mainLaunch == .suppressed && windows.launchBehavior != .suppressed)
+                    || (mainLaunch != .presented && windows.launchBehavior == .presented) {
                 main = window
+                mainLaunch = windows.launchBehavior
+                mainRestoration = windows.restorationBehavior
                 if windows.defaultSize != nil || windows.defaultPosition != nil || windows.resizability != nil {
                     let own = window as? WindowSceneAsks
                     main = ModifiedWindowScene(base: window) {
@@ -129,6 +134,8 @@ public struct TupleScene: Scene {
         }
 
         var merged = Windows(groups: groups, main: main)
+        merged.launchBehavior = mainLaunch
+        merged.restorationBehavior = mainRestoration
         merged.environments = environments
         merged.environmentEdits = environmentEdits
         merged.commands = commands

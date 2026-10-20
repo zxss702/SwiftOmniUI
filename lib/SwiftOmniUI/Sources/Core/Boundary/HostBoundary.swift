@@ -87,13 +87,20 @@
     /// registered. Every later call creates another independent scene. Values
     /// restored by the platform land before that scene builds, so
     /// `@State(sceneKey:)` never briefly exposes its declared default.
-    public static func connectScene(restoring values: [String: HostValue] = [:]) {
-        Scenes.shared.connected(restoring: values)
+    public static func connectScene(
+        restoring values: [String: HostValue] = [:], windows: [(kind: String, value: String?)] = []
+    ) {
+        Scenes.shared.connected(restoring: values, windows: windows)
     }
 
     /// Reopens the first declared main window in an existing scene; its scene key identifies the native target.
     public static func reopenInitialWindow() -> String? {
         Scenes.shared.reopenInitialWindow()
+    }
+
+    /// The window selected by the most recent launch request after the tree settled.
+    public static func initialWindowKey(in scene: String) -> String? {
+        Scenes.shared.record(id: scene)?.activationWindowKey
     }
 
     /// Updates the process-wide application session from native lifecycle.

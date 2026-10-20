@@ -214,12 +214,13 @@
         pump.turn()
     }
 
-    /// A plain launch targets the declared main window, even when only secondary windows currently exist.
+    /// Reuses an open window, or opens the current default when no windows remain.
     public func initialWindowForActivation() -> MountedElement? {
         guard let scene = core.reopenInitialWindow() else { return nil }
         pump.turn()
+        guard let key = core.initialWindowKey(in: scene) else { return nil }
         return tree.root?.windows.first {
-            $0.id == .manual("main") && $0.enclosing(type: .scene)?.id == .manual(scene)
+            $0.id == .manual(key) && $0.enclosing(type: .scene)?.id == .manual(scene)
         }
     }
 

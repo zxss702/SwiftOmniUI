@@ -35,6 +35,35 @@
 }
 
 extension Scene {
+    /// Chooses whether this scene opens automatically at launch or reactivation.
+    /// Explicit `openWindow` calls are unaffected by `.suppressed`.
+    public func defaultLaunchBehavior(_ behavior: SceneLaunchBehavior) -> some Scene {
+        PlacedScene(base: self) { windows in
+            var windows = windows
+            windows.launchBehavior = behavior
+            windows.groups = windows.groups.map { group in
+                var group = group
+                group.launchBehavior = behavior
+                return group
+            }
+            return windows
+        }
+    }
+
+    /// Controls whether windows of this scene may be restored on a later launch.
+    public func restorationBehavior(_ behavior: SceneRestorationBehavior) -> some Scene {
+        PlacedScene(base: self) { windows in
+            var windows = windows
+            windows.restorationBehavior = behavior
+            windows.groups = windows.groups.map { group in
+                var group = group
+                group.restorationBehavior = behavior
+                return group
+            }
+            return windows
+        }
+    }
+
     /// Offers an object to every window of every session of this scene,
     /// resolved by type the way `.environment` on a view is.
     ///
@@ -181,4 +210,19 @@ struct AnyScene: Scene {
     let base: any Scene
 
     var windows: Windows { base.windows }
+}
+
+/// The automatic presentation policy of a scene, matching SwiftUI.
+public struct SceneLaunchBehavior: Sendable, Equatable {
+    private let value: Int
+    public static let automatic = Self(value: 0)
+    public static let presented = Self(value: 1)
+    public static let suppressed = Self(value: 2)
+}
+
+/// Whether the system may restore a scene's windows on a later launch.
+public struct SceneRestorationBehavior: Sendable, Equatable {
+    private let value: Int
+    public static let automatic = Self(value: 0)
+    public static let disabled = Self(value: 1)
 }

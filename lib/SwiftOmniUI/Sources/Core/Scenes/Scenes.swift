@@ -54,8 +54,8 @@ final class Scenes: @unchecked Sendable {
         }
     }
 
-    /// A plain application activation reuses the earliest scene's declared main window.
-    /// If the last scene just closed, a launch received before native shutdown starts a fresh scene.
+    /// A plain activation reuses an open window, or asks the current launch policy
+    /// for one when none remains. After the last scene closes it starts a fresh scene.
     func reopenInitialWindow() -> String? {
         let standing = _list.storage.value
         if standing.isEmpty {
@@ -63,7 +63,8 @@ final class Scenes: @unchecked Sendable {
             return _list.storage.value.first?.id
         }
         guard let record = standing.first(where: { $0.declaresMainWindow }) else { return nil }
-        if !record.mainIsOpen { record.mainIsOpen = true }
+        record.launchRequested = true
+        Renderer.shared.setNeedsRender()
         return record.id
     }
 
@@ -86,16 +87,20 @@ final class Scenes: @unchecked Sendable {
     /// The platform handed over a window nobody here asked for: the scene waiting for
     /// its first window takes it, or a new scene does.
     /// Design: docs/design/core/scenes.md#connecting-and-ending
-    func connected(restoring values: [String: PropValue]) {
+    func connected(
+        restoring values: [String: PropValue], windows: [(kind: String, value: String?)] = []
+    ) {
         let standing = _list.storage.value
 
         if let waiting = standing.first(where: { !$0.handedOver }) {
             waiting.handedOver = true
             waiting.restore(values)
+            waiting.pendingRestoredWindows = windows
         } else {
             let record = SceneRecord(id: "\(next)", handedOver: true)
             next += 1
             record.restore(values)
+            record.pendingRestoredWindows = windows
             list.append(record)
         }
 

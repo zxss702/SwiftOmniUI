@@ -33,6 +33,11 @@ public struct WindowGroup {
     /// A value read back from its text: what a restored window is opened for.
     let restore: (_ text: String) -> AnyHashable?
 
+    /// A named `Window` participates in automatic launch; legacy groups are explicit-only.
+    var isLaunchCandidate = false
+    var launchBehavior: SceneLaunchBehavior = .automatic
+    var restorationBehavior: SceneRestorationBehavior = .automatic
+
     /// Whether its windows hide while another scene is in front.
     var hides = false
 

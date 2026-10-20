@@ -190,12 +190,17 @@
     }
 
     /// Hands a platform scene to SwiftOmniUI before its first render.
-    public func connectScene(restoring values: [String: HostValue] = [:]) {
-        HostBoundary.connectScene(restoring: values)
+    public func connectScene(
+        restoring values: [String: HostValue] = [:], windows: [(kind: String, value: String?)] = []
+    ) {
+        HostBoundary.connectScene(restoring: values, windows: windows)
     }
 
     /// Reopens the first declared main window, retaining any other windows in its scene.
     public func reopenInitialWindow() -> String? { HostBoundary.reopenInitialWindow() }
+
+    /// The window chosen by the launch policy after rendering the scene.
+    public func initialWindowKey(in scene: String) -> String? { HostBoundary.initialWindowKey(in: scene) }
 
     /// The keys read from the platform's settings store before the first render.
     public var persistentKeys: [PersistentKey] { HostBoundary.persistentKeys }

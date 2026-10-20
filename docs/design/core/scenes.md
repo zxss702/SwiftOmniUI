@@ -12,7 +12,8 @@ reads.
   App
     Scene "1"            one per open scene, in the order they opened
       WindowScene "main"      its main window, always first
-      WindowScene "fonts 1"   a window of a group: the kind, and a number of its own
+      WindowScene "fonts 1"   a value/group window: the kind, and a number of its own
+      WindowScene "window welcome"  a named singleton Window, independent of main
     Scene "2"
       WindowScene "main"
 ```
@@ -59,6 +60,32 @@ changes. Its kind, its value's text, whether it hides while another scene is in
 front and whether it floats are written on every build, either way, so none of
 them is ever cleared off a window it was on - those members have no host
 default (contracts.md).
+
+## Default launch and independent windows
+
+A named `Window(_:id:)` declares a singleton group rather than reusing the
+legacy unnamed `main` window. Its tree key is `window <id>`, and its session
+lasts while that particular window is open. Opening another named window and
+closing the first therefore creates an independent native window with its own
+size, position, and state.
+
+`defaultLaunchBehavior(_:)` keeps `.automatic`, `.presented`, or `.suppressed`
+on each declaration. A launch selects an explicitly presented window before an
+automatic candidate. Suppressed windows remain available to explicit
+`openWindow` calls. The policy is evaluated on connection and explicit app
+activation, not on ordinary state changes. The activation target is the selected
+window's key, not a hard-coded `main` key.
+
+The host offers saved windows before the first render. Eligible restored windows
+are accepted before automatic launch, so a saved editor does not also create a
+welcome window merely because its declaration uses `.presented`.
+`restorationBehavior(.disabled)` excludes the window from kept snapshots and
+rejects older restoration requests, without closing an already open window.
+
+`@Environment(\.dismissWindow)` closes named windows by ID or group/value,
+independently of the caller's navigation stack. Closing an absent window does
+nothing. To hand off from onboarding, save completion, open the start window,
+then dismiss the onboarding window by its ID.
 
 ## What the platform keeps
 

@@ -31,6 +31,7 @@ struct SceneElement: Element {
 
         // `\.openWindow` acts on this scene's groups, wherever below it is read.
         node.environmentValues[keyPath: \.openWindow] = OpenWindowAction(record: record)
+        node.environmentValues[keyPath: \.dismissWindow] = DismissWindowAction(record: record)
 
         return node
     }
@@ -43,12 +44,18 @@ struct SceneElement: Element {
         var declared: [WindowType: GroupShape] = [:]
 
         for group in windows.groups where declared[group.type] == nil {
-            declared[group.type] = GroupShape(valueType: group.valueType, restore: group.restore)
+            declared[group.type] = GroupShape(
+                valueType: group.valueType, restore: group.restore,
+                restorationBehavior: group.restorationBehavior, isSingleton: group.isLaunchCandidate)
         }
 
         record.declared = declared
-        record.declaresMainWindow = windows.main != nil
         record.mainWindowType = (windows.main as? WindowSceneAsks)?.windowID.map(WindowType.init)
+
+        let restored = record.pendingRestoredWindows
+        record.pendingRestoredWindows = []
+        for window in restored { record.restored(kind: window.kind, text: window.value) }
+        record.applyLaunchPolicy(windows)
 
         var children: [Node] = []
 
@@ -57,6 +64,7 @@ struct SceneElement: Element {
             var main = windowScene.node(session: record.windowSession(SceneElement.mainKey))
             main.id = SceneElement.mainKey
             if let type = record.mainWindowType { main.write(WindowSceneContract.windowType, type) }
+            main.write(WindowSceneContract.allowsRestoration, windows.restorationBehavior != .disabled)
             main.append(commands: sceneMenus(of: windows))
 
             // The window's own asks win over its scene's defaults.
@@ -89,6 +97,7 @@ struct SceneElement: Element {
 
             // Written either way, so none of them is ever cleared off a window.
             // Design: docs/design/core/scenes.md#opening-windows
+            window.write(WindowSceneContract.allowsRestoration, group.restorationBehavior != .disabled)
             window.write(WindowSceneContract.windowType, opened.type)
             window.describe(WindowSceneContract.windowValue, opened.text)
             window.write(WindowSceneContract.hidesWhenInactive, group.hides)

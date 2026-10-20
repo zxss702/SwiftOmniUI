@@ -142,6 +142,7 @@ enum GTKRealization {
         .complete("ToolbarItem", "priority"),
         .complete("ToolbarSpacer", "placement"),
         .complete("ToolbarSpacer", "variant"),
+        .complete("WindowScene", "allowsRestoration"),
         .partial("WindowScene", "resizability",
             missing: "A content minimum names the window element's own minimum instead of measuring content."),
         .unrealized("WindowScene", "defaultPosition",

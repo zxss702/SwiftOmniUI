@@ -16,11 +16,15 @@
 /// window shows.
 public struct Windows {
     /// The kinds of window the scene may open beside its main one.
-    let groups: [WindowGroup]
+    var groups: [WindowGroup]
 
     /// The main window, or nil where the scene is only groups - its windows
     /// open as `openWindow` asks, none of its own.
     let main: WindowScene?
+
+    /// The main window's policies; named windows keep their own on their groups.
+    var launchBehavior: SceneLaunchBehavior = .automatic
+    var restorationBehavior: SceneRestorationBehavior = .automatic
 
     /// What `.environment(_:)` offered every window of the scene.
     var environments: [(key: ObjectIdentifier, object: AnyObject)] = []

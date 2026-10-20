@@ -90,16 +90,16 @@ public protocol WindowScene: Element, Scene {
 }
 
 extension WindowScene {
-    /// A window alone is a scene of one window:
-    /// `var body: some Scene { MainWindow() }`. A window named for
-    /// `openWindow(id:)` is also the group that name reopens once the user
-    /// has closed it.
+    /// An unnamed window is the scene's main window. A named `Window` has
+    /// an independent singleton group, eligible for automatic launch and
+    /// reopened by `openWindow(id:)` without sharing another window's session.
     public var windows: Windows {
-        var groups: [WindowGroup] = []
         if let asks = self as? WindowSceneAsks, let id = asks.windowID {
-            groups.append(WindowGroup(WindowType(id)) { self })
+            var group = WindowGroup(WindowType(id)) { self }
+            group.isLaunchCandidate = true
+            return Windows(groups: [group], main: nil)
         }
-        return Windows(groups: groups, main: self)
+        return Windows(groups: [], main: self)
     }
 
     /// The window as a node: its page, and what hangs off it - its title bar

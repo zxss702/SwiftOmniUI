@@ -353,6 +353,7 @@ extension NodeType {
     static let verticalTextAlignment = TextAlignmentElementContract.verticalTextAlignment.token
     static let width = VisualElementContract.width.token
     static let windowBackground = PageElementContract.windowBackground.token
+    static let allowsRestoration = WindowSceneContract.allowsRestoration.token
     static let windowType = WindowSceneContract.windowType.token
     static let windowValue = WindowSceneContract.windowValue.token
     static let defaultPosition = WindowSceneContract.defaultPosition.token

@@ -97,9 +97,13 @@ public enum WindowSceneContract: ElementContract {
     /// Where the window stands down the screen, in device units.
     public static let y = ElementProperty<Self, Double>("y", layer: .structure)
 
+    /// Whether the host may keep this window for restoration on a later launch.
+    public static let allowsRestoration = ElementProperty<Self, Bool>(
+        "allowsRestoration", layer: .structure, cleared: true)
+
     /// The element's own members.
     public static let members: [any ContractMember] = [
-        activated, created, deactivated, destroying, floatsOnTop, height, hidesWhenInactive, isMaximizable,
+        allowsRestoration, activated, created, deactivated, destroying, floatsOnTop, height, hidesWhenInactive, isMaximizable,
         isMinimizable, isTranslucent, maximumHeight, maximumWidth, minimumHeight, minimumWidth, modalPopped,
         resizability, resumed, stopped, title, width, windowType, windowValue, x, y, defaultPosition,
     ]
