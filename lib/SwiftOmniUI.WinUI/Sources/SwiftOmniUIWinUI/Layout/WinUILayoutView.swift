@@ -335,7 +335,7 @@ class WinUILayoutView: WinUIView {
             return
         }
         nativeArrangePending = false
-        swiftomniui_winui_invalidate_arrange(presentationHandle)
+        swiftomniui_winui_invalidate_arrange(layoutHandle)
     }
 
     /// Forgets the kept sizes and asks WinUI to measure again.

@@ -24,7 +24,53 @@ private final class PlanConsumptionChild: WinUILayoutView {
     }
 }
 
+@MainActor
+private final class PresentedLayoutOwner: WinUISingleChildView {
+    var nativeMeasures = 0
+    var nativeArrangements = 0
+
+    override func measure(width: Double, height: Double) -> LayoutSize {
+        nativeMeasures += 1
+        return super.measure(width: width, height: height)
+    }
+
+    override func arrange(in bounds: Rect) {
+        nativeArrangements += 1
+        super.arrange(in: bounds)
+    }
+}
+
 final class WinUILayoutPlanConsumptionTests: XCTestCase {
+    func testInvalidationReachesTheLayoutOwnerBeneathAnIdleBlurPresenter() {
+        onUIThread {
+            let content = WinUIZStackView()
+            let owner = PresentedLayoutOwner()
+            owner.setItems([WinUILayoutItem(view: content)])
+            owner.prepareBlur()
+            let root = WinUISingleChildView()
+            root.setItems([WinUILayoutItem(view: owner)])
+            root.prepareMeasure(width: 320, height: 128)
+            swiftomniui_winui_arrange(root.handle, 0, 0, 320, 128)
+
+            let arrangements = owner.nativeArrangements
+            owner.invalidateArrange()
+            // Enter through the native ancestor at the same rectangle. Do not
+            // call owner.arrange or invalidate its ancestor to repair the path.
+            swiftomniui_winui_arrange(root.handle, 0, 0, 320, 128)
+            XCTAssertGreaterThan(owner.nativeArrangements, arrangements,
+                                 "a clean presentation wrapper must not swallow its layout owner's invalidation")
+            XCTAssertEqual(content.committedFrame, Rect(0, 0, 320, 128))
+
+            let measures = owner.nativeMeasures
+            owner.invalidateMeasure()
+            root.prepareMeasure(width: 320, height: 128)
+            swiftomniui_winui_arrange(root.handle, 0, 0, 320, 128)
+            XCTAssertGreaterThan(owner.nativeMeasures, measures,
+                                 "Measure must reach the inner panel even when the wrapper's proposal is unchanged")
+            XCTAssertEqual(content.committedFrame, Rect(0, 0, 320, 128))
+        }
+    }
+
     func testWidthOnlyAllocationObservesAWritingBatchsSecondLayoutChange() throws {
         try onUIThread {
             let input = WinUIZStackView()

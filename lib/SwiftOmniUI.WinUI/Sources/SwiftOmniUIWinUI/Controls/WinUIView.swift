@@ -14,7 +14,11 @@ class WinUIView {
 
     /// Parents attach the drawing boundary when one is needed; control APIs
     /// continue to use `handle`, preserving the actual native control identity.
-    var presentationHandle: SwiftOmniUIObjectRef { blurPresenter ?? nativeAllocation ?? handle }
+    var presentationHandle: SwiftOmniUIObjectRef { blurPresenter ?? layoutHandle }
+    /// Layout invalidation belongs to the element that consumes the allocation,
+    /// beneath any drawing-only presenter. Dirtying only a blur presenter lets
+    /// its clean source Grid skip this element at an unchanged rectangle.
+    var layoutHandle: SwiftOmniUIObjectRef { nativeAllocation ?? handle }
     /// A native control can consume SOUI allocation through its own boundary
     /// while its control handle, editing state and event identity stay intact.
     private let nativeAllocation: SwiftOmniUIObjectRef?
@@ -519,7 +523,7 @@ class WinUIView {
     /// a viewport notice may update the tree inside ArrangeOverride.
     func invalidateNativeMeasure() {
         WinUILayoutDiagnostics.record("invalidate.native.commit", view: self)
-        swiftomniui_winui_invalidate_measure(presentationHandle)
+        swiftomniui_winui_invalidate_measure(layoutHandle)
     }
 
     /// Loaded can change a TextBlock's resources after it was measured outside

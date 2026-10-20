@@ -155,7 +155,9 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                                     Button("Pause") {}.frame(width: 40, height: 40).id("new-pause")
                                 }
                             }
-                        }.padding(16).buttonStyle(.plain).id("new-composer-row")
+                        }
+                        .transition(.blur.combined(with: .offset(x: 0, y: 128)).animation(.snappy))
+                        .padding(16).buttonStyle(.plain).id("new-composer-row")
                     }
             }
             let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)

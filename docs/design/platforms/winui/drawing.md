@@ -168,6 +168,14 @@ native content slots attach the presentation handle. The extra panel passes
 the proposal and allocation through unchanged. Views without blur acquire
 no extra panel or effect resources.
 
+Native Measure/Arrange invalidation targets the allocation owner beneath that
+presentation panel. Marking only the outer presenter dirty leaves its source
+grid clean: at the same proposal or rectangle, XAML can skip the original
+control or SOUI panel. Dirtying the allocation owner propagates through the
+native ancestors and reaches its layout callback without another refresh.
+For an editor this owner is its retained allocation boundary, so invalidation
+does not change the live TextBox's measurement contract.
+
 An unstyled source grid holds the actual control subtree. A live
 [`CompositionVisualSurface`](https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.composition.compositionvisualsurface)
 and surface brush feed a Gaussian blur effect, exposed through the SDK's
