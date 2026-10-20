@@ -8,6 +8,61 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 final class WinUIViewportClippingTests: XCTestCase {
+    func testReadingAndClearingAnUnauthoredClipLeavesNativeScaleAvailable() {
+        onUIThread {
+            let panel = WinUIGridView()
+            func clipped() -> String {
+                WinUIStrings.read { swiftomniui_winui_read(panel.handle, "clipped", $0, $1) }
+            }
+            XCTAssertEqual(clipped(), "0")
+            swiftomniui_winui_set_clip(panel.handle, false, SwiftOmniUIOutlineRectangle, 0, 200, 100)
+            swiftomniui_winui_path_clip_attach(panel.handle, nil)
+            XCTAssertTrue(swiftomniui_winui_set_scale_for_testing(panel.handle, 1.25, 1.25),
+                          "a read or empty clear must not claim the native element's handout Visual")
+
+            // Exercise the opposite order too: a native owner can begin using
+            // its facades before SOUI inspects or clears an absent clip.
+            XCTAssertEqual(clipped(), "0")
+            swiftomniui_winui_set_clip(panel.handle, false, SwiftOmniUIOutlineRectangle, 0, 200, 100)
+            swiftomniui_winui_path_clip_attach(panel.handle, nil)
+            XCTAssertTrue(swiftomniui_winui_set_scale_for_testing(panel.handle, 1, 1))
+        }
+    }
+
+    func testViewportQueriesPreserveNativeScrollContentScaleBeforeAndAfterScrolling() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<100) { number in Text("Row \(number)").frame(height: 28) }
+                    }
+                }.frame(width: 260, height: 220)
+            }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            let document = try XCTUnwrap(lazy.placingLayout as? WinUIScrollDocument)
+            let identity = document.handle
+            for offset in [0.0, 280, 0] {
+                if offset != 0 || scroll.scroller.standing.offset.y != 0 {
+                    scroll.scroller.move(to: Point(0, offset))
+                    host.settle { abs(scroll.scroller.standing.offset.y - offset) < 1 }
+                }
+                var viewport = [Double](repeating: .nan, count: 6)
+                XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &viewport),
+                               SwiftOmniUIViewportReady)
+                XCTAssertGreaterThan(viewport[2], 0)
+                XCTAssertGreaterThan(viewport[3], 0)
+                XCTAssertFalse(lazy.mounted.isEmpty, "the first visible window must be mounted without a scroll")
+                XCTAssertEqual(WinUIStrings.read {
+                    swiftomniui_winui_read(document.handle, "clipped", $0, $1)
+                }, "0")
+                XCTAssertTrue(swiftomniui_winui_set_scale_for_testing(document.handle, 1, 1),
+                              "viewport inspection must leave ScrollPresenter's Scale facade available")
+                XCTAssertEqual(document.handle, identity)
+            }
+        }
+    }
+
     func testNativeViewportFailureIsDistinctFromPendingAndPreservesTheOutput() throws {
         try onUIThread {
             let host = WinUIRenderer.running(reducesMotion: true) {

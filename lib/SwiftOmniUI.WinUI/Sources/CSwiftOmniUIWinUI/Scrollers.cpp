@@ -6,6 +6,7 @@
 // Design: docs/design/platforms/winui/layout.md#scrolling
 
 #include "Relay.h"
+#include "CompositionClips.h"
 
 #include <algorithm>
 #include <cmath>
@@ -14,9 +15,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <winrt/Microsoft.UI.Composition.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
-#include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Windows.Foundation.h>
@@ -94,8 +93,11 @@ namespace {
                         return SwiftOmniUIViewportNotReady;
                     intersect(visual, across, down);
                 }
-                auto composition = xaml::Hosting::ElementCompositionPreview::GetElementVisual(visual);
-                if (visual.Clip() || composition.Clip()) {
+                // GetElementVisual is not a read-only query. In particular,
+                // ScrollPresenter animates its content's XAML Scale and
+                // Translation; acquiring that content's handout Visual here
+                // prevents those native animations from starting on Loaded.
+                if (visual.Clip() || elementCompositionClip(visual)) {
                     // SOUI's geometric clips are authored in the view's bounds.
                     // Their bounding rectangle also bounds a nonrectangular path.
                     auto size = visual.ActualSize();

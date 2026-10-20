@@ -1203,6 +1203,8 @@ bool swiftomniui_winui_picture_pixels(char const *const *names, int32_t count, i
 int32_t swiftomniui_winui_read(SwiftOmniUIObjectRef element, char const *what, char *utf8, int32_t capacity);
 /// Requests a native element theme (0 system, 1 light, 2 dark), without a Swift tree update. What a test does.
 void swiftomniui_winui_set_theme_for_testing(SwiftOmniUIObjectRef element, int32_t theme);
+/// Writes UIElement.Scale directly, reporting whether XAML permits the facade. What a test does.
+bool swiftomniui_winui_set_scale_for_testing(SwiftOmniUIObjectRef element, double x, double y);
 
 /// The question showing over `element`'s window, in UTF-8, as far as `capacity` goes: its title, message, accepting
 /// and cancelling captions, its field's words (0x01 for none) and its choices, each ended by the unit separator

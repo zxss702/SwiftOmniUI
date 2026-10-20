@@ -9,6 +9,7 @@
 // Design: docs/design/platforms/winui/relay.md#what-a-test-reads
 
 #include "Figure.h"
+#include "CompositionClips.h"
 
 #include <cstdio>
 #include <cstring>
@@ -37,6 +38,18 @@ extern "C" void swiftomniui_winui_set_theme_for_testing(SwiftOmniUIObjectRef han
             theme == 1 ? xaml::ElementTheme::Light : theme == 2 ? xaml::ElementTheme::Dark : xaml::ElementTheme::Default);
     } catch (...) {
         report("requesting a native theme for testing");
+    }
+}
+
+extern "C" bool swiftomniui_winui_set_scale_for_testing(SwiftOmniUIObjectRef handle, double x, double y) {
+    try {
+        // Exercise the actual XAML facade, as ScrollPresenter does. A render
+        // transform would not detect accidental acquisition of its Visual.
+        as<xaml::UIElement>(handle).Scale({static_cast<float>(x), static_cast<float>(y), 1});
+        return true;
+    } catch (...) {
+        report("setting a native XAML scale for testing");
+        return false;
     }
 }
 
@@ -394,8 +407,7 @@ namespace {
             if (what == "hitTestable") return flag(element.IsHitTestVisible());
             if (what == "zIndex") return number(controls::Canvas::GetZIndex(element));
             if (what == "clipped") {
-                auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(element);
-                return flag(static_cast<bool>(element.Clip()) || static_cast<bool>(visual.Clip()));
+                return flag(static_cast<bool>(element.Clip()) || static_cast<bool>(elementCompositionClip(element)));
             }
             if (what == "alphaMasked") {
                 auto output = xaml::Hosting::ElementCompositionPreview::GetElementChildVisual(element)

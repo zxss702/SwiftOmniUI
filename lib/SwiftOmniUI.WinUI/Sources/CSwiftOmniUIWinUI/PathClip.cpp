@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "Relay.h"
+#include "CompositionClips.h"
 #include <d2d1_1.h>
 #include <windows.graphics.interop.h>
 #include <winrt/Windows.Graphics.h>
@@ -112,7 +113,7 @@ extern "C" void swiftomniui_winui_path_clip_update(
 
 extern "C" void swiftomniui_winui_path_clip_attach(SwiftOmniUIObjectRef element, SwiftOmniUIObjectRef clip) {
     try {
-        auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(as<xaml::UIElement>(element));
-        visual.Clip(clip ? as<composition::CompositionGeometricClip>(clip) : nullptr);
+        setElementCompositionClip(as<xaml::UIElement>(element),
+                                  clip ? as<composition::CompositionGeometricClip>(clip) : nullptr);
     } catch (...) { report("attaching a path clip"); }
 }

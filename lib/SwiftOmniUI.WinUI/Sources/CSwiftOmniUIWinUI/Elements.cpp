@@ -5,6 +5,7 @@
 // for, whether it shows, how opaque it is drawn, and a control's enabled state.
 
 #include "Relay.h"
+#include "CompositionClips.h"
 
 #include <algorithm>
 #include <cstring>
@@ -152,11 +153,12 @@ extern "C" void swiftomniui_winui_set_clip(
     SwiftOmniUIObjectRef handle, bool cuts, SwiftOmniUIOutline outline, double radius, double width, double height
 ) {
     try {
-        auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(as<xaml::UIElement>(handle));
+        auto element = as<xaml::UIElement>(handle);
         if (!cuts) {
-            visual.Clip(nullptr);
+            setElementCompositionClip(element, nullptr);
             return;
         }
+        auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(element);
         auto compositor = visual.Compositor();
         auto w = static_cast<float>(width), h = static_cast<float>(height);
         if (outline == SwiftOmniUIOutlineEllipse || outline == SwiftOmniUIOutlineCircle) {
@@ -165,14 +167,14 @@ extern "C" void swiftomniui_winui_set_clip(
                 : winrt::Windows::Foundation::Numerics::float2{std::min(w, h) / 2, std::min(w, h) / 2};
             ellipse.Center({w / 2, h / 2});
             ellipse.Radius(radius);
-            visual.Clip(compositor.CreateGeometricClip(ellipse));
+            setElementCompositionClip(element, compositor.CreateGeometricClip(ellipse));
         } else {
             auto rectangle = compositor.CreateRoundedRectangleGeometry();
             auto r = outline == SwiftOmniUIOutlineRounded ? std::min(static_cast<float>(radius), std::min(w, h) / 2)
                 : outline == SwiftOmniUIOutlineCapsule ? std::min(w, h) / 2 : 0.0f;
             rectangle.Size({w, h});
             rectangle.CornerRadius({r, r});
-            visual.Clip(compositor.CreateGeometricClip(rectangle));
+            setElementCompositionClip(element, compositor.CreateGeometricClip(rectangle));
         }
     } catch (...) {
         report("cutting an element to its outline");
