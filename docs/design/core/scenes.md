@@ -76,6 +76,11 @@ automatic candidate. Suppressed windows remain available to explicit
 activation, not on ordinary state changes. The activation target is the selected
 window's key, not a hard-coded `main` key.
 
+An explicit application activation (launching the executable again) reopens and
+targets that default even when editors are already open. An existing default
+window is reused; other windows and their state stay in place. Initial connection
+still accepts restored windows before considering automatic presentation.
+
 The host offers saved windows before the first render. Eligible restored windows
 are accepted before automatic launch, so a saved editor does not also create a
 welcome window merely because its declaration uses `.presented`.

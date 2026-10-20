@@ -17,6 +17,7 @@ final class SceneRecord: @unchecked Sendable {
 
     /// Launch is requested once on connection, then only by explicit activation.
     var launchRequested = true
+    var activationRequested = false
     var activationWindowKey: String?
     var pendingRestoredWindows: [(kind: String, value: String?)] = []
 
@@ -142,9 +143,11 @@ final class SceneRecord: @unchecked Sendable {
             mainIsOpen = false
             return
         }
-        guard windows.contains(where: { $0.key == key }) else { throw WindowError.notOpen }
+        guard let index = windows.firstIndex(where: { $0.key == key }) else { throw WindowError.notOpen }
 
-        closed(key: key)
+        // Like close(type:) and dismissWindow(id:), a programmatic dismissal
+        // leaves the scene available for another openWindow in the same action.
+        windows.remove(at: index)
     }
 
     /// A named dismissal is independent of the caller's navigation presentation.
@@ -218,16 +221,19 @@ final class SceneRecord: @unchecked Sendable {
 
         guard launchRequested else { return }
         launchRequested = false
+        let activating = activationRequested
+        activationRequested = false
         activationWindowKey = nil
 
         let needsWindow = !mainIsOpen && self.windows.isEmpty
         if usesMain {
             // Legacy unnamed main windows anchor their restored secondary windows.
             // Named SwiftUI-style Windows use independent groups and do not take this path.
-            if needsWindow || windows.launchBehavior == .automatic { mainIsOpen = true }
+            if activating || needsWindow || windows.launchBehavior == .automatic { mainIsOpen = true }
             if mainIsOpen { activationWindowKey = SceneElement.mainKey }
         } else if let named {
-            if needsWindow {
+            if (activating || needsWindow),
+                !self.windows.contains(where: { $0.type == named.type && $0.value == nil }) {
                 // The initial window is allowed even on a host that cannot open
                 // additional windows. Explicit openWindow still checks that capability.
                 self.windows.append(OpenedWindow(

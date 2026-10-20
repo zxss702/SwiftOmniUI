@@ -214,7 +214,7 @@
         pump.turn()
     }
 
-    /// Reuses an open window, or opens the current default when no windows remain.
+    /// Reopens and targets the current default, retaining other windows in its scene.
     public func initialWindowForActivation() -> MountedElement? {
         guard let scene = core.reopenInitialWindow() else { return nil }
         pump.turn()
