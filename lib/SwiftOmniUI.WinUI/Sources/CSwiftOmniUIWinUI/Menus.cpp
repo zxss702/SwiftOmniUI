@@ -377,7 +377,17 @@ extern "C" void swiftomniui_winui_menu_button_set_menu(
             auto flyout = button.Flyout().try_as<controls::MenuFlyout>();
             if (!flyout) {
                 flyout = controls::MenuFlyout();
-                flyout.Opening(guarded("requesting menu contents", [view](auto const &, auto const &) {
+                // A flexible frame widens the trigger, not the popup's
+                // anchor. Use native edge alignment instead of centring the
+                // flyout over the complete form row.
+                flyout.Placement(controls::Primitives::FlyoutPlacementMode::BottomEdgeAlignedLeft);
+                flyout.Opening(guarded("requesting menu contents", [view, trigger = winrt::make_weak(button)](auto const &sender, auto const &) {
+                    if (auto button = trigger.get()) {
+                        sender.template as<controls::MenuFlyout>().Placement(
+                            button.FlowDirection() == xaml::FlowDirection::RightToLeft
+                                ? controls::Primitives::FlyoutPlacementMode::BottomEdgeAlignedRight
+                                : controls::Primitives::FlyoutPlacementMode::BottomEdgeAlignedLeft);
+                    }
                     if (callbacks.menuContentRequested) callbacks.menuContentRequested(view, 0);
                 }));
                 // As the context menu's: the menu standing over the pointer holds what is under it.

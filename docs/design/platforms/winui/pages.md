@@ -224,6 +224,9 @@ column. This lets a label's flexible frame and alignment operate inside a
 wide form row instead of centring a natural-width StackPanel. The columns
 have a 2 DIP gap in content and a 6 DIP gap in the toolbar; hiding the
 indicator also removes the gap. Popup entries remain native MenuFlyout items.
+The flyout uses BottomEdgeAlignedLeft (Right for RTL): widening the trigger's
+frame must not move the popup to the centre of a form row. WinUI still handles
+screen-edge fallback and keyboard/focus behaviour.
 
 The visible page's menus stand on WinUI's `MenuBar` in a row of the window
 beneath its chrome, above the window's tabs - each menu one of the bar's,
