@@ -167,6 +167,11 @@ namespace {
             length = alone ? width : std::min(available, std::clamp(length, least, most));
         }
         if (split.OpenPaneLength() != length) split.OpenPaneLength(length);
+        // SplitView can measure a closed pane at zero while arranging its
+        // sliding content at OpenPaneLength. The pane's content has that
+        // declared width even while the native template clips it away.
+        // Keep its Measure and Arrange proposals on the same native boundary.
+        if (pane.Width() != length) pane.Width(length);
     }
 
 }
@@ -448,11 +453,15 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
         split.PanePlacement(trailing ? controls::SplitViewPanePlacement::Right : controls::SplitViewPanePlacement::Left);
         split.Tag(winrt::single_threaded_vector<double>({0, 256, INFINITY, 256, expandsAt, 0, INFINITY}));
         split.RegisterPropertyChangedCallback(controls::SplitView::OpenPaneLengthProperty(),
-            guarded("changing a split column's width", [view](xaml::DependencyObject const &, xaml::DependencyProperty const &) {
+            guarded("changing a split column's width", [view](xaml::DependencyObject const &sender, xaml::DependencyProperty const &) {
+                auto split = sender.as<controls::SplitView>();
+                if (auto pane = split.Pane().try_as<controls::Grid>(); pane && pane.Width() != split.OpenPaneLength())
+                    pane.Width(split.OpenPaneLength());
                 callbacks.paneWidthChanged(view);
             }));
         split.Content(rows({true, false}));
         controls::Grid pane;
+        pane.Width(split.OpenPaneLength());
         controls::ContentControl face;
         face.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
         face.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
