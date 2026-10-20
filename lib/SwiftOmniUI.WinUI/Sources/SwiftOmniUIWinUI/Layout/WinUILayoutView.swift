@@ -21,6 +21,19 @@ class WinUILayoutView: WinUIView {
     private var nativePreparationDepth = 0
     private var hadSwiftAllocation = false
 
+    private var nativeMeasureCheckpoint: (order: UInt64, proposal: ProposedViewSize, answer: LayoutSize, swiftOwned: Bool)?
+    private var nativeArrangeCheckpoint: (order: UInt64, bounds: Rect, submitted: Bool)?
+
+    var nativeAllocationDiagnostic: String {
+        let measure = nativeMeasureCheckpoint.map {
+            "\($0.order)/\(WinUILayoutDiagnostics.proposal(width: $0.proposal.width, height: $0.proposal.height))/answer=\(WinUILayoutDiagnostics.size($0.answer))/swiftOwned=\($0.swiftOwned)"
+        } ?? "none"
+        let arrange = nativeArrangeCheckpoint.map {
+            "\($0.order)/\(WinUILayoutDiagnostics.rect($0.bounds))/submitted=\($0.submitted)"
+        } ?? "none"
+        return ",allocated=\(WinUILayoutDiagnostics.rect(allocatedBounds)),lastMeasure=\(measure),lastArrange=\(arrange)"
+    }
+
     private var hasSwiftAllocation: Bool {
         placingLayout != nil && nativeContentOwner == nil && nativeSafeBarOwner == nil
             && nativeLayoutOwner == nil && rootSafeAreaContext == nil
@@ -496,24 +509,27 @@ class WinUILayoutView: WinUIView {
             let framed = values.sized(size, offered: proposal.width)
             WinUILayoutDiagnostics.record("measure.natural", view: self,
                 "proposal=\(WinUILayoutDiagnostics.proposal(width: proposal.width, height: proposal.height)) natural=\(WinUILayoutDiagnostics.size(size)) framed=\(WinUILayoutDiagnostics.size(framed))")
+            let answer: LayoutSize
             if nativeLayoutOwner != nil || rootSafeAreaContext != nil {
                 // A native page/window has already allocated these finite
                 // axes. Its DesiredSize must describe that allocation, just
                 // as its plan does. SOUI parents query naturalSize separately.
                 // Returning intrinsic extent here lets XAML choose another
                 // slot and then remeasure the page during its own Arrange.
-                return LayoutSize(width: proposal.width ?? framed.width, height: proposal.height ?? framed.height)
-            }
-            if hasSwiftAllocation {
+                answer = LayoutSize(width: proposal.width ?? framed.width, height: proposal.height ?? framed.height)
+            } else if hasSwiftAllocation {
                 // The SOUI parent queries naturalSize itself and owns this
                 // panel's allocation, including animation samples. Publishing
                 // its destination as XAML DesiredSize would make ArrangeCore
                 // enlarge a smaller sample to that destination and clip it.
                 // Native-owned labels, pages and scroll documents still report
                 // the size that their actual native owner needs above/below.
-                return .zero
+                answer = .zero
+            } else {
+                answer = LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
             }
-            return LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
+            nativeMeasureCheckpoint = (WinUILayoutDiagnostics.checkpoint(), proposal, answer, hasSwiftAllocation)
+            return answer
         }
     }
 
@@ -680,6 +696,7 @@ class WinUILayoutView: WinUIView {
     /// Answers WinUI's arrange: places the box and every child in `width` by `height` DIPs, inside the pass.
     func arrange(width: Double, height: Double) {
         let bounds = Self.nativeRect(Rect(0, 0, width, height))
+        nativeArrangeCheckpoint = (WinUILayoutDiagnostics.checkpoint(), bounds, isNativeArranging)
         let nativeRoomChanged = !isNativeArranging && placingLayout == nil
             && allocatedBounds.width > 0 && allocatedBounds.height > 0
             && (allocatedBounds.width != bounds.width || allocatedBounds.height != bounds.height)

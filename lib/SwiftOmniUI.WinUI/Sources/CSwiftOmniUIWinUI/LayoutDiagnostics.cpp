@@ -20,6 +20,7 @@ namespace swiftomniui {
             std::array<std::string, capacity> recent;
             std::deque<std::string> states;
             std::deque<std::string> presentations;
+            std::deque<std::string> allocations;
             size_t next = 0;
             uint64_t sequence = 0;
             ULONGLONG started = GetTickCount64();
@@ -47,7 +48,7 @@ namespace swiftomniui {
                              static_cast<unsigned long>(GetCurrentProcessId()));
                 std::fflush(stderr);
                 if (file) {
-                    std::fprintf(file, "SOUI layout diagnostics v11 pid=%lu; sizes in DIPs; no input text\n",
+                    std::fprintf(file, "SOUI layout diagnostics v12 pid=%lu; sizes in DIPs; no input text\n",
                                  static_cast<unsigned long>(GetCurrentProcessId()));
                     std::fflush(file);
                     snapshotTimer = CreateThreadpoolTimer([](PTP_CALLBACK_INSTANCE, void *context, PTP_TIMER) {
@@ -90,6 +91,8 @@ namespace swiftomniui {
                 for (auto const &state : states) std::fprintf(file, "%s\n", state.c_str());
                 std::fprintf(file, "--- pane, editor and picker presentation history ---\n");
                 for (auto const &state : presentations) std::fprintf(file, "%s\n", state.c_str());
+                std::fprintf(file, "--- submitted allocation divergences ---\n");
+                for (auto const &state : allocations) std::fprintf(file, "%s\n", state.c_str());
                 auto count = static_cast<size_t>(std::min<uint64_t>(sequence, capacity));
                 auto begin = sequence < capacity ? size_t{0} : next;
                 std::fprintf(file, "--- recent %zu events ---\n", count);
@@ -122,6 +125,10 @@ namespace swiftomniui {
                 recent[next] = std::string(prefix) + (message ? message : "");
                 auto const &line = recent[next];
                 std::string_view event = message ? message : "";
+                if (event.substr(0, 20) == "allocation.diverged ") {
+                    if (allocations.size() == 128) allocations.pop_front();
+                    allocations.push_back(line);
+                }
                 if (event.substr(0, 6) == "split." || event.substr(0, 7) == "editor."
                     || event.substr(0, 7) == "picker." || event.substr(0, 8) == "runtime.") {
                     if (presentations.size() == 512) presentations.pop_front();

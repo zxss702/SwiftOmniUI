@@ -17,6 +17,23 @@ enum WinUILayoutDiagnostics {
     private static var sequence: UInt64 = 0
     private static var phases: [Phase] = []
 
+    /// Orders retained allocation checkpoints even when their detailed trace
+    /// events have left the bounded log. This never schedules layout work.
+    static func checkpoint() -> UInt64 {
+        sequence &+= 1
+        return sequence
+    }
+
+    static func allocationChain(from view: WinUIView) -> String {
+        var entries: [String] = []
+        var next: WinUIView? = view
+        while let current = next {
+            entries.append(current.allocationDiagnostic)
+            next = current.placingLayout
+        }
+        return entries.joined(separator: ";")
+    }
+
     static func begin(_ kind: String, view: WinUIView, _ details: String) -> UInt64 {
         sequence &+= 1
         let token = sequence

@@ -37,12 +37,9 @@ final class WinUITextEditorView: WinUIInputView {
     /// Observe both the submitted geometry and XAML's completed size delivery.
     /// Reading ancestors here does not measure, arrange or request another pass.
     func recordAllocation(_ event: String, frame: Rect, room: Rect) {
-        var ancestors: [String] = []
         var decorations: [String] = []
         var owner = placingLayout
         while let layout = owner {
-            let committed = layout.committedFrame.map(WinUILayoutDiagnostics.rect) ?? "uncommitted"
-            ancestors.append("\(layout.number):\(type(of: layout)):placed=\(WinUILayoutDiagnostics.rect(layout.placedFrame)),committed=\(committed),allocated=\(WinUILayoutDiagnostics.rect(layout.allocatedBounds)),native=\(WinUILayoutDiagnostics.rect(layout.laidOutFrame))")
             for item in layout.items where item.values.isLayoutDecoration {
                 let committed = item.view.committedFrame.map(WinUILayoutDiagnostics.rect) ?? "uncommitted"
                 decorations.append("\(item.view.number):allocated=\(committed),native=\(WinUILayoutDiagnostics.rect(item.view.laidOutFrame))")
@@ -51,7 +48,7 @@ final class WinUITextEditorView: WinUIInputView {
         }
         let height = swiftomniui_winui_editor_allocated_height(handle)
         WinUILayoutDiagnostics.record(event, view: self,
-            "frame=\(WinUILayoutDiagnostics.rect(frame)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) control=\(WinUILayoutDiagnostics.rect(controlFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize)) heightConstraint=\(height) ancestors=[\(ancestors.joined(separator: ";"))] decorations=[\(decorations.joined(separator: ";"))]")
+            "frame=\(WinUILayoutDiagnostics.rect(frame)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) control=\(WinUILayoutDiagnostics.rect(controlFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize)) heightConstraint=\(height) ancestors=[\(WinUILayoutDiagnostics.allocationChain(from: self))] decorations=[\(decorations.joined(separator: ";"))]")
     }
 
     /// Arithmetic queries must not change the live TextBox's native Measure
