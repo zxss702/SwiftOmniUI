@@ -44,6 +44,26 @@ class WinUIView {
     var safeAreaContext: SafeAreaContext? {
         didSet { if safeAreaContext != oldValue { safeAreaChanged() } }
     }
+    private(set) var isReceivingLayoutContext = false
+    private(set) var layoutContextRevision = 0
+
+    /// A parent supplies proposal-dependent regions as part of its current
+    /// plan. This is layout input, not another content/environment mutation.
+    func setLayoutContext(_ context: SafeAreaContext?) {
+        withLayoutContext { safeAreaContext = context }
+    }
+
+    func withLayoutContext<Result>(_ body: () -> Result) -> Result {
+        let previous = isReceivingLayoutContext
+        isReceivingLayoutContext = true
+        defer { isReceivingLayoutContext = previous }
+        return body()
+    }
+
+    func layoutContextChanged() {
+        layoutContextRevision &+= 1
+        (placingLayout as? WinUILazyView)?.rowMeasurementChanged(self)
+    }
     var rootSafeAreaContext: ((Rect) -> SafeAreaContext)?
 
     /// A native toolbar owns the widget, while the source modifier still owns
@@ -67,7 +87,7 @@ class WinUIView {
 
     func recordSafeBarPlace(_ place: Rect, context: SafeAreaContext) {
         placed = place
-        safeAreaContext = context
+        setLayoutContext(context)
         (nativeSafeBarOwner as? WinUISafeAreaBarHost)?.sourcePlaced(place)
         updateSafeBarDrawing()
     }
@@ -137,6 +157,18 @@ class WinUIView {
     /// Update document arithmetic before its presenter measures; native
     /// invalidations and margins are committed outside the layout pass.
     func safeAreaChanged() {}
+
+    private var nativeHeightChanged: (() -> Void)?
+    private var watchingNativeHeight = false
+
+    func watchNativeHeight(_ changed: @escaping () -> Void) {
+        nativeHeightChanged = changed
+        guard !watchingNativeHeight else { return }
+        watchingNativeHeight = true
+        swiftomniui_winui_on_height_changed(handle, number) { number in
+            MainActor.assumeIsolated { WinUIView.find(number)?.nativeHeightChanged?() }
+        }
+    }
 
     /// Toolbar controls share the title bar's transparent trigger appearance.
     var isToolbarControl = false
@@ -568,8 +600,8 @@ class WinUIView {
     func layout(_ place: Rect) {
         let moved = placed != place
         if nativeSafeBarOwner == nil, let placingLayout {
-            safeAreaContext = placingLayout.context(for: self, at: place)
-                .ignoring(sourceElement?.ignoresSafeArea)
+            setLayoutContext(placingLayout.context(for: self, at: place)
+                .ignoring(sourceElement?.ignoresSafeArea))
         }
         let resized = placed.map { $0.width != place.width || $0.height != place.height } ?? true
         if nativeSafeBarOwner == nil { placed = place }

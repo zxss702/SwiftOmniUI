@@ -149,6 +149,19 @@ extern "C" void swiftomniui_winui_invalidate_arrange(SwiftOmniUIObjectRef handle
     }
 }
 
+extern "C" void swiftomniui_winui_on_height_changed(
+    SwiftOmniUIObjectRef handle, int64_t view, void (*changed)(int64_t)
+) {
+    try {
+        as<xaml::FrameworkElement>(handle).SizeChanged(guarded("observing a native height",
+            [view, changed](IInspectable const &, xaml::SizeChangedEventArgs const &args) {
+                if (args.NewSize().Height != args.PreviousSize().Height) changed(view);
+            }));
+    } catch (...) {
+        report("observing a native height");
+    }
+}
+
 extern "C" void swiftomniui_winui_set_clip(
     SwiftOmniUIObjectRef handle, bool cuts, SwiftOmniUIOutline outline, double radius, double width, double height
 ) {

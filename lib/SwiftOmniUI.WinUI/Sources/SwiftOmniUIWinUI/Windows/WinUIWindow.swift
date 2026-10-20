@@ -60,6 +60,10 @@ final class WinUIWindow {
     init() {
         handle = swiftomniui_winui_window_make(titleBar.number)!
         swiftomniui_winui_window_set_chrome(handle, titleBar.handle, nil, nil)
+        let rows: [WinUIView] = [titleBar, menuBar, tabRow]
+        for row in rows {
+            row.watchNativeHeight { [weak self] in self?.refreshSafeAreaEnvironment() }
+        }
     }
 
     isolated deinit {
@@ -235,7 +239,8 @@ final class WinUIWindow {
 
     /// Shows `view` as the window's content - the first one activates the window, unless its scene hides it.
     func show(_ view: WinUIView?, present: Bool = true) {
-        if content !== view {
+        let changed = content !== view
+        if changed {
             content?.rootSafeAreaContext = nil
             view?.placingLayout = nil
             view?.safeAreaContext = nil
@@ -257,6 +262,7 @@ final class WinUIWindow {
                                    layout: bounds, container: bounds)
         }
         swiftomniui_winui_window_set_content(handle, view?.presentationHandle)
+        if changed { view?.safeAreaChanged() }
         if present { activateFirstTime() }
     }
 
@@ -327,6 +333,22 @@ final class WinUIWindow {
         swiftomniui_winui_window_set_chrome(
             handle, titleBarStands ? titleBar.handle : nil, menuBarStands ? menuBar.handle : nil,
             tabsStandInWindow ? tabRow.handle : nil)
+        refreshSafeAreaEnvironment()
+    }
+
+    private var safeAreaRefreshPending = false
+
+    /// Read the committed native rows after their structural change. A new
+    /// environment starts a pass even when the content's final size is equal.
+    private func refreshSafeAreaEnvironment() {
+        guard !safeAreaRefreshPending else { return }
+        safeAreaRefreshPending = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.safeAreaRefreshPending = false
+            guard !self.isClosed else { return }
+            self.content?.safeAreaChanged()
+        }
     }
 
     /// Shows `sheets` over everything the window shows, the last on top.

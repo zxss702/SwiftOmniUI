@@ -389,6 +389,9 @@ bool swiftomniui_winui_projection(SwiftOmniUIObjectRef element, double *matrix);
 /// Asks WinUI to arrange the element again - a place in the air lands only in a pass.
 void swiftomniui_winui_invalidate_arrange(SwiftOmniUIObjectRef element);
 
+/// Reports a changed committed native height, without measuring or flushing layout.
+void swiftomniui_winui_on_height_changed(SwiftOmniUIObjectRef element, int64_t view, void (*changed)(int64_t));
+
 /// Runs WinUI's layout pass over the element's tree now, as its next frame would.
 void swiftomniui_winui_update_layout(SwiftOmniUIObjectRef element);
 

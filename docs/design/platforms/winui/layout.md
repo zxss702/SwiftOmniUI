@@ -100,6 +100,16 @@ bounds, preserving edge distances and consumed insets. Native-owned content
 uses the actual column's allocation, including changes from sidebar toggles.
 Promoted bars retain their logical identity and native ownership dependency.
 
+A parent's selected safe-area projection is a plan input, not a content
+change. Selecting it discards dependent arithmetic and plans synchronously,
+without requesting another native Measure from the pass consuming it. Actual
+environment changes still request layout, including independent container and
+keyboard regions and chrome outside the local safe rectangle. Native chrome
+height changes publish that environment after the active pass. A SplitView's
+pane keeps its declared open width while closed; the native template clips
+the pane rather than measuring its content at zero and arranging it at the
+open width.
+
 Safe-area arithmetic preserves exact zero contributions at fractional origins.
 Consumed outsets compare original endpoints, and fully contained intervals
 retain their original extents. A region covering a whole child axis uses that

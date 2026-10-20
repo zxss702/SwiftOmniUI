@@ -174,12 +174,17 @@ final class WinUIScrollView: WinUILayoutView {
         let consumed = context.consumed + insets
         if document.consumedInsets != consumed {
             document.consumedInsets = consumed
-            document.invalidateArrange()
+            document.layoutContextChanged()
+            document.forgetMeasurements()
         }
         let padding = SafeAreaArithmetic.physicalInsets(writtenPadding, direction: direction) + insets
         if document.layoutPadding != padding {
             document.layoutPadding = padding
-            document.invalidateOwnMeasurements()
+            // Resolved padding belongs to this proposal. Commit its native
+            // contribution once after layout; selecting another plan must not
+            // dirty an ancestor that is still measuring or arranging us.
+            document.layoutContextChanged()
+            document.forgetMeasurements()
             wrapper.forgetMeasurements()
         }
         if barsInsets != insets || document.padding != padding { pendingInsets = insets }

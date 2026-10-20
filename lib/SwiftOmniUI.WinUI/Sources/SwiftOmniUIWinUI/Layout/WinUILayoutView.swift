@@ -34,19 +34,21 @@ class WinUILayoutView: WinUIView {
         weak var view: WinUIView?
         let revision: Int
         let hierarchy: Int
+        let context: Int
         let attached: Bool
 
         init(_ view: WinUIView) {
             self.view = view
             revision = view.parentMeasurementRevision
             hierarchy = view.hierarchyRevision
+            context = view.layoutContextRevision
             attached = view.isAttached
         }
 
         var isCurrent: Bool {
             guard let view, !view.isDetached else { return false }
             return revision == view.parentMeasurementRevision && hierarchy == view.hierarchyRevision
-                && attached == view.isAttached
+                && context == view.layoutContextRevision && attached == view.isAttached
         }
     }
 
@@ -602,7 +604,7 @@ class WinUILayoutView: WinUIView {
             // page. Its actual XAML owner alone selects the native proposal.
             guard view.nativeSafeBarOwner == nil || view.nativeSafeBarOwner === self else { continue }
             if view.nativeSafeBarOwner == nil {
-                view.safeAreaContext = context(for: view, at: proposal.place).ignoring(view.sourceElement?.ignoresSafeArea)
+                view.setLayoutContext(context(for: view, at: proposal.place).ignoring(view.sourceElement?.ignoresSafeArea))
             }
             let room = view.wordsRoom ?? proposal.place
             if preparation == .allocation {
@@ -735,7 +737,9 @@ class WinUILayoutView: WinUIView {
     func backgroundBounds(in bounds: Rect) -> Rect { bounds }
 
     private struct SafeAreaInput: Equatable {
-        let insets: EdgeInsets
+        let bounds: EdgeInsets
+        let container: EdgeInsets
+        let keyboard: EdgeInsets
         let consumed: EdgeInsets
     }
     private var lastSafeAreaInput: SafeAreaInput?
@@ -749,12 +753,31 @@ class WinUILayoutView: WinUIView {
         // allocatedBounds still describes the previous Arrange. Allocation size
         // is already a measurement proposal; only changed insets invalidate it.
         let context = layoutSafeArea(in: safeAreaContext?.layout ?? allocatedBounds)
-        let input = SafeAreaInput(insets: SafeAreaContext.insets(of: context.safe, in: context.layout),
-                                  consumed: context.consumed)
+        func edges(_ region: Rect) -> EdgeInsets {
+            let layout = context.layout
+            return EdgeInsets(top: region.y - layout.y, leading: region.x - layout.x,
+                              bottom: (region.y + region.height) - (layout.y + layout.height),
+                              trailing: (region.x + region.width) - (layout.x + layout.width))
+        }
+        // Keep outside strips and the two independent regions as inputs too.
+        // A native title bar can change its contribution while the local safe
+        // rectangle and its remaining insets are unchanged.
+        let input = SafeAreaInput(bounds: edges(context.bounds), container: edges(context.container),
+                                  keyboard: edges(context.keyboard), consumed: context.consumed)
         guard input != lastSafeAreaInput else { return }
         WinUILayoutDiagnostics.record("safeArea.changed", view: self,
             "layout=\(WinUILayoutDiagnostics.rect(context.layout)) bounds=\(WinUILayoutDiagnostics.rect(context.bounds)) safe=\(WinUILayoutDiagnostics.rect(context.safe)) previous=\(String(describing: lastSafeAreaInput)) next=\(input)")
         lastSafeAreaInput = input
+        layoutContextChanged()
+        // Different native proposals can project the same environment to
+        // different insets (a closed SplitView pane is measured at width 0).
+        // The selecting parent consumes this input synchronously. Re-requesting
+        // native Measure here would alternate with its actual Arrange slot.
+        if isReceivingLayoutContext {
+            forgetMeasurements()
+            measured = nil
+            return
+        }
         invalidateMeasure()
         invalidateArrange()
     }

@@ -214,7 +214,10 @@ final class WinUISplitView: WinUILayoutView {
         super.safeAreaChanged()
         // Native pages have no `placingLayout` to receive the usual context
         // assignment. Their root closures read the new region on arrangement.
-        for page in pages { page.view.safeAreaChanged() }
+        for page in pages {
+            if isReceivingLayoutContext { page.view.withLayoutContext { page.view.safeAreaChanged() } }
+            else { page.view.safeAreaChanged() }
+        }
     }
 
     private func release(_ page: WinUIView) {

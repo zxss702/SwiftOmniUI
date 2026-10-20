@@ -62,7 +62,10 @@ final class WinUINavigationView: WinUILayoutView {
 
     override func safeAreaChanged() {
         super.safeAreaChanged()
-        items.last?.view.safeAreaChanged()
+        if let page = items.last?.view {
+            if isReceivingLayoutContext { page.withLayoutContext { page.safeAreaChanged() } }
+            else { page.safeAreaChanged() }
+        }
     }
 
     private func release(_ page: WinUIView) {
