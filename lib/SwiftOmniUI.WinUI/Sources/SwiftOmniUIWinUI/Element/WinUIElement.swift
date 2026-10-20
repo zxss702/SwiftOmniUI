@@ -183,6 +183,12 @@ final class WinUIElement: NativeElement {
         applyProperties(changed: changed)
         if let view, let host { element.applyDrawnChildren(to: view, through: WinUIRegistrations.registry, in: host.runtime) }
         configureGestures()
+        if let label = view as? WinUITextView {
+            label.onTextLayout = element.value(TextContract.reportsLayout.token)?.bool == true ? { [weak self] report in
+                guard let self, let host = self.host else { return }
+                self.element.reportTextLayout(report, in: host.runtime)
+            } : nil
+        }
         view?.setFocusChanged(element.handler(.isFocusedChanged) == nil ? nil : { [weak self] focused in
             self?.send(.isFocusedChanged, [.bool(focused)])
         })

@@ -133,6 +133,9 @@ outline's width and SwiftOmniUI against the whole, so it is doubled.
 with several children remains inside its own group, so every layer in the mask
 contributes to its alpha. Only the content determines the container's intrinsic
 size; both groups are placed in its allocated room.
+The alpha group is a layout decoration: neither its intrinsic dimensions nor
+its expanding/scrolling axes participate in the source's layout request. GTK
+uses the same source-only measurement rule.
 
 WinUI redirects each complete visual subtree through a native
 `CompositionVisualSurface`. Two `CompositionSurfaceBrush` objects supply a

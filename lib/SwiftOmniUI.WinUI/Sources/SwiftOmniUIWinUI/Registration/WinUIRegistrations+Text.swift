@@ -10,6 +10,9 @@ extension WinUIRegistrations {
     static func text(_ registry: Registry<WinUIView>) {
         registry.add(TextContract.self, create: { _ in WinUILabelView() }) { label in
             label.applies(TextMembers.members) { view, values in applyText(view, values) }
+            label.property(TextContract.selectable) { view, selectable in
+                view.setSelectable(selectable ?? false)
+            }
             label.applies([TextContract.lineBreak, TextContract.lineLimit]) { view, values in
                 view.setLines(
                     breaking: values[TextContract.lineBreak] ?? .wordWrap,

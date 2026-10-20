@@ -31,6 +31,9 @@ public enum GridContract: ElementContract {
     /// first, an `.adaptive` one standing for as many as fit.
     public static let flowColumns = ElementProperty<Self, [GridItem]>("flowColumns", layer: .stateUI)
 
+    /// SwiftUI GridRow grids fit their implicit tracks to cell content.
+    public static let contentSizedTracks = ElementProperty<Self, Bool>("contentSizedTracks", layer: .stateUI)
+
     /// The element's own members.
-    public static let members: [any ContractMember] = [columnSpacing, columns, flowColumns, rowSpacing, rows]
+    public static let members: [any ContractMember] = [columnSpacing, columns, flowColumns, rowSpacing, rows, contentSizedTracks]
 }

@@ -7,6 +7,20 @@
 /// A Grid: the core's grid arithmetic over a panel.
 @MainActor
 final class GTKGridView: GTKTravellingLayout {
+    var contentSizedTracks = false {
+        didSet { if contentSizedTracks != oldValue { invalidateMeasurements() } }
+    }
+    private var implicitRows: [GridLength] {
+        guard contentSizedTracks, rows.isEmpty else { return rows }
+        let count = max(1, items.map { $0.values.row + $0.values.rowSpan }.max() ?? 1)
+        return Array(repeating: .auto, count: count)
+    }
+    private var implicitColumns: [GridLength] {
+        guard contentSizedTracks, columns.isEmpty else { return columns }
+        let count = max(1, items.map { $0.values.column + $0.values.columnSpan }.max() ?? 1)
+        return Array(repeating: .auto, count: count)
+    }
+
     var rows: [GridLength] = [] {
         didSet { if rows != oldValue { invalidateMeasurements() } }
     }
@@ -45,7 +59,7 @@ final class GTKGridView: GTKTravellingLayout {
     override func contentSize(width: Double?) -> LayoutSize {
         if sourceElement?.isGeometryReader == true { return GeometryReaderArithmetic.size(width: width) }
         return GridArithmetic.size(
-            of: items, rows: rows, columns: columns,
+            of: items, rows: implicitRows, columns: implicitColumns,
             rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, width: width,
             flow: flowColumns)
     }
@@ -71,7 +85,7 @@ final class GTKGridView: GTKTravellingLayout {
             return
         }
         let places = GridArithmetic.places(
-            of: items, rows: rows, columns: columns,
+            of: items, rows: implicitRows, columns: implicitColumns,
             rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, in: bounds,
             direction: direction, flow: flowColumns)
         for (item, place) in zip(items, places) {

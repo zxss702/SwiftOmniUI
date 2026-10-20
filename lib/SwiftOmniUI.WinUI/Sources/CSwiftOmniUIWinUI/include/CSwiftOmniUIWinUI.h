@@ -469,6 +469,9 @@ void swiftomniui_winui_set_padding(SwiftOmniUIObjectRef element, double left, do
 void swiftomniui_winui_text_style(SwiftOmniUIObjectRef element, double *style);
 
 SwiftOmniUIObjectRef swiftomniui_winui_text_make(void);
+void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef element, int32_t style);
+void swiftomniui_winui_text_set_selectable(SwiftOmniUIObjectRef element, bool selectable);
+int32_t swiftomniui_winui_text_character_rects(SwiftOmniUIObjectRef element, double *rectangles, int32_t capacity);
 
 /// Native attachment completes the label's pre-attachment measurement. The
 /// callback names the live view; no native handler retains a Swift object.

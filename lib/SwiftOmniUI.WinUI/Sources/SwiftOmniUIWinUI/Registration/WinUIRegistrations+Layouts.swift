@@ -22,11 +22,12 @@ extension WinUIRegistrations {
 
         registry.add(GridContract.self, create: { _ in WinUIGridView() }) { grid in
             grid.applies([
-                GridContract.rows, GridContract.columns,
+                GridContract.rows, GridContract.columns, GridContract.contentSizedTracks,
                 GridContract.rowSpacing, GridContract.columnSpacing,
                 GridContract.flowColumns,
                 PaddingElementContract.contentPadding,
             ]) { view, values in
+                view.contentSizedTracks = values[GridContract.contentSizedTracks] ?? false
                 view.rows = values[GridContract.rows] ?? []
                 view.columns = values[GridContract.columns] ?? []
                 view.flowColumns = values[GridContract.flowColumns] ?? []

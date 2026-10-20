@@ -147,6 +147,8 @@ extension Text {
         public struct RunSlice: Equatable, Sendable {
             /// Where the slice stands.
             public let typographicBounds: TypographicBounds
+            /// The source grapheme, when the native typesetter reports it.
+            public let text: String?
         }
 
         /// Where the first line stands.
@@ -161,7 +163,7 @@ extension Text {
         /// Two layouts agree when they were folded of the same report's
         /// generation - the box standing behind them reads live either way.
         public static func == (lhs: Layout, rhs: Layout) -> Bool {
-            lhs.version == rhs.version
+            lhs.box === rhs.box && lhs.version == rhs.version
         }
     }
 

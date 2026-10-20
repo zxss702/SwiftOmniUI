@@ -24,6 +24,11 @@ final class GTKMaskedView: GTKZStackView {
         return super.setItems(items)
     }
 
+    override func contentSize(width: Double?) -> LayoutSize {
+        ZStackArithmetic.size(of: Array(items.filter { !$0.departing }.prefix(1)),
+                              padding: padding, width: width)
+    }
+
     /// The content under the mask's alpha: the mask rendered into the mask
     /// slot, the children into the source - the mask's own widget skipped in
     /// that pass.

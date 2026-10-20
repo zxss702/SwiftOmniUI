@@ -177,7 +177,11 @@ private struct PreferenceBacked<K: PreferenceKey, Base: View, Content: View>: Vi
     }
 
     var body: some View {
-        let heard = base.onPreferenceChange(K.self) { value = $0 }
+        let heard = base.revised { node in
+            if ObjectIdentifier(K.self) == ObjectIdentifier(Text.LayoutKey.self) {
+                node.writeInherited(TextContract.reportsLayout, true)
+            }
+        }.onPreferenceChange(K.self) { value = $0 }
         return Group {
             if over {
                 heard.overlay { transform(value) }

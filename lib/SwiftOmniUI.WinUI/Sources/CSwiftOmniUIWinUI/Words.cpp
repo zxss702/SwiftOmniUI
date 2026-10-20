@@ -19,11 +19,37 @@
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Text.h>
 #include <winrt/Microsoft.UI.Text.h>
+#include <winrt/Microsoft.UI.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Documents.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 
 using namespace swiftomniui;
 namespace media = winrt::Microsoft::UI::Xaml::Media;
+namespace documents = winrt::Microsoft::UI::Xaml::Documents;
+
+extern "C" void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef handle, int32_t style) {
+    try {
+        using winrt::Microsoft::UI::Input::InputSystemCursorShape;
+        auto element = as<xaml::UIElement>(handle).as<xaml::IUIElementProtected>();
+        if (style < 0) { element.ProtectedCursor(nullptr); return; }
+        auto shape = InputSystemCursorShape::Arrow;
+        switch (style) {
+        case 1: case 2: case 3: case 11: shape = InputSystemCursorShape::IBeam; break;
+        case 4: case 5: case 6: case 7: case 8: shape = InputSystemCursorShape::Hand; break;
+        case 9: shape = InputSystemCursorShape::UniversalNo; break;
+        case 10: shape = InputSystemCursorShape::Cross; break;
+        case 12: shape = InputSystemCursorShape::SizeWestEast; break;
+        case 13: shape = InputSystemCursorShape::SizeNorthSouth; break;
+        case 14: shape = InputSystemCursorShape::SizeNorthwestSoutheast; break;
+        }
+        element.ProtectedCursor(winrt::Microsoft::UI::Input::InputSystemCursor::Create(shape));
+    } catch (...) { report("pointer style"); }
+}
+
+extern "C" void swiftomniui_winui_text_set_selectable(SwiftOmniUIObjectRef handle, bool selectable) {
+    try { labelWords(handle).IsTextSelectionEnabled(selectable); }
+    catch (...) { report("text selectable"); }
+}
 
 namespace {
     uint64_t fontProbes = 0;
@@ -523,4 +549,38 @@ extern "C" void swiftomniui_winui_text_style(SwiftOmniUIObjectRef handle, double
     } catch (...) {
         report("reading how words look");
     }
+}
+
+extern "C" int32_t swiftomniui_winui_text_character_rects(
+    SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity
+) {
+    try {
+        auto block = labelWords(handle);
+        int32_t at = 0;
+        auto append = [&](documents::TextPointer const &start, std::wstring_view string) {
+            for (int32_t i = 0; i < static_cast<int32_t>(string.size()) && at < capacity; ++i, ++at) {
+                auto position = start.GetPositionAtOffset(i, documents::LogicalDirection::Forward);
+                auto rect = position.GetCharacterRect(documents::LogicalDirection::Forward);
+                rectangles[at * 4] = rect.X;
+                rectangles[at * 4 + 1] = rect.Y;
+                rectangles[at * 4 + 2] = rect.Width;
+                rectangles[at * 4 + 3] = rect.Height;
+            }
+        };
+        if (block.Inlines().Size() == 0) {
+            auto words = block.Text();
+            append(block.ContentStart(), std::wstring_view(words.c_str(), words.size()));
+        } else {
+            for (auto const &inlineValue : block.Inlines()) {
+                if (auto run = inlineValue.try_as<documents::Run>()) {
+                    auto words = run.Text();
+                    append(run.ContentStart(), std::wstring_view(words.c_str(), words.size()));
+                } else {
+                    // Embedded glyphs occupy one replacement character.
+                    append(inlineValue.ContentStart(), L"\uFFFC");
+                }
+            }
+        }
+        return at;
+    } catch (...) { report("reading native text geometry"); return 0; }
 }

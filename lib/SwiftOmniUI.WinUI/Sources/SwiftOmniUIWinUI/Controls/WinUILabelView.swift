@@ -42,6 +42,7 @@ final class WinUILabelView: WinUITextView {
         guard self.runs != runs || (runs != nil && spacingChanged) else { return }
         let paintOnly = !spacingChanged && Self.onlyRunPaintChanged(from: self.runs, to: runs)
         self.runs = runs
+        invalidateTextLayout()
         runsFontSize = look.size
         runsLetterSpacing = look.letterSpacing
         guard let runs else {

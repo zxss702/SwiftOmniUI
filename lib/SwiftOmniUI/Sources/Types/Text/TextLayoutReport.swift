@@ -41,13 +41,17 @@ public struct TextLayoutReport: Equatable, Sendable {
         /// The run's glyph slices - each cluster's rectangle.
         public let slices: [Rect]
 
+        /// Graphemes occupying the corresponding native selection rectangles.
+        public let sliceTexts: [String]
+
         /// A run of `rect`, reading `direction`, laying out `span`, its glyphs
         /// at `slices`.
-        public init(rect: Rect, direction: LayoutDirection, span: Int, slices: [Rect]) {
+        public init(rect: Rect, direction: LayoutDirection, span: Int, slices: [Rect], sliceTexts: [String] = []) {
             self.rect = rect
             self.direction = direction
             self.span = span
             self.slices = slices
+            self.sliceTexts = sliceTexts
         }
     }
 
@@ -78,6 +82,7 @@ extension TextLayoutReport: HostRepresentable {
                         .number(Double(run.direction.rawValue)),
                         .number(Double(run.span)),
                         .values(run.slices.map(\.propValue)),
+                        .strings(run.sliceTexts),
                     ])
                 }),
             ])
@@ -96,7 +101,7 @@ extension TextLayoutReport: HostRepresentable {
 
             var runs: [Run] = []
             for runValue in runValues {
-                guard let runParts = runValue.values, runParts.count == 4,
+                guard let runParts = runValue.values, runParts.count >= 4,
                       let runRect = Rect(propValue: runParts[0]),
                       let rawDirection = runParts[1].number,
                       let direction = LayoutDirection(rawValue: Int32(rawDirection)),
@@ -108,7 +113,8 @@ extension TextLayoutReport: HostRepresentable {
                     guard let slice = Rect(propValue: sliceValue) else { return nil }
                     slices.append(slice)
                 }
-                runs.append(Run(rect: runRect, direction: direction, span: Int(span), slices: slices))
+                let texts = runParts.count > 4 ? runParts[4].strings ?? [] : []
+                runs.append(Run(rect: runRect, direction: direction, span: Int(span), slices: slices, sliceTexts: texts))
             }
             lines.append(Line(rect: rect, runs: runs))
         }

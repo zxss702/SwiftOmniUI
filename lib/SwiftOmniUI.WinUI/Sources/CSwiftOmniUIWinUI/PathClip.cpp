@@ -3,6 +3,7 @@
 
 #include "Relay.h"
 #include "CompositionClips.h"
+#include "PathGeometry.h"
 #include <d2d1_1.h>
 #include <windows.graphics.interop.h>
 #include <winrt/Windows.Graphics.h>
@@ -94,6 +95,18 @@ namespace {
     };
 }
 
+namespace swiftomniui {
+    ID2D1Factory *pathFactory() { return factory(); }
+
+    winrt::com_ptr<ID2D1PathGeometry> pathGeometry(double const *commands, int32_t count, bool evenOdd) {
+        return geometry(commands, count, evenOdd);
+    }
+
+    composition::CompositionPath compositionPath(winrt::com_ptr<ID2D1Geometry> const &path, bool evenOdd) {
+        return composition::CompositionPath(winrt::make<GeometrySource>(path, evenOdd));
+    }
+}
+
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_path_clip_make(SwiftOmniUIObjectRef element) {
     try {
         auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(as<xaml::UIElement>(element));
@@ -105,9 +118,9 @@ extern "C" void swiftomniui_winui_path_clip_update(
     SwiftOmniUIObjectRef clip, double const *commands, int32_t count, bool evenOdd
 ) {
     try {
-        auto source = winrt::make<GeometrySource>(geometry(commands, count, evenOdd).as<ID2D1Geometry>(), evenOdd);
+        auto source = compositionPath(pathGeometry(commands, count, evenOdd).as<ID2D1Geometry>(), evenOdd);
         as<composition::CompositionGeometricClip>(clip).Geometry().as<composition::CompositionPathGeometry>()
-            .Path(composition::CompositionPath(source));
+            .Path(source);
     } catch (...) { report("updating a path clip"); }
 }
 

@@ -217,6 +217,7 @@ extension View {
         source.producer = { content.asChildren }
         var alpha = Node(contract: ZStackContract.self)
         alpha.key = "mask"
+        alpha.props[.isLayoutDecoration] = true.propValue
         alpha.producer = { maskNode.asChildren }
         wrapper.producer = { [source, alpha] }
         return ModifiedContent(node: wrapper)

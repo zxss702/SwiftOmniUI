@@ -99,6 +99,31 @@ class GTKTextView: GTKView {
         gtk_label_set_selectable(widget.opaque, selectable ? 1 : 0)
     }
 
+    var onTextLayout: ((TextLayoutReport) -> Void)?
+
+    func publishTextLayout() {
+        guard let onTextLayout, let layout = gtk_label_get_layout(widget.opaque) else { return }
+        var originX: Int32 = 0, originY: Int32 = 0
+        gtk_label_get_layout_offsets(widget.opaque, &originX, &originY)
+        var byteOffset: Int32 = 0
+        var glyphs: [NativeTextLayout.Glyph] = []
+        for character in text {
+            let string = String(character)
+            var native = PangoRectangle()
+            pango_layout_index_to_pos(layout, byteOffset, &native)
+            var line: Int32 = 0, x: Int32 = 0
+            pango_layout_index_to_line_x(layout, byteOffset, 0, &line, &x)
+            let scale = Double(PANGO_SCALE)
+            let rect = Rect(Double(originX) + Double(min(native.x, native.x + native.width)) / scale,
+                            Double(originY) + Double(native.y) / scale,
+                            Double(abs(native.width)) / scale, Double(native.height) / scale)
+            glyphs.append(.init(text: string, rect: rect, line: Int(line),
+                                direction: native.width < 0 ? .rightToLeft : .leftToRight))
+            byteOffset += Int32(string.utf8.count)
+        }
+        onTextLayout(NativeTextLayout.report(glyphs))
+    }
+
     /// Where the lines stand across the label: from its leading edge, in its middle, or at its trailing edge.
     func setAlignment(horizontal: TextAlignment) {
         let (share, justification): (Float, GtkJustification) = switch horizontal {

@@ -18,6 +18,11 @@ for as long as the list stands. WinUI's container cannot refuse to be chosen,
 so a header or a footer can be: such a choice is not the user's, and the
 list shows the tree's choice again; opening one is heard by nobody.
 
+Headers, footers, and content-only rows with neither selection nor invocation
+do not draw container hover/pressed feedback. Their native ItemContainer theme
+brushes are transparent; descendants keep their own pointer interaction.
+Changing the selection/invocation mode restores the template's theme brushes.
+
 A list is a vertical `StackLayout`, a row a horizontal one, `spacing` apart,
 and a grid a `UniformGridLayout` of items at least the narrowest width,
 `spacing` apart both ways, stretched to share the width. WinUI's lists know

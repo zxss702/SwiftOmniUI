@@ -40,6 +40,7 @@ enum GTKPictures {
 
     /// The file `name` names (`PictureArithmetic.files`): a PNG the folder holds as an SVG is the SVG. Nil for none.
     static func path(of name: String) -> String? {
+        if name.hasPrefix("/"), g_file_test(name, G_FILE_TEST_IS_REGULAR) != 0 { return name }
         let files = PictureArithmetic.files(for: name)
         return folders.lazy.flatMap { folder in files.map { folder + "/" + $0 } }
             .first { g_file_test($0, G_FILE_TEST_IS_REGULAR) != 0 }

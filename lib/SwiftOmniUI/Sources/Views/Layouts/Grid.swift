@@ -132,6 +132,7 @@ public struct Grid: LayoutView, GridProperties {
         node = Node(contract: GridContract.self)
         if let horizontalSpacing { node.write(GridContract.columnSpacing, horizontalSpacing) }
         if let verticalSpacing { node.write(GridContract.rowSpacing, verticalSpacing) }
+        node.write(GridContract.contentSizedTracks, true)
         node.producer = { Self.cells(of: content().node.asChildren, alignment: alignment) }
     }
 

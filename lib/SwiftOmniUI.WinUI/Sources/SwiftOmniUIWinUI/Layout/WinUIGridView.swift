@@ -7,6 +7,20 @@
 /// A Grid: the core's grid arithmetic over the relay's panel.
 @MainActor
 final class WinUIGridView: WinUITravellingLayout {
+    var contentSizedTracks = false {
+        didSet { if contentSizedTracks != oldValue { invalidateMeasurements() } }
+    }
+    private var implicitRows: [GridLength] {
+        guard contentSizedTracks, rows.isEmpty else { return rows }
+        let count = max(1, items.map { $0.values.row + $0.values.rowSpan }.max() ?? 1)
+        return Array(repeating: .auto, count: count)
+    }
+    private var implicitColumns: [GridLength] {
+        guard contentSizedTracks, columns.isEmpty else { return columns }
+        let count = max(1, items.map { $0.values.column + $0.values.columnSpan }.max() ?? 1)
+        return Array(repeating: .auto, count: count)
+    }
+
     var rows: [GridLength] = [] {
         didSet { if rows != oldValue { invalidateMeasurements() } }
     }
@@ -57,7 +71,7 @@ final class WinUIGridView: WinUITravellingLayout {
 
     private func queriedSize(width: Double?) -> LayoutSize {
         if sourceElement?.isGeometryReader == true { return GeometryReaderArithmetic.size(width: width) }
-        return GridArithmetic.size(of: items, rows: rows, columns: columns,
+        return GridArithmetic.size(of: items, rows: implicitRows, columns: implicitColumns,
                                    rowSpacing: rowSpacing, columnSpacing: columnSpacing,
                                    padding: padding, width: width, flow: flowColumns)
     }
@@ -88,7 +102,7 @@ final class WinUIGridView: WinUITravellingLayout {
             }
         }
         return GridArithmetic.places(
-            of: items, rows: rows, columns: columns,
+            of: items, rows: implicitRows, columns: implicitColumns,
             rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, in: bounds,
             direction: direction, flow: flowColumns)
     }

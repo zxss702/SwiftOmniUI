@@ -107,6 +107,27 @@ extension GTKElement {
             case .blur: view.setBlur(value(.blur)?.number ?? 0)
             case .isEnabled: view.setEnabled(value(.isEnabled)?.bool ?? true)
             case .isVisible: view.setShown(isShown)
+            case .pointerStyle:
+                let style = value(.pointerStyle)?.enumeration.flatMap(PointerStyle.init(rawValue:))
+                let name: String? = style.map {
+                    switch $0 {
+                    case .default: "default"
+                    case .text, .horizontalText, .alertText: "text"
+                    case .verticalText: "vertical-text"
+                    case .link: "pointer"
+                    case .grabIdle: "grab"
+                    case .grabActive: "grabbing"
+                    case .dragCopy: "copy"
+                    case .dragLink: "alias"
+                    case .operationNotAllowed: "not-allowed"
+                    case .rectangleSelection: "crosshair"
+                    case .columnResize: "col-resize"
+                    case .rowResize: "row-resize"
+                    case .frameResize: "nwse-resize"
+                    }
+                }
+                if let name { gtk_widget_set_cursor_from_name(view.widget, name) }
+                else { gtk_widget_set_cursor(view.widget, nil) }
             case .hint:
                 value(.hint)?.string?.withCString { gtk_widget_set_tooltip_text(view.widget, $0) }
                     ?? gtk_widget_set_tooltip_text(view.widget, nil)

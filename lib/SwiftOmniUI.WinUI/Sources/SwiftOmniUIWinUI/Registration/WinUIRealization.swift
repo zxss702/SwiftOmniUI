@@ -65,8 +65,7 @@ enum WinUIRealization {
             missing: "WinUI's items name no text baseline: the baseline guides land on edges; the rest align."),
         .partial("View", "verticalGuide",
             missing: "WinUI's items name no text baseline: the baseline guides land on edges; the rest align."),
-        .notPlanned("View", "pointerStyle",
-            reason: "WinUI's ProtectedCursor is not wired to elements yet."),
+        .complete("View", "pointerStyle"),
 
         // MARK: Entries - a control's or a part's own
         .unrealized("ActivityIndicator", "ignoresInput", why: hitOnlyWherePainted),

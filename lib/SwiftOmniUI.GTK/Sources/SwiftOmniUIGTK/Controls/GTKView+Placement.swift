@@ -33,6 +33,7 @@ extension GTKView {
         gtk_widget_measure(widget, GTK_ORIENTATION_VERTICAL, width, &least, &natural, nil, nil)
         let height = max(least, Int32(room.height.rounded()))
         gtk_widget_allocate(widget, width, height, -1, allocation(at: place, width: Double(width), height: Double(height)))
+        (self as? GTKTextView)?.publishTextLayout()
     }
 
     /// Moves, turns and scales the view where its layout put it; drawn in the layout's next allocation.

@@ -333,13 +333,22 @@ namespace {
     }
 }
 
+namespace {
+    bool absolutePicture(std::wstring const &file) {
+        return file.size() > 1 && (file[1] == L':' || file[0] == L'/' || file[0] == L'\\');
+    }
+    std::wstring picturePath(std::wstring const &file) {
+        return absolutePicture(file) ? file : pictures() + file;
+    }
+}
+
 std::wstring swiftomniui::pictureFile(char const *names) {
     std::string_view left(names ? names : "");
     while (!left.empty()) {
         auto end = left.find('\n');
         auto name = left.substr(0, end);
         std::wstring each(winrt::to_hstring(name).c_str());
-        if (!each.empty() && exists(pictures() + each)) return each;
+        if (!each.empty() && exists(picturePath(each))) return each;
         if (end == std::string_view::npos) break;
         left.remove_prefix(end + 1);
     }
@@ -347,7 +356,7 @@ std::wstring swiftomniui::pictureFile(char const *names) {
 }
 
 xaml::Media::ImageSource swiftomniui::pictureSource(std::wstring const &file) {
-    auto path = pictures() + file;
+    auto path = picturePath(file);
     auto dot = file.find_last_of(L'.');
     if (dot != std::wstring::npos && file.substr(dot) == L".svg") return svgSource(path);
     return bitmapSource(path);
@@ -376,7 +385,7 @@ extern "C" bool swiftomniui_winui_picture_pixels(
         auto file = pictureFile(listed.c_str());
         if (file.empty()) return false;
         if (auto dot = file.find_last_of(L'.'); dot != std::wstring::npos && file.substr(dot) == L".svg") {
-            auto source = svgSource(pictures() + file);
+            auto source = svgSource(picturePath(file));
             size[0] = source.PixelWidth();
             size[1] = source.PixelHeight();
             auto bytes = static_cast<int64_t>(size[0]) * size[1] * 4;
@@ -391,7 +400,7 @@ extern "C" bool swiftomniui_winui_picture_pixels(
             }
             return true;
         }
-        auto found = decodedPixels(pictures() + file);
+        auto found = decodedPixels(picturePath(file));
         if (!found) return false;
         size[0] = static_cast<int32_t>(found->width);
         size[1] = static_cast<int32_t>(found->height);
@@ -565,7 +574,7 @@ extern "C" bool swiftomniui_winui_image_set(
             state->size = {};
             return !named;
         }
-        auto path = pictures() + file;
+        auto path = picturePath(file);
         auto dot = file.find_last_of(L'.');
         auto extension = dot == std::wstring::npos ? std::wstring() : file.substr(dot);
         if (extension != L".svg") {

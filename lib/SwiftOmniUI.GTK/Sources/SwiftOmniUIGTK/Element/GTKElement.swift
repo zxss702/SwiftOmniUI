@@ -63,6 +63,12 @@ final class GTKElement: NativeElement {
             self?.send(.isFocusedChanged, [.bool(focused)])
         })
         configureGestures()
+        if let label = view as? GTKTextView {
+            label.onTextLayout = element.value(TextContract.reportsLayout.token)?.bool == true ? { [weak self] report in
+                guard let self, let host = self.host else { return }
+                self.element.reportTextLayout(report, in: host.runtime)
+            } : nil
+        }
         configureLayoutMotion()
         arrangeChildren()
         arrangePages(changed: changed)

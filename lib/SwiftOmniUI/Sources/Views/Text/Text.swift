@@ -260,8 +260,9 @@ extension TextLayoutBox {
                     Text.Layout.Run(
                         typographicBounds: TypographicBounds(rect: run.rect),
                         layoutDirection: run.direction,
-                        slices: run.slices.map {
-                            Text.Layout.RunSlice(typographicBounds: TypographicBounds(rect: $0))
+                        slices: run.slices.enumerated().map { index, rect in
+                            Text.Layout.RunSlice(typographicBounds: TypographicBounds(rect: rect),
+                                                 text: index < run.sliceTexts.count ? run.sliceTexts[index] : nil)
                         },
                         attributes: attributes)
                 })

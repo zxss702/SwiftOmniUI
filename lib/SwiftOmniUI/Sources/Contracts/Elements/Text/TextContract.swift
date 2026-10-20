@@ -29,6 +29,10 @@ public enum TextContract: ElementContract {
     public static let selectable = ElementProperty<Self, Bool>(
         "selectable", layer: .native, cleared: false)
 
+    /// A subtree reading Text.LayoutKey asks its native labels for geometry.
+    public static let reportsLayout = ElementProperty<Self, Bool>(
+        "reportsTextLayout", layer: .native, cleared: false)
+
     /// The fraction of its size the text may shrink to before it is cut;
     /// `.minimumScaleFactor` writes it.
     public static let minimumScaleFactor = ElementProperty<Self, Double>(
@@ -53,6 +57,6 @@ public enum TextContract: ElementContract {
 
     /// The element's own members.
     public static let members: [any ContractMember] = [
-        lineBreak, lineLimit, minimumScaleFactor, selectable, textRenderer,
+        lineBreak, lineLimit, minimumScaleFactor, selectable, reportsLayout, textRenderer,
         textLayoutChanged, textFrameChanged]
 }

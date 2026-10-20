@@ -1,137 +1,125 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-// The six shapes, each one WinUI Path in a figure: a rectangle and an ellipse
-// filling their room, and a geometry of their own - a line, a path, a polygon,
-// a polyline - placed in it where Swift says.
-// Design: docs/design/platforms/winui/drawing.md#the-shapes
-
+// Vector drawing has no native intrinsic extent. Updating its geometry during
+// Arrange must not make XAML stop arranging the following content for Measure.
 #include "Figure.h"
+#include "PathGeometry.h"
 
 #include <algorithm>
 #include <cmath>
-
-#include <winrt/Microsoft.UI.Xaml.Media.h>
-#include <winrt/Microsoft.UI.Xaml.Shapes.h>
-#include <winrt/Microsoft.UI.Composition.h>
+#include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
+#include <winrt/Microsoft.UI.Xaml.Media.h>
 
 using namespace swiftomniui;
-using winrt::Windows::Foundation::Point;
-namespace media = winrt::Microsoft::UI::Xaml::Media;
-namespace shapes = winrt::Microsoft::UI::Xaml::Shapes;
+using winrt::Windows::Foundation::Size;
+namespace composition = winrt::Microsoft::UI::Composition;
+namespace peers = winrt::Microsoft::UI::Xaml::Automation::Peers;
 
 namespace {
-    Point at(double x, double y) {
-        return {static_cast<float>(x), static_cast<float>(y)};
-    }
+    struct PathPanel : controls::PanelT<PathPanel> {
+        explicit PathPanel(int64_t view) : view(view) {}
+        int64_t view;
+        composition::ShapeVisual drawing{nullptr};
 
-    /// The Path a shape's figure holds.
-    shapes::Path path(SwiftOmniUIObjectRef handle) {
-        return figureShape(as<IInspectable>(handle)).as<shapes::Path>();
-    }
-
-    /// A rectangle from (x0, y0) to (x1, y1), its corners rounded clockwise from the top left.
-    media::PathGeometry rounded(double x0, double y0, double x1, double y1, double const *radii) {
-        auto limit = std::max(0.0, std::min(x1 - x0, y1 - y0) / 2);
-        double r[4];
-        for (int index = 0; index < 4; ++index) r[index] = std::clamp(std::isfinite(radii[index]) ? radii[index] : 0, 0.0, limit);
-
-        media::PathFigure figure;
-        figure.StartPoint(at(x0 + r[0], y0));
-        figure.IsClosed(true);
-        auto segments = figure.Segments();
-        auto line = [&](double x, double y) {
-            media::LineSegment segment;
-            segment.Point(at(x, y));
-            segments.Append(segment);
-        };
-        auto corner = [&](double radius, double x, double y) {
-            if (radius <= 0) return line(x, y);
-            media::ArcSegment segment;
-            segment.Point(at(x, y));
-            segment.Size({static_cast<float>(radius), static_cast<float>(radius)});
-            segment.SweepDirection(media::SweepDirection::Clockwise);
-            segments.Append(segment);
-        };
-        line(x1 - r[1], y0);
-        corner(r[1], x1, y0 + r[1]);
-        line(x1, y1 - r[2]);
-        corner(r[2], x1 - r[2], y1);
-        line(x0 + r[3], y1);
-        corner(r[3], x0, y1 - r[3]);
-        line(x0, y0 + r[0]);
-        corner(r[0], x0 + r[0], y0);
-
-        media::PathGeometry geometry;
-        geometry.Figures().Append(figure);
-        return geometry;
-    }
-
-    /// The geometry the flat commands draw: 0 move, 1 line, 2 cubic, 3 quadratic, 4 close.
-    media::PathGeometry authored(double const *commands, int32_t count, bool evenOdd) {
-        media::PathGeometry geometry;
-        geometry.FillRule(evenOdd ? media::FillRule::EvenOdd : media::FillRule::Nonzero);
-        media::PathFigure figure{nullptr};
-        Point start = at(0, 0);
-        for (int32_t index = 0; index < count;) {
-            auto op = static_cast<int32_t>(commands[index++]);
-            auto need = op == 0 || op == 1 ? 2 : op == 2 ? 6 : op == 3 ? 4 : 0;
-            if (index + need > count) break;
-            auto const *p = commands + index;
-            index += need;
-            if (op == 4) {
-                if (figure) figure.IsClosed(true);
-                figure = nullptr;
-                continue;
-            }
-            if (op == 0 || !figure) {
-                if (op == 0) start = at(p[0], p[1]);
-                figure = media::PathFigure();
-                figure.StartPoint(start);
-                figure.IsFilled(true);
-                geometry.Figures().Append(figure);
-                if (op == 0) continue;
-            }
-            switch (op) {
-            case 1: {
-                media::LineSegment segment;
-                segment.Point(at(p[0], p[1]));
-                figure.Segments().Append(segment);
-                break;
-            }
-            case 2: {
-                media::BezierSegment segment;
-                segment.Point1(at(p[0], p[1]));
-                segment.Point2(at(p[2], p[3]));
-                segment.Point3(at(p[4], p[5]));
-                figure.Segments().Append(segment);
-                break;
-            }
-            case 3: {
-                media::QuadraticBezierSegment segment;
-                segment.Point1(at(p[0], p[1]));
-                segment.Point2(at(p[2], p[3]));
-                figure.Segments().Append(segment);
-                break;
-            }
-            }
+        peers::AutomationPeer OnCreateAutomationPeer() {
+            IInspectable self = *this;
+            return figurePeer(self.as<xaml::FrameworkElement>(), view);
         }
-        return geometry;
+
+        Size MeasureOverride(Size) { return {0, 0}; }
+        Size ArrangeOverride(Size final) {
+            if (callbacks.arrange) callbacks.arrange(view, final.Width, final.Height);
+            drawing.Size({final.Width, final.Height});
+            return final;
+        }
+    };
+
+    winrt::Windows::UI::Color color(uint32_t argb) {
+        return {static_cast<uint8_t>(argb >> 24), static_cast<uint8_t>(argb >> 16),
+                static_cast<uint8_t>(argb >> 8), static_cast<uint8_t>(argb)};
+    }
+
+    composition::CompositionBrush paint(composition::Compositor const &compositor, SwiftOmniUIBrush const &value) {
+        if (value.kind == 0) return nullptr;
+        if (value.kind == 1) return compositor.CreateColorBrush(color(value.count > 0 ? value.colors[0] : 0));
+        auto const *g = value.geometry;
+        composition::CompositionGradientBrush brush{nullptr};
+        if (value.kind == 2) {
+            auto linear = compositor.CreateLinearGradientBrush();
+            linear.StartPoint({static_cast<float>(g[0]), static_cast<float>(g[1])});
+            linear.EndPoint({static_cast<float>(g[2]), static_cast<float>(g[3])});
+            brush = linear;
+        } else if (value.kind == 3) {
+            auto radial = compositor.CreateRadialGradientBrush();
+            radial.EllipseCenter({static_cast<float>(g[0]), static_cast<float>(g[1])});
+            radial.EllipseRadius({static_cast<float>(g[2]), static_cast<float>(g[3])});
+            radial.GradientOriginOffset({0, 0});
+            brush = radial;
+        } else {
+            throw winrt::hresult_invalid_argument();
+        }
+        brush.MappingMode(composition::CompositionMappingMode::Relative);
+        brush.InterpolationSpace(composition::CompositionColorSpace::Rgb);
+        for (int32_t index = 0; index < value.count; ++index)
+            brush.ColorStops().Append(compositor.CreateColorGradientStop(
+                static_cast<float>(value.offsets[index]), color(value.colors[index])));
+        return brush;
+    }
+
+    winrt::com_ptr<ID2D1Geometry> rounded(double width, double height, double inset, double const *radii) {
+        auto x0 = static_cast<float>(inset), y0 = x0;
+        auto x1 = static_cast<float>(std::max(inset, width - inset));
+        auto y1 = static_cast<float>(std::max(inset, height - inset));
+        auto limit = std::max(0.0f, std::min(x1 - x0, y1 - y0) / 2);
+        float r[4];
+        for (int index = 0; index < 4; ++index)
+            r[index] = static_cast<float>(std::clamp(std::isfinite(radii[index]) ? radii[index] : 0.0, 0.0, double(limit)));
+        winrt::com_ptr<ID2D1PathGeometry> path;
+        winrt::com_ptr<ID2D1GeometrySink> sink;
+        winrt::check_hresult(pathFactory()->CreatePathGeometry(path.put()));
+        winrt::check_hresult(path->Open(sink.put()));
+        sink->BeginFigure(D2D1::Point2F(x0 + r[0], y0), D2D1_FIGURE_BEGIN_FILLED);
+        auto line = [&](float x, float y) { sink->AddLine(D2D1::Point2F(x, y)); };
+        auto corner = [&](float radius, float x, float y) {
+            if (radius == 0) { line(x, y); return; }
+            sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(x, y), D2D1::SizeF(radius, radius),
+                                        0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+        };
+        line(x1 - r[1], y0); corner(r[1], x1, y0 + r[1]);
+        line(x1, y1 - r[2]); corner(r[2], x1 - r[2], y1);
+        line(x0 + r[3], y1); corner(r[3], x0, y1 - r[3]);
+        line(x0, y0 + r[0]); corner(r[0], x0 + r[0], y0);
+        sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        winrt::check_hresult(sink->Close());
+        return path.as<ID2D1Geometry>();
+    }
+}
+
+namespace swiftomniui {
+    composition::CompositionSpriteShape pathSprite(IInspectable const &object) {
+        auto element = object.try_as<xaml::UIElement>();
+        if (!element) return nullptr;
+        auto visual = xaml::Hosting::ElementCompositionPreview::GetElementChildVisual(element);
+        auto drawing = visual ? visual.try_as<composition::ShapeVisual>() : composition::ShapeVisual{nullptr};
+        if (!drawing || drawing.Shapes().Size() != 1) return nullptr;
+        return drawing.Shapes().GetAt(0).try_as<composition::CompositionSpriteShape>();
     }
 }
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_path_make(int64_t view) {
     try {
-        shapes::Path figure;
-        figure.Stretch(media::Stretch::None);
-        auto held = swiftomniui::figure(view);
-        held.Children().Append(figure);
+        auto held = winrt::make<PathPanel>(view).as<controls::Panel>();
+        auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(held).Compositor();
+        auto drawing = compositor.CreateShapeVisual();
+        drawing.Shapes().Append(compositor.CreateSpriteShape(compositor.CreatePathGeometry()));
+        winrt::get_self<PathPanel>(held.as<xaml::IFrameworkElementOverrides>())->drawing = drawing;
+        xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(held, drawing);
+        // The XAML node supplies input and automation; the vector is its drawing.
+        held.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
         return detach(held);
-    } catch (...) {
-        report("making a shape");
-        return nullptr;
-    }
+    } catch (...) { report("making a shape"); return nullptr; }
 }
 
 extern "C" void swiftomniui_winui_path_paint(
@@ -139,37 +127,36 @@ extern "C" void swiftomniui_winui_path_paint(
     int32_t dashCount, double dashOffset, int32_t cap, int32_t join, double miter
 ) {
     try {
-        auto path = ::path(handle);
-        path.Fill(brush(fill));
-        path.Stroke(brush(stroke));
-        path.StrokeThickness(width);
-        // The Swift boundary has normalized dashes and phase to WinUI's width units.
-        media::DoubleCollection pattern;
-        for (int32_t index = 0; index < dashCount; ++index) pattern.Append(dashes[index]);
-        path.StrokeDashArray(pattern);
-        path.StrokeDashOffset(dashOffset);
-        auto ends = cap == 1 ? media::PenLineCap::Round : cap == 2 ? media::PenLineCap::Square : media::PenLineCap::Flat;
-        path.StrokeStartLineCap(ends);
-        path.StrokeEndLineCap(ends);
-        path.StrokeDashCap(ends);
-        path.StrokeLineJoin(join == 1 ? media::PenLineJoin::Bevel : join == 2 ? media::PenLineJoin::Round : media::PenLineJoin::Miter);
-        // WinUI measures a mitred corner against half the outline's width; SwiftOmniUI against the whole.
-        path.StrokeMiterLimit(miter * 2);
-    } catch (...) {
-        report("painting a shape");
-    }
+        auto shape = pathSprite(as<IInspectable>(handle));
+        auto compositor = shape.Compositor();
+        shape.FillBrush(paint(compositor, fill));
+        shape.StrokeBrush(paint(compositor, stroke));
+        shape.StrokeThickness(static_cast<float>(width));
+        auto pattern = shape.StrokeDashArray();
+        pattern.Clear();
+        for (int32_t index = 0; index < dashCount; ++index) pattern.Append(static_cast<float>(dashes[index]));
+        shape.StrokeDashOffset(static_cast<float>(dashOffset));
+        auto ends = cap == 1 ? composition::CompositionStrokeCap::Round
+            : cap == 2 ? composition::CompositionStrokeCap::Square : composition::CompositionStrokeCap::Flat;
+        shape.StrokeStartCap(ends); shape.StrokeEndCap(ends); shape.StrokeDashCap(ends);
+        shape.StrokeLineJoin(join == 1 ? composition::CompositionStrokeLineJoin::Bevel
+            : join == 2 ? composition::CompositionStrokeLineJoin::Round : composition::CompositionStrokeLineJoin::Miter);
+        shape.StrokeMiterLimit(static_cast<float>(miter * 2));
+    } catch (...) { report("painting a shape"); }
 }
 
 extern "C" void swiftomniui_winui_path_bounds(double const *commands, int32_t count, double *bounds) {
     try {
-        auto box = authored(commands, count, false).Bounds();
-        bool known = std::isfinite(box.X) && std::isfinite(box.Y) && std::isfinite(box.Width)
-            && std::isfinite(box.Height);
-        double const read[] = {known ? box.X : 0, known ? box.Y : 0, known ? box.Width : 0, known ? box.Height : 0};
+        auto path = pathGeometry(commands, count, false);
+        D2D1_RECT_F box{};
+        winrt::check_hresult(path->GetBounds(nullptr, &box));
+        // An empty D2D geometry has an inverted bound rather than a zero rect.
+        bool known = std::isfinite(box.left) && std::isfinite(box.top) && std::isfinite(box.right)
+            && std::isfinite(box.bottom) && box.right >= box.left && box.bottom >= box.top;
+        double read[] = {known ? box.left : 0, known ? box.top : 0,
+                         known ? box.right - box.left : 0, known ? box.bottom - box.top : 0};
         std::copy(read, read + 4, bounds);
-    } catch (...) {
-        report("measuring a shape");
-    }
+    } catch (...) { report("measuring a shape"); }
 }
 
 extern "C" void swiftomniui_winui_path_draw(
@@ -177,33 +164,27 @@ extern "C" void swiftomniui_winui_path_draw(
     double const *placement, double width, double height, double inset
 ) {
     try {
-        auto path = ::path(handle);
-        media::Geometry geometry{nullptr};
-        if (kind == 0) {
-            geometry = rounded(inset, inset, width - inset, height - inset, radii);
-        } else if (kind == 1) {
-            media::EllipseGeometry ellipse;
-            ellipse.Center(at(width / 2, height / 2));
-            ellipse.RadiusX(std::max(0.0, width / 2 - inset));
-            ellipse.RadiusY(std::max(0.0, height / 2 - inset));
-            geometry = ellipse;
-        } else {
-            geometry = authored(commands, count, evenOdd);
-        }
+        winrt::com_ptr<ID2D1Geometry> geometry;
+        if (kind == 0) geometry = rounded(width, height, inset, radii);
+        else if (kind == 1) {
+            winrt::com_ptr<ID2D1EllipseGeometry> ellipse;
+            winrt::check_hresult(pathFactory()->CreateEllipseGeometry(D2D1::Ellipse(
+                D2D1::Point2F(static_cast<float>(width / 2), static_cast<float>(height / 2)),
+                static_cast<float>(std::max(0.0, width / 2 - inset)),
+                static_cast<float>(std::max(0.0, height / 2 - inset))), ellipse.put()));
+            geometry = ellipse.as<ID2D1Geometry>();
+        } else geometry = pathGeometry(commands, count, evenOdd).as<ID2D1Geometry>();
         if (placement) {
-            winrt::Microsoft::UI::Xaml::Media::Matrix place{
-                placement[0], placement[1], placement[2], placement[3], placement[4], placement[5]};
-            // WinUI draws nothing of a geometry whose transform is the identity: a geometry left in place takes none.
-            bool identity = place.M11 == 1 && place.M12 == 0 && place.M21 == 0 && place.M22 == 1
-                && place.OffsetX == 0 && place.OffsetY == 0;
-            if (!identity) {
-                media::MatrixTransform moved;
-                moved.Matrix(place);
-                geometry.Transform(moved);
-            }
+            // Bake the geometry transform before stroking, retaining the authored
+            // line width through nonuniform scale, skew and reflection.
+            D2D1_MATRIX_3X2_F matrix{static_cast<float>(placement[0]), static_cast<float>(placement[1]),
+                static_cast<float>(placement[2]), static_cast<float>(placement[3]),
+                static_cast<float>(placement[4]), static_cast<float>(placement[5])};
+            winrt::com_ptr<ID2D1TransformedGeometry> transformed;
+            winrt::check_hresult(pathFactory()->CreateTransformedGeometry(geometry.get(), &matrix, transformed.put()));
+            geometry = transformed.as<ID2D1Geometry>();
         }
-        path.Data(geometry);
-    } catch (...) {
-        report("drawing a shape");
-    }
+        auto shape = pathSprite(as<IInspectable>(handle));
+        shape.Geometry().as<composition::CompositionPathGeometry>().Path(compositionPath(geometry, evenOdd));
+    } catch (...) { report("drawing a shape"); }
 }

@@ -114,6 +114,8 @@ extension WinUIElement {
             case .isVisible: view.setShown(isShown)
             // Ignored, the view and all in it are passed over: a click goes to what is under it.
             case .ignoresInput: view.setIgnoresInput(element.bool(.ignoresInput) == true)
+            case .pointerStyle:
+                swiftomniui_winui_set_pointer_style(view.handle, value(.pointerStyle)?.enumeration ?? -1)
             case .hint:
                 if let hint = value(.hint)?.string {
                     hint.withCString { swiftomniui_winui_set_tooltip(view.handle, $0) }

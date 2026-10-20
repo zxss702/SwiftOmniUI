@@ -11,6 +11,7 @@
 
 #include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
 #include <winrt/Microsoft.UI.Xaml.Shapes.h>
+#include <winrt/Microsoft.UI.Composition.h>
 
 namespace swiftomniui {
     /// A figure for the view numbered `view`: it puts what it holds as far as that reaches from its corner, and
@@ -23,4 +24,8 @@ namespace swiftomniui {
 
     /// The shape `object` is, or the one its figure holds; null for none.
     winrt::Microsoft::UI::Xaml::Shapes::Shape figureShape(IInspectable const &object);
+
+    /// A vector shape's actual drawing. No hidden XAML Shape participates in
+    /// measurement; inspection reads the Composition shape itself.
+    winrt::Microsoft::UI::Composition::CompositionSpriteShape pathSprite(IInspectable const &object);
 }
