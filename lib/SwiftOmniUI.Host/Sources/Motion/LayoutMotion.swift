@@ -35,6 +35,9 @@ extension PlacedView {
 
     /// Measurement refinement may retarget an existing journey without starting a new one.
     public var refines: Bool
+    /// Child geometry already follows a parent's described animation frame.
+    /// It must not acquire a second layout animation toward that frame.
+    public var followsPresentation: Bool = false
 
     /// An arrangement that animates `lanes` under `law`, fading in a joining child when `fades`.
     public init(
@@ -133,6 +136,10 @@ extension PlacedView {
 
         let seat = seats[mount]!
         seats[mount]?.view = view
+        if arrangement.followsPresentation {
+            arrive(view, at: target, mount: mount)
+            return
+        }
         let key = AnimationTarget.placed(mount)
         let destination = Self.lanes(target)
         let running = animator.animation(for: key)
@@ -154,7 +161,7 @@ extension PlacedView {
             }
             let moved = RunningAnimation(from: from, destination: destination,
                                          velocity: running.velocity, animation: running.animation,
-                                         began: running.began)
+                                         began: running.began, segmentBegan: running.segmentBegan)
             let standing = Self.rect(moved.position(at: now()).value)
             animator.start(moved, for: key)
             seats[mount]?.standing = standing
@@ -188,7 +195,8 @@ extension PlacedView {
         }
 
         // A running animation bends from where it has reached, at the speed it has.
-        let position = running?.position(at: now())
+        let instant = now()
+        let position = running?.position(at: instant)
         var start = position?.value ?? Self.lanes(from)
         var velocity = position?.velocity ?? [0, 0, 0, 0]
         start[0] += anchorOffset.x
@@ -199,9 +207,11 @@ extension PlacedView {
             velocity[index] = 0
         }
 
-        let animation = RunningAnimation(from: start, destination: destination, velocity: velocity, animation: law, began: now())
+        let animation = RunningAnimation(
+            from: start, destination: destination, velocity: velocity, animation: law,
+            began: refining ? running!.began : instant, segmentBegan: instant)
 
-        guard !animation.arrives else {
+        guard !animation.arrives, !animation.position(at: instant).rested else {
             arrive(view, at: target, mount: mount)
             return
         }
@@ -245,7 +255,7 @@ extension PlacedView {
                 destination[1] += offset.y
                 animator.start(RunningAnimation(from: start, destination: destination,
                                                 velocity: running.velocity, animation: running.animation,
-                                                began: running.began), for: key)
+                                                began: running.began, segmentBegan: running.segmentBegan), for: key)
                 seats[mount]?.standing = frame
                 view.travels(to: Self.rect(destination))
             }

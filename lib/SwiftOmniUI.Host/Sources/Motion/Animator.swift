@@ -51,20 +51,34 @@
     /// When it began, in the frame clock's milliseconds.
     public let began: Double
 
+    /// A measurement correction can continue from a sampled presentation
+    /// without extending the original business animation's deadline.
+    public let segmentBegan: Double
+
     /// A animation from `from` to `destination`, begun at `began`.
-    public init(from: [Double], destination: [Double], velocity: [Double], animation: Animation, began: Double) {
+    public init(from: [Double], destination: [Double], velocity: [Double], animation: Animation, began: Double,
+                segmentBegan: Double? = nil) {
         self.from = from
         self.destination = destination
         self.velocity = velocity
         self.animation = animation
         self.began = began
+        self.segmentBegan = segmentBegan ?? began
     }
 
     /// Each lane's value and speed at `now`, and whether it has arrived.
     public func position(at now: Double) -> (value: [Double], velocity: [Double], rested: Bool) {
+        let duration = Double(animation.millis)
+        let remaining = began + duration - segmentBegan
+        if animation.law == .eased && (remaining <= 0 || now >= began + duration)
+            || animation.law == .spring && now - began >= HostMotionLaw.longest {
+            return (destination, Array(repeating: 0, count: destination.count), true)
+        }
+        let rate = animation.law == .eased ? duration / remaining : 1
         let sample = HostMotionLaw.sample(
-            animation, elapsed: max(0, now - began), from: from, destination: destination, velocity: velocity)
-        return (sample.value, sample.velocity, sample.rested)
+            animation, elapsed: max(0, now - segmentBegan) * rate,
+            from: from, destination: destination, velocity: velocity.map { $0 / rate })
+        return (sample.value, sample.velocity.map { $0 * rate }, sample.rested)
     }
 
     /// Whether it starts where it ends, standing still: nothing to animate.

@@ -7,6 +7,19 @@ import XCTest
 
 /// The runtime's one animator: every animation advanced together, in target order.
 final class AnimatorTests: XCTestCase {
+    func testASpringRefinementKeepsItsPhysicalResponseAndOriginalLongestLimit() {
+        let original = RunningAnimation(from: [0], destination: [100], velocity: [0],
+                                        animation: .spring(milliseconds: 800, damping: 0.05), began: 0)
+        let current = original.position(at: 100)
+        let refined = RunningAnimation(from: current.value, destination: [150], velocity: current.velocity,
+                                       animation: original.animation, began: original.began, segmentBegan: 100)
+        XCTAssertEqual(refined.position(at: 100).value[0], current.value[0], accuracy: 1e-9)
+        XCTAssertEqual(refined.position(at: 100).velocity[0], current.velocity[0], accuracy: 1e-9)
+        XCTAssertEqual(refined.animation.millis, 800)
+        XCTAssertEqual(refined.position(at: HostMotionLaw.longest).value, [150])
+        XCTAssertTrue(refined.position(at: HostMotionLaw.longest).rested)
+    }
+
     /// One advance moves every animation, states first by number and then described
     /// properties by element and property - the order two runs of one frame
     /// both write in.

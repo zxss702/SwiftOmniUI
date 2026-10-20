@@ -127,8 +127,8 @@ child stands on the way. Why an arrangement happens decides everything:
   that joins fades in.
 - No patch: the room itself is moving - a window resized, a sidebar dragged -
   and every child follows exactly, because a child that glides after the
-  user's own hand is late on every frame. A layout whose own width changed is
-  this case even with a patch: its width is its parent's to say.
+  user's own hand is late on every frame. A layout whose allocated width or
+  height changed is this case even with a patch: its room is its parent's to say.
 - The first arrangement arrives: the first thing anyone sees is the thing itself.
 
 A size a child states for itself arrives while its place animates: a stated
@@ -155,6 +155,10 @@ At an unchanged cross-axis size, replacing estimated extents can retarget a
 running placement using its current velocity and law even without another
 business patch. It does not start a journey for a stationary row. Resizes,
 business geometry reads and reduced motion retain their immediate-arrival rules.
+An eased refinement keeps the original completion time, continuing from its
+sampled value and velocity through the remaining interval. Spring refinement
+keeps its response and the original settling deadline. Another measurement
+does not grant either kind of motion a new lifetime.
 
 ## Words at their destination
 

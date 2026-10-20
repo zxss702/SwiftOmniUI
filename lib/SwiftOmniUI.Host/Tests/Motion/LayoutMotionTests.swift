@@ -9,6 +9,66 @@ import XCTest
 /// arrives, and a child on its way bends, keeps its way, or stops as it leaves.
 @MainActor
 final class LayoutMotionTests: XCTestCase {
+    func testMeasurementRefinementsKeepTheOriginalDeadlineAndSampledVelocity() throws {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Self.row(0, x: 80))])
+        layout.arrange([(moved, 1, Self.row(0, x: 40))])
+        for (time, x) in [(100.0, 30.0), (150, 25)] {
+            layout.frame(at: time)
+            let standing = moved.placedFrame
+            let before = try XCTUnwrap(layout.animator.animation(for: .placed(1))).position(at: time)
+            layout.arrange([(moved, 1, Self.row(0, x: x))], patched: false, refining: true)
+            let refined = try XCTUnwrap(layout.animator.animation(for: .placed(1)))
+            XCTAssertEqual(refined.began, 0)
+            XCTAssertEqual(refined.segmentBegan, time)
+            XCTAssertEqual(moved.placedFrame, standing, "refinement cannot jump at its own first sample")
+            XCTAssertEqual(refined.position(at: time).velocity[0], before.velocity[0], accuracy: 1e-9)
+        }
+        layout.frame(at: 200)
+        XCTAssertEqual(moved.placedFrame, Self.row(0, x: 25))
+        XCTAssertFalse(layout.animator.isMoving, "repeated measurement cannot extend the business animation")
+    }
+
+    func testParentPresentationFrameStopsASecondChildGeometryAnimation() {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Self.row(0, x: 80))])
+        layout.arrange([(moved, 1, Self.row(0, x: 40))])
+        layout.frame(at: 50)
+        let target = Self.row(0, x: 40)
+        layout.arrange([(moved, 1, target)], patched: false, followingPresentation: true)
+        XCTAssertEqual(moved.placedFrame, target)
+        XCTAssertFalse(layout.animator.isMoving, "even an unchanged target must follow its parent's current frame")
+    }
+
+    func testARefinementAfterTheOriginalDeadlineArrivesOnItsFirstCommit() {
+        let animator = Animator()
+        var now = 0.0
+        let motion = LayoutMotion(animator: animator, now: { now }, reducesMotion: { false })
+        let moved = Placed()
+        motion.place(moved, mount: 1, at: Self.row(0, x: 80), stated: [], fadeIn: nil, in: Arrangement())
+        motion.place(moved, mount: 1, at: Self.row(0, x: 40), stated: [], fadeIn: nil,
+                     in: Arrangement(law: .eased(200, .linear), lanes: .all))
+        now = 201 // The animator has not advanced and removed its old seat yet.
+        let target = Self.row(0, x: 30)
+        motion.place(moved, mount: 1, at: target, stated: [], fadeIn: nil, in: Arrangement(refines: true))
+        XCTAssertEqual(moved.placedFrame, target)
+        XCTAssertFalse(animator.isMoving)
+    }
+
+    func testAHeightAllocationChangeUsesTheSameRuleAsAWidthChange() {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Self.row(0, x: 80))], height: 200)
+        layout.arrange([(moved, 1, Self.row(0, x: 40))], height: 200)
+        layout.frame(at: 50)
+        let target = Self.row(0, x: 30)
+        layout.arrange([(moved, 1, target)], patched: false, refining: true, height: 220)
+        XCTAssertEqual(moved.placedFrame, target)
+        XCTAssertFalse(layout.animator.isMoving)
+    }
+
     func testDeferredLazyRealizationKeepsTheDataTransactionButLaterContentClearsIt() throws {
         let runtime = HostRuntime.still()
         var first = HostPatch(id: .manual("lazy"), type: .lazyVStack)
@@ -361,10 +421,11 @@ private final class HandWoundLayout {
         width: Double = 300,
         patched: Bool = true,
         heights: [UInt64: Double] = [:],
-        measured: Set<UInt64> = []
+        measured: Set<UInt64> = [], refining: Bool = false, height: Double? = nil,
+        followingPresentation: Bool = false
     ) {
         if patched { places.patchArrived() }
-        places.begin(width: width)
+        places.begin(width: width, refining: refining, height: height, followingPresentation: followingPresentation)
         for child in children {
             var values = LayoutValues()
             values.width = measured.contains(child.mount) ? nil : 100

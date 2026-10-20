@@ -22,6 +22,7 @@
 
     /// The width of the last arrangement; nil before the first.
     private var arrangedWidth: Double?
+    private var arrangedHeight: Double?
 
     private var arrangement = Arrangement()
     private var commitsArrangement = true
@@ -40,19 +41,22 @@
     /// `anchorOffset` compensates a changed viewport origin without moving any layout destination.
     /// An unfinished layout places native views without consuming its patch or registering animation seats.
     public func begin(width: Double, animating: Bool = true, anchorOffset: Point = .zero, refining: Bool = false,
-                      consumingPatch: Bool = true) {
+                      consumingPatch: Bool = true, height: Double? = nil, followingPresentation: Bool = false) {
         let said = consumingPatch && patched && arrangedWidth != nil
         commitsArrangement = consumingPatch
-        let resized = arrangedWidth.map { abs($0 - width) > 0.5 } ?? false
+        let resized = (arrangedWidth.map { abs($0 - width) > 0.5 } ?? false)
+            || (height.flatMap { height in arrangedHeight.map { abs($0 - height) > 0.5 } } ?? false)
         if consumingPatch {
             patched = false
             arrangedWidth = width
+            arrangedHeight = height
         }
         self.anchorOffset = resized || framesRead ? .zero : anchorOffset
 
         arrangement = layoutMotion?.arrangement(
             said: said && animating, resized: resized, animation: animation, framesRead: framesRead) ?? Arrangement()
         arrangement.refines = refining && !(said && animating) && !resized && !framesRead
+        arrangement.followsPresentation = followingPresentation
     }
 
     /// Stands `view`, the mounted element `mount`'s, at `place`, or on its way there; its `values` say which sides
