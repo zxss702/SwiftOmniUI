@@ -39,6 +39,10 @@ extension PlacedView {
     /// existing journeys without changing their timing or starting another.
     public var followsPresentation: Bool = false
 
+    /// Geometry already sampled by another channel. An existing placement
+    /// journey yields these lanes as well as refraining from starting them.
+    public var presentedLanes: AnimationLanes = []
+
     /// An arrangement that animates `lanes` under `law`, fading in a joining child when `fades`.
     public init(
         law: Animation = .none, lanes: AnimationLanes = [],
@@ -135,16 +139,49 @@ extension PlacedView {
             view.placedFrame = arrivedFrom
         }
 
-        let seat = seats[mount]!
+        var seat = seats[mount]!
         seats[mount]?.view = view
         seats[mount]?.target = target
         let key = AnimationTarget.placed(mount)
         let destination = Self.lanes(target)
-        let running = animator.animation(for: key)
+        let owned = stated.union(arrangement.presentedLanes)
+        var running = animator.animation(for: key)
 
         if reducesMotion() {
             arrive(view, at: target, mount: mount)
             return
+        }
+
+        if let previous = running, !owned.isEmpty {
+            // Ownership can change while a placement journey is in flight,
+            // even when its destination equals the first described sample.
+            // Yield before the same-target check; otherwise the old residual
+            // motion is added to every subsequent described geometry sample.
+            var from = previous.from
+            var end = previous.destination
+            var velocity = previous.velocity
+            var standing = Self.lanes(seat.standing ?? view.placedFrame)
+            for (index, lane) in Self.order.enumerated() where owned.contains(lane) {
+                from[index] = destination[index]
+                end[index] = destination[index]
+                velocity[index] = 0
+                standing[index] = destination[index]
+            }
+            let yielded = RunningAnimation(from: from, destination: end, velocity: velocity,
+                                           animation: previous.animation, began: previous.began,
+                                           segmentBegan: previous.segmentBegan)
+            let frame = Self.rect(standing)
+            seat.standing = frame
+            seats[mount]?.standing = frame
+            if yielded.arrives {
+                animator.halt(key)
+                running = nil
+                view.travels(to: nil)
+            } else {
+                animator.start(yielded, for: key)
+                running = yielded
+                view.travels(to: Self.rect(end))
+            }
         }
 
         // The same place asked for again keeps its animation rather than starting it over.
@@ -164,7 +201,7 @@ extension PlacedView {
             let previousLanes = Self.lanes(previous)
             var from = running.from
             var end = running.destination
-            for index in destination.indices {
+            for (index, lane) in Self.order.enumerated() where !owned.contains(lane) {
                 let delta = destination[index] - previousLanes[index]
                 from[index] += delta
                 end[index] += delta
@@ -176,7 +213,7 @@ extension PlacedView {
             // Arrange translates that sample; it must not advance another
             // channel at a later wall-clock time after expensive measurement.
             var standing = Self.lanes(seat.standing ?? view.placedFrame)
-            for index in standing.indices {
+            for (index, lane) in Self.order.enumerated() where !owned.contains(lane) {
                 standing[index] += destination[index] - previousLanes[index]
             }
             animator.start(translated, for: key)
@@ -224,7 +261,7 @@ extension PlacedView {
             if anchorOffset.x != 0 { lanes.insert(.x) }
             if anchorOffset.y != 0 { lanes.insert(.y) }
         }
-        lanes.subtract(stated)
+        lanes.subtract(owned)
 
         guard !lanes.isEmpty, Self.isReal(from), Self.isReal(target) else {
             arrive(view, at: target, mount: mount)

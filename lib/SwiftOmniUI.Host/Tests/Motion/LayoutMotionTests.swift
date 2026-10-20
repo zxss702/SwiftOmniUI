@@ -147,6 +147,83 @@ final class LayoutMotionTests: XCTestCase {
         XCTAssertEqual(sibling.placedFrame.y, 60, accuracy: 1e-9)
     }
 
+    func testDescribedHeightTakesOverAnExistingJourneyBeforeTheSameTargetCheck() throws {
+        let layout = HandWoundLayout()
+        let editor = Placed(), sibling = Placed()
+        layout.arrange([(editor, 1, Rect(80, 0, 100, 100)), (sibling, 2, Rect(0, 0, 100, 100))])
+        layout.arrange([(editor, 1, Rect(40, 0, 100, 200)), (sibling, 2, Rect(0, 0, 100, 200))])
+        layout.frame(at: 100)
+        XCTAssertEqual(editor.placedFrame, Rect(60, 0, 100, 150))
+
+        for _ in 0..<3 {
+            layout.arrange([(editor, 1, Rect(40, 0, 100, 200)), (sibling, 2, Rect(0, 0, 100, 200))],
+                           patched: false, followingPresentation: true, presentedItems: [1: [.height]])
+            XCTAssertEqual(editor.placedFrame, Rect(60, 0, 100, 200),
+                           "the described sample owns height even when it equals the old destination")
+            XCTAssertEqual(sibling.placedFrame.height, 150, accuracy: 1e-9)
+        }
+        let running = try XCTUnwrap(layout.animator.animation(for: .placed(1)))
+        XCTAssertEqual(running.from[3], 200)
+        XCTAssertEqual(running.velocity[3], 0)
+        XCTAssertEqual(running.began, 0)
+        XCTAssertEqual(running.segmentBegan, 0)
+
+        layout.frame(at: 150)
+        layout.arrange([(editor, 1, Rect(40, 0, 100, 210)), (sibling, 2, Rect(0, 0, 100, 200))],
+                       patched: false, followingPresentation: true, presentedItems: [1: [.height]])
+        XCTAssertEqual(editor.placedFrame, Rect(50, 0, 100, 210))
+        XCTAssertEqual(sibling.placedFrame.height, 175, accuracy: 1e-9,
+                       "handing off one child's height must preserve another child's height journey")
+        layout.frame(at: 200)
+        XCTAssertEqual(editor.placedFrame, Rect(40, 0, 100, 210))
+        XCTAssertEqual(sibling.placedFrame.height, 200)
+        XCTAssertFalse(layout.animator.isMoving)
+    }
+
+    func testDescribedHeightRetiresAPlacementJourneyWithNoIndependentLanes() {
+        let layout = HandWoundLayout()
+        let editor = Placed()
+        layout.arrange([(editor, 1, Rect(0, 0, 100, 100))])
+        layout.arrange([(editor, 1, Rect(0, 0, 100, 200))])
+        layout.frame(at: 100)
+        XCTAssertEqual(editor.placedFrame.height, 150)
+        layout.arrange([(editor, 1, Rect(0, 0, 100, 200))], patched: false,
+                       followingPresentation: true, presentedLanes: [.height])
+        XCTAssertEqual(editor.placedFrame.height, 200)
+        XCTAssertFalse(layout.animator.isMoving)
+        layout.frame(at: 150)
+        layout.arrange([(editor, 1, Rect(0, 0, 100, 190))], patched: false,
+                       followingPresentation: true, presentedLanes: [.height])
+        XCTAssertEqual(editor.placedFrame.height, 190)
+        XCTAssertFalse(layout.animator.isMoving, "a later described sample cannot revive the previous height journey")
+    }
+
+    func testAStatedHeightTakesOverAnExistingJourneyWithoutStoppingHorizontalMotion() {
+        let layout = HandWoundLayout()
+        let editor = Placed()
+        let target = Rect(40, 0, 100, 200)
+        layout.arrange([(editor, 1, Rect(80, 0, 100, 100))])
+        layout.arrange([(editor, 1, target)])
+        layout.frame(at: 100)
+        XCTAssertEqual(editor.placedFrame, Rect(60, 0, 100, 150))
+        layout.arrange([(editor, 1, target)], patched: false, heights: [1: 200])
+        XCTAssertEqual(editor.placedFrame, Rect(60, 0, 100, 200))
+        layout.frame(at: 150)
+        layout.arrange([(editor, 1, target)], patched: false, heights: [1: 200])
+        XCTAssertEqual(editor.placedFrame, Rect(50, 0, 100, 200))
+        layout.frame(at: 200)
+        XCTAssertEqual(editor.placedFrame, target)
+        XCTAssertFalse(layout.animator.isMoving)
+
+        // Removing the explicit height returns ownership to layout animation.
+        layout.arrange([(editor, 1, Rect(40, 0, 100, 100))])
+        layout.frame(at: 300)
+        XCTAssertEqual(editor.placedFrame.height, 150)
+        layout.frame(at: 400)
+        XCTAssertEqual(editor.placedFrame.height, 100)
+        XCTAssertFalse(layout.animator.isMoving)
+    }
+
     func testARefinementAfterTheOriginalDeadlineArrivesOnItsFirstCommit() {
         let animator = Animator()
         var now = 0.0

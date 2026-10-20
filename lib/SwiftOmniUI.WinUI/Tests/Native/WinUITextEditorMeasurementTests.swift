@@ -9,6 +9,118 @@ import SwiftOmniUIConformance
 import XCTest
 
 final class WinUITextEditorMeasurementTests: XCTestCase {
+    func testNestedComposerUsesOneHeightThroughExpansionReversalAndEmptyInput() throws {
+        try onUIThread {
+            let words = State(wrappedValue: "")
+            let emptySession = State(wrappedValue: false)
+            let clock = TestClock()
+            let host = WinUIRenderer.running(clock: clock) {
+                let height = !words.wrappedValue.isEmpty || emptySession.wrappedValue ? 128.0 : 40.0
+                return ScrollView { Text("Conversation") }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        HStack(alignment: .bottom) {
+                            Button("Attach") {}.frame(width: 40, height: 40)
+                            ZStack(alignment: .bottom) {
+                                TextEditor(words.projectedValue)
+                                    .scrollContentBackground(.hidden)
+                                    .background(alignment: .topLeading) {
+                                        if emptySession.wrappedValue && words.wrappedValue.isEmpty {
+                                            Text("Placeholder").padding(.top, 1).padding(.leading, 4)
+                                        }
+                                    }
+                                    .animation(nil, value: emptySession.wrappedValue && words.wrappedValue.isEmpty)
+                                    .safeAreaPadding(.vertical, 12)
+                                    .safeAreaPadding(.leading, 12)
+                                    .frame(height: height)
+                                    .background { RoundedRectangle(cornerRadius: 20).fill(Color.white).id("nested-fill") }
+                                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                                Rectangle().fill(Color.clear).frame(height: 16).offset(y: -height + 8)
+                            }
+                            .frame(height: height).id("nested-input")
+                            if words.wrappedValue.isEmpty {
+                                HStack {
+                                    Button("Send") {}.frame(width: 40, height: 40)
+                                    Button("Pause") {}.frame(width: 40, height: 40)
+                                }
+                            } else {
+                                VStack {
+                                    Button("Send") {}.frame(width: 40, height: 40)
+                                    Button("Pause") {}.frame(width: 40, height: 40)
+                                }
+                            }
+                        }.padding(16).buttonStyle(.plain).id("nested-row")
+                    }
+            }
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            let input = try XCTUnwrap(host.view(id: .manual("nested-input")))
+            let fill = try XCTUnwrap(host.view(id: .manual("nested-fill")))
+            XCTAssertEqual(input.laidOutFrame.height, 40, accuracy: 1)
+            XCTAssertEqual(editor.laidOutFrame.height, 16, accuracy: 1)
+            let bottom = input.origin.y + input.laidOutFrame.height
+            XCTAssertTrue(swiftomniui_winui_focus(editor.handle, true))
+
+            // Reverse the first expansion halfway, then complete both directions.
+            for (value, through) in [("a", 100.0), ("", 200), ("again", 200), ("", 200)] {
+                let start = input.laidOutFrame.height
+                let target = value.isEmpty ? 40.0 : 128.0
+                let began = clock.now
+                withAnimation(.eased(200, .linear)) { words.wrappedValue = value }
+                host.step()
+                for elapsed in [0.0, 16, 50, 100, 150, 200] where elapsed <= through {
+                    clock.now = began + elapsed
+                    host.frame()
+                    // A reversal carries velocity and can follow a Hermite
+                    // segment. Geometry must follow the presented property,
+                    // rather than adding another placement curve to it.
+                    let expected = try XCTUnwrap(input.sourceElement?.number(.height))
+                    if elapsed == 0 { XCTAssertEqual(expected, start, accuracy: 1) }
+                    if elapsed == 200 { XCTAssertEqual(expected, target, accuracy: 1) }
+                    for _ in 0..<3 {
+                        host.layOut()
+                        XCTAssertEqual(input.laidOutFrame.height, expected, accuracy: 1)
+                        XCTAssertEqual(fill.committedFrame?.height ?? -1, expected, accuracy: 1)
+                        XCTAssertEqual(editor.laidOutFrame.height, expected - 24, accuracy: 1,
+                                       "the native control must honor the padded slot, including an empty 16 DIP slot")
+                        XCTAssertEqual(input.origin.y + input.laidOutFrame.height, bottom, accuracy: 1)
+                    }
+                    XCTAssertTrue(host.views(WinUITextEditorView.self).first === editor)
+                    XCTAssertTrue(swiftomniui_winui_focused(editor.handle))
+                }
+            }
+            XCTAssertFalse(host.runtime.animator.isMoving)
+            emptySession.wrappedValue = true
+            host.step()
+            host.layOut()
+            XCTAssertEqual(input.laidOutFrame.height, 128, accuracy: 1,
+                           "an empty session keeps its expanded editor even with empty text")
+            XCTAssertEqual(editor.laidOutFrame.height, 104, accuracy: 1)
+            XCTAssertTrue(host.views(WinUITextEditorView.self).first === editor)
+        }
+    }
+
+    func testNativeEditorHonorsShortAllocationsWithoutStockTextBoxChrome() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { TextEditor("").frame(width: 240, height: 128) }
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            for focused in [false, true, false] {
+                _ = swiftomniui_winui_focus(editor.handle, focused)
+                for text in ["", "Text\nSecond line", ""] {
+                    editor.setText(text)
+                    for height in [16.0, 40, 104, 128, 16] {
+                        editor.prepareMeasure(width: 220, height: height)
+                        swiftomniui_winui_arrange(editor.handle, 7, 9, 220, height)
+                        XCTAssertLessThanOrEqual(editor.desiredSize.height, height)
+                        XCTAssertEqual(editor.laidOutFrame.width, 220, accuracy: 0.01)
+                        XCTAssertEqual(editor.laidOutFrame.height, height, accuracy: 0.01,
+                                       "DesiredSize alone does not detect a native minimum that enlarges ActualSize")
+                        XCTAssertEqual(editor.laidOutFrame.x, 7, accuracy: 0.01)
+                        XCTAssertEqual(editor.laidOutFrame.y, 9, accuracy: 0.01)
+                    }
+                }
+            }
+        }
+    }
+
     func testComposerIntermediateFramesShareOneHeightAndBottomEdge() throws {
         try onUIThread {
             let words = State(wrappedValue: "")

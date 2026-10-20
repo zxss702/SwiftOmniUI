@@ -626,6 +626,7 @@ class WinUIView {
                     .ignoring(sourceElement?.ignoresSafeArea))
             }
             let resized = committedFrame.map { $0.width != place.width || $0.height != place.height } ?? true
+            let editorGeometryChanged = sourceElement?.type == .textEditor && committedFrame != place
             let room = wordsRoom ?? place
             WinUILayoutDiagnostics.record("place", view: self,
                 "frame=\(WinUILayoutDiagnostics.rect(place)) measureRoom=\(WinUILayoutDiagnostics.rect(room)) resized=\(resized)")
@@ -635,13 +636,13 @@ class WinUIView {
             if let layout = self as? WinUILayoutView, placingLayout != nil {
                 layout.standsAt = place.width
             }
-            if resized, sourceElement?.type == .textEditor {
-                WinUILayoutDiagnostics.record("editor.commit", view: self,
-                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room))")
-            }
             commitAllocationGeometry(in: place)
             withNativeArrange {
                 swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
+            }
+            if editorGeometryChanged {
+                WinUILayoutDiagnostics.record("editor.commit", view: self,
+                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize))")
             }
         } else if moved {
             // The parent's next Arrange prepares the latest presentation slot.

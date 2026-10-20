@@ -61,6 +61,7 @@
         // Described geometry owns only the axes that depend on it. The same
         // business patch can still animate unrelated layout lanes and fades.
         arrangement.lanes.subtract(presentedLanes)
+        arrangement.presentedLanes = presentedLanes
         arrangement.refines = refining && !(said && animating) && !resized && !framesRead && presentedLanes.isEmpty
         // A business patch can move other children independently of a
         // described geometry channel. Only its subsequent samples translate
@@ -86,6 +87,7 @@
         var placement = arrangement
         let presented = presentedItems[mount] ?? []
         placement.lanes.subtract(presented)
+        placement.presentedLanes.formUnion(presented)
         placement.refines = placement.refines && presented.isEmpty
         layoutMotion.place(view, mount: mount, at: place, stated: stated,
                            fadeIn: fadeIn, arrivedFrom: arrivedFrom,

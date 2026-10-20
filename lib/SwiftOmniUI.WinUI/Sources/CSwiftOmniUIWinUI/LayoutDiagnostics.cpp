@@ -47,7 +47,7 @@ namespace swiftomniui {
                              static_cast<unsigned long>(GetCurrentProcessId()));
                 std::fflush(stderr);
                 if (file) {
-                    std::fprintf(file, "SOUI layout diagnostics v4 pid=%lu; sizes in DIPs; no input text\n",
+                    std::fprintf(file, "SOUI layout diagnostics v5 pid=%lu; sizes in DIPs; no input text\n",
                                  static_cast<unsigned long>(GetCurrentProcessId()));
                     std::fflush(file);
                     snapshotTimer = CreateThreadpoolTimer([](PTP_CALLBACK_INSTANCE, void *context, PTP_TIMER) {

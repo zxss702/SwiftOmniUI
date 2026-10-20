@@ -257,16 +257,18 @@ A field submits when Enter goes down in it; the key's release reaches nothing.
 ## An editor
 
 A TextEditor is a `TextBox` of several lines whose Enter starts a new line and
-submits nothing, its words wrapped and scrolled inside it. It keeps its native
-canvas and padding, with no border or system focus decoration, including the
-focused template's own border thickness. `scrollContentBackground(.hidden)`
+submits nothing, its words wrapped and scrolled inside it. Its parent owns
+padding and allocated size: the bare editor clears TextBox's stock minimum
+width, minimum height and padding, as well as its border and system focus
+decoration, including the focused template's own border thickness. Otherwise
+XAML can enlarge a short allocation internally and clip the result, while
+DesiredSize still reports the smaller slot. `scrollContentBackground(.hidden)`
 clears the canvas in every visual state; visible, automatic or unsaid restores
 the theme's background. Its native caret and selection stay. Growing with its
 words, it is measured with the room below it open and takes the height they
 take. A scrolling editor without an allocated height asks for one line,
-measured from a separate native TextBlock with the editor's font plus its
-padding, border and native minimum height. This does not edit its text or
-selection. Every finite height, including zero, reaches native measurement
+measured from a separate native TextBlock with the editor's font. This does
+not edit its text or selection. Every finite height, including zero, reaches native measurement
 unchanged. Its parent's allocation is the room it scrolls in; an intrinsic
 query never replaces it with a fabricated zero-height proposal.
 

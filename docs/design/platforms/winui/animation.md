@@ -56,7 +56,10 @@ arrangement asks for the same places and keeps the running animation.
 When described geometry supplies a presentation frame, dependent layout lanes
 follow it directly. A described height owns vertical placement and height
 along its containing branch; other children and lanes in the same patch can
-still animate. Subsequent samples translate
+still animate. Ownership is supplied on every sample. Before preserving an
+existing placement journey, its owned lanes yield to that sample with zero
+velocity; an old height curve cannot add its residual motion to the described
+height, even when both currently name the same destination. Subsequent samples translate
 existing independent journeys by the change in the arithmetic target,
 preserving their sampled frame and original clock. Arrange never samples a
 new animation time, and an unchanged target never cancels a sibling's motion.

@@ -131,6 +131,12 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_editor_make(int64_t view) {
         controls::TextBox editor;
         editor.AcceptsReturn(true);
         editor.TextWrapping(xaml::TextWrapping::Wrap);
+        // SwiftUI composition owns the editor's padding and allocated size.
+        // TextBox's stock chrome otherwise expands a short slot internally
+        // and clips it, even when DesiredSize reports the requested height.
+        editor.MinWidth(0);
+        editor.MinHeight(0);
+        editor.Padding({0, 0, 0, 0});
         auto transparent = media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent());
         editor.BorderBrush(transparent);
         editor.BorderThickness({0, 0, 0, 0});

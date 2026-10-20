@@ -44,6 +44,17 @@ final class WinUIElement: NativeElement {
         .layoutPriority, .horizontalGuide, .verticalGuide,
     ])
 
+    private static func geometryLanes(affectedBy properties: Set<Prop>) -> AnimationLanes {
+        var lanes: AnimationLanes = []
+        for property in properties where layoutInputs.contains(property) {
+            switch property {
+            case .height, .minimumHeight, .maximumHeight: lanes.formUnion([.y, .height])
+            default: lanes.formUnion(.all)
+            }
+        }
+        return lanes
+    }
+
     var resolvedLayoutValues: LayoutValues {
         if let cachedLayoutValues { return cachedLayoutValues }
         let values = element.layoutValues(readingChildren: { $0.winUI.resolvedLayoutValues })
@@ -157,19 +168,16 @@ final class WinUIElement: NativeElement {
             // A described height owns dependent vertical geometry, not every
             // sibling's animation. Width may also reflow height; other layout
             // inputs can affect both axes.
-            var presented: AnimationLanes = []
+            var presented: Set<Prop> = []
             for property in changed where Self.layoutInputs.contains(property) {
                 let driven = element.driven[property].map { binding in
                     binding.mode != .in && host?.runtime.animator.animation(for: .state(binding.state)) != nil
                 } ?? false
                 guard driven || host?.runtime.animator.animation(
                     for: .described(DescribedKey(mount: element.mount, property: property))) != nil else { continue }
-                switch property {
-                case .height, .minimumHeight, .maximumHeight: presented.formUnion([.y, .height])
-                default: presented.formUnion(.all)
-                }
+                presented.insert(property)
             }
-            layoutItemChanged(presentedLanes: presented)
+            layoutItemChanged(presentedLanes: Self.geometryLanes(affectedBy: presented))
         }
         if wasDescribed, changed.contains(.isVisible) { crossVisibility() }
         applyProperties(changed: changed)
@@ -204,7 +212,9 @@ final class WinUIElement: NativeElement {
     }
 
     func presentFrame(_ changed: Set<Prop>) {
-        if !changed.isDisjoint(with: Self.layoutInputs) { layoutItemChanged(followingPresentation: true) }
+        if !changed.isDisjoint(with: Self.layoutInputs) {
+            layoutItemChanged(followingPresentation: true, presentedLanes: Self.geometryLanes(affectedBy: changed))
+        }
         applyProperties(changed: changed, followingPresentation: true)
     }
 
