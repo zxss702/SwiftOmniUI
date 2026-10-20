@@ -25,6 +25,37 @@ private final class PlanConsumptionChild: WinUILayoutView {
 }
 
 final class WinUILayoutPlanConsumptionTests: XCTestCase {
+    func testWidthOnlyAllocationObservesAWritingBatchsSecondLayoutChange() throws {
+        try onUIThread {
+            let input = WinUIZStackView()
+            let controls = WinUIZStackView()
+            var inputItem = WinUILayoutItem(view: input)
+            inputItem.values.expandingAxes = .horizontal
+            inputItem.values.height = 128
+            var controlsItem = WinUILayoutItem(view: controls)
+            controlsItem.values.width = 40
+            controlsItem.values.height = 40
+            let row = WinUIStackView(axis: .horizontal)
+            row.setItems([inputItem, controlsItem])
+
+            try ProgramWrite.perform {
+                row.spacing = 8
+                // Allocation can consume arithmetic without a native Measure.
+                row.prepareAllocation(in: Rect(0, 0, 320, 128))
+                // The container and both children's declared heights stay put.
+                // A second layout write must discard the just-prepared plan.
+                row.spacing = 24
+                row.arrange(width: 320, height: 128)
+                let inputFrame = try XCTUnwrap(input.committedFrame)
+                let controlsFrame = try XCTUnwrap(controls.committedFrame)
+                XCTAssertEqual(inputFrame, Rect(0, 0, 256, 128))
+                XCTAssertEqual(controlsFrame.x, 280)
+                XCTAssertEqual(controlsFrame.width, 40)
+                XCTAssertEqual(controlsFrame.x - inputFrame.width, 24)
+            }
+        }
+    }
+
     func testOpeningTabbedScrollContentInAWindowReachesAnIdleNativeLayout() {
         onUIThread {
             for extent in [40.0, 2000] {

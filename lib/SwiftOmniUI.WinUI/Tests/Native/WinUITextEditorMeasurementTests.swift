@@ -141,6 +141,7 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                                     .background {
                                         RoundedRectangle(cornerRadius: 20).fill(Color.white).id("new-fill")
                                     }
+                                    .contentShape(RoundedRectangle(cornerRadius: 20))
                                 Rectangle().fill(Color.clear).frame(height: 16).offset(y: -120)
                             }.frame(height: 128).id("new-composer")
                             if words.wrappedValue.isEmpty {
@@ -200,6 +201,9 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                 }
                 XCTAssertEqual(composer.laidOutFrame.width, emptyWidth + (text.isEmpty ? 0 : 48), accuracy: 1,
                                "the editor must receive the width released by changing two buttons from a row to a column")
+                let send = try XCTUnwrap(host.view(id: .manual("new-send")))
+                XCTAssertEqual(send.origin.x - (composer.origin.x + composer.laidOutFrame.width), 8, accuracy: 1,
+                               "a fixed-height composer must close the old controls' horizontal space")
                 // The 48 DIP strip released by the old HStack must be painted,
                 // rather than merely included in the TextBox's logical frame.
                 XCTAssertEqual(fill.pixels(at: [(composer.laidOutFrame.width - 2, 64)]), [0xFFFF_FFFF])

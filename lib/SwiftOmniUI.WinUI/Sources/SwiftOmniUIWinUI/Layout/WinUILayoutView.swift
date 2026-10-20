@@ -558,6 +558,7 @@ class WinUILayoutView: WinUIView {
     }
 
     private func keepLayoutPlan(in bounds: Rect, proposals: [NativeProposal]) {
+        WinUILayoutUpdates.readLayoutCache(self)
         layoutPlans.removeAll { $0.bounds == bounds }
         if layoutPlans.count == 4 { layoutPlans.removeFirst() }
         layoutPlans.append(LayoutPlan(
@@ -568,6 +569,7 @@ class WinUILayoutView: WinUIView {
     }
 
     private func cachedLayoutPlan(in bounds: Rect) -> LayoutPlan? {
+        WinUILayoutUpdates.readLayoutCache(self)
         let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
         let context = layoutSafeArea(in: bounds)
         return layoutPlans.first(where: {

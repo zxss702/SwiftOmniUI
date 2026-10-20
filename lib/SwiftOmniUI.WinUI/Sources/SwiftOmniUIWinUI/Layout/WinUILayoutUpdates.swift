@@ -22,8 +22,15 @@ enum WinUILayoutUpdates {
         return invalidated.insert(view.number).inserted
     }
 
-    static func measured(_ view: WinUIView) {
+    /// Arithmetic has observed the preceding writes. A later write in this
+    /// batch must invalidate the answer again, even when no XAML Measure ran.
+    /// This does not consume or submit a pending native layout request.
+    static func readLayoutCache(_ view: WinUIView) {
         invalidated.remove(view.number)
+    }
+
+    static func measured(_ view: WinUIView) {
+        readLayoutCache(view)
         // A native Measure inside a patch must see preceding writes immediately.
         if pending[view.number]?.measure == true {
             pending[view.number]?.measure = false

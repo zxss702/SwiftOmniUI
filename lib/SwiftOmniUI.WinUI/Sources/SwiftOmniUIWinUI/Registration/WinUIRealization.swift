@@ -168,6 +168,7 @@ enum WinUIRealization {
         .complete("WindowScene", "width"),
         .complete("WindowScene", "windowType"),
         .complete("WindowScene", "windowValue"),
+        .complete("WindowScene", "allowsRestoration"),
         .complete("WindowScene", "x"),
         .complete("WindowScene", "y"),
     ]

@@ -47,7 +47,7 @@ namespace swiftomniui {
                              static_cast<unsigned long>(GetCurrentProcessId()));
                 std::fflush(stderr);
                 if (file) {
-                    std::fprintf(file, "SOUI layout diagnostics v9 pid=%lu; sizes in DIPs; no input text\n",
+                    std::fprintf(file, "SOUI layout diagnostics v10 pid=%lu; sizes in DIPs; no input text\n",
                                  static_cast<unsigned long>(GetCurrentProcessId()));
                     std::fflush(file);
                     snapshotTimer = CreateThreadpoolTimer([](PTP_CALLBACK_INSTANCE, void *context, PTP_TIMER) {
@@ -122,7 +122,7 @@ namespace swiftomniui {
                 recent[next] = std::string(prefix) + (message ? message : "");
                 auto const &line = recent[next];
                 std::string_view event = message ? message : "";
-                if (event.substr(0, 6) == "split." || event.substr(0, 14) == "editor.commit "
+                if (event.substr(0, 6) == "split." || event.substr(0, 7) == "editor."
                     || event.substr(0, 7) == "picker." || event.substr(0, 8) == "runtime.") {
                     if (presentations.size() == 512) presentations.pop_front();
                     presentations.push_back(line);

@@ -48,6 +48,10 @@ than rerunning placement arithmetic against unrelated native measurements.
 Cached ZStack inset context is restored from the recorded bar rectangle.
 Custom Layout forwards both axes through size, dimensions and placement.
 Replacing the layout object invalidates its plan even with unchanged children.
+Reading or rebuilding a plan ends the preceding batch's cache-invalidation
+coalescing interval. A subsequent layout write must discard that plan even if
+the container's bounds and stated height are unchanged. This cache lifecycle
+does not submit or consume XAML Measure requests during allocation.
 Changes to a child's layout-value tags notify its nearest Custom Layout through
 `HostPatch.customLayoutChanged`; the mounted revision invalidates that
 container even when its LayoutBox and child identities remain unchanged.

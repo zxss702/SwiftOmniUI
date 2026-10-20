@@ -287,8 +287,12 @@ class WinUIView {
         // SOUI-owned slots have already committed it during parent Arrange.
         swiftomniui_winui_on_size_changed(nativeAllocation ?? handle, number) { number, width, height in
             MainActor.assumeIsolated {
-                guard let view = WinUIView.find(number), view.placingLayout == nil else { return }
-                view.commitNativeAllocation(width: width, height: height)
+                guard let view = WinUIView.find(number) else { return }
+                if view.placingLayout == nil { view.commitNativeAllocation(width: width, height: height) }
+                if let editor = view as? WinUITextEditorView {
+                    editor.recordAllocation("editor.native", frame: view.placedFrame,
+                                            room: Rect(0, 0, width, height))
+                }
             }
         }
     }
@@ -654,18 +658,7 @@ class WinUIView {
                 swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
             }
             if editorGeometryChanged, let editor = self as? WinUITextEditorView {
-                let height = swiftomniui_winui_editor_allocated_height(handle)
-                var decorations: [String] = []
-                var owner = placingLayout
-                while let layout = owner {
-                    for item in layout.items where item.values.isLayoutDecoration {
-                        let committed = item.view.committedFrame.map(WinUILayoutDiagnostics.rect) ?? "uncommitted"
-                        decorations.append("\(item.view.number):allocated=\(committed),native=\(WinUILayoutDiagnostics.rect(item.view.laidOutFrame))")
-                    }
-                    owner = layout.placingLayout
-                }
-                WinUILayoutDiagnostics.record("editor.commit", view: self,
-                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) control=\(WinUILayoutDiagnostics.rect(editor.controlFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize)) heightConstraint=\(height) decorations=[\(decorations.joined(separator: ";"))]")
+                editor.recordAllocation("editor.commit", frame: place, room: room)
             }
         } else if moved {
             // The parent's next Arrange prepares the latest presentation slot.
