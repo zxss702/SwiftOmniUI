@@ -140,11 +140,13 @@ public struct Grid: LayoutView, GridProperties {
     /// `GridRow`'s children one to a column, a bare child a row of its own
     /// spanning every column the rows make.
     private static func cells(of children: [Node], alignment: Alignment) -> [Node] {
-        let rows = children.map { child -> (bare: Bool, alignment: AxisAlignment, cells: [Node]) in
-            guard child.type == GridRowContract.nodeType else { return (true, .fill, [child]) }
+        let rows = children.enumerated().map { entry -> (key: String, bare: Bool, alignment: AxisAlignment, cells: [Node]) in
+            let (index, child) = entry
+            let key = child.id.map { "id[\($0)]" } ?? child.key.map { "key[\($0)]" } ?? "position[\(index)]"
+            guard child.type == GridRowContract.nodeType else { return (key, true, .fill, [child]) }
             let axis = AxisAlignment(rawValue: child.props[.verticalAlignment]?.enumeration ?? -1)
                 ?? alignment.vertical.axis
-            return (false, axis, child.producer?() ?? [])
+            return (key, false, axis, child.producer?() ?? [])
         }
         let columns = max(rows.map(\.cells.count).max() ?? 1, 1)
         var cells: [Node] = []
@@ -152,6 +154,10 @@ public struct Grid: LayoutView, GridProperties {
         for (row, laid) in rows.enumerated() {
             for (column, cell) in laid.cells.enumerated() {
                 var cell = cell
+                // Splicing rows removes an identity boundary. Keep equal cell
+                // identifiers in different rows distinct in the flat child list.
+                if let id = cell.id { cell.id = "row[\(laid.key)]/cell[\(id)]" }
+                cell.key = "row[\(laid.key)]/\(cell.key ?? String(column))"
                 cell.write(ViewContract.gridRow, row)
                 cell.write(ViewContract.gridColumn, column)
                 if laid.bare {

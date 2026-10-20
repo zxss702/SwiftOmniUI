@@ -124,6 +124,12 @@ whichever is more; an undefined track is a proportional track of one share.
 A child's cell is its row and column, clamped into the grid, spanning its
 spans.
 
+The SwiftUI `Grid(alignment:horizontalSpacing:verticalSpacing:)` initializer
+uses content-sized implicit tracks instead. `GridRow` children become cells;
+bare children span the columns. Splicing rows into the flat child list scopes
+each cell's identity by its row, so repeated column identifiers in different
+rows cannot replace one another. Explicit host track definitions still win.
+
 ## Tracks
 
 A fixed track is its length. An automatic track is as large as its largest

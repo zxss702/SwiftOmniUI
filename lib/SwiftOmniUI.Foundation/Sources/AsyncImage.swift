@@ -36,11 +36,7 @@ public struct AsyncImage<Content: View>: View {
             do {
                 let file = try await AsyncImageFiles.shared.file(for: url)
                 try Task.checkCancellation()
-                var path = file.path(percentEncoded: false)
-                #if os(Windows)
-                if path.hasPrefix("/"), path.dropFirst(2).hasPrefix(":") { path.removeFirst() }
-                #endif
-                phase = .success(Image(ImageSource(path)))
+                phase = .success(Image(ImageSource(asyncImagePath(file))))
             } catch {
                 guard !Task.isCancelled else { return }
                 phase = .failure(error)
@@ -54,8 +50,14 @@ private actor AsyncImageFiles {
     private var requests: [URL: Task<URL, any Error>] = [:]
 
     func file(for url: URL) async throws -> URL {
-        if url.isFileURL { return url }
+        if url.isFileURL {
+            guard FileManager.default.fileExists(atPath: asyncImagePath(url)) else {
+                throw URLError(.fileDoesNotExist)
+            }
+            return url
+        }
         if let request = requests[url] { return try await request.value }
+        if requests.count >= 128 { requests.removeAll(keepingCapacity: true) }
         let request = Task<URL, any Error> {
             let (data, response) = try await URLSession.shared.data(from: url)
             if let response = response as? HTTPURLResponse, !(200..<300).contains(response.statusCode) {
@@ -72,4 +74,12 @@ private actor AsyncImageFiles {
         do { return try await request.value }
         catch { requests[url] = nil; throw error }
     }
+}
+
+private func asyncImagePath(_ url: URL) -> String {
+    var path = url.path(percentEncoded: false)
+    #if os(Windows)
+    if path.hasPrefix("/"), path.dropFirst(2).hasPrefix(":") { path.removeFirst() }
+    #endif
+    return path
 }

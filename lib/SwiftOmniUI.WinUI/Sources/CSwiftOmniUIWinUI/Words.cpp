@@ -12,6 +12,8 @@
 #include <cmath>
 #include <cwchar>
 #include <cwctype>
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -30,8 +32,6 @@ namespace documents = winrt::Microsoft::UI::Xaml::Documents;
 extern "C" void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef handle, int32_t style) {
     try {
         using winrt::Microsoft::UI::Input::InputSystemCursorShape;
-        auto element = as<xaml::UIElement>(handle).as<xaml::IUIElementProtected>();
-        if (style < 0) { element.ProtectedCursor(nullptr); return; }
         auto shape = InputSystemCursorShape::Arrow;
         switch (style) {
         case 1: case 2: case 3: case 11: shape = InputSystemCursorShape::IBeam; break;
@@ -42,7 +42,23 @@ extern "C" void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef handle,
         case 13: shape = InputSystemCursorShape::SizeNorthSouth; break;
         case 14: shape = InputSystemCursorShape::SizeNorthwestSoutheast; break;
         }
-        element.ProtectedCursor(winrt::Microsoft::UI::Input::InputSystemCursor::Create(shape));
+        auto apply = [shape, style](xaml::FrameworkElement const &target) {
+            auto element = target.as<xaml::IUIElementProtected>();
+            if (style < 0) element.ProtectedCursor(nullptr);
+            else element.ProtectedCursor(winrt::Microsoft::UI::Input::InputSystemCursor::Create(shape));
+        };
+        auto target = as<xaml::FrameworkElement>(handle);
+        if (target.IsLoaded()) apply(target);
+        else {
+            // ProtectedCursor requires a live XamlRoot. Unsubscribe before
+            // applying so later attachments do not accumulate callbacks.
+            auto token = std::make_shared<winrt::event_token>();
+            *token = target.Loaded([weak = winrt::make_weak(target), token, apply](auto const &, auto const &) {
+                try {
+                    if (auto target = weak.get()) { target.Loaded(*token); apply(target); }
+                } catch (...) { report("loaded pointer style"); }
+            });
+        }
     } catch (...) { report("pointer style"); }
 }
 
@@ -376,6 +392,7 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
                     media::TranslateTransform shift;
                     shift.Y(-run.baseline);
                     part.RenderTransform(shift);
+                    part.Tag(winrt::box_value(true)); // Raised text retains all of its source characters.
                     holder.Child(part);
                 }
                 inlines.Append(holder);
@@ -556,11 +573,16 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
 ) {
     try {
         auto block = labelWords(handle);
+        auto coordinates = as<xaml::UIElement>(handle);
         int32_t at = 0;
-        auto append = [&](documents::TextPointer const &start, std::wstring_view string) {
+        auto append = [&](documents::TextPointer const &start, std::wstring_view string,
+                          xaml::UIElement const &owner = nullptr) {
             for (int32_t i = 0; i < static_cast<int32_t>(string.size()) && at < capacity; ++i, ++at) {
                 auto position = start.GetPositionAtOffset(i, documents::LogicalDirection::Forward);
+                if (!position) continue;
                 auto rect = position.GetCharacterRect(documents::LogicalDirection::Forward);
+                if (owner) rect = owner.TransformToVisual(block).TransformBounds(rect);
+                rect = block.TransformToVisual(coordinates).TransformBounds(rect);
                 rectangles[at * 4] = rect.X;
                 rectangles[at * 4 + 1] = rect.Y;
                 rectangles[at * 4 + 2] = rect.Width;
@@ -571,15 +593,26 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
             auto words = block.Text();
             append(block.ContentStart(), std::wstring_view(words.c_str(), words.size()));
         } else {
-            for (auto const &inlineValue : block.Inlines()) {
+            std::function<void(documents::Inline const &)> visit = [&](documents::Inline const &inlineValue) {
                 if (auto run = inlineValue.try_as<documents::Run>()) {
                     auto words = run.Text();
                     append(run.ContentStart(), std::wstring_view(words.c_str(), words.size()));
+                } else if (auto span = inlineValue.try_as<documents::Span>()) {
+                    for (auto const &child : span.Inlines()) visit(child);
+                } else if (auto holder = inlineValue.try_as<documents::InlineUIContainer>()) {
+                    auto child = holder.Child().try_as<controls::TextBlock>();
+                    if (child && winrt::unbox_value_or<bool>(child.Tag(), false)) {
+                        auto words = child.Text();
+                        append(child.ContentStart(), std::wstring_view(words.c_str(), words.size()), child);
+                    } else {
+                        append(inlineValue.ContentStart(), L"\uFFFC");
+                    }
                 } else {
                     // Embedded glyphs occupy one replacement character.
                     append(inlineValue.ContentStart(), L"\uFFFC");
                 }
-            }
+            };
+            for (auto const &inlineValue : block.Inlines()) visit(inlineValue);
         }
         return at;
     } catch (...) { report("reading native text geometry"); return 0; }

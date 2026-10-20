@@ -21,19 +21,6 @@ class WinUILayoutView: WinUIView {
     private var nativePreparationDepth = 0
     private var hadSwiftAllocation = false
 
-    private var nativeMeasureCheckpoint: (order: UInt64, proposal: ProposedViewSize, answer: LayoutSize, swiftOwned: Bool)?
-    private var nativeArrangeCheckpoint: (order: UInt64, bounds: Rect, submitted: Bool)?
-
-    var nativeAllocationDiagnostic: String {
-        let measure = nativeMeasureCheckpoint.map {
-            "\($0.order)/\(WinUILayoutDiagnostics.proposal(width: $0.proposal.width, height: $0.proposal.height))/answer=\(WinUILayoutDiagnostics.size($0.answer))/swiftOwned=\($0.swiftOwned)"
-        } ?? "none"
-        let arrange = nativeArrangeCheckpoint.map {
-            "\($0.order)/\(WinUILayoutDiagnostics.rect($0.bounds))/submitted=\($0.submitted)"
-        } ?? "none"
-        return ",allocated=\(WinUILayoutDiagnostics.rect(allocatedBounds)),lastMeasure=\(measure),lastArrange=\(arrange)"
-    }
-
     private var hasSwiftAllocation: Bool {
         placingLayout != nil && nativeContentOwner == nil && nativeSafeBarOwner == nil
             && nativeLayoutOwner == nil && rootSafeAreaContext == nil
@@ -257,8 +244,6 @@ class WinUILayoutView: WinUIView {
             pendingChildren = nil
             return
         }
-        WinUILayoutDiagnostics.record("children.change", view: self,
-            "oldCount=\(held.count) nextCount=\(views.count) next=\(views.prefix(32).map(\.number)) defer=\(WinUIView.arranging > 0 || WinUIView.measuring > 0)")
         if WinUIView.arranging > 0 || WinUIView.measuring > 0 {
             pendingChildren = proposed
             guard !childrenCommitPending else { return }
@@ -334,8 +319,6 @@ class WinUILayoutView: WinUIView {
 
     /// Asks WinUI to arrange the children again: a place in the air lands in the pass it asks for.
     func invalidateArrange() {
-        WinUILayoutDiagnostics.record("invalidate.arrange", view: self,
-            "pending=\(nativeArrangePending) programWrite=\(ProgramWrite.isWriting)")
         guard !WinUILayoutUpdates.enqueue(self, measure: false) else { return }
         guard WinUIView.arranging == 0, WinUIView.measuring == 0 else {
             guard !nativeArrangePending else { return }
@@ -352,15 +335,14 @@ class WinUILayoutView: WinUIView {
     }
 
     /// Forgets the kept sizes and asks WinUI to measure again.
-    func invalidateMeasurements(file: StaticString = #fileID, line: UInt = #line) {
-        WinUILayoutDiagnostics.record("invalidate.tree", view: self, file: file, line: line)
+    func invalidateMeasurements() {
         invalidateOwnMeasurements()
         if self is WinUILazyView { return }
         if let parent = (self as? WinUIScrollDocument)?.scrollView ?? placingLayout {
-            parent.invalidateMeasurements(file: file, line: line)
+            parent.invalidateMeasurements()
         } else if let owner = nativeContentOwner {
             owner.invalidateMeasure()
-            owner.placingLayout?.invalidateMeasurements(file: file, line: line)
+            owner.placingLayout?.invalidateMeasurements()
         }
     }
 
@@ -430,8 +412,6 @@ class WinUILayoutView: WinUIView {
         if hasNativeProposals,
            !hasSizing || lastSizingWidth != proposal.width || lastSizingHeight != proposal.height
             || cachedLayoutPlan(in: planBounds(proposal: proposal, natural: naturalSize(proposal: proposal))) == nil {
-            WinUILayoutDiagnostics.record("prepare.restore", view: self,
-                "proposal=\(WinUILayoutDiagnostics.proposal(width: proposal.width, height: proposal.height)) previous=\(WinUILayoutDiagnostics.proposal(width: lastSizingWidth, height: lastSizingHeight)) hasSizing=\(hasSizing)")
             // An intrinsic probe can change a descendant's last native
             // proposal without changing this panel's own cached Measure.
             // Restore its child plan directly instead of forcing another
@@ -457,8 +437,6 @@ class WinUILayoutView: WinUIView {
         let bounds = Self.nativeRect(bounds)
         if hasSizing, lastSizingWidth == bounds.width, lastSizingHeight == bounds.height,
            cachedLayoutPlan(in: bounds) != nil { return }
-        WinUILayoutDiagnostics.record("prepare.allocation", view: self,
-            "bounds=\(WinUILayoutDiagnostics.rect(bounds))")
         let previousHeight = measurementHeight
         measurementHeight = bounds.height
         defer { measurementHeight = previousHeight }
@@ -507,8 +485,6 @@ class WinUILayoutView: WinUIView {
             measured = (proposal, size)
             let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
             let framed = values.sized(size, offered: proposal.width)
-            WinUILayoutDiagnostics.record("measure.natural", view: self,
-                "proposal=\(WinUILayoutDiagnostics.proposal(width: proposal.width, height: proposal.height)) natural=\(WinUILayoutDiagnostics.size(size)) framed=\(WinUILayoutDiagnostics.size(framed))")
             let answer: LayoutSize
             if nativeLayoutOwner != nil || rootSafeAreaContext != nil {
                 // A native page/window has already allocated these finite
@@ -528,7 +504,6 @@ class WinUILayoutView: WinUIView {
             } else {
                 answer = LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
             }
-            nativeMeasureCheckpoint = (WinUILayoutDiagnostics.checkpoint(), proposal, answer, hasSwiftAllocation)
             return answer
         }
     }
@@ -568,8 +543,6 @@ class WinUILayoutView: WinUIView {
             _ = prepareLayoutPlan(in: bounds)
             let current = naturalSize(proposal: proposal)
             if planBounds(proposal: proposal, natural: current) == bounds { return current }
-            WinUILayoutDiagnostics.record("plan.resize", view: self,
-                "bounds=\(WinUILayoutDiagnostics.rect(bounds)) previous=\(WinUILayoutDiagnostics.size(size)) current=\(WinUILayoutDiagnostics.size(current))")
         }
     }
 
@@ -596,9 +569,6 @@ class WinUILayoutView: WinUIView {
 
     private func completedLayoutPlan(in bounds: Rect) -> LayoutPlan {
         if let plan = cachedLayoutPlan(in: bounds) { return plan }
-        let context = layoutSafeArea(in: bounds)
-        WinUILayoutDiagnostics.record("plan.build", view: self,
-            "bounds=\(WinUILayoutDiagnostics.rect(bounds)) safe=\(WinUILayoutDiagnostics.rect(context.safe)) cached=\(layoutPlans.count)")
         let previousBounds = preparingBounds
         preparingBounds = bounds
         let proposals = Self.querySize { makeLayoutPlan(in: bounds) }.map {
@@ -623,8 +593,6 @@ class WinUILayoutView: WinUIView {
             }
             // Preparation may resolve an attached template or inherited font.
             // Recompute before giving those child rectangles to Arrange.
-            WinUILayoutDiagnostics.record("plan.refine", view: self,
-                "bounds=\(WinUILayoutDiagnostics.rect(bounds)) revision=\(revision)->\(measurementRevision) nativeRevision=\(before)->\(WinUIView.nativeSizeRevision) stale=\(plan.dependencies.filter { !$0.isCurrent }.compactMap { $0.view?.number })")
             forgetMeasurements()
             prepareLayoutContent(in: bounds, measuringNative: preparation == .measure)
             plan = completedLayoutPlan(in: bounds)
@@ -696,7 +664,6 @@ class WinUILayoutView: WinUIView {
     /// Answers WinUI's arrange: places the box and every child in `width` by `height` DIPs, inside the pass.
     func arrange(width: Double, height: Double) {
         let bounds = Self.nativeRect(Rect(0, 0, width, height))
-        nativeArrangeCheckpoint = (WinUILayoutDiagnostics.checkpoint(), bounds, isNativeArranging)
         let nativeRoomChanged = !isNativeArranging && placingLayout == nil
             && allocatedBounds.width > 0 && allocatedBounds.height > 0
             && (allocatedBounds.width != bounds.width || allocatedBounds.height != bounds.height)
@@ -786,8 +753,6 @@ class WinUILayoutView: WinUIView {
         let input = SafeAreaInput(bounds: edges(context.bounds), container: edges(context.container),
                                   keyboard: edges(context.keyboard), consumed: context.consumed)
         guard input != lastSafeAreaInput else { return }
-        WinUILayoutDiagnostics.record("safeArea.changed", view: self,
-            "layout=\(WinUILayoutDiagnostics.rect(context.layout)) bounds=\(WinUILayoutDiagnostics.rect(context.bounds)) safe=\(WinUILayoutDiagnostics.rect(context.safe)) previous=\(String(describing: lastSafeAreaInput)) next=\(input)")
         lastSafeAreaInput = input
         layoutContextChanged()
         // Different native proposals can project the same environment to

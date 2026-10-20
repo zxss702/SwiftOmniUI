@@ -40,20 +40,16 @@ enum WinUIDoorbell {
         guard WinUIView.arranging == 0, WinUIView.measuring == 0 else { return }
         let works = pending
         pending = []
-        if !works.isEmpty { WinUILayoutDiagnostics.record("defer.drain.begin", view: nil, "count=\(works.count)") }
         for work in works { work() }
-        if !works.isEmpty { WinUILayoutDiagnostics.record("defer.drain.end", view: nil, "newPending=\(pending.count)") }
     }
 }
 
 extension WinUIDoorbell {
     /// Runs `work` in the next turn posted, once the layout pass under way is over: what a pass decides - a split
     /// view's first room - is said once WinUI has finished laying out.
-    @MainActor static func afterPass(file: StaticString = #fileID, line: UInt = #line,
-                                     _ work: @escaping @MainActor () -> Void) {
+    @MainActor static func afterPass(_ work: @escaping @MainActor () -> Void) {
         let needsTurn = pending.isEmpty
         pending.append(work)
-        WinUILayoutDiagnostics.record("defer.enqueue", view: nil, "count=\(pending.count)", file: file, line: line)
         if needsTurn { swiftomniui_winui_post_turn() }
         WinUIRenderer.shared?.runtime.displayCycle.hold()
     }

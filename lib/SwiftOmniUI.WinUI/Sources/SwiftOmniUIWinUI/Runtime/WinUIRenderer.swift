@@ -141,23 +141,9 @@ final class WinUIRenderer {
 
     /// A plain launch targets the first declared window, restoring one minimized by the user.
     func activateInitialWindow() {
-        swiftomniui_winui_layout_trace("runtime.activation.resolve.begin")
-        guard let element = runtime.initialWindowForActivation() else {
-            swiftomniui_winui_layout_trace("runtime.activation.resolve missingDefault=true")
-            Self.log.note("Application activation has no resolved default window.")
-            return
-        }
-        let kind = element.value(.windowType)?.name ?? "unnamed"
-        guard let controller = roster.controller(of: element) else {
-            "runtime.activation.resolve kind=\(kind) mounted=false".withCString { swiftomniui_winui_layout_trace($0) }
-            Self.log.error("Application activation selected \(kind), but its native window is not mounted.")
-            return
-        }
-        "runtime.activation.resolve kind=\(kind) mounted=true window=\(controller.window.number) closed=\(controller.window.isClosed)"
-            .withCString { swiftomniui_winui_layout_trace($0) }
-        Self.log.note("Application activation selected \(kind), native window \(controller.window.number).")
+        guard let element = runtime.initialWindowForActivation(),
+              let controller = roster.controller(of: element) else { return }
         swiftomniui_winui_window_activate(controller.window.handle)
-        swiftomniui_winui_layout_trace("runtime.activation.resolve.end")
     }
 
     /// Renders the application whole: the scenes kept for this start come back, else one new scene.

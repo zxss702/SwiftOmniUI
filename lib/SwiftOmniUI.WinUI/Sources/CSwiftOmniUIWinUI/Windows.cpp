@@ -378,7 +378,6 @@ extern "C" void swiftomniui_winui_window_activate(SwiftOmniUIObjectRef handle) {
     try {
         auto window = borrow<xaml::Window>(handle);
         auto app = window.AppWindow();
-        traceLayout(("runtime.activation.window.begin id=" + std::to_string(app.Id().Value)).c_str());
         if (auto presenter = app.Presenter().try_as<windowing::OverlappedPresenter>(); presenter && minimized(app)) {
             presenter.Restore();
         }
@@ -386,10 +385,7 @@ extern "C" void swiftomniui_winui_window_activate(SwiftOmniUIObjectRef handle) {
         window.Activate();
         // XAML activation alone can leave an existing window behind another process. A redirected launch's
         // sender has granted this process foreground permission; let Windows activate and raise the window.
-        auto hwnd = reinterpret_cast<HWND>(app.Id().Value);
-        auto raised = SetForegroundWindow(hwnd);
-        traceLayout((std::string("runtime.activation.window.end raised=") + (raised ? "true" : "false")
-            + " foreground=" + (GetForegroundWindow() == hwnd ? "true" : "false")).c_str());
+        SetForegroundWindow(reinterpret_cast<HWND>(app.Id().Value));
     } catch (...) {
         report("showing a window");
     }

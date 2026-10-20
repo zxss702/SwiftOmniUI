@@ -21,12 +21,24 @@
         return TextLayoutReport(lines: groups.keys.sorted().compactMap { key in
             guard let glyphs = groups[key], let first = glyphs.first else { return nil }
             let rect = glyphs.dropFirst().reduce(first.rect) { union($0, $1.rect) }
-            // Preserve logical order, including mixed-direction text. One native
-            // grapheme per run avoids assuming that visual and source order agree.
-            return TextLayoutReport.Line(rect: rect, runs: glyphs.map {
-                TextLayoutReport.Run(rect: $0.rect, direction: $0.direction, span: -1,
-                                     slices: [$0.rect], sliceTexts: [$0.text])
-            })
+            // Keep source order inside directional runs; slices retain the native
+            // grapheme boundaries. A run per glyph would multiply wire payload
+            // and preference-copy costs for long paragraphs.
+            var runs: [TextLayoutReport.Run] = []
+            var current: [Glyph] = []
+            func flush() {
+                guard let first = current.first else { return }
+                let bounds = current.dropFirst().reduce(first.rect) { union($0, $1.rect) }
+                runs.append(TextLayoutReport.Run(rect: bounds, direction: first.direction, span: -1,
+                                                 slices: current.map(\.rect), sliceTexts: current.map(\.text)))
+                current.removeAll(keepingCapacity: true)
+            }
+            for glyph in glyphs {
+                if let previous = current.last, previous.direction != glyph.direction { flush() }
+                current.append(glyph)
+            }
+            flush()
+            return TextLayoutReport.Line(rect: rect, runs: runs)
         })
     }
 

@@ -216,7 +216,6 @@ class WinUIView {
     }
 
     func nativeParentChanged() {
-        WinUILayoutDiagnostics.record("parent.changed", view: self)
         hierarchyRevision &+= 1
         discardMeasurementResults()
     }
@@ -227,24 +226,6 @@ class WinUIView {
     /// Geometry committed with the native allocation, distinct from the next
     /// presentation sample waiting for its parent's Arrange.
     private(set) var committedFrame: Rect?
-
-    // Diagnostic checkpoints distinguish a sampled request waiting for its
-    // parent from a rectangle actually submitted to XAML. They own no geometry.
-    private var allocationRequest: (order: UInt64, inArrange: Bool)?
-    private var allocationSubmission: (order: UInt64, frame: Rect)?
-
-    var allocationDiagnostic: String {
-        var raw = [0.0, 0.0, 0.0, 0.0]
-        var desired = [0.0, 0.0]
-        swiftomniui_winui_frame(layoutHandle, &raw)
-        swiftomniui_winui_desired_size(layoutHandle, &desired)
-        let request = allocationRequest.map { "\($0.order)/arranging=\($0.inArrange)" } ?? "none"
-        let submitted = allocationSubmission.map { "\($0.order)/\(WinUILayoutDiagnostics.rect($0.frame))" } ?? "none"
-        let committed = committedFrame.map(WinUILayoutDiagnostics.rect) ?? "none"
-        let native = Rect(raw[0], raw[1], raw[2], raw[3])
-        let layout = (self as? WinUILayoutView)?.nativeAllocationDiagnostic ?? ""
-        return "\(number):\(type(of: self)):request=\(request),placed=\(WinUILayoutDiagnostics.rect(placedFrame)),submitted=\(submitted),committed=\(committed),raw=\(WinUILayoutDiagnostics.rect(native)),desired=\(desired[0])x\(desired[1]),presenter=\(blurPresenter != nil),native=\(WinUILayoutDiagnostics.rect(laidOutFrame))\(layout)"
-    }
 
     /// How opaque the view's own property draws it, and whether it shows, as the host last wrote them.
     private(set) var opacity = 1.0
@@ -311,10 +292,6 @@ class WinUIView {
             MainActor.assumeIsolated {
                 guard let view = WinUIView.find(number) else { return }
                 if view.placingLayout == nil { view.commitNativeAllocation(width: width, height: height) }
-                if let editor = view as? WinUITextEditorView {
-                    editor.recordAllocation("editor.native", frame: view.placedFrame,
-                                            room: Rect(0, 0, width, height))
-                }
             }
         }
     }
@@ -501,9 +478,7 @@ class WinUIView {
     }
 
     /// Asks WinUI to measure this element again, and every panel above it.
-    func invalidateMeasure(file: StaticString = #fileID, line: UInt = #line) {
-        WinUILayoutDiagnostics.record("invalidate.measure", view: self, "programWrite=\(ProgramWrite.isWriting)",
-                                      file: file, line: line)
+    func invalidateMeasure() {
         guard WinUILayoutUpdates.invalidate(self) else { return }
         discardMeasurementResults()
         guard !WinUILayoutUpdates.enqueue(self, measure: true) else { return }
@@ -522,7 +497,6 @@ class WinUIView {
     }
 
     func requestNativeMeasure() {
-        WinUILayoutDiagnostics.record("invalidate.native.request", view: self, "pending=\(nativeMeasurePending)")
         guard Self.arranging == 0, Self.measuring == 0 else {
             guard !nativeMeasurePending else { return }
             nativeMeasurePending = true
@@ -540,7 +514,6 @@ class WinUIView {
     /// Native invalidation is separate from discarding Swift's arithmetic:
     /// a viewport notice may update the tree inside ArrangeOverride.
     func invalidateNativeMeasure() {
-        WinUILayoutDiagnostics.record("invalidate.native.commit", view: self)
         swiftomniui_winui_invalidate_measure(layoutHandle)
     }
 
@@ -597,8 +570,6 @@ class WinUIView {
            let measured = measuredSizes.first(where: {
                $0.width == width && $0.height == height
            }) {
-            WinUILayoutDiagnostics.record("probe.cached", view: self,
-                "proposal=\(WinUILayoutDiagnostics.proposal(width: width, height: height)) answer=\(WinUILayoutDiagnostics.size(measured.size))")
             return measured.size
         }
         precondition(!isNativeArranging, "native size probes cannot reenter an arranging view")
@@ -608,22 +579,17 @@ class WinUIView {
             invalidateNativeMeasure()
         }
         let contentRevision = measurementRevision
-        let trace = WinUILayoutDiagnostics.begin("native.measure", view: self,
-            "proposal=\(WinUILayoutDiagnostics.proposal(width: width, height: height))")
         var size = [0.0, 0.0]
         withNativeMeasure {
             swiftomniui_winui_measure(presentationHandle, width ?? .infinity, height ?? .infinity, &size)
         }
         let measured = LayoutSize(width: size[0], height: size[1])
-        WinUILayoutDiagnostics.end(trace, view: self, "desired=\(WinUILayoutDiagnostics.size(measured))")
         guard contentRevision == measurementRevision else {
             measuredSizes.removeAll(keepingCapacity: true)
             return measured
         }
         if let previous = measuredSizes.first(where: { $0.width == width && $0.height == height }),
            previous.size != measured {
-            WinUILayoutDiagnostics.record("probe.corrected", view: self,
-                "proposal=\(WinUILayoutDiagnostics.proposal(width: width, height: height)) previous=\(WinUILayoutDiagnostics.size(previous.size)) current=\(WinUILayoutDiagnostics.size(measured))")
             // A changed answer at the same proposal invalidates all intrinsic
             // answers for the old native content, not just this allocation.
             measuredSizes.removeAll(keepingCapacity: true)
@@ -657,7 +623,6 @@ class WinUIView {
     /// the layout for one. Its size is its words' room while its place travels.
     /// Design: docs/design/platforms/winui/layout.md#a-place-between-passes
     func layout(_ place: Rect) {
-        allocationRequest = (WinUILayoutDiagnostics.checkpoint(), Self.arranging > 0)
         let moved = placed != place
         if nativeSafeBarOwner == nil { placed = place }
         if Self.arranging > 0 {
@@ -665,11 +630,7 @@ class WinUIView {
                 setLayoutContext(placingLayout.context(for: self, at: place)
                     .ignoring(sourceElement?.ignoresSafeArea))
             }
-            let resized = committedFrame.map { $0.width != place.width || $0.height != place.height } ?? true
-            let editorGeometryChanged = sourceElement?.type == .textEditor && committedFrame != place
             let room = wordsRoom ?? place
-            WinUILayoutDiagnostics.record("place", view: self,
-                "frame=\(WinUILayoutDiagnostics.rect(place)) measureRoom=\(WinUILayoutDiagnostics.rect(room)) resized=\(resized)")
             // Complete placement input, preserving the native Measure result.
             // The same contract applies to SOUI and native XAML containers.
             prepareAllocation(in: Rect(0, 0, room.width, room.height))
@@ -677,19 +638,8 @@ class WinUIView {
                 layout.standsAt = place.width
             }
             commitAllocationGeometry(in: place)
-            allocationSubmission = (WinUILayoutDiagnostics.checkpoint(), room)
             withNativeArrange {
                 swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
-            }
-            if self is WinUILayoutView, placingLayout != nil {
-                let actual = laidOutFrame
-                if abs(actual.width - room.width) > 0.01 || abs(actual.height - room.height) > 0.01 {
-                    WinUILayoutDiagnostics.record("allocation.diverged", view: self,
-                        "ancestors=[\(WinUILayoutDiagnostics.allocationChain(from: self))]")
-                }
-            }
-            if editorGeometryChanged, let editor = self as? WinUITextEditorView {
-                editor.recordAllocation("editor.commit", frame: place, room: room)
             }
         } else if moved {
             // The parent's next Arrange prepares the latest presentation slot.

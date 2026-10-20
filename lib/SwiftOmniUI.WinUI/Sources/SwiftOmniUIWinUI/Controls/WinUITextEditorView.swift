@@ -27,28 +27,11 @@ final class WinUITextEditorView: WinUIInputView {
     }
 
     /// The retained TextBox's geometry inside its allocation boundary. Keep it
-    /// distinct from the boundary so diagnostics/tests detect template clipping.
+    /// distinct from the boundary so tests detect template clipping.
     var controlFrame: Rect {
         var frame = [0.0, 0.0, 0.0, 0.0]
         swiftomniui_winui_frame(handle, &frame)
         return Rect(frame[0], frame[1], frame[2], frame[3])
-    }
-
-    /// Observe both the submitted geometry and XAML's completed size delivery.
-    /// Reading ancestors here does not measure, arrange or request another pass.
-    func recordAllocation(_ event: String, frame: Rect, room: Rect) {
-        var decorations: [String] = []
-        var owner = placingLayout
-        while let layout = owner {
-            for item in layout.items where item.values.isLayoutDecoration {
-                let committed = item.view.committedFrame.map(WinUILayoutDiagnostics.rect) ?? "uncommitted"
-                decorations.append("\(item.view.number):allocated=\(committed),native=\(WinUILayoutDiagnostics.rect(item.view.laidOutFrame))")
-            }
-            owner = layout.placingLayout
-        }
-        let height = swiftomniui_winui_editor_allocated_height(handle)
-        WinUILayoutDiagnostics.record(event, view: self,
-            "frame=\(WinUILayoutDiagnostics.rect(frame)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) control=\(WinUILayoutDiagnostics.rect(controlFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize)) heightConstraint=\(height) ancestors=[\(WinUILayoutDiagnostics.allocationChain(from: self))] decorations=[\(decorations.joined(separator: ";"))]")
     }
 
     /// Arithmetic queries must not change the live TextBox's native Measure

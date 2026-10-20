@@ -84,23 +84,17 @@ enum WinUICallbacks {
                 nonisolated(unsafe) let size = size
                 MainActor.assumeIsolated {
                     guard let layout = WinUIView.find(view) as? WinUILayoutView, let size else { return }
-                    let call = WinUILayoutDiagnostics.begin("measure", view: layout,
-                        "proposal=\(WinUILayoutDiagnostics.proposal(width: width, height: height))")
                     // Keep the enclosing Arrange visible to structural safety
                     // checks. The measured child has its own phase scope.
                     let measured = layout.measure(width: width, height: height)
                     size[0] = measured.width
                     size[1] = measured.height
-                    WinUILayoutDiagnostics.end(call, view: layout, "returned=\(WinUILayoutDiagnostics.size(measured))")
                 }
             },
             arrange: { view, width, height in
                 MainActor.assumeIsolated {
                     if let layout = WinUIView.find(view) as? WinUILayoutView {
-                        let call = WinUILayoutDiagnostics.begin("arrange", view: layout,
-                            "bounds=\(WinUILayoutDiagnostics.proposal(width: width, height: height))")
                         layout.arrange(width: width, height: height)
-                        WinUILayoutDiagnostics.end(call, view: layout)
                     } else {
                         WinUIView.find(view)?.commitNativeAllocation(width: width, height: height)
                     }

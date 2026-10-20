@@ -28,6 +28,17 @@ as its text block was. What assistive technology meets of a label is its text
 block - a border has no automation peer - so its identifier, name, hint and
 heading level are the text block's.
 
+`textSelection(.enabled)` enables `TextBlock.IsTextSelectionEnabled`. A subtree
+reading `Text.LayoutKey` requests source-grapheme rectangles from the live text
+block's `TextPointer`s after layout. UTF-16 rectangles are joined into Swift
+graphemes; raised inline text is transformed back into the owning label's
+coordinates. Labels without a layout reader do no per-character geometry work.
+Reports are invalidated by text, typography, wrapping, alignment and size changes.
+
+`pointerStyle` sets WinUI's `ProtectedCursor` through its projected protected
+interface, after the element is loaded; removing it restores inheritance.
+Continuous hover uses the native pointer events in local coordinates.
+
 WinUI spaces letters in thousandths of an em and lines in DIPs, where SwiftOmniUI
 gives the first in points and the second as a multiple of the font's own
 line: both are worked out against the font's size, a line of Segoe UI taken as

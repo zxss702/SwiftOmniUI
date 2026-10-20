@@ -168,7 +168,7 @@ extension Text {
         /// Two layouts agree when they were folded of the same report's
         /// generation - the box standing behind them reads live either way.
         public static func == (lhs: Layout, rhs: Layout) -> Bool {
-            lhs.box.identity == rhs.box.identity && lhs.version == rhs.version
+            lhs.box.identity === rhs.box.identity && lhs.version == rhs.version
         }
     }
 
@@ -189,10 +189,11 @@ extension Text {
 /// The report a `Text.Layout` reads, filled by the handler that hears the
 /// host's `textLayoutChanged`. Shared by reference: the seed's layout and the
 /// handler's writes are the same box.
+fileprivate final class TextLayoutIdentity {}
+
 final class TextLayoutBox: @unchecked Sendable {
     /// Stable across a Text value rebuilding, distinct between sibling labels.
-    private(set) var identity: ObjectIdentifier?
-    init() { identity = ObjectIdentifier(self) }
+    fileprivate var identity = TextLayoutIdentity()
     /// The lines the host last said the text stands on.
     var lines: [Text.Layout.Line] = []
 

@@ -117,7 +117,9 @@ class GTKTextView: GTKView {
     }
 
     private func reportTextLayout() {
-        guard let onTextLayout, let layout = gtk_label_get_layout(widget.opaque) else { return }
+        guard let onTextLayout, gtk_widget_get_width(widget) > 0,
+              gtk_widget_get_height(widget) > 0,
+              let layout = gtk_label_get_layout(widget.opaque) else { return }
         var originX: Int32 = 0, originY: Int32 = 0
         gtk_label_get_layout_offsets(widget.opaque, &originX, &originY)
         let serial = pango_layout_get_serial(layout)

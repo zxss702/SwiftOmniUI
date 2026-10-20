@@ -93,12 +93,16 @@ class WinUITextView: WinUIView {
             guard let self else { return }
             self.textLayoutPending = false
             guard let report = self.onTextLayout, self.textLayoutDirty, self.isAttached else { return }
-            self.textLayoutDirty = false
             let text = self.text
             let count = text.utf16.count
-            guard count > 0 else { report(TextLayoutReport(lines: [])); return }
+            guard count > 0 else {
+                self.textLayoutDirty = false
+                report(TextLayoutReport(lines: [])); return
+            }
             var rectangles = [Double](repeating: 0, count: count * 4)
             guard swiftomniui_winui_text_character_rects(self.handle, &rectangles, Int32(count)) == count else { return }
+            guard stride(from: 3, to: rectangles.count, by: 4).contains(where: { rectangles[$0] > 0 }) else { return }
+            self.textLayoutDirty = false
             self.lastTextLayoutSize = LayoutSize(width: self.laidOutFrame.width, height: self.laidOutFrame.height)
             var offset = 0, line = 0
             var last: Rect?
@@ -171,11 +175,13 @@ class WinUITextView: WinUIView {
         let trims = breaking.truncates || (breaking.wraps && lines != nil)
         swiftomniui_winui_text_set_lines(
             handle, breaking.wraps, Int32(lines ?? 0), trims)
+        invalidateTextLayout()
     }
 
     /// Where the words stand across the label.
     func setAlignment(horizontal: TextAlignment) {
         swiftomniui_winui_text_set_alignment(handle, horizontal.rawValue)
+        invalidateTextLayout()
     }
 
     /// The space between the letters, in DIPs.

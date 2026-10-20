@@ -22,6 +22,10 @@ final class WinUILabelView: WinUITextView {
         if runs == nil { super.setText(text) }
     }
 
+    override var text: String {
+        runs.map { $0.map { $0.image == nil ? $0.text : "\u{FFFC}" }.joined() } ?? ownText
+    }
+
     /// What the label is drawn over: a colour, a gradient, or nothing.
     func setBackground(_ value: HostValue?) {
         let brush = WinUIBrush(value)

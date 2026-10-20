@@ -62,6 +62,11 @@ executable, which the run script fills from the application's
 for a PNG the folder holds as an SVG, the SVG is shown: the application's
 pictures are written once, as SVGs, for every host.
 
+An absolute file path is also a picture source. The Foundation `AsyncImage`
+phase initializer downloads URL images outside layout and hands its cached file
+to the same native decoder; file URLs use their existing local file. The phase
+reports transport and missing-file errors to the caller's content closure.
+
 A picture shown as an icon is a `GtkImage` of the file's icon, a given number
 of logical pixels across: GTK reads the file - an SVG through gdk-pixbuf's
 loader - at that size times the display's scale, and again when the scale

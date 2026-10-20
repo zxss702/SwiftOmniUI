@@ -252,8 +252,6 @@ final class WinUISplitView: WinUILayoutView {
             }
             return
         }
-        WinUILayoutDiagnostics.record("split.configure", view: self,
-            "open=\(isPresented) content=\(isContentPresented) automatic=\(automaticallyOpensSidebar) pages=\(pages.map { $0.view.number })")
         ProgramWrite.perform {
             let three = pages.count > 2 && SplitColumnWidth(detailWidthBounds, defaultIdeal: 320).maximum != 0
             var next: [NativeSlot] = []

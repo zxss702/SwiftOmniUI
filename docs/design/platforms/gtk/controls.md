@@ -28,6 +28,18 @@ class filling that box in its colour - a brush's first colour. A button's captio
 the `GtkLabel` the button shows it in, and takes the same look, font and
 colour, and the button its padding.
 
+`textSelection(.enabled)` uses the label's native selection. A subtree reading
+`Text.LayoutKey` additionally requests source-grapheme rectangles from the
+allocated Pango layout, including its label offsets and right-to-left positions.
+Reports are delivered after allocation, and unchanged Pango layout serials and
+offsets reuse the previous report. Labels outside such a reader do no per-character
+geometry work. Cross-block selection can use these rectangles without laying out
+a second copy of the text.
+
+`pointerStyle` writes the widget's native cursor name; removing it restores
+inheritance. Continuous hover reports local pointer positions and exit through
+the existing native motion controller.
+
 ## A button's box
 
 A button the tree gives a fill, an outline or a shape wears a class of the
