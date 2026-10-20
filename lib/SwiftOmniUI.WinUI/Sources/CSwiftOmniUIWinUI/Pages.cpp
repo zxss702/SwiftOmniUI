@@ -7,7 +7,6 @@
 // Design: docs/design/platforms/winui/pages.md
 
 #include "Relay.h"
-#include "ToolbarMetrics.h"
 
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Windows.UI.h>
@@ -194,7 +193,6 @@ namespace {
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view) {
     try {
         controls::TitleBar bar;
-        compactToolbarResources(bar.Resources());
         // Keep an 8-DIP gap between the trailing toolbar and native caption
         // buttons instead of TitleBar's default 48-DIP drag strip.
         bar.Resources().Insert(winrt::box_value(L"TitleBarMinDragRegionWidth"), winrt::box_value(8.0));
@@ -205,12 +203,10 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view) {
             [view](controls::TitleBar const &, IInspectable const &) { callbacks.chosen(view, -2); }));
         controls::StackPanel left;
         left.Orientation(controls::Orientation::Horizontal);
-        left.VerticalAlignment(xaml::VerticalAlignment::Center);
         left.Spacing(4);
         left.Children().Append(controls::ContentControl());
         left.Children().Append(controls::ContentControl());
         controls::CommandBar leadingActions;
-        leadingActions.DefaultLabelPosition(controls::CommandBarDefaultLabelPosition::Right);
         leadingActions.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
         leadingActions.VerticalAlignment(xaml::VerticalAlignment::Center);
         left.Children().Append(leadingActions);
@@ -233,7 +229,6 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view) {
         actions.VerticalAlignment(xaml::VerticalAlignment::Center);
         controls::StackPanel right;
         right.Orientation(controls::Orientation::Horizontal);
-        right.VerticalAlignment(xaml::VerticalAlignment::Center);
         right.Children().Append(actions);
         right.Children().Append(controls::ContentControl());
         bar.RightHeader(right);
@@ -241,6 +236,24 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view) {
     } catch (...) {
         report("making a title bar");
         return nullptr;
+    }
+}
+
+extern "C" double swiftomniui_winui_title_bar_layout_height(SwiftOmniUIObjectRef handle) {
+    try {
+        auto bar = borrow<controls::TitleBar>(handle);
+        // This is TitleBar::UpdateHeight's state selection. Its template has
+        // a declared row height, independent of the commands it contains.
+        // Before activation, native Measure can still answer DesiredSize=0;
+        // that provisional answer must not determine the window's first size.
+        auto key = winrt::box_value(bar.Content() || bar.LeftHeader() || bar.RightHeader()
+            ? L"TitleBarExpandedHeight" : L"TitleBarCompactHeight");
+        auto value = bar.Resources().TryLookup(key);
+        if (!value) value = xaml::Application::Current().Resources().Lookup(key);
+        return winrt::unbox_value<double>(value);
+    } catch (...) {
+        report("reading a title bar's declared row height");
+        return 0;
     }
 }
 
@@ -329,8 +342,9 @@ extern "C" void swiftomniui_winui_toolbar_button_set_icon(SwiftOmniUIObjectRef h
             bool collapsed = icon || words.empty();
             command.LabelPosition(collapsed ? controls::CommandBarLabelPosition::Collapsed
                                             : controls::CommandBarLabelPosition::Default);
-            // Icon-only commands keep a compact face; words retain their native label width.
-            if (collapsed) command.Width(36);
+            // Showing its icon alone, the button stands as wide as the bar's own back and pane buttons - the
+            // system gives those 40. Words alone keep the default width, which a label needs.
+            if (collapsed) command.Width(40);
             else command.ClearValue(xaml::FrameworkElement::WidthProperty());
             if (icon && !words.empty()) controls::ToolTipService::SetToolTip(command, winrt::box_value(words));
         };
@@ -393,7 +407,6 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
                 continue;
             }
             controls::AppBarButton button;
-            compactToolbarButton(button);
             button.Label(text(texts[index]));
             button.IsEnabled(enabled[index]);
             if (identifiers[index] && *identifiers[index]) {
@@ -405,7 +418,9 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
             if (icon) {
                 button.Icon(icon);
                 button.LabelPosition(controls::CommandBarLabelPosition::Collapsed);
-                button.Width(36);
+                // As wide as the bar's own back and pane buttons - the system gives those 40. The AppBarButton
+                // default is a labelled command bar's width, which an icon alone does not need.
+                button.Width(40);
                 controls::ToolTipService::SetToolTip(button, winrt::box_value(text(texts[index])));
             }
             button.Click(guarded("handling Click", [view, index](IInspectable const &, xaml::RoutedEventArgs const &) {

@@ -976,6 +976,10 @@ int32_t swiftomniui_winui_items_row_name(SwiftOmniUIObjectRef items, int64_t cel
 /// in its overflow, and three slots - leading, centre, trailing. The way back is chosen as -1, the toggle as -2, an
 /// action by its place.
 SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view);
+
+/// The native template's declared row height in DIPs, available before activation or layout.
+double swiftomniui_winui_title_bar_layout_height(SwiftOmniUIObjectRef bar);
+
 /// `words` stand light (1) or dark (2) on a bar the tree paints, the bar's buttons and commands with them; 0 for
 /// the theme's own.
 void swiftomniui_winui_title_bar_set(SwiftOmniUIObjectRef bar, char const *title, bool back, bool paneToggle,

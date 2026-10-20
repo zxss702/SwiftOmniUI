@@ -413,15 +413,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_app_menu_make(int64_t view) {
         // The scene's commands behind one button at the title bar's leading edge - the platform's own application
         // menu's place on this family, its face the navigation glyph. `menu_button_set_menu` writes its flyout.
         controls::Button button;
-        button.Width(36);
-        button.Height(28);
-        button.MinHeight(0);
-        button.Padding({0, 0, 0, 0});
-        button.VerticalAlignment(xaml::VerticalAlignment::Center);
-        controls::FontIcon icon;
-        icon.FontFamily(xaml::Media::FontFamily(L"Segoe Fluent Icons"));
-        icon.FontSize(16);
-        icon.Glyph(L"\uE700");
+        controls::SymbolIcon icon{controls::Symbol::GlobalNavigationButton};
         button.Content(icon);
         return detach(button);
     } catch (...) {

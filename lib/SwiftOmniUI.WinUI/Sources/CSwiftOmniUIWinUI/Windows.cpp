@@ -28,31 +28,8 @@ using winrt::Windows::System::VirtualKeyModifiers;
 namespace windowing = winrt::Microsoft::UI::Windowing;
 
 namespace {
-    /// How many pixels a DIP is in `window`, known before its content is laid out.
-    double scale(xaml::Window const &window) {
-        auto dpi = GetDpiForWindow(reinterpret_cast<HWND>(window.AppWindow().Id().Value));
-        return dpi ? dpi / 96.0 : 1.0;
-    }
-
     controls::Grid root(xaml::Window const &window) {
         return window.Content().as<controls::Grid>();
-    }
-
-    /// Windows owns the caption's height. TitleBar normally changes its inner
-    /// row from 32 to 48 DIPs as soon as a header/content slot exists, even if
-    /// that slot is empty. Both template states must occupy the caption's
-    /// actual row, rather than adding space beneath the system buttons.
-    void sizeTitleBar(xaml::Window const &window) {
-        auto height = window.AppWindow().TitleBar().Height() / scale(window);
-        if (height <= 0) return;
-        for (auto const &child : root(window).Children()) {
-            auto bar = child.try_as<controls::TitleBar>();
-            if (!bar || bar.Height() == height) continue;
-            auto resources = bar.Resources();
-            resources.Insert(winrt::box_value(L"TitleBarCompactHeight"), winrt::box_value(height));
-            resources.Insert(winrt::box_value(L"TitleBarExpandedHeight"), winrt::box_value(height));
-            bar.Height(height);
-        }
     }
 
     /// The window's way back - the mouse's back button, Alt+Left and the Back key - chosen on its chrome as -1; and
@@ -145,14 +122,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number) {
         }));
         window.AppWindow().Changed(
             guarded("handling Changed",
-                [number, weak = winrt::make_weak(window)](
-                    windowing::AppWindow const &sender, windowing::AppWindowChangedEventArgs const &args) {
-                // A display/DPI or presenter change can change the native
-                // caption metrics. Update the row at that native lifecycle
-                // boundary, never by measuring chrome during a page's layout.
-                if (args.DidSizeChange() || args.DidPresenterChange()) {
-                    if (auto window = weak.get()) sizeTitleBar(window);
-                }
+                [number](windowing::AppWindow const &sender, windowing::AppWindowChangedEventArgs const &args) {
                 if (args.DidVisibilityChange()) {
                     auto active = GetActiveWindow() == reinterpret_cast<HWND>(sender.Id().Value);
                     callbacks.windowStateChanged(number, offScreen(sender), active && sender.IsVisible());
@@ -385,7 +355,8 @@ extern "C" void swiftomniui_winui_window_set_chrome(
             // overlaid on the content; they do not reserve a blank strip at the top of the client area.
             window.SetTitleBar(next);
             auto caption = window.AppWindow().TitleBar();
-            caption.PreferredHeightOption(windowing::TitleBarHeightOption::Standard);
+            caption.PreferredHeightOption(titleBar ? windowing::TitleBarHeightOption::Tall
+                                                  : windowing::TitleBarHeightOption::Standard);
             auto transparent = winrt::box_value(winrt::Windows::UI::Colors::Transparent())
                 .as<winrt::Windows::Foundation::IReference<winrt::Windows::UI::Color>>();
             caption.ButtonBackgroundColor(transparent);
@@ -397,10 +368,7 @@ extern "C" void swiftomniui_winui_window_set_chrome(
                     .ClearRegionRects(winrt::Microsoft::UI::Input::NonClientRegionKind::Caption);
             }
         }
-        if (titleBar) {
-            sizeTitleBar(window);
-            as<controls::TitleBar>(titleBar).ApplyTemplate();
-        }
+        if (titleBar) as<controls::TitleBar>(titleBar).ApplyTemplate();
     } catch (...) {
         report("dressing a window");
     }
@@ -475,6 +443,12 @@ extern "C" void swiftomniui_winui_window_set_shown(SwiftOmniUIObjectRef handle, 
 }
 
 namespace {
+    /// How many pixels a DIP is in `window`, known before its content is laid out: a window's id is its HWND.
+    double scale(xaml::Window const &window) {
+        auto dpi = GetDpiForWindow(reinterpret_cast<HWND>(window.AppWindow().Id().Value));
+        return dpi ? dpi / 96.0 : 1.0;
+    }
+
     /// The work area of the display `window` stands on, in pixels.
     winrt::Windows::Graphics::RectInt32 workArea(xaml::Window const &window) {
         auto area = windowing::DisplayArea::GetFromWindowId(window.AppWindow().Id(), windowing::DisplayAreaFallback::Nearest);

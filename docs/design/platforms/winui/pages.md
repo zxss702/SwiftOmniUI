@@ -42,15 +42,6 @@ whose resting backgrounds are transparent. The default caption drag strip is
 cleared so it does not intercept controls along that edge. Showing the toolbar
 again reattaches the same native title bar and restores its height.
 
-The XAML title bar uses the system caption's actual height in DIPs, with
-`TitleBarHeightOption.Standard`. Both its compact and expanded template
-states use that height: adding a page's toolbar content does not introduce
-an extra strip below the caption buttons. Native display/presenter changes
-update this metric; content measurement does not select another height.
-Commands use centred 16-DIP glyphs in a 28-DIP face, leaving vertical room
-inside the standard caption. These template metrics are scoped to the title
-bar and its commands; ordinary controls keep their native sizes.
-
 A window has one chrome: WinUI's `TitleBar`, across the top of a window
 whose content extends under its title bar, over a Mica backdrop, as
 Windows' own applications stand. The renderer composes it again from what

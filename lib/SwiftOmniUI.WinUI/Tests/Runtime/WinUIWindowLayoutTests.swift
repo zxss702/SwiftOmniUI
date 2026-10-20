@@ -25,13 +25,36 @@ private final class WindowLayoutProbe: WinUILayoutView {
 }
 
 final class WinUIWindowLayoutTests: XCTestCase {
+    func testFirstAllocationIncludesTheDeclaredChromeBeforeActivation() {
+        onUIThread {
+            let window = WinUIWindow()
+            defer { window.close() }
+            let page = WindowLayoutProbe()
+            page.extent = 400
+            let chrome = window.chromeHeight
+            XCTAssertGreaterThan(window.titleBar.layoutHeight, 0,
+                                 "the template's height is available without a live XAML Measure")
+            XCTAssertGreaterThanOrEqual(chrome, window.titleBar.layoutHeight)
+            window.boundContent(WindowBounds(minimumWidth: 560, minimumHeight: 400), chromeHeight: chrome)
+            window.requestContent(WindowFrame(width: 560, height: 400), chromeHeight: chrome)
+            window.show(page)
+            WinUITestHost.pump()
+
+            XCTAssertEqual(window.chromeHeight, chrome, accuracy: 0.01)
+            XCTAssertEqual(window.titleBar.laidOutFrame.height, window.titleBar.layoutHeight, accuracy: 1)
+            XCTAssertEqual(page.laidOutFrame.height, 400, accuracy: 1,
+                           "the first frame must not borrow pixels from content for the caption")
+            XCTAssertEqual(window.contentSize.height, 400, accuracy: 1)
+        }
+    }
+
     func testReadingChromeDoesNotFlushPendingPageLayout() {
         onUIThread {
             let window = WinUIWindow()
             defer { window.close() }
             let page = WindowLayoutProbe()
             window.request(WindowFrame(width: 560, height: 440))
-            // Template application and the first caption measure work before activation.
+            // The native template's declaration is available before activation.
             let initialChrome = window.chromeHeight
             XCTAssertGreaterThan(initialChrome, 0)
             window.show(page)

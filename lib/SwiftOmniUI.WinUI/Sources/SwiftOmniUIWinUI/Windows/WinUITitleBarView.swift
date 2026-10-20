@@ -24,6 +24,9 @@ final class WinUITitleBarView: WinUIView {
         super.init { number in swiftomniui_winui_title_bar_make(number) }
     }
 
+    /// The native template's row height, available before its first Measure.
+    var layoutHeight: Double { swiftomniui_winui_title_bar_layout_height(handle) }
+
     /// Shows `chrome`, writing only the parts that changed.
     func apply(_ chrome: WinUIWindowChrome) {
         let previous = self.chrome

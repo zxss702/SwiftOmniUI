@@ -209,10 +209,13 @@ it as it stands: `ResizeClient` would add the title bar's height again, which
 the content already covers.
 
 The bounds are the presenter's preferred least and greatest size. The
-caption height comes from `AppWindow.TitleBar.Height`, converted from pixels
-to DIPs, and fixes both states of the XAML title bar's row. A new page's
-toolbar content does not change this contribution to window sizing. Reading
-it neither measures the title bar's children nor calls `UpdateLayout`, which
+XAML title bar's row height is read from its native template resources,
+using the same compact/expanded selection as `TitleBar::UpdateHeight`.
+This is available before activation: a first native `Measure` can still
+return zero, and using that provisional answer undersizes the initial window
+until its first navigation reapplies the bounds. This does not change the
+native Tall caption, button sizes, margins or template states. Reading the
+height must not call `UpdateLayout`, which
 would flush pending page layout inside window presentation and can realize
 another lazy window before the current render returns. Window requests and
 presenter properties are written only when their native pixel values differ;
