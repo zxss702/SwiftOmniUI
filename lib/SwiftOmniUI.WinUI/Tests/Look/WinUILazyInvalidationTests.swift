@@ -133,7 +133,7 @@ final class WinUILazyInvalidationTests: XCTestCase {
             for _ in 0..<12 { host.step(); host.frame() }
             let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
             lazy.standsAt = 320
-            _ = lazy.contentSize(width: 320)
+            lazy.prepareLayoutContent(in: Rect(0, 0, 320, lazy.laidOutFrame.height), measuringNative: true)
             let offscreen = lazy.cells.orderedIdentities[50]
             XCTAssertNil(lazy.mounted[offscreen])
             lazy.acrossWidest[offscreen] = 900
@@ -146,6 +146,7 @@ final class WinUILazyInvalidationTests: XCTestCase {
                            "fixed-width vertical layout does not scan historical row widths")
 
             lazy.invalidateMeasure()
+            lazy.prepareLayoutContent(in: Rect(0, 0, 320, lazy.laidOutFrame.height), measuringNative: true)
             let intrinsic = lazy.contentSize(width: nil)
             XCTAssertGreaterThanOrEqual(intrinsic.width, 900,
                                         "intrinsic layout still includes the widest offscreen row")
@@ -165,15 +166,39 @@ final class WinUILazyInvalidationTests: XCTestCase {
             }
             for _ in 0..<12 { host.step(); host.frame() }
             let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
-            _ = lazy.contentSize(width: nil)
+            lazy.prepareLayoutContent(in: lazy.laidOutFrame, measuringNative: true)
             let offscreen = lazy.cells.orderedIdentities[50]
             XCTAssertNil(lazy.mounted[offscreen])
             lazy.acrossWidest[offscreen] = 160
             lazy.invalidateMeasure()
+            lazy.prepareLayoutContent(in: lazy.laidOutFrame, measuringNative: true)
 
             let size = lazy.contentSize(width: nil)
             XCTAssertGreaterThanOrEqual(size.height, 160,
                                         "horizontal intrinsic size retains previously measured rows")
+        }
+    }
+
+    func testFiniteRowPreparationRefreshesCachedIntrinsicWidthWithUnchangedExtent() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) { Text("i").frame(height: 32).id("row") }
+                }.frame(width: 320, height: 120)
+            }
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            let row = try XCTUnwrap(host.view(id: .manual("row")) as? WinUILayoutView)
+            let label = try XCTUnwrap(host.views(WinUITextView.self).first)
+            let total = lazy.cells.total
+            label.setText("A substantially wider row")
+            row.invalidateMeasurements()
+            let before = lazy.naturalSize(width: nil)
+
+            lazy.prepareMeasure(width: 320, height: lazy.laidOutFrame.height)
+
+            XCTAssertEqual(lazy.cells.total, total)
+            XCTAssertGreaterThan(lazy.naturalSize(width: nil).width, before.width,
+                                 "a fixed-width pass also refreshes its cached intrinsic answer")
         }
     }
 

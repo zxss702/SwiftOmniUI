@@ -84,6 +84,10 @@ class WinUILazyView: WinUITravellingLayout {
     private var identitiesByView: [Int64: String] = [:]
     private var measurementRows: Set<String> = []
     private var measuredEmptyGeneration = -1
+    var isPreparingRows = false
+    private var measuringRowsNatively = false
+
+    override var hasNativeProposals: Bool { true }
 
     // A committed window can contain new rows (including empty fragments)
     // even when its range and the document's estimated extent did not change.
@@ -113,23 +117,39 @@ class WinUILazyView: WinUITravellingLayout {
 
     func rowSize(_ identity: String, item: WinUILayoutItem, proposedWidth: Double?) -> LayoutSize {
         if let kept = measured[identity], kept.proposal == proposedWidth,
-           measuredRevisions[identity] == item.view.measurementRevision {
+           measuredRevisions[identity] == item.view.measurementRevision,
+           measuredContexts[identity] == item.view.layoutContextRevision {
             return kept.size
         }
-        let size = item.size(offered: proposedWidth)
+        let size = measuringRowsNatively
+            ? item.size(offered: proposedWidth)
+            : Self.querySize { item.size(offered: proposedWidth) }
         cells.measurements += 1
         measured[identity] = (proposedWidth, size)
         measuredRevisions[identity] = item.view.measurementRevision
+        measuredContexts[identity] = item.view.layoutContextRevision
         return size
     }
 
     /// A mounted row has a real measurement before its first visible placement.
     /// Only rows that have not been requested keep an estimated document extent.
-    func prepareRowsForArrangement(in bounds: Rect) {
+    override func prepareLayoutContent(in bounds: Rect, measuringNative: Bool) {
         for (identity, item) in mounted where !item.departing {
-            if measured[identity] == nil || measuredRevisions[identity] != item.view.measurementRevision {
+            if measured[identity] == nil || measuredRevisions[identity] != item.view.measurementRevision
+                || measuredContexts[identity] != item.view.layoutContextRevision {
                 measurementRows.insert(identity)
             }
+        }
+        let previousQuery = Self.queryingSize
+        let previousPreparation = isPreparingRows
+        let previousNative = measuringRowsNatively
+        Self.queryingSize = 0
+        isPreparingRows = true
+        measuringRowsNatively = measuringNative
+        defer {
+            Self.queryingSize = previousQuery
+            isPreparingRows = previousPreparation
+            measuringRowsNatively = previousNative
         }
         _ = contentSize(width: axis == .vertical ? bounds.width : nil)
     }
@@ -158,6 +178,7 @@ class WinUILazyView: WinUITravellingLayout {
     var measured: [String: (proposal: Double?, size: LayoutSize)] = [:]
     /// The revision of each row's view when it was measured: a row is measured again when its own view changed.
     var measuredRevisions: [String: Int] = [:]
+    private var measuredContexts: [String: Int] = [:]
     var measuredRevision = -1
     var measuredAcross: Double?
     var naturalAcross = 44.0
@@ -286,6 +307,7 @@ class WinUILazyView: WinUITravellingLayout {
             if now[identity]?.view !== previous.view || now[identity]?.values != previous.values {
                 measured.removeValue(forKey: identity)
                 measuredRevisions.removeValue(forKey: identity)
+                measuredContexts.removeValue(forKey: identity)
             }
         }
         if !cells.inserting.isDisjoint(with: now.keys) { cells.animatesChanges = true }
@@ -486,10 +508,11 @@ class WinUILazyView: WinUITravellingLayout {
             // further rows; those are visible work, not next-frame prefetch.
             guard WinUIView.arranging == 0, WinUIView.measuring == 0,
                   cells.element?.handler(.realizedChanged) == nil || cells.requestedItemsAreCurrent,
-                  let placed else { return }
+                  placed != nil else { return }
             if cells.built != built || measuredRevision != measurementRevision
                 || needsRowMeasurements || cells.anchorShift != 0 {
-                _ = contentSize(width: standsAt ?? placed.width)
+                let actual = laidOutFrame
+                prepareLayoutContent(in: Rect(0, 0, actual.width, actual.height), measuringNative: true)
                 needsArrangement = true
             }
             let after = grid ? cells.runs.revision : cells.extents.revision
@@ -668,6 +691,7 @@ class WinUILazyView: WinUITravellingLayout {
                   cells.built.contains(place) else { return false }
             return measured[entry.key] == nil
                 || measuredRevisions[entry.key] != entry.value.view.measurementRevision
+                || measuredContexts[entry.key] != entry.value.view.layoutContextRevision
         }
         guard !waiting else {
             retell()
@@ -687,10 +711,17 @@ class WinUILazyView: WinUITravellingLayout {
         places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges && ready,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
                                          axis == .vertical ? cells.anchorShift : 0), refining: true,
-                     consumingPatch: ready)
+                     consumingPatch: ready, height: axis == .vertical ? bounds.height : bounds.width,
+                     followingPresentation: ready ? takePresentationFrame() : false)
         if ready {
             cells.animatesChanges = false
             cells.anchorShift = 0
+        }
+        for proposal in preparedLayoutPlan(in: bounds) {
+            guard let view = proposal.view, let identity = identitiesByView[view.number],
+                  var item = mounted[identity] else { continue }
+            if cells.animatesChanges || cells.inserting.remove(identity) == nil { item.fadeIn = nil }
+            place(item, at: proposal.place)
         }
         retell()
     }
@@ -763,15 +794,15 @@ final class WinUILazyStackView: WinUILazyView {
         }
     }
 
-    /// The current finite proposal determines row wrapping. A previous
-    /// allocation is only a fallback for an unspecified proposal, never a
-    /// replacement for the new width during initialization or resize.
+    /// The current proposal determines wrapping; intrinsic queries read the
+    /// measured extent index without substituting a previous native frame.
     override func contentSize(width: Double?) -> LayoutSize {
         let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         let across = axis == .vertical
-            ? (width ?? standsAt).map { max(0, Double(Float($0)) - padding.left - padding.right) } : nil
-        if WinUILayoutView.queryingSize == 0 {
+            ? width.map { max(0, $0 - padding.left - padding.right) } : nil
+        if isPreparingRows {
             let revision = cells.extents.revision
+            let widest = acrossWidest.maximum
             if measuredAcross != across {
                 // Retain offscreen extents as estimates. Resetting them all to 44
                 // changes the scroll range before any new measurement exists.
@@ -780,6 +811,7 @@ final class WinUILazyStackView: WinUILazyView {
                 acrossWidest = WinUILazyCrossExtents()
                 measuredAcross = across
                 measureMountedRows()
+                forgetMeasurements()
             }
             // Empty fragments are acknowledged once per window, not per measure.
             for identity in takeEmptyRows() {
@@ -800,6 +832,7 @@ final class WinUILazyStackView: WinUILazyView {
                 acrossWidest[identity] = acrossSize
                 completedMeasurement(identity)
             }
+            if widest != acrossWidest.maximum { forgetMeasurements() }
             // A finite proposal fixes a vertical stack's returned width. Scanning every
             // row ever measured in this room cannot affect that answer. An intrinsic
             // cross-axis size still uses the widest measured row, including rows that
@@ -816,6 +849,7 @@ final class WinUILazyStackView: WinUILazyView {
             let total = cells.total
             if cells.extents.revision != revision || total != measuredExtent {
                 geometryChanged = true
+                forgetLayoutPlans()
                 if total != measuredExtent { commitChangedContentExtent() }
             }
             measuredExtent = total
@@ -823,18 +857,15 @@ final class WinUILazyStackView: WinUILazyView {
         }
         let total = cells.total
         return axis == .vertical
-            ? LayoutSize(width: width ?? naturalAcross + padding.left + padding.right, height: total)
+            ? LayoutSize(width: width ?? (acrossWidest.maximum ?? naturalAcross) + padding.left + padding.right, height: total)
             : LayoutSize(width: total, height: naturalAcross + padding.top + padding.bottom)
     }
 
-    /// Native descendants can receive a new allocation with their parent's Arrange.
-    /// Complete their row measurements before placing this window.
-    override func arrange(in bounds: Rect) {
+    override func makeLayoutPlan(in bounds: Rect) -> [NativeProposal] {
         let across = max(0, axis == .vertical
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom)
-        prepareRowsForArrangement(in: bounds)
-        super.arrange(in: bounds)
+        var proposals: [NativeProposal] = []
         for (identity, item) in mounted {
             let margin = item.values.margin
             guard let place = cells.position(of: identity) else { continue }
@@ -875,10 +906,9 @@ final class WinUILazyStackView: WinUILazyView {
                 frame = Rect(x: run + margin.left, y: y,
                              width: extent - margin.left - margin.right, height: height)
             }
-            var placed = item
-            if cells.animatesChanges || cells.inserting.remove(identity) == nil { placed.fadeIn = nil }
-            self.place(placed, at: direction.places(frame, in: bounds))
+            proposals.append(NativeProposal(view: item.view, place: direction.places(frame, in: bounds)))
         }
+        return proposals
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {
@@ -943,16 +973,27 @@ final class WinUILazyGridView: WinUILazyView {
     /// The runs the cells make.
     private var runCount: Int { (cells.orderedIdentities.count + perRun - 1) / perRun }
 
-    /// Tracks and row heights use the current finite proposal. A previous
-    /// allocation only answers when the parent left that proposal unspecified.
+    override var contentSizeDependsOnHeight: Bool { axis == .horizontal }
+
+    override func contentSize(proposal: ProposedViewSize) -> LayoutSize {
+        let height = proposal.height.flatMap { $0.isFinite ? max(0, $0 - padding.top - padding.bottom) : nil }
+        return gridContentSize(width: proposal.width, crossHeight: height)
+    }
+
     override func contentSize(width: Double?) -> LayoutSize {
+        gridContentSize(width: width, crossHeight: isPreparingRows ? acrossRoom : nil)
+    }
+
+    /// Both axes belong to this proposal. An unspecified cross axis resolves
+    /// declared tracks at their ideal/minimum extents, not at an old frame.
+    private func gridContentSize(width: Double?, crossHeight: Double?) -> LayoutSize {
         let width = width.flatMap { $0.isFinite ? Double(Float($0)) : nil }
         let room = max(0, axis == .vertical
-            ? ((width ?? standsAt).map { Double(Float($0)) - padding.left - padding.right } ?? acrossRoom)
-            : acrossRoom)
+            ? width.map { $0 - padding.left - padding.right } ?? 0
+            : crossHeight ?? 0)
         let proposed = LazyGridTracks.resolve(tracks, width: room, spacing: trackSpacing)
         let widths = LazyGridTracks.extents(proposed, width: room, spacing: trackSpacing)
-        if WinUILayoutView.queryingSize == 0 {
+        if isPreparingRows {
             let revision = cells.runs.revision
             if widths != columns {
                 // A different grouping invalidates run identities. A width-only
@@ -964,6 +1005,7 @@ final class WinUILazyGridView: WinUILazyView {
                 // width that returns to a former one costs no native measure.
                 measureMountedRows()
                 geometryChanged = true
+                forgetMeasurements()
             }
             var runExtents: [Int: Double] = [:]
             var pendingRuns: Set<Int> = []
@@ -1008,6 +1050,7 @@ final class WinUILazyGridView: WinUILazyView {
             let total = cells.runs.total(count: runCount)
             if cells.runs.revision != revision || total != measuredExtent {
                 geometryChanged = true
+                forgetLayoutPlans()
                 if total != measuredExtent { commitChangedContentExtent() }
             }
             measuredExtent = total
@@ -1018,19 +1061,23 @@ final class WinUILazyGridView: WinUILazyView {
             : cells.runs.padding.head + cells.runs.padding.tail + Double(count) * cells.runs.estimate
                 + Double(max(0, count - 1)) * runSpacing
         return axis == .vertical
-            ? LayoutSize(width: width ?? 0, height: total)
+            ? LayoutSize(width: width ?? (widths.reduce(0, +)
+                + Double(max(widths.count - 1, 0)) * trackSpacing + padding.left + padding.right), height: total)
             : LayoutSize(width: total, height: widths.reduce(0, +)
                 + Double(max(widths.count - 1, 0)) * trackSpacing + padding.top + padding.bottom)
     }
 
-    override func arrange(in bounds: Rect) {
+    override func prepareLayoutContent(in bounds: Rect, measuringNative: Bool) {
         acrossRoom = max(0, axis == .vertical
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom)
-        prepareRowsForArrangement(in: bounds)
+        super.prepareLayoutContent(in: bounds, measuringNative: measuringNative)
+    }
+
+    override func makeLayoutPlan(in bounds: Rect) -> [NativeProposal] {
         let widths = columns
-        guard !widths.isEmpty else { return }
-        super.arrange(in: bounds)
+        guard !widths.isEmpty else { return [] }
+        var proposals: [NativeProposal] = []
         var trackOrigins: [Double] = []
         let extent = widths.reduce(0, +) + Double(max(widths.count - 1, 0)) * trackSpacing
         var start = Extent.start(option: trackAlignment.rawValue, extent: extent,
@@ -1082,10 +1129,9 @@ final class WinUILazyGridView: WinUILazyView {
                 frame = Rect(x: origin + margin.left, y: y,
                              width: runExtent - margin.left - margin.right, height: height)
             }
-            var placed = item
-            if cells.animatesChanges || cells.inserting.remove(identity) == nil { placed.fadeIn = nil }
-            self.place(placed, at: direction.places(frame, in: bounds))
+            proposals.append(NativeProposal(view: item.view, place: direction.places(frame, in: bounds)))
         }
+        return proposals
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {

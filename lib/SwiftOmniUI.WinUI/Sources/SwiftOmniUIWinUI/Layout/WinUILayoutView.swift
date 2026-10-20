@@ -93,6 +93,11 @@ class WinUILayoutView: WinUIView {
     /// Specialized safe-area layouts restore context when reusing a plan.
     func restoreLayoutContext(in bounds: Rect, proposals: [NativeProposal]) {}
 
+    /// Lazy containers resolve their mounted rows before selecting a plan.
+    /// Allocation prepares logical geometry without restoring native Measure
+    /// constraints on controls whose native parent is already arranging.
+    func prepareLayoutContent(in bounds: Rect, measuringNative: Bool) {}
+
     func forgetLayoutPlans() {
         layoutPlans.removeAll(keepingCapacity: true)
     }
@@ -403,7 +408,8 @@ class WinUILayoutView: WinUIView {
         defer { nativePreparationDepth -= 1 }
         super.prepareMeasure(width: width, height: height)
         if hasNativeProposals,
-           !hasSizing || lastSizingWidth != proposal.width || lastSizingHeight != proposal.height {
+           !hasSizing || lastSizingWidth != proposal.width || lastSizingHeight != proposal.height
+            || cachedLayoutPlan(in: planBounds(proposal: proposal, natural: naturalSize(proposal: proposal))) == nil {
             WinUILayoutDiagnostics.record("prepare.restore", view: self,
                 "proposal=\(WinUILayoutDiagnostics.proposal(width: proposal.width, height: proposal.height)) previous=\(WinUILayoutDiagnostics.proposal(width: lastSizingWidth, height: lastSizingHeight)) hasSizing=\(hasSizing)")
             // An intrinsic probe can change a descendant's last native
@@ -572,6 +578,7 @@ class WinUILayoutView: WinUIView {
     }
 
     private func prepareLayoutPlan(in bounds: Rect, for preparation: Preparation = .measure) -> LayoutPlan {
+        prepareLayoutContent(in: bounds, measuringNative: preparation == .measure)
         var plan = completedLayoutPlan(in: bounds)
         while true {
             let before = WinUIView.nativeSizeRevision
@@ -587,6 +594,7 @@ class WinUILayoutView: WinUIView {
             WinUILayoutDiagnostics.record("plan.refine", view: self,
                 "bounds=\(WinUILayoutDiagnostics.rect(bounds)) revision=\(revision)->\(measurementRevision) nativeRevision=\(before)->\(WinUIView.nativeSizeRevision) stale=\(plan.dependencies.filter { !$0.isCurrent }.compactMap { $0.view?.number })")
             forgetMeasurements()
+            prepareLayoutContent(in: bounds, measuringNative: preparation == .measure)
             plan = completedLayoutPlan(in: bounds)
         }
     }

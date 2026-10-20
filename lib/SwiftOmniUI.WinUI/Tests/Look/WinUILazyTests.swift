@@ -172,7 +172,7 @@ final class WinUILazyTests: XCTestCase {
             host.runtime.pump.turn()
             XCTAssertEqual(document.measurementRevision, revision,
                            "a row's state patch cannot eagerly invalidate the scroll document")
-            _ = lazy.contentSize(width: 320)
+            lazy.prepareMeasure(width: 320, height: lazy.laidOutFrame.height)
             WinUIDoorbell.commitPending()
             XCTAssertEqual(lazy.cells.total, extent)
             XCTAssertEqual(document.measurementRevision, revision,
@@ -181,7 +181,7 @@ final class WinUILazyTests: XCTestCase {
 
             height.wrappedValue = 76
             host.runtime.pump.turn()
-            _ = lazy.contentSize(width: 320)
+            lazy.prepareMeasure(width: 320, height: lazy.laidOutFrame.height)
             WinUIDoorbell.commitPending()
             XCTAssertEqual(lazy.cells.total, extent + 48, accuracy: 0.01)
             XCTAssertGreaterThan(document.measurementRevision, revision,
@@ -938,7 +938,7 @@ final class WinUILazyTests: XCTestCase {
         }
     }
 
-    func testSpeculativeProposalsKeepEveryLazyContainersCommittedGeometry() throws {
+    func testIntrinsicProposalsKeepEveryLazyContainersCommittedGeometry() throws {
         try onUIThread {
             for kind in 0..<4 {
                 let horizontal = kind % 2 == 1
@@ -984,16 +984,13 @@ final class WinUILazyTests: XCTestCase {
                 XCTAssertGreaterThan(horizontal ? standing.reach.x : standing.reach.y, 0)
                 for phase in 0..<2 {
                     if phase == 0 {
+                        let revision = lazy.measurementRevision
                         for proposal: Double? in [nil, 0, 72, canonical, nil, 72, canonical] {
                             _ = lazy.naturalSize(width: proposal)
                         }
-                        let revision = lazy.measurementRevision
-                        _ = lazy.measure(width: canonical, height: .infinity)
-                        _ = lazy.measure(width: 72, height: .infinity)
-                        lazy.arrange(width: canonical, height: lazy.laidOutFrame.height)
                         WinUIDoorbell.turn()
                         XCTAssertEqual(lazy.measurementRevision, revision,
-                                       "speculative native measurement must not invalidate committed geometry")
+                                       "intrinsic queries must not invalidate committed geometry")
                     } else {
                         host.layOut()
                         for _ in 0..<8 { host.step() }

@@ -126,6 +126,13 @@ after the active pass, and their own invalidation resumes layout. Realization
 follows actual scrolling and clipped viewport geometry; program destinations
 remain a separate preparation request.
 
+Intrinsic queries do not commit lazy row geometry. Selected native Measure
+prepares row measurements and the extent index before building a plan;
+allocation preparation resolves a changed slot from logical answers without
+rewriting a native control's completed DesiredSize. Stack and Grid both consume
+these prepared rectangles in Arrange. A row-position index change discards
+placement plans even when the document's total extent stays the same.
+
 GeometryReader and frame feeds report committed native geometry on a display
 frame, outside native layout. Unloaded views publish no false zero frame.
 Native Image/Viewbox content is prepared at its intrinsic size.
