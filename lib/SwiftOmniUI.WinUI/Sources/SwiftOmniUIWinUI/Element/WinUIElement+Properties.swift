@@ -92,7 +92,7 @@ extension WinUIElement {
     /// Puts the changed properties on the element - a patch's or a frame's, the program's write either way: its
     /// registration's first, then what every element takes.
     /// Design: docs/design/host/patches.md#program-write
-    func applyProperties(changed: Set<Prop>) {
+    func applyProperties(changed: Set<Prop>, followingPresentation: Bool = false) {
         WinUILayoutDiagnostics.record("properties", view: view,
             "element=\(type) changed=\(changed.map { String(describing: $0) }.sorted())")
         guard let view else {
@@ -138,16 +138,18 @@ extension WinUIElement {
         }
         let registeredLayoutChanged = !changed.isDisjoint(with: view.registeredLayoutProperties)
         if registeredLayoutChanged || !measuredChanges.isSubset(of: MountedElement.unmeasuredProperties) {
-            invalidateMeasurements(ownPlacementChanged: !changed.isDisjoint(with: MountedElement.arrangedProperties))
+            invalidateMeasurements(ownPlacementChanged: !changed.isDisjoint(with: MountedElement.arrangedProperties),
+                                   followingPresentation: followingPresentation)
         }
     }
 
     /// Forgets affected sizes up to the nearest Lazy boundary. A change to
     /// that container's own placement still belongs to its parent layout.
-    func invalidateMeasurements(ownPlacementChanged: Bool = false) {
+    func invalidateMeasurements(ownPlacementChanged: Bool = false, followingPresentation: Bool = false) {
         var invalidated: Set<ObjectIdentifier> = []
         func invalidate(_ view: WinUIView?) {
             guard let view, invalidated.insert(ObjectIdentifier(view)).inserted else { return }
+            if followingPresentation { (view as? WinUITravellingLayout)?.followsPresentationFrame() }
             if let layout = view as? WinUILayoutView {
                 layout.invalidateOwnMeasurements()
             } else { view.invalidateMeasure() }

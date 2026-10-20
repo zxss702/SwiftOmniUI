@@ -106,7 +106,7 @@ final class WinUICustomLayoutView: WinUITravellingLayout {
     }
 
     override func arrange(in bounds: Rect) {
-        beginArrangement(width: bounds.width)
+        beginArrangement(in: bounds)
         let arrangedItems = Dictionary(uniqueKeysWithValues: items.filter { !$0.departing }.map {
             (ObjectIdentifier($0.view), $0)
         })

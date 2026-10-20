@@ -52,13 +52,15 @@ final class WinUIElement: NativeElement {
         return values
     }
 
-    func layoutItemChanged() {
+    func layoutItemChanged(followingPresentation: Bool = false) {
         cachedLayoutValues = nil
+        if followingPresentation { (view as? WinUITravellingLayout)?.followsPresentationFrame() }
         var owners: [WinUIElement] = []
         var owner = parent
         while let each = owner {
             each.layoutItemsDirty = true
             each.cachedLayoutValues = nil
+            if followingPresentation { (each.view as? WinUITravellingLayout)?.followsPresentationFrame() }
             owners.append(each)
             owner = each.parent
         }
@@ -143,7 +145,16 @@ final class WinUIElement: NativeElement {
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {
         if !wasDescribed || element.childOrderChanged || !changed.isDisjoint(with: Self.layoutInputs) {
-            layoutItemChanged()
+            // The explicit geometry channel already owns this motion, starting
+            // with the patch's first presentation. Ancestors derive their
+            // occupied space from it instead of animating that space again.
+            let followsGeometry = changed.contains { property in
+                guard Self.layoutInputs.contains(property) else { return false }
+                if let binding = element.driven[property], binding.mode != .in { return true }
+                return host?.runtime.animator.animation(
+                    for: .described(DescribedKey(mount: element.mount, property: property))) != nil
+            }
+            layoutItemChanged(followingPresentation: followsGeometry)
         }
         if wasDescribed, changed.contains(.isVisible) { crossVisibility() }
         applyProperties(changed: changed)
@@ -178,8 +189,8 @@ final class WinUIElement: NativeElement {
     }
 
     func presentFrame(_ changed: Set<Prop>) {
-        if !changed.isDisjoint(with: Self.layoutInputs) { layoutItemChanged() }
-        applyProperties(changed: changed)
+        if !changed.isDisjoint(with: Self.layoutInputs) { layoutItemChanged(followingPresentation: true) }
+        applyProperties(changed: changed, followingPresentation: true)
     }
 
     func departureChanged() {

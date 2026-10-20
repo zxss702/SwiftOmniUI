@@ -64,7 +64,7 @@ class WinUIZStackView: WinUITravellingLayout {
             return apply(placements, in: bounds)
         }
 
-        beginArrangement(width: bounds.width)
+        beginArrangement(in: bounds)
         for item in items where item.view.nativeSafeBarOwner == nil { item.view.setPlacedDrawing(nil, opacity: 1) }
         let byView = Dictionary(uniqueKeysWithValues: items.map { ($0.view.number, $0) })
         for proposal in preparedLayoutPlan(in: bounds) {

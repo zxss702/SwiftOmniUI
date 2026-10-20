@@ -18,6 +18,14 @@ class WinUITravellingLayout: WinUILayoutView {
     /// The arrangement that can place those rows is the one that must spend it, so it stands
     /// here in between.
     private var arrivalMotion: HostLayoutMotion?
+    private var pendingPresentationFrame = false
+
+    func followsPresentationFrame() { pendingPresentationFrame = true }
+
+    func takePresentationFrame() -> Bool {
+        defer { pendingPresentationFrame = false }
+        return pendingPresentationFrame
+    }
 
     /// Keeps the motion a patch named. A patch that names none leaves the last one standing:
     /// the arrangement that will place the change is the one that spends it.
@@ -32,11 +40,12 @@ class WinUITravellingLayout: WinUILayoutView {
         return arrivalMotion
     }
 
-    func beginArrangement(width: Double) {
+    func beginArrangement(in bounds: Rect) {
         if let motion = takeArrivalMotion() { places.animation = motion }
         // Native layout may refine a patch more than once. Only the patch starts
         // a new motion; another arrangement preserves the motion already running.
-        places.begin(width: width, refining: true)
+        places.begin(width: bounds.width, refining: true, height: bounds.height,
+                     followingPresentation: takePresentationFrame())
     }
 
     /// Stands `item` at `place`, or on its way there.

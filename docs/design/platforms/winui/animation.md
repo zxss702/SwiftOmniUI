@@ -53,6 +53,11 @@ passes, and the place lands in the arrangement it asks for
 ([a place between passes](layout.md#a-place-between-passes)); that
 arrangement asks for the same places and keeps the running animation.
 
+When described geometry already supplies a presentation frame, dependent
+layouts follow that frame directly. They do not start another placement
+animation toward each intermediate size. The marker is retained through patch
+and native preparation until the arrangement that consumes it.
+
 By the host layer's rule ([showing and
 hiding](../../host/animation.md#showing-and-hiding)), a child that joins a
 standing stack fades in while the others make room. A

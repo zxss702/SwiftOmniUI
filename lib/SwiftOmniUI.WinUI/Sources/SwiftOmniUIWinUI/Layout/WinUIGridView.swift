@@ -63,7 +63,7 @@ final class WinUIGridView: WinUITravellingLayout {
     }
 
     override func arrange(in bounds: Rect) {
-        beginArrangement(width: bounds.width)
+        beginArrangement(in: bounds)
         let byView = Dictionary(uniqueKeysWithValues: items.map { ($0.view.number, $0) })
         for proposal in preparedLayoutPlan(in: bounds) {
             guard let view = proposal.view, let item = byView[view.number] else { continue }
