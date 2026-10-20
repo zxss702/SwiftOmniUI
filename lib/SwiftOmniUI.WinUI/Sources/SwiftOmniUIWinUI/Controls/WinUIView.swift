@@ -31,7 +31,9 @@ class WinUIView {
     let number: Int64
 
     /// The layout that places this view, which a place written between passes asks to arrange again.
-    weak var placingLayout: WinUILayoutView?
+    weak var placingLayout: WinUILayoutView? {
+        didSet { if placingLayout !== oldValue { nativeParentChanged() } }
+    }
     /// Native controls own arbitrary SwiftUI label roots without placing them
     /// through a SOUI stack. Size corrections must cross that ownership edge.
     weak var nativeContentOwner: WinUIView? {

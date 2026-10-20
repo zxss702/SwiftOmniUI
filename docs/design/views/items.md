@@ -52,5 +52,9 @@ build.
 
 ## Empty
 
+The list accepts the available width and height, including while no rows are
+realized. A surrounding stack allocates it a viewport rather than centering a
+zero-height collection; overlays and safe-area bars use that same allocation.
+
 The empty view is SwiftOmniUI's: while the list has no items, the List is
 that view in the list's place. A header or a footer alone is no item.

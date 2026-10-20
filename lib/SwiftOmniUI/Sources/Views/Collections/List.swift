@@ -58,7 +58,9 @@ public struct List<Items: RandomAccessCollection, Id: Hashable>: View {
 
         private var content: any View {
         source.finish(header: headerView, footer: footerView)
-        if source.entries.isEmpty, let empty { return empty }
+        if source.entries.isEmpty, let empty {
+            return empty.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
 
         let source = self.source
         let realized = self.realized

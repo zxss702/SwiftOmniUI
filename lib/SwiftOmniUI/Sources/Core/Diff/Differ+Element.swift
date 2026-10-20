@@ -488,8 +488,9 @@ extension Differ {
         // `.transaction(_:)` rewrites over it.
         let transacting = plan?.transaction(under: transaction) ?? transaction
 
-        // The animation a changed property takes this render: a `withAnimation`
-        // write wins, then an armed gate, then what the element resolves.
+        // A value gate rewrites this change's animation locally, including an
+        // explicit nil. Otherwise the write's transaction overrides the
+        // standing instruction without changing that instruction.
         let animating = { (values: AnimationValues) -> Animation in
             if transacting?.disablesAnimations == true { return .none }
             if transacting?.isGeometryFeedback == true, !values.isDisjoint(with: .size) { return .none }
@@ -497,6 +498,7 @@ extension Differ {
             let resolved = (plan?.animation(for: values, armed: armed) ?? .inherited)
                 .resolved(against: standing)
 
+            if !armed.isEmpty { return resolved }
             if let override = transacting?.animation, !resolved.isCustom { return override }
 
             return resolved

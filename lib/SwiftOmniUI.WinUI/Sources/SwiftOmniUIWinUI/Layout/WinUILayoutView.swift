@@ -19,6 +19,24 @@ class WinUILayoutView: WinUIView {
     private var lastSizingHeight: Double?
     private var hasSizing = false
     private var nativePreparationDepth = 0
+    private var hadSwiftAllocation = false
+
+    private var hasSwiftAllocation: Bool {
+        placingLayout != nil && nativeContentOwner == nil && nativeSafeBarOwner == nil
+            && nativeLayoutOwner == nil && rootSafeAreaContext == nil
+    }
+
+    override func nativeParentChanged() {
+        super.nativeParentChanged()
+        let allocated = hasSwiftAllocation
+        guard allocated != hadSwiftAllocation else { return }
+        hadSwiftAllocation = allocated
+        // Ownership is part of XAML's Measure contract. A native owner can ask
+        // the same proposal that a previous SOUI parent used, so switching
+        // owners must invalidate that cached native answer as well.
+        guard !WinUILayoutUpdates.enqueue(self, measure: true) else { return }
+        requestNativeMeasure()
+    }
 
     private enum Preparation: Equatable {
         case measure
@@ -197,9 +215,9 @@ class WinUILayoutView: WinUIView {
             }
         }
         self.items = items
-        itemMeasurementRevisions = revisions
         for item in items { item.view.placingLayout = self }
         if !sameArrangement { holdChildren() }
+        itemMeasurementRevisions = items.map { $0.view.parentMeasurementRevision }
         invalidateMeasurements()
         return true
     }
@@ -485,6 +503,15 @@ class WinUILayoutView: WinUIView {
                 // Returning intrinsic extent here lets XAML choose another
                 // slot and then remeasure the page during its own Arrange.
                 return LayoutSize(width: proposal.width ?? framed.width, height: proposal.height ?? framed.height)
+            }
+            if hasSwiftAllocation {
+                // The SOUI parent queries naturalSize itself and owns this
+                // panel's allocation, including animation samples. Publishing
+                // its destination as XAML DesiredSize would make ArrangeCore
+                // enlarge a smaller sample to that destination and clip it.
+                // Native-owned labels, pages and scroll documents still report
+                // the size that their actual native owner needs above/below.
+                return .zero
             }
             return LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
         }

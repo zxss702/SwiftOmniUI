@@ -10,6 +10,8 @@ import XCTest
 @MainActor
 private final class NativeAllocationContent: WinUILayoutView {
     var nativeMeasures = 0
+    var naturalHeight = 40.0
+    var arrangedHeights: [Double] = []
 
     override func measure(width: Double, height: Double) -> LayoutSize {
         nativeMeasures += 1
@@ -17,11 +19,68 @@ private final class NativeAllocationContent: WinUILayoutView {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        LayoutSize(width: 80, height: 40)
+        LayoutSize(width: 80, height: naturalHeight)
+    }
+
+    override func arrange(in bounds: Rect) {
+        arrangedHeights.append(bounds.height)
     }
 }
 
 final class WinUINativeAllocationTests: XCTestCase {
+    func testSOUIOwnedPanelDoesNotTurnItsMeasuredDestinationIntoANativeMinimum() {
+        onUIThread {
+            let parent = WinUIStackView(axis: .vertical)
+            let child = NativeAllocationContent()
+            child.naturalHeight = 128
+            parent.setItems([WinUILayoutItem(view: child)])
+            child.prepareMeasure(width: 320, height: 128)
+            XCTAssertEqual(child.naturalSize(width: 320), LayoutSize(width: 80, height: 128))
+            XCTAssertEqual(child.desiredSize, .zero,
+                           "the Swift parent already reads intrinsic size and owns the actual native slot")
+            let measures = child.nativeMeasures
+            for height in [40.0, 52, 84, 128, 84, 40] {
+                swiftomniui_winui_arrange(child.handle, 0, 0, 320, height)
+                XCTAssertEqual(child.arrangedHeights.last, height,
+                               "XAML must pass the presentation slot to ArrangeOverride, rather than expand it to 128")
+                XCTAssertEqual(child.laidOutFrame.height, height, accuracy: 0.01)
+                XCTAssertEqual(child.nativeMeasures, measures,
+                               "a presentation allocation does not require a compensating native Measure")
+            }
+        }
+    }
+
+    func testScrollDocumentStillPublishesItsExtentToItsNativeOwner() {
+        onUIThread {
+            let child = NativeAllocationContent()
+            child.naturalHeight = 1000
+            let document = WinUIScrollDocument()
+            document.setItems([WinUILayoutItem(view: child)])
+            document.prepareMeasure(width: 320)
+            XCTAssertEqual(document.desiredSize.height, 1000)
+            XCTAssertEqual(child.desiredSize, .zero)
+        }
+    }
+
+    func testNativeMeasurementContractChangesWithOwnershipAtTheSameProposal() {
+        onUIThread {
+            let parent = WinUIStackView(axis: .vertical)
+            let child = NativeAllocationContent()
+            child.prepareMeasure(width: 320, height: 128)
+            let intrinsic = child.desiredSize
+            XCTAssertEqual(intrinsic, LayoutSize(width: 80, height: 40))
+            parent.setItems([WinUILayoutItem(view: child)])
+            child.prepareMeasure(width: 320, height: 128)
+            XCTAssertEqual(child.desiredSize, .zero)
+            XCTAssertFalse(parent.setItems([WinUILayoutItem(view: child)]),
+                           "the ownership observer must be included in the stored child revision snapshot")
+            parent.setItems([])
+            child.prepareMeasure(width: 320, height: 128)
+            XCTAssertEqual(child.desiredSize, intrinsic,
+                           "leaving SOUI allocation must restore the native owner's intrinsic contract")
+        }
+    }
+
     func testNativeOwnedPageReportsItsAllocatedFrameWhileKeepingItsNaturalSize() {
         onUIThread {
             let owner = WinUINavigationView()

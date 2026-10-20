@@ -762,6 +762,10 @@ SwiftOmniUIObjectRef swiftomniui_winui_editor_make(int64_t view);
 /// Writes height only on success; false reports a native measurement failure.
 bool swiftomniui_winui_editor_intrinsic_height(SwiftOmniUIObjectRef editor, double *height);
 
+/// Queries a separate TextBlock with the editor's font and optional wrapped
+/// content; never measures or changes the live TextBox. Two size values.
+bool swiftomniui_winui_editor_content_size(SwiftOmniUIObjectRef editor, double width, bool growing, double *size);
+
 /// Hides an editor's native canvas in every visual state; false restores its theme's background, without chrome.
 void swiftomniui_winui_editor_set_background_hidden(SwiftOmniUIObjectRef editor, bool hidden);
 

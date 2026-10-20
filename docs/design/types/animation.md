@@ -134,6 +134,9 @@ for everything.
 watches against the one the previous render saw, and only a render where it
 moved takes the gate's animation. The first render arms nothing, since there
 is no change yet to answer.
+A gate that fires overrides the write's animation locally, including
+`.animation(nil, value:)`. An unarmed gate leaves the transaction intact;
+`disablesAnimations` still prevents both from starting animations.
 
 ## Layout lanes
 

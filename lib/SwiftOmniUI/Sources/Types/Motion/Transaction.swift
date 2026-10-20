@@ -118,9 +118,9 @@ public func withTransaction<R, V>(_ keyPath: WritableKeyPath<Transaction, V>, _ 
 ///         isShowingDetails = true
 ///     }
 ///
-/// Every state write in the body animates to its new value under the given
-/// animation, whatever animation each view would otherwise answer - except a
-/// `.custom` one, which stays with its engine.
+/// State writes use this animation instead of a view's standing instruction.
+/// A value-gated animation that fires can rewrite it locally, including to
+/// nil; `.custom` animations stay with their own engine.
 ///
 /// - Parameters:
 ///   - animation: the animation the changes run under; `nil` for none.

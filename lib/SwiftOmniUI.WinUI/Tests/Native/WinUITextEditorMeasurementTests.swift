@@ -9,6 +9,121 @@ import SwiftOmniUIConformance
 import XCTest
 
 final class WinUITextEditorMeasurementTests: XCTestCase {
+    func testArithmeticQueriesNeverReplaceTheLiveEditorsPreparedMeasure() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { TextEditor("A long editor line and more words").frame(width: 240, height: 128) }
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            XCTAssertTrue(swiftomniui_winui_focus(editor.handle, true))
+            editor.select(start: 2, length: 4)
+            editor.prepareMeasure(width: 240, height: 104)
+            let nativeDesired = editor.desiredSize
+            for growing in [false, true] {
+                editor.growsWithText = growing
+                // The policy setter invalidates measurement, so prepare its
+                // actual native slot before probing the alternate proposals.
+                editor.prepareMeasure(width: 240, height: 104)
+                let prepared = editor.desiredSize
+                let revision = editor.measurementRevision
+                XCTAssertGreaterThan(editor.measure(width: nil, height: 104).width, 0,
+                                     "a pure query retains the words' unconstrained ideal width")
+                for width in [nil, 40.0, 480, 240] as [Double?] {
+                    for height in [nil, 16.0, 128] as [Double?] {
+                        _ = WinUILayoutView.querySize { editor.measure(width: width, height: height) }
+                        XCTAssertEqual(editor.desiredSize, prepared,
+                                       "an arithmetic question must not change XAML's prepared Measure result")
+                        XCTAssertEqual(editor.measurementRevision, revision)
+                    }
+                }
+                swiftomniui_winui_arrange(editor.handle, 0, 0, 240, 104)
+                XCTAssertEqual(editor.laidOutFrame.height, 104, accuracy: 1)
+                XCTAssertEqual(editor.text, "A long editor line and more words")
+                XCTAssertTrue(swiftomniui_winui_focused(editor.handle))
+                var facts = [Int32](repeating: -1, count: 9)
+                swiftomniui_winui_field_facts(editor.handle, &facts)
+                XCTAssertEqual(Array(facts[5...6]), [2, 4])
+            }
+            XCTAssertGreaterThan(nativeDesired.width, 0)
+        }
+    }
+
+    func testNewConversationFirstInputKeepsItsExpandedHeightWhileControlsReflow() throws {
+        try onUIThread {
+            let words = State(wrappedValue: "")
+            let clock = TestClock()
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView { Text("New conversation") }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        HStack(alignment: .bottom) {
+                            Button("Attach") {}.frame(width: 40, height: 40)
+                            ZStack(alignment: .bottom) {
+                                TextEditor(words.projectedValue.transaction(.init(animation: .snappy)))
+                                    .scrollContentBackground(.hidden)
+                                    .background(alignment: .topLeading) {
+                                        if words.wrappedValue.isEmpty {
+                                            Text("Placeholder for a new conversation").padding(.top, 1).padding(.leading, 4)
+                                        }
+                                    }
+                                    .animation(nil, value: words.wrappedValue.isEmpty)
+                                    .safeAreaPadding(.vertical, 12)
+                                    .safeAreaPadding(.leading, 12)
+                                    .frame(height: 128)
+                                    .background(Color.white, in: RoundedRectangle(cornerRadius: 20))
+                                Rectangle().fill(Color.clear).frame(height: 16).offset(y: -120)
+                            }.frame(height: 128).id("new-composer")
+                            if words.wrappedValue.isEmpty {
+                                HStack {
+                                    Button("Send") {}.frame(width: 40, height: 40).id("new-send")
+                                    Button("Pause") {}.frame(width: 40, height: 40).id("new-pause")
+                                }
+                            } else {
+                                VStack {
+                                    Button("Send") {}.frame(width: 40, height: 40).id("new-send")
+                                    Button("Pause") {}.frame(width: 40, height: 40).id("new-pause")
+                                }
+                            }
+                        }.padding(16).buttonStyle(.plain).id("new-composer-row")
+                    }
+            }
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            let composer = try XCTUnwrap(host.view(id: .manual("new-composer")))
+            let row = try XCTUnwrap(host.view(id: .manual("new-composer-row")))
+            let emptyWidth = composer.laidOutFrame.width
+            let bottom = composer.origin.y + composer.laidOutFrame.height
+            for text in ["a", "more input", "", "again"] {
+                editor.type(text)
+                host.step()
+                let began = clock.now
+                for elapsed in [0.0, 16, 50, 100, 200, 400, 800, 1600] {
+                    clock.now = began + elapsed
+                    host.frame()
+                    XCTAssertEqual(composer.laidOutFrame.height, 128, accuracy: 1)
+                    XCTAssertEqual(composer.origin.y + composer.laidOutFrame.height, bottom, accuracy: 1)
+                    XCTAssertEqual(editor.laidOutFrame.height, 104, accuracy: 1)
+                    XCTAssertGreaterThan(editor.laidOutFrame.width, 40)
+                    XCTAssertGreaterThan(composer.laidOutFrame.width, 52)
+                    XCTAssertEqual(editor.laidOutFrame.width, composer.laidOutFrame.width - 12, accuracy: 1,
+                                   "native width must follow the currently allocated composer, including animation samples")
+                    XCTAssertTrue(host.views(WinUITextEditorView.self).first === editor)
+                    XCTAssertEqual(host.views(WinUITextEditorView.self).count, 1)
+                    XCTAssertEqual(editor.text, text)
+                    for identity in ["new-send", "new-pause"] {
+                        let button = try XCTUnwrap(host.view(id: .manual(identity)))
+                        XCTAssertEqual(button.laidOutFrame.width, 40, accuracy: 1)
+                        XCTAssertEqual(button.laidOutFrame.height, 40, accuracy: 1)
+                        XCTAssertGreaterThanOrEqual(button.origin.x, row.origin.x - 1)
+                        XCTAssertLessThanOrEqual(button.origin.x + button.laidOutFrame.width,
+                                                 row.origin.x + row.laidOutFrame.width + 1)
+                        XCTAssertGreaterThanOrEqual(button.origin.y, row.origin.y - 1)
+                        XCTAssertLessThanOrEqual(button.origin.y + button.laidOutFrame.height,
+                                                 row.origin.y + row.laidOutFrame.height + 1)
+                    }
+                }
+                XCTAssertEqual(composer.laidOutFrame.width, emptyWidth + (text.isEmpty ? 0 : 48), accuracy: 1,
+                               "the editor must receive the width released by changing two buttons from a row to a column")
+            }
+        }
+    }
+
     func testNestedComposerUsesOneHeightThroughExpansionReversalAndEmptyInput() throws {
         try onUIThread {
             let words = State(wrappedValue: "")

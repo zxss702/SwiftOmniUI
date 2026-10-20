@@ -15,6 +15,46 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class MotionTests: XCTestCase {
+    func testArmedNilGateOverridesTheWritesAnimationInsideItsOwnFrame() throws {
+        let differ = Differ()
+        func composer(_ filled: Bool) -> Node {
+            ZStack { Text("Editor") }
+                .opacity(filled ? 1 : 0.5)
+                .animation(nil, value: filled)
+                .id("placeholder-surface")
+                .frame(height: filled ? 128 : 40)
+                .id("outer-frame")
+                .node
+        }
+        let initial = differ.reconcile(nil, with: composer(false))
+        let law = Animation.snappy
+        differ.transaction = Transaction(animation: law)
+        let changed = differ.reconcile(initial.node, with: composer(true))
+        let outer = changed.patch
+        let inner = try XCTUnwrap(outer.subtree.first { $0.type == .zStack })
+        XCTAssertEqual(outer.transitions[.height]?.animation, law,
+                       "the enclosing frame keeps the binding's animation")
+        XCTAssertNil(inner.transitions[.opacity], "local animation(nil) must win over an enclosing animated write")
+        XCTAssertEqual(inner.layoutTransition?.animation, Animation.none)
+        XCTAssertEqual(inner.layoutTransition?.lanes, [])
+    }
+
+    func testArmedValueGateWinsLocallyButAnUnarmedGateLeavesTheTransactionIntact() {
+        let differ = Differ()
+        let gate = Animation.eased(120, .linear)
+        let write = Animation.eased(800, .cubicIn)
+        func surface(_ watched: Bool, opacity: Double) -> Node {
+            ZStack { Text("Editor") }.opacity(opacity).animation(gate, value: watched).node
+        }
+        let initial = differ.reconcile(nil, with: surface(false, opacity: 0))
+        differ.transaction = Transaction(animation: write)
+        let armed = differ.reconcile(initial.node, with: surface(true, opacity: 1))
+        XCTAssertEqual(armed.patch.transitions[.opacity]?.animation, gate)
+        XCTAssertEqual(armed.patch.layoutTransition?.animation, gate)
+        let ordinary = differ.reconcile(armed.node, with: surface(true, opacity: 0.5))
+        XCTAssertEqual(ordinary.patch.transitions[.opacity]?.animation, write)
+    }
+
     func testExplicitTransactionReopensIdleLayoutLanesOnAFullDescription() {
         let differ = Differ()
         func stack(_ width: Double) -> Node {

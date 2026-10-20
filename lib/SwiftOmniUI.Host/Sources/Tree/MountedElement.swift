@@ -656,6 +656,15 @@ import CRT
         case .scrollView:
             values.scrollAxes = value(.orientation)?.enumeration.flatMap(Axis.init(rawValue:)) ?? .vertical
             values.expandingAxes = values.scrollAxes == .vertical ? .both : values.scrollAxes
+        case .list:
+            // A native list consumes a viewport even with no realized rows.
+            // Its cells must not supply the enclosing stack's ideal height.
+            if case .row? = value(.itemsLayout).flatMap(ItemsLayout.init(propValue:)) {
+                values.scrollAxes = .horizontal
+            } else {
+                values.scrollAxes = .vertical
+            }
+            values.expandingAxes = .both
         case .webView:
             values.scrollAxes = .both
         case .page, .navigationStack, .tabView, .navigationSplitView:

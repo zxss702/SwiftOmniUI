@@ -11,6 +11,15 @@ and measures and places each child through the relay. WinUI lays out by
 asking: a child is placed only inside its parent's arrangement
 ([a place between passes](#a-place-between-passes)).
 
+A panel placed by a SOUI parent reports zero native DesiredSize after completing
+measurement and child preparation. Its intrinsic answer is still available to
+that parent through `naturalSize`; it does not also become a native minimum.
+Otherwise XAML can retain the animation's destination as its unclipped desired
+size, enlarge a smaller presentation slot and add an implicit layout clip.
+Native-owned pages, button/menu labels, toolbar bars and scroll documents keep
+the dimensions their native owner needs. Changing this ownership invalidates
+the native measurement contract even when its proposal stays the same.
+
 ## Measured every pass
 
 Intrinsic answers and native allocations are separate. Native leaf answers

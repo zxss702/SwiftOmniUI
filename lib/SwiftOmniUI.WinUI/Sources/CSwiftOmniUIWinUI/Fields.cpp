@@ -156,7 +156,9 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_editor_make(int64_t view) {
     }
 }
 
-extern "C" bool swiftomniui_winui_editor_intrinsic_height(SwiftOmniUIObjectRef handle, double *height) {
+extern "C" bool swiftomniui_winui_editor_content_size(
+    SwiftOmniUIObjectRef handle, double width, bool growing, double *size
+) {
     try {
         auto editor = borrow<controls::TextBox>(handle);
         controls::TextBlock line;
@@ -167,20 +169,43 @@ extern "C" bool swiftomniui_winui_editor_intrinsic_height(SwiftOmniUIObjectRef h
         line.FontStretch(editor.FontStretch());
         line.CharacterSpacing(editor.CharacterSpacing());
         line.FlowDirection(editor.FlowDirection());
-        line.Text(L"Mg");
         constexpr auto unbounded = std::numeric_limits<float>::infinity();
-        line.Measure({unbounded, unbounded});
         auto padding = editor.Padding();
         auto border = editor.BorderThickness();
-        auto measured = std::max(editor.MinHeight(), double(line.DesiredSize().Height)
+        auto across = padding.Left + padding.Right + border.Left + border.Right;
+        line.Text(L"Mg");
+        line.TextWrapping(xaml::TextWrapping::NoWrap);
+        line.Measure({unbounded, unbounded});
+        auto desired = line.DesiredSize();
+        auto lineHeight = double(desired.Height);
+        double naturalWidth = 0;
+        if (growing || !std::isfinite(width)) {
+            auto words = editor.Text();
+            line.Text(words.empty() ? editor.PlaceholderText() : words);
+            line.TextWrapping(growing ? xaml::TextWrapping::Wrap : xaml::TextWrapping::NoWrap);
+            auto offered = growing && std::isfinite(width)
+                ? static_cast<float>(std::max(0.0, width - across)) : unbounded;
+            line.Measure({offered, unbounded});
+            desired = line.DesiredSize();
+            naturalWidth = double(desired.Width);
+        }
+        auto measured = std::max(editor.MinHeight(), (growing ? std::max(lineHeight, double(desired.Height)) : lineHeight)
             + padding.Top + padding.Bottom + border.Top + border.Bottom);
         if (!std::isfinite(measured) || measured <= 0) throw winrt::hresult_error(E_UNEXPECTED);
-        *height = measured;
+        size[0] = std::max(editor.MinWidth(), naturalWidth + across);
+        size[1] = measured;
         return true;
     } catch (...) {
-        report("measuring an editor's intrinsic line");
+        report("querying an editor's content size");
         return false;
     }
+}
+
+extern "C" bool swiftomniui_winui_editor_intrinsic_height(SwiftOmniUIObjectRef handle, double *height) {
+    double size[2] = {0, 0};
+    if (!swiftomniui_winui_editor_content_size(handle, std::numeric_limits<double>::infinity(), false, size)) return false;
+    *height = size[1];
+    return true;
 }
 
 extern "C" void swiftomniui_winui_editor_set_background_hidden(SwiftOmniUIObjectRef handle, bool hidden) {
