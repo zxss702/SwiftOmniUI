@@ -225,7 +225,10 @@ final class LayoutArithmeticTests: XCTestCase {
 
         XCTAssertEqual(places[1], Rect(20, 0, 100, 30), "three lines of words at the column's 100")
         XCTAssertEqual(size.height, 30)
-        XCTAssertEqual(size.width, 320, "its natural width is still its words on one line")
+        XCTAssertEqual(size.width, 120, "both measured axes must belong to the resolved column proposal")
+        XCTAssertEqual(GridArithmetic.size(of: [icon, words], rows: [.auto], columns: columns,
+                                           rowSpacing: 0, columnSpacing: 0, padding: EdgeInsets(0)).width, 320,
+                       "an unspecified proposal still reports the ideal width")
     }
 
     @MainActor
@@ -244,7 +247,7 @@ final class LayoutArithmeticTests: XCTestCase {
                 of: [child], rows: [.auto], columns: [.fill], rowSpacing: 0,
                 columnSpacing: 0, padding: EdgeInsets(0), width: 920)
             XCTAssertEqual(offers.widths.last!, proposal)
-            XCTAssertEqual(size.width, 64.9, accuracy: 0.01, "the natural width remains independent of expansion")
+            XCTAssertEqual(size.width, proposal, accuracy: 0.01, "returned width follows the same tracks as row height")
             XCTAssertEqual(size.height, proposal / 2, accuracy: 0.01, "row height follows the column's actual proposal")
         }
     }

@@ -34,12 +34,12 @@
             items, definitions: columnDefinitions, count: columnCount,
             available: nil, spacing: columnSpacing, vertical: false, cells: cells,
             limits: cells == nil ? nil : flowColumns.map(\.limits))
-        let width = padding.left + padding.right + columnSizes.reduce(0, +)
+        let naturalWidth = padding.left + padding.right + columnSizes.reduce(0, +)
             + columnSpacing * Double(max(columnCount - 1, 0))
 
         let expandsAcross = items.contains { $0.isShown && !$0.values.isLayoutDecoration
             && ($0.values.flex != nil || $0.values.expandingAxes == .horizontal || $0.values.expandingAxes == .both) }
-        if let offered, offered.isFinite, width > offered || expandsAcross {
+        if let offered, offered.isFinite, naturalWidth > offered || expandsAcross {
             columnSizes = trackSizes(
                 items, definitions: columnDefinitions, count: columnCount,
                 available: max(0, offered - padding.left - padding.right), spacing: columnSpacing,
@@ -52,7 +52,8 @@
             cells: cells)
 
         return LayoutSize(
-            width: width,
+            width: padding.left + padding.right + columnSizes.reduce(0, +)
+                + columnSpacing * Double(max(columnCount - 1, 0)),
             height: padding.top + padding.bottom + rowSizes.reduce(0, +)
                 + rowSpacing * Double(max(rowCount - 1, 0)))
     }
