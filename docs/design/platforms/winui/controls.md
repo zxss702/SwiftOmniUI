@@ -309,6 +309,11 @@ frame, unless an ancestor explicitly clips it; a native Grid must not enlarge
 that frame and supply an implicit layout clip. Drawing dimensions are assigned
 before arranging the image, including its first placement.
 
+`ImageContract` wears `TextStyleElementContract`, so a system symbol receives
+both its own and its ancestors' `foregroundStyle`/`foregroundColor`. The image
+registration sends that colour to `FontIcon.Foreground`; a colour-only patch
+keeps the glyph and its measurements intact.
+
 SVG documents are parsed once per full path and aspect mode. Ready rasters
 are shared by path, aspect mode and physical pixel size, with a 64 MiB cache
 budget; images still showing an evicted entry retain it. A resized image or

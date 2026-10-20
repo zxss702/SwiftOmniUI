@@ -164,6 +164,13 @@ folder ([the application's pictures](drawing.md#the-applications-pictures)),
 its own size, whatever room its layout offers: an SVG the size it declares,
 a bitmap its pixels, both as gdk-pixbuf reads them from the file.
 
+System symbols keep the icon theme's `GtkIconPaintable` instead of decoding
+its SVG as a file texture. Their contract accepts inherited and explicit
+`foregroundStyle` (including `foregroundColor`); the native symbolic snapshot
+uses that colour, or the widget's theme foreground when none is supplied.
+Colour-only updates redraw the retained paintable without reloading it or
+invalidating layout. Paintable content invalidations queue the next snapshot.
+
 The panel draws the picture in the place its layout gives it, as the aspect
 says - whole in its room, covering it, stretched across it, or at its own
 size in the middle - cut at the room's edge. A bitmap is read once. An SVG is

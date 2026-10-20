@@ -21,6 +21,12 @@ final class GTKImageView: GTKPanelView {
     private var path: String?
     private var size = LayoutSize(width: 0, height: 0)
     private var isVector = false
+    private var symbol: OpaquePointer?
+    private var symbolInvalidation: gulong = 0
+    private var foreground: HostValue?
+    private var loadedSource: ImageSource?
+    private var loadedSymbolSize = 0.0
+    private var loadedScale: Int32 = 0
 
     /// The picture's pixels, and the size in device pixels they were drawn at; nil while none are.
     private var texture: OpaquePointer?
@@ -28,19 +34,48 @@ final class GTKImageView: GTKPanelView {
 
     isolated deinit {
         if let texture { g_object_unref(UnsafeMutableRawPointer(texture)) }
+        if let symbol {
+            if symbolInvalidation != 0 { g_signal_handler_disconnect(UnsafeMutableRawPointer(symbol), symbolInvalidation) }
+            g_object_unref(UnsafeMutableRawPointer(symbol))
+        }
     }
 
     /// Shows the picture `source` names, filling its room as `aspect` says. A source naming a symbol shows the
     /// icon theme's icon for it - the platform's own symbols - or the missing-image icon where the name is
     /// unknown.
     func apply(source: ImageSource?, aspect: ContentMode, resizable: Bool = false, font: TextLook = TextLook()) {
-        file = source?.file ?? ""
-        self.aspect = resizable ? aspect : .center
+        foreground = font.color
+        let aspect = resizable ? aspect : .center
         let symbolSize = source?.symbol == nil ? 16 : font.symbolPointSize
-        path = if let symbol = source?.symbol {
-            GTKSymbols.path(of: symbol, size: Int32(symbolSize.rounded(.up)))
-        } else { GTKPictures.path(of: file) }
-        found = path != nil
+        let scale = max(gtk_widget_get_scale_factor(widget), 1)
+        if found, source == loadedSource, symbolSize == loadedSymbolSize, scale == loadedScale {
+            self.aspect = aspect
+            gtk_widget_queue_draw(widget)
+            return
+        }
+        loadedSource = source
+        loadedSymbolSize = symbolSize
+        loadedScale = scale
+        if let symbol {
+            if symbolInvalidation != 0 { g_signal_handler_disconnect(UnsafeMutableRawPointer(symbol), symbolInvalidation) }
+            g_object_unref(UnsafeMutableRawPointer(symbol))
+        }
+        symbol = nil
+        symbolInvalidation = 0
+        file = source?.file ?? ""
+        self.aspect = aspect
+        path = source?.symbol == nil ? GTKPictures.path(of: file) : nil
+        if let name = source?.symbol {
+            symbol = GTKSymbols.paintable(of: name, size: Int32(symbolSize.rounded(.up)), scale: scale)
+        }
+        if let symbol {
+            symbolInvalidation = connectSignal(UnsafeMutableRawPointer(symbol), "invalidate-contents", number: number) { _, data in
+                MainActor.assumeIsolated {
+                    if let view = GTKView.find(viewNumber(data)) { gtk_widget_queue_draw(view.widget) }
+                }
+            }
+        }
+        found = symbol != nil || path != nil
         if !found, let name = source?.symbol ?? (file.isEmpty ? nil : file) {
             GTKRenderer.log.error("no picture or symbol for \(name)")
         }
@@ -49,7 +84,12 @@ final class GTKImageView: GTKPanelView {
         var height: Int32 = 0
         if let path { _ = gdk_pixbuf_get_file_info(path, &width, &height) }
         size = LayoutSize(width: Double(max(width, 0)), height: Double(max(height, 0)))
-        if source?.symbol != nil, size.height > 0 { size = PictureArithmetic.glyph(size, height: symbolSize) }
+        if let symbol {
+            let intrinsic = LayoutSize(width: Double(gdk_paintable_get_intrinsic_width(symbol)),
+                                       height: Double(gdk_paintable_get_intrinsic_height(symbol)))
+            size = intrinsic.height > 0 ? PictureArithmetic.glyph(intrinsic, height: symbolSize)
+                : LayoutSize(width: symbolSize, height: symbolSize)
+        }
         isVector = path?.lowercased().hasSuffix(".svg") == true
         replaceTexture(with: nil)
         drawn = nil
@@ -102,6 +142,25 @@ final class GTKImageView: GTKPanelView {
     }
 
     override func draw(_ snapshot: OpaquePointer, width: Double, height: Double) {
+        if let symbol {
+            let place = place(in: LayoutSize(width: width, height: height))
+            guard place.width > 0, place.height > 0 else { return }
+            var tint = GdkRGBA()
+            gtk_widget_get_color(widget, &tint)
+            if let own = foreground.flatMap(GTKBrush.rgba) { tint = own }
+            var origin = graphene_point_t(x: Float(place.x), y: Float(place.y))
+            gtk_snapshot_save(snapshot)
+            gtk_snapshot_translate(snapshot, &origin)
+            // All symbolic roles use the foreground in monochrome mode.
+            // Keep the native paintable, including theme fallback and HiDPI.
+            let colors = [tint, tint, tint, tint]
+            colors.withUnsafeBufferPointer {
+                gtk_symbolic_paintable_snapshot_symbolic(symbol, snapshot, place.width, place.height,
+                                                         $0.baseAddress, gsize($0.count))
+            }
+            gtk_snapshot_restore(snapshot)
+            return
+        }
         read(for: LayoutSize(width: width, height: height))
         guard let texture else { return }
 

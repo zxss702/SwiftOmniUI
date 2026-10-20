@@ -11,6 +11,7 @@ extension GTKRegistrations {
             image.applies([
                 ImageContract.source, ImageElementContract.aspect, ImageContract.isResizable,
                 FontElementContract.fontSize, FontElementContract.fontTextStyle,
+                TextStyleElementContract.foregroundStyle,
             ]) { view, values in
                 view.apply(source: values[ImageContract.source], aspect: values[ImageElementContract.aspect] ?? .stretch,
                            resizable: values[ImageContract.isResizable] ?? false, font: TextMembers.look(of: values))

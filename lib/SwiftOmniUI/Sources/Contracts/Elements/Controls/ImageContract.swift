@@ -9,8 +9,10 @@ public enum ImageContract: ElementContract {
     /// Every base host presents it with its native control.
     public static let layer: ElementLayer = .native
 
-    /// An image keeps its own size; a symbol also takes the inherited font.
-    public static let tiers: [any Contract.Type] = [ViewContract.self, ImageElementContract.self, FontElementContract.self]
+    /// An image keeps its own size; a symbol takes the inherited font and foreground.
+    public static let tiers: [any Contract.Type] = [
+        ViewContract.self, ImageElementContract.self, FontElementContract.self, TextStyleElementContract.self,
+    ]
 
     /// Whether an animated picture is running.
     public static let isAnimating = ElementProperty<Self, Bool>("isAnimating", layer: .native)

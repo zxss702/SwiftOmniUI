@@ -14,21 +14,15 @@ enum GTKSymbols {
     /// Whether the bundled icons stand in the theme's search paths yet.
     private static var registered = false
 
-    /// The file the icon theme keeps `name`'s icon at, or nil where the theme has none.
-    static func path(of name: String, size: Int32 = 32) -> String? {
+    /// The theme's native symbolic paintable. The caller owns its reference.
+    static func paintable(of name: String, size: Int32 = 32, scale: Int32 = 1) -> OpaquePointer? {
         guard let display = gdk_display_get_default() else { return nil }
         guard let theme = gtk_icon_theme_get_for_display(display) else { return nil }
         registerBundledIcons(in: theme)
         guard let icon = g_themed_icon_new(name) else { return nil }
         defer { g_object_unref(UnsafeMutableRawPointer(icon)) }
-        let paintable = gtk_icon_theme_lookup_by_gicon(
-            theme, icon, size, 1, GTK_TEXT_DIR_LTR, GTK_ICON_LOOKUP_FORCE_SYMBOLIC)
-        guard let paintable, let file = gtk_icon_paintable_get_file(paintable) else { return nil }
-        defer {
-            g_object_unref(UnsafeMutableRawPointer(paintable))
-            g_object_unref(UnsafeMutableRawPointer(file))
-        }
-        return g_file_get_path(file).map { String(cString: $0) }
+        return gtk_icon_theme_lookup_by_gicon(
+            theme, icon, size, scale, GTK_TEXT_DIR_LTR, GTK_ICON_LOOKUP_FORCE_SYMBOLIC)
     }
 
     /// Whether the icon theme knows `name` - the bundled icons registered first.
