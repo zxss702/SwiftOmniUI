@@ -126,26 +126,6 @@ reconciliation can exhaust that budget at ordinary view nesting depths.
 The request travels with the object linked into the consuming executable;
 DLLs cannot configure the executable's main-thread stack.
 
-## Layout diagnostics
-
-The relay writes `%TEMP%/SwiftOmniUI-layout-<pid>.log`, with a `v3` header.
-It retains the first 8192 events, 256 recent split/viewport/runtime state
-changes, a separate 512-event pane/editor presentation history that scrolling
-cannot evict, and a rolling tail of 4096 events. Foreground tail writes use a
-one-second throttle; a one-shot thread-pool timer also saves the final idle
-tail. An unhandled XAML exception forces a synchronous snapshot.
-File access is serialized, and stopping diagnostics cancels and joins the
-timer before closing the file. Diagnostics never request layout or animation
-frames. The records include runtime compatibility/optional-change settings,
-pane configuration, viewport state, and realized lazy ranges;
-they exclude the user's input text.
-
-Earlier `v1` logs stopped appending after the startup prefix unless an
-exception was reported. A file ending at that prefix contains no evidence
-about subsequent nonfatal sidebar flickering or blank content. Interpret
-the current state-history and recent-tail sections by event number because
-retained history can overlap the startup and recent events.
-
 ## A windowed application
 
 The head links as a windowed application (`/SUBSYSTEM:WINDOWS`, its entry
@@ -229,8 +209,10 @@ it as it stands: `ResizeClient` would add the title bar's height again, which
 the content already covers.
 
 The bounds are the presenter's preferred least and greatest size. The
-caption height is read by measuring the chrome alone; attaching it already
-applies its template. Reading that height must not call `UpdateLayout`, which
+caption height comes from `AppWindow.TitleBar.Height`, converted from pixels
+to DIPs, and fixes both states of the XAML title bar's row. A new page's
+toolbar content does not change this contribution to window sizing. Reading
+it neither measures the title bar's children nor calls `UpdateLayout`, which
 would flush pending page layout inside window presentation and can realize
 another lazy window before the current render returns. Window requests and
 presenter properties are written only when their native pixel values differ;

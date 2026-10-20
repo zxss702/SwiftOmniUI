@@ -193,13 +193,12 @@ final class WinUIWindow {
     }
 
     var chromeHeight: Double {
-        // Attaching the chrome applies the TitleBar template. Measure just these bars:
-        // UpdateLayout would synchronously flush the page's pending layout as well,
-        // including EffectiveViewportChanged and another lazy realization/render.
+        // The TitleBar row follows the native caption height, including before
+        // its first layout. A page's toolbar content is not window chrome to
+        // add to the window's requested height. Only menus and tabs size to
+        // their content; none of these reads flush the page's pending layout.
         let width = clientSize.width
-        let caption = titleBarStands
-            ? max(swiftomniui_winui_window_title_bar_height(handle), titleBar.measure(width: width, height: nil).height)
-            : 0
+        let caption = titleBarStands ? swiftomniui_winui_window_title_bar_height(handle) : 0
         let bars: [WinUIView] = (menuBarStands ? [menuBar] : []) + (tabsStandInWindow ? [tabRow] : [])
         return bars.reduce(caption) { $0 + $1.measure(width: width, height: nil).height }
     }
@@ -253,8 +252,7 @@ final class WinUIWindow {
             // readers still observe them and scrollers can extend behind them.
             // Read committed metrics here; measuring chrome during Arrange
             // would recursively enter the native layout engine.
-            let caption = max(swiftomniui_winui_window_title_bar_height(self.handle),
-                              self.titleBar.laidOutFrame.height)
+            let caption = swiftomniui_winui_window_title_bar_height(self.handle)
             let menu = self.menuBarStands ? self.menuBar.laidOutFrame.height : 0
             let tabs = self.tabsStandInWindow ? self.tabRow.laidOutFrame.height : 0
             let top = max(0, caption + menu + tabs)

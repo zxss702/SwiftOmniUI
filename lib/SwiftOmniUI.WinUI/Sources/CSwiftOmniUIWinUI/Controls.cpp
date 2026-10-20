@@ -6,6 +6,7 @@
 // on.
 
 #include "Automation.h"
+#include "ToolbarMetrics.h"
 
 #include <algorithm>
 #include <string>
@@ -196,6 +197,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_toolbar_button_make(int64_t vi
         // a press on one that keeps nothing is taken back at once. Its icon slot and label are what it shows;
         // `toolbar_button_set_icon` and `set_caption` fill them.
         controls::AppBarToggleButton button;
+        compactToolbarButton(button);
         button.LabelPosition(controls::CommandBarLabelPosition::Collapsed);
         wireButton(button, view);
         return detach(button);
@@ -277,9 +279,8 @@ extern "C" void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef handle, char 
             command.Label(words);
             command.LabelPosition(collapsed ? controls::CommandBarLabelPosition::Collapsed
                                             : controls::CommandBarLabelPosition::Default);
-            // Showing its icon alone, the button stands as wide as the bar's own back and pane buttons - the
-            // system gives those 40. Words alone keep the default width, which a label needs.
-            if (collapsed) command.Width(40);
+            // Icon-only commands keep a compact face; words retain their native label width.
+            if (collapsed) command.Width(36);
             else command.ClearValue(xaml::FrameworkElement::WidthProperty());
             if (pictured && !words.empty()) controls::ToolTipService::SetToolTip(command, winrt::box_value(words));
         };

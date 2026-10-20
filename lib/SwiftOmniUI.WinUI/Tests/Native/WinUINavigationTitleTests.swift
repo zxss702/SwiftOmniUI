@@ -8,6 +8,80 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 final class WinUINavigationTitleTests: XCTestCase {
+    func testFirstVisitsWithDifferentToolbarsKeepTheWindowSizeAndCaptionRow() throws {
+        try onUIThread {
+            for split in [false, true] {
+                let path = State(wrappedValue: [Int]())
+                let query = State(wrappedValue: "")
+                let sidebar = State(wrappedValue: true)
+                let minimumHeight = split ? 320.0 : 480.0
+                let room = split ? LayoutSize(width: 1100, height: 700) : LayoutSize(width: 800, height: 512)
+                let host = WinUIRenderer.running(reducesMotion: true, room: room) {
+                    let stack = NavigationStack(path.projectedValue) {
+                        Text("Home").navigationTitle("Home")
+                    } destination: { number in
+                        Text("Page \(number)")
+                            .navigationTitle("Page \(number)")
+                            .toolbar {
+                                ToolbarItem("Save", systemImage: "square.and.arrow.down") {}
+                                ToolbarItem {
+                                    Button(icon: .symbol("pencil")) {}.id("edit-command-\(number)")
+                                }
+                                ToolbarItem {
+                                    Button("Options") {}.id("label-command-\(number)")
+                                }
+                                if number.isMultiple(of: 2) {
+                                    ToolbarItem { SearchField(query.projectedValue).frame(width: 180) }
+                                }
+                            }
+                    }
+                    if split {
+                        return NavigationSplitView(sidebar.projectedValue) {
+                            Text("Files")
+                        } detail: {
+                            stack
+                        }.frame(minWidth: 640, minHeight: minimumHeight)
+                    }
+                    return stack.frame(minWidth: 640, minHeight: minimumHeight)
+                }
+                let window = try XCTUnwrap(host.window)
+                let content = try XCTUnwrap(window.content)
+                var initial = [Double](repeating: 0, count: 13)
+                swiftomniui_winui_window_frame(window.handle, &initial)
+
+                // Every destination is new. Check the first completed native
+                // pass as well as idle, rather than revisiting cached pages.
+                for number in 1...5 {
+                    path.wrappedValue.append(number)
+                    host.runtime.pump.turn()
+                    host.layOut()
+                    for idle in [false, true] {
+                        if idle { host.step() }
+                        var frame = [Double](repeating: 0, count: 13)
+                        swiftomniui_winui_window_frame(window.handle, &frame)
+                        for axis in 0..<4 {
+                            XCTAssertEqual(frame[axis], initial[axis], accuracy: 0.01,
+                                           "first visit \(number), split=\(split), idle=\(idle), axis=\(axis)")
+                        }
+                        let caption = swiftomniui_winui_window_title_bar_height(window.handle)
+                        XCTAssertEqual(window.chromeHeight, caption, accuracy: 0.01)
+                        XCTAssertEqual(window.titleBar.laidOutFrame.height, caption, accuracy: 1)
+                        XCTAssertEqual(content.origin.y, caption, accuracy: 1,
+                                       "no extra strip below the native caption buttons")
+                        for name in ["edit-command-\(number)", "label-command-\(number)"] {
+                            let command = try XCTUnwrap(host.view(id: .manual(name)))
+                            let height = command.laidOutFrame.height
+                            XCTAssertGreaterThan(height, 0)
+                            XCTAssertLessThan(height, caption, "commands leave room above and below")
+                            XCTAssertEqual(command.origin.y + height / 2, caption / 2, accuracy: 1,
+                                           "commands and native caption buttons share their vertical centre")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     func testTextTitlesOnTheOuterSplitReachTheNativeTitleBarAndFollowChanges() throws {
         try onUIThread {
             let title = State(wrappedValue: "SwiftOmniUI"), subtitle = State(wrappedValue: "新对话")
