@@ -297,6 +297,12 @@ a runtime calls after it reports the locale) - and nothing else.
 
 ## Scrolling
 
+A horizontal viewport accepts the finite width its parent offers. Only an
+unbounded width query reports zero along the scrolling axis; the document's
+width is not the viewport's ideal width. This also holds when the viewport is
+wrapped in a frame or used as a native button's label: returning zero for a
+finite proposal would collapse the content and its input area.
+
 A scroller's content is held to the scroller's width when it scrolls only
 down, or not at all, and offered no width when it scrolls across, where its
 width is its own to decide. A filling child stated no width takes the width

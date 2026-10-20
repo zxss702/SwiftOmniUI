@@ -129,14 +129,17 @@
         Extent.bounded(proposed, minimum: minimumHeight, maximum: maximumHeight, available: available)
     }
 
-    /// One axis of `sized`: a stated size wins, a scroller reports nothing
-    /// along its axis, a bound child's measured size stands only where the
-    /// offer was unbounded.
+    /// One axis of `sized`: a stated size wins. A scroller accepts a finite
+    /// viewport proposal, but its document supplies no ideal extent along
+    /// that axis when the proposal is unbounded.
     private func extent(
         _ stated: Double?, measured: Double, offered: Double?, bound: Bool, scrolled: Bool
     ) -> Double {
         if let stated { return stated }
-        if scrolled { return 0 }
+        if scrolled {
+            guard let offered, offered.isFinite else { return 0 }
+            return max(0, offered)
+        }
         guard bound, let offered, offered.isFinite else { return measured }
         return offered
     }
