@@ -253,7 +253,7 @@ final class WinUISplitView: WinUILayoutView {
             guard let self else { return }
             self.columnLayoutRefreshPending = false
             guard !self.isDetached else { return }
-            func reconcile(_ element: MountedElement) {
+            @MainActor func reconcile(_ element: MountedElement) {
                 (element.winUI.view as? WinUILazyView)?.nativeViewportChanged()
                 for child in element.children { reconcile(child) }
             }

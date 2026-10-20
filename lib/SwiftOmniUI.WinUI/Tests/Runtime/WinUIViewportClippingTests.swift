@@ -20,7 +20,7 @@ final class WinUIViewportClippingTests: XCTestCase {
             let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
             let nativeSize = scroll.scroller.laidOutFrame
-            func viewport() -> [Double] {
+            @MainActor func viewport() -> [Double] {
                 var value = [Double](repeating: .nan, count: 6)
                 XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &value),
                                SwiftOmniUIViewportReady)
@@ -46,7 +46,7 @@ final class WinUIViewportClippingTests: XCTestCase {
     func testReadingAndClearingAnUnauthoredClipLeavesNativeScaleAvailable() {
         onUIThread {
             let panel = WinUIGridView()
-            func clipped() -> String {
+            @MainActor func clipped() -> String {
                 WinUIStrings.read { swiftomniui_winui_read(panel.handle, "clipped", $0, $1) }
             }
             XCTAssertEqual(clipped(), "0")
