@@ -540,7 +540,8 @@ class WinUIView {
     /// Measure result. A different final slot is not another Measure proposal:
     /// measuring a SplitView, scroller or list here changes its DesiredSize
     /// and restarts the parent that is currently arranging it. SOUI panels
-    /// override this to prepare their descendant placement plans instead.
+    /// prepare descendant plans; an editor prepares its explicitly owned leaf
+    /// height before entering Arrange, rather than leaving TextBox on Auto.
     func prepareAllocation(in bounds: Rect) {}
 
     /// The element's size for the room offered, in DIPs; nil offers any.
@@ -643,8 +644,9 @@ class WinUIView {
                 swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
             }
             if editorGeometryChanged {
+                let height = swiftomniui_winui_editor_allocated_height(handle)
                 WinUILayoutDiagnostics.record("editor.commit", view: self,
-                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize))")
+                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize)) heightConstraint=\(height)")
             }
         } else if moved {
             // The parent's next Arrange prepares the latest presentation slot.

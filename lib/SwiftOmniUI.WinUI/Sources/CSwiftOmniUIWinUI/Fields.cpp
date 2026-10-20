@@ -201,6 +201,31 @@ extern "C" bool swiftomniui_winui_editor_content_size(
     }
 }
 
+extern "C" void swiftomniui_winui_editor_set_allocated_height(SwiftOmniUIObjectRef handle, double height) {
+    try {
+        auto editor = borrow<controls::TextBox>(handle);
+        // TextBox::OnSizeChanged starts its own 100 ms Height storyboard when
+        // Height is Auto and a focused multiline box changes size. SOUI owns
+        // this allocation, including every animation sample. Express that
+        // ownership before Measure; leaving Height Auto gives XAML a second
+        // geometry driver which also suppresses SizeChanged and caret updates.
+        // https://github.com/microsoft/microsoft-ui-xaml/blob/main/dxaml/xcp/dxaml/lib/TextBox_Partial.cpp
+        if (!std::isfinite(height) || height < 0) throw winrt::hresult_error(E_INVALIDARG);
+        if (editor.Height() != height) editor.Height(height);
+    } catch (...) {
+        report("allocating an editor's height");
+    }
+}
+
+extern "C" double swiftomniui_winui_editor_allocated_height(SwiftOmniUIObjectRef handle) {
+    try {
+        return borrow<controls::TextBox>(handle).Height();
+    } catch (...) {
+        report("reading an editor's allocated height");
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+}
+
 extern "C" bool swiftomniui_winui_editor_intrinsic_height(SwiftOmniUIObjectRef handle, double *height) {
     double size[2] = {0, 0};
     if (!swiftomniui_winui_editor_content_size(handle, std::numeric_limits<double>::infinity(), false, size)) return false;

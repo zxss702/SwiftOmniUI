@@ -757,6 +757,10 @@ SwiftOmniUIObjectRef swiftomniui_winui_field_make(int64_t view);
 /// A field's logical style kind: 1 takes the chrome away, 3 unrounds it, the rest the platform's own look.
 void swiftomniui_winui_field_set_style(SwiftOmniUIObjectRef field, int kind);
 SwiftOmniUIObjectRef swiftomniui_winui_editor_make(int64_t view);
+/// Gives SOUI ownership of the native height before measuring its allocated slot.
+void swiftomniui_winui_editor_set_allocated_height(SwiftOmniUIObjectRef editor, double height);
+/// The effective native Height; NaN means XAML still owns automatic sizing.
+double swiftomniui_winui_editor_allocated_height(SwiftOmniUIObjectRef editor);
 
 /// One line in the editor's native font, including its padding, border and minimum height.
 /// Writes height only on success; false reports a native measurement failure.

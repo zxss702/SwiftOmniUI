@@ -9,6 +9,67 @@ import SwiftOmniUIConformance
 import XCTest
 
 final class WinUITextEditorMeasurementTests: XCTestCase {
+    func testFocusedEditorKeepsSOUIHeightOwnershipAcrossNativeSizeChangedDelivery() throws {
+        try onUIThread {
+            let height = State(wrappedValue: 40.0)
+            let clock = TestClock()
+            let host = WinUIRenderer.running(clock: clock) {
+                TextEditor("Editable text")
+                    .safeAreaPadding(.vertical, 12)
+                    .frame(height: height.wrappedValue)
+                    .id("height-owner")
+            }
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            let input = try XCTUnwrap(host.view(id: .manual("height-owner")))
+            XCTAssertTrue(swiftomniui_winui_focus(editor.handle, true))
+            editor.select(start: 1, length: 3)
+            for target in [128.0, 40, 128] {
+                let began = clock.now
+                withAnimation(.eased(200, .linear)) { height.wrappedValue = target }
+                host.step()
+                for elapsed in [0.0, 16, 50, 100, 150, 200] {
+                    clock.now = began + elapsed
+                    host.frame()
+                    let expected = try XCTUnwrap(input.sourceElement?.number(.height)) - 24
+                    // SizeChanged runs as XAML delivers layout, outside the
+                    // synchronous Arrange call. TextBox must see a finite
+                    // Height there, or it launches an independent storyboard.
+                    XCTAssertEqual(swiftomniui_winui_editor_allocated_height(editor.handle), expected, accuracy: 0.001)
+                    XCTAssertEqual(editor.laidOutFrame.height, expected, accuracy: 0.001)
+                    XCTAssertEqual(editor.laidOutFrame.y, 0, accuracy: 0.001)
+                    XCTAssertTrue(swiftomniui_winui_focused(editor.handle))
+                    var facts = [Int32](repeating: -1, count: 9)
+                    swiftomniui_winui_field_facts(editor.handle, &facts)
+                    XCTAssertEqual(Array(facts[5...6]), [1, 3])
+                }
+            }
+            XCTAssertFalse(host.runtime.animator.isMoving)
+        }
+    }
+
+    func testFinalEditorAllocationSelectsItsHeightBeforeTheLeafEntersArrange() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running { TextEditor("Text").frame(width: 240, height: 128) }
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            let parent = try XCTUnwrap(editor.placingLayout)
+            XCTAssertTrue(swiftomniui_winui_focus(editor.handle, true))
+            for height in [16.0, 29.021526, 82.93654, 104, 45.69025, 16] {
+                // The original Measure selected a different slot. An actual
+                // allocation is prepared on this leaf, inside the parent's
+                // Arrange, before the leaf's own native Arrange begins.
+                editor.prepareMeasure(width: 240, height: 128)
+                parent.withNativeArrange { editor.layout(Rect(0, 0, 220, height)) }
+                XCTAssertEqual(swiftomniui_winui_editor_allocated_height(editor.handle), height, accuracy: 0.001)
+                XCTAssertEqual(editor.laidOutFrame.height, height, accuracy: 0.001)
+                XCTAssertEqual(editor.laidOutFrame.width, 220, accuracy: 0.001)
+                XCTAssertEqual(editor.laidOutFrame.y, 0, accuracy: 0.001)
+                // Natural size questions retain the selected native Height.
+                _ = WinUILayoutView.querySize { editor.measure(width: 40, height: nil) }
+                XCTAssertEqual(swiftomniui_winui_editor_allocated_height(editor.handle), height, accuracy: 0.001)
+            }
+        }
+    }
+
     func testArithmeticQueriesNeverReplaceTheLiveEditorsPreparedMeasure() throws {
         try onUIThread {
             let host = WinUIRenderer.running { TextEditor("A long editor line and more words").frame(width: 240, height: 128) }
@@ -99,6 +160,7 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                     XCTAssertEqual(composer.laidOutFrame.height, 128, accuracy: 1)
                     XCTAssertEqual(composer.origin.y + composer.laidOutFrame.height, bottom, accuracy: 1)
                     XCTAssertEqual(editor.laidOutFrame.height, 104, accuracy: 1)
+                    XCTAssertEqual(swiftomniui_winui_editor_allocated_height(editor.handle), 104, accuracy: 0.001)
                     XCTAssertGreaterThan(editor.laidOutFrame.width, 40)
                     XCTAssertGreaterThan(composer.laidOutFrame.width, 52)
                     XCTAssertEqual(editor.laidOutFrame.width, composer.laidOutFrame.width - 12, accuracy: 1,
@@ -190,6 +252,8 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                     let expected = try XCTUnwrap(input.sourceElement?.number(.height))
                     if elapsed == 0 { XCTAssertEqual(expected, start, accuracy: 1) }
                     if elapsed == 200 { XCTAssertEqual(expected, target, accuracy: 1) }
+                    XCTAssertEqual(editor.laidOutFrame.height, expected - 24, accuracy: 1,
+                                   "the first frame must already have the right native allocation")
                     for _ in 0..<3 {
                         host.layOut()
                         XCTAssertEqual(input.laidOutFrame.height, expected, accuracy: 1)

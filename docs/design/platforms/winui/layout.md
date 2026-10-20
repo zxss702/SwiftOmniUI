@@ -74,12 +74,19 @@ new final bounds synchronously computes and prepares its child plan for those
 bounds without reentering its own native Measure.
 
 Preparing an Arrange allocation preserves native Measure results for both
-SOUI panels and native XAML controls. It recursively prepares SOUI panels'
+SOUI panels and native XAML containers. It recursively prepares SOUI panels'
 child plans. SplitView, scroll and item containers consume their completed
 measurements and let XAML arrange their templates and pages at the final slot.
 `WinUIView.layout` uses the same `prepareAllocation` contract before Arrange;
-it does not remeasure native controls just because their final slot differs.
-Animated text alone prepares its independent destination wrapping proposal,
+it does not remeasure native containers just because their final slot differs.
+A multiline editor is a leaf with an explicitly owned native Height. Its
+parent prepares that Height and measures the leaf before the editor's own
+Arrange. This also applies when the actual slot differs from Measure. Intrinsic
+questions never write this Height. Leaving the native property on Auto would
+start TextBox's own 100 ms height storyboard on focused SizeChanged, competing
+with SOUI's presentation geometry and suppressing native size/caret events.
+No SizeChanged handler repairs the allocation after it has been committed.
+Animated text prepares its independent destination wrapping proposal,
 which does not follow the changing presentation slot.
 For example, a native Grid can measure a page at 792 DIPs but arrange it at
 792.5714 DIPs on a 175% display. Measuring the page's framed child again at the
