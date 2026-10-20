@@ -86,13 +86,17 @@ SplitView, scroll and item containers consume their completed
 measurements and let XAML arrange their templates and pages at the final slot.
 `WinUIView.layout` uses the same `prepareAllocation` contract before Arrange;
 it does not remeasure native containers just because their final slot differs.
-A multiline editor is a leaf with an explicitly owned native Height. Its
-parent prepares that Height and measures the leaf before the editor's own
-Arrange. This also applies when the actual slot differs from Measure. Intrinsic
-questions never write this Height. Leaving the native property on Auto would
-start TextBox's own 100 ms height storyboard on focused SizeChanged, competing
-with SOUI's presentation geometry and suppressing native size/caret events.
-No SizeChanged handler repairs the allocation after it has been committed.
+A multiline editor retains its TextBox inside a native allocation panel.
+The panel's Measure returns zero and does not prepare the TextBox: intrinsic
+size belongs to SOUI's separate content query. Only the panel's actual Arrange
+slot supplies the TextBox's explicit Height and its template Measure/Arrange.
+XAML can replay an older Measure constraint without replacing that allocation
+or alternating the internal DesiredSize between two widths. TextBox's focused
+Auto-height storyboard therefore never competes with SOUI presentation samples.
+Control APIs, events, focus and selection continue to use the retained TextBox;
+blur and parent placement wrap its allocation panel. Diagnostics inspect both
+the panel and the actual TextBox, so a correct outer frame cannot hide an
+incorrect internal allocation. No SizeChanged handler repairs either frame.
 Animated text prepares its independent destination wrapping proposal,
 which does not follow the changing presentation slot.
 For example, a native Grid can measure a page at 792 DIPs but arrange it at

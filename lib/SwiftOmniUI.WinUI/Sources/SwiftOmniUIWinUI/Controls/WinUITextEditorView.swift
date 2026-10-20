@@ -16,7 +16,9 @@ final class WinUITextEditorView: WinUIInputView {
     }
 
     init() {
-        super.init { number in swiftomniui_winui_editor_make(number) }
+        super.init(allocation: { swiftomniui_winui_editor_allocation_make($0) }) {
+            number in swiftomniui_winui_editor_make(number)
+        }
     }
 
     /// Hides only the editor's canvas, leaving native editing and the words' look intact.
@@ -24,28 +26,17 @@ final class WinUITextEditorView: WinUIInputView {
         swiftomniui_winui_editor_set_background_hidden(handle, visibility == .hidden)
     }
 
-    /// The parent selects an allocation before this leaf enters native
-    /// Measure/Arrange. A finite Height tells TextBox that its size belongs to
-    /// SOUI; Auto would start TextBox's own focused multiline height animation.
-    override func prepareMeasure(width: Double, height: Double? = nil) {
-        precondition(!isNativeArranging, "an arranging editor cannot measure itself")
-        let allocation = height.flatMap { $0.isFinite ? max(0, $0) : nil }
-            ?? measure(width: width.isFinite ? width : nil, height: nil).height
-        let nativeHeight = Double(Float(allocation))
-        swiftomniui_winui_editor_set_allocated_height(handle, nativeHeight)
-        super.prepareMeasure(width: width, height: nativeHeight)
-    }
-
-    /// A parent can assign a different presentation slot than its Measure
-    /// proposal. Prepare this leaf for that slot before its own Arrange, never
-    /// remeasuring the enclosing panel or a native container's subtree.
-    override func prepareAllocation(in bounds: Rect) {
-        prepareMeasure(width: bounds.width, height: bounds.height)
+    /// The retained TextBox's geometry inside its allocation boundary. Keep it
+    /// distinct from the boundary so diagnostics/tests detect template clipping.
+    var controlFrame: Rect {
+        var frame = [0.0, 0.0, 0.0, 0.0]
+        swiftomniui_winui_frame(handle, &frame)
+        return Rect(frame[0], frame[1], frame[2], frame[3])
     }
 
     /// Arithmetic queries must not change the live TextBox's native Measure
-    /// input. The parent's prepareMeasure alone prepares that control for its
-    /// allocation; Arrange may query ideal sizes again at different widths.
+    /// input. The native allocation boundary prepares that control for its
+    /// final slot; Measure proposals and ideal queries do not select that slot.
     override func measure(width: Double?, height: Double?) -> LayoutSize {
         let offeredWidth = width.flatMap { $0.isFinite ? max(0, $0) : nil }
         let offeredHeight = height.flatMap { $0.isFinite ? max(0, $0) : nil }

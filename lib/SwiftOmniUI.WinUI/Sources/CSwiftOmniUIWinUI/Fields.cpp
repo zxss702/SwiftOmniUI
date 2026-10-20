@@ -25,6 +25,36 @@ using namespace swiftomniui;
 namespace media = winrt::Microsoft::UI::Xaml::Media;
 
 namespace {
+    /// SOUI answers intrinsic queries separately. This boundary consumes an
+    /// allocated rectangle without exposing TextBox's template DesiredSize to
+    /// SOUI's native parent. In particular, XAML may replay an older Measure
+    /// constraint while retaining a newer final Arrange rectangle.
+    struct EditorAllocation : controls::PanelT<EditorAllocation> {
+        controls::TextBox editor;
+
+        explicit EditorAllocation(controls::TextBox const &control) : editor(control) {
+            UseLayoutRounding(false);
+            Children().Append(editor);
+        }
+
+        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size) {
+            return {0, 0};
+        }
+
+        winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) {
+            // TextBox::OnSizeChanged animates Height for a focused multiline
+            // editor on Auto. SOUI owns the final allocation, so give the leaf
+            // an explicit height before measuring and arranging its template.
+            // Never prepare it from the allocation boundary's Measure proposal:
+            // that proposal may differ from this actual final rectangle.
+            // https://github.com/microsoft/microsoft-ui-xaml/blob/main/dxaml/xcp/dxaml/lib/TextBox_Partial.cpp
+            if (editor.Height() != final.Height) editor.Height(final.Height);
+            editor.Measure(final);
+            editor.Arrange({0, 0, final.Width, final.Height});
+            return final;
+        }
+    };
+
     void centerSingleLine(controls::TextBox const &box) {
         if (box.AcceptsReturn()) return;
         box.ApplyTemplate();
@@ -201,19 +231,12 @@ extern "C" bool swiftomniui_winui_editor_content_size(
     }
 }
 
-extern "C" void swiftomniui_winui_editor_set_allocated_height(SwiftOmniUIObjectRef handle, double height) {
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_editor_allocation_make(SwiftOmniUIObjectRef handle) {
     try {
-        auto editor = borrow<controls::TextBox>(handle);
-        // TextBox::OnSizeChanged starts its own 100 ms Height storyboard when
-        // Height is Auto and a focused multiline box changes size. SOUI owns
-        // this allocation, including every animation sample. Express that
-        // ownership before Measure; leaving Height Auto gives XAML a second
-        // geometry driver which also suppresses SizeChanged and caret updates.
-        // https://github.com/microsoft/microsoft-ui-xaml/blob/main/dxaml/xcp/dxaml/lib/TextBox_Partial.cpp
-        if (!std::isfinite(height) || height < 0) throw winrt::hresult_error(E_INVALIDARG);
-        if (editor.Height() != height) editor.Height(height);
+        return detach(winrt::make<EditorAllocation>(borrow<controls::TextBox>(handle)).as<controls::Panel>());
     } catch (...) {
-        report("allocating an editor's height");
+        report("making an editor's allocation boundary");
+        return nullptr;
     }
 }
 

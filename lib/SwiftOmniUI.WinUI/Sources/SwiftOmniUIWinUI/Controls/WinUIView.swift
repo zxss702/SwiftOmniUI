@@ -14,7 +14,10 @@ class WinUIView {
 
     /// Parents attach the drawing boundary when one is needed; control APIs
     /// continue to use `handle`, preserving the actual native control identity.
-    var presentationHandle: SwiftOmniUIObjectRef { blurPresenter ?? handle }
+    var presentationHandle: SwiftOmniUIObjectRef { blurPresenter ?? nativeAllocation ?? handle }
+    /// A native control can consume SOUI allocation through its own boundary
+    /// while its control handle, editing state and event identity stay intact.
+    private let nativeAllocation: SwiftOmniUIObjectRef?
     /// Native viewport controls can update their registered content without
     /// invalidating the size of their enclosing SOUI layout.
     var registeredPropertiesAffectSize: Bool { true }
@@ -265,18 +268,24 @@ class WinUIView {
     private static let live = LiveViews<WinUIView>()
 
     /// Takes the next number and holds the element `make` makes, handed that number.
-    init(_ make: (_ number: Int64) -> SwiftOmniUIObjectRef?) {
+    init(allocation: ((SwiftOmniUIObjectRef) -> SwiftOmniUIObjectRef?)? = nil,
+         _ make: (_ number: Int64) -> SwiftOmniUIObjectRef?) {
         number = Self.live.reserve()
         guard let handle = make(number) else { fatalError("the relay made no element - its log says why") }
         self.handle = handle
+        if let allocation {
+            guard let boundary = allocation(handle) else { fatalError("the relay made no allocation boundary") }
+            nativeAllocation = boundary
+        } else { nativeAllocation = nil }
         Self.live.hold(self, as: number)
         // A control's style aligns it inside its place; a SwiftOmniUI layout decides the place, so it fills it.
         // Design: docs/design/platforms/winui/layout.md#a-place-filled
         swiftomniui_winui_fill_place(handle)
+        if let nativeAllocation { swiftomniui_winui_fill_place(nativeAllocation) }
         // System controls do not expose ArrangeOverride to Swift. Their
         // committed size notification publishes drawing geometry directly;
         // SOUI-owned slots have already committed it during parent Arrange.
-        swiftomniui_winui_on_size_changed(handle, number) { number, width, height in
+        swiftomniui_winui_on_size_changed(nativeAllocation ?? handle, number) { number, width, height in
             MainActor.assumeIsolated {
                 guard let view = WinUIView.find(number), view.placingLayout == nil else { return }
                 view.commitNativeAllocation(width: width, height: height)
@@ -290,6 +299,7 @@ class WinUIView {
             swiftomniui_winui_blur_clear(blurPresenter)
             swiftomniui_winui_release(blurPresenter)
         }
+        if let nativeAllocation { swiftomniui_winui_release(nativeAllocation) }
         swiftomniui_winui_release(handle)
     }
 
@@ -327,7 +337,7 @@ class WinUIView {
             scheduleBlurCommit()
             return
         }
-        blurPresenter = swiftomniui_winui_blur_make(handle)
+        blurPresenter = swiftomniui_winui_blur_make(nativeAllocation ?? handle)
         if blurPresenter != nil { nativeParentChanged() }
     }
 
@@ -540,8 +550,8 @@ class WinUIView {
     /// Measure result. A different final slot is not another Measure proposal:
     /// measuring a SplitView, scroller or list here changes its DesiredSize
     /// and restarts the parent that is currently arranging it. SOUI panels
-    /// prepare descendant plans; an editor prepares its explicitly owned leaf
-    /// height before entering Arrange, rather than leaving TextBox on Auto.
+    /// prepare descendant plans; native leaf boundaries own internal controls'
+    /// preparation without changing the boundary's Measure contract.
     func prepareAllocation(in bounds: Rect) {}
 
     /// The element's size for the room offered, in DIPs; nil offers any.
@@ -643,10 +653,10 @@ class WinUIView {
             withNativeArrange {
                 swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
             }
-            if editorGeometryChanged {
+            if editorGeometryChanged, let editor = self as? WinUITextEditorView {
                 let height = swiftomniui_winui_editor_allocated_height(handle)
                 WinUILayoutDiagnostics.record("editor.commit", view: self,
-                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize)) heightConstraint=\(height)")
+                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) control=\(WinUILayoutDiagnostics.rect(editor.controlFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize)) heightConstraint=\(height)")
             }
         } else if moved {
             // The parent's next Arrange prepares the latest presentation slot.
