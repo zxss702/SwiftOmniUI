@@ -5,7 +5,7 @@
 @_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIWinUI
 
-enum WinUIScrollViewport {
+enum WinUIScrollViewport: Equatable {
     case ready(Rect)
     case notReady
     case failed

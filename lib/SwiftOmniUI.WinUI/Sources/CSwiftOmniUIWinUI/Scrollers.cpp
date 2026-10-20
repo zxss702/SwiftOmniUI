@@ -69,9 +69,8 @@ namespace {
                 winrt::Windows::Foundation::Rect(0, 0, static_cast<float>(width), static_cast<float>(height)));
             double left = initial.X, top = initial.Y;
             double right = left + initial.Width, bottom = top + initial.Height;
-            auto intersect = [&](xaml::UIElement const &clipper, double across, double down) {
-                auto bounds = clipper.TransformToVisual(element).TransformBounds(
-                    winrt::Windows::Foundation::Rect(0, 0, static_cast<float>(across), static_cast<float>(down)));
+            auto intersect = [&](xaml::UIElement const &clipper, winrt::Windows::Foundation::Rect const &region) {
+                auto bounds = clipper.TransformToVisual(element).TransformBounds(region);
                 if (!std::isfinite(bounds.X) || !std::isfinite(bounds.Y)
                     || !std::isfinite(bounds.Width) || !std::isfinite(bounds.Height))
                     throw winrt::hresult_error(E_UNEXPECTED);
@@ -91,19 +90,24 @@ namespace {
                     auto across = presenter.ViewportWidth(), down = presenter.ViewportHeight();
                     if (!std::isfinite(across) || !std::isfinite(down) || across <= 0 || down <= 0)
                         return SwiftOmniUIViewportNotReady;
-                    intersect(visual, across, down);
+                    intersect(visual, {0, 0, static_cast<float>(across), static_cast<float>(down)});
                 }
                 // GetElementVisual is not a read-only query. In particular,
                 // ScrollPresenter animates its content's XAML Scale and
                 // Translation; acquiring that content's handout Visual here
                 // prevents those native animations from starting on Loaded.
-                if (visual.Clip() || elementCompositionClip(visual)) {
+                if (auto clip = visual.Clip()) {
+                    // Native templates animate their RectangleGeometry, not
+                    // the element's ActualSize. Bounds includes Geometry.Transform.
+                    intersect(visual, clip.Bounds());
+                }
+                if (elementCompositionClip(visual)) {
                     // SOUI's geometric clips are authored in the view's bounds.
                     // Their bounding rectangle also bounds a nonrectangular path.
                     auto size = visual.ActualSize();
                     if (!std::isfinite(size.x) || !std::isfinite(size.y) || size.x < 0 || size.y < 0)
                         return SwiftOmniUIViewportNotReady;
-                    intersect(visual, size.x, size.y);
+                    intersect(visual, {0, 0, size.x, size.y});
                 }
             }
             double values[]{left, top, std::max(0.0, right - left), std::max(0.0, bottom - top), displayed.X, displayed.Y};

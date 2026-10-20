@@ -8,6 +8,41 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 final class WinUIViewportClippingTests: XCTestCase {
+    func testNativeClipRectangleAndItsTransformDefineTheVisibleWindow() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<100) { Text("Row \($0)").frame(height: 28) }
+                    }
+                }.frame(width: 260, height: 220)
+            }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let nativeSize = scroll.scroller.laidOutFrame
+            func viewport() -> [Double] {
+                var value = [Double](repeating: .nan, count: 6)
+                XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &value),
+                               SwiftOmniUIViewportReady)
+                return value
+            }
+            let full = viewport()
+            swiftomniui_winui_set_native_clip_for_testing(scroll.scroller.handle, true, 10, 20, 100, 60, 15, 25)
+            let clipped = viewport()
+            let scrollOrigin = scroll.scroller.origin, rowOrigin = lazy.origin
+            XCTAssertEqual(clipped[0], scrollOrigin.x - rowOrigin.x + 25, accuracy: 1)
+            XCTAssertEqual(clipped[1], scrollOrigin.y - rowOrigin.y + 45, accuracy: 1)
+            XCTAssertEqual(clipped[2], 100, accuracy: 1)
+            XCTAssertEqual(clipped[3], 60, accuracy: 1)
+            XCTAssertEqual(scroll.scroller.laidOutFrame, nativeSize, "clipping does not resize the control")
+
+            swiftomniui_winui_set_native_clip_for_testing(scroll.scroller.handle, true, 0, 0, 0, 60, 0, 0)
+            XCTAssertEqual(viewport()[2], 0, "a real empty clip remains an empty viewport")
+            swiftomniui_winui_set_native_clip_for_testing(scroll.scroller.handle, false, 0, 0, 0, 0, 0, 0)
+            XCTAssertEqual(viewport(), full)
+        }
+    }
+
     func testReadingAndClearingAnUnauthoredClipLeavesNativeScaleAvailable() {
         onUIThread {
             let panel = WinUIGridView()

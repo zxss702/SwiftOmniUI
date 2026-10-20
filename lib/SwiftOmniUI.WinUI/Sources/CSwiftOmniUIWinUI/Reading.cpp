@@ -53,6 +53,22 @@ extern "C" bool swiftomniui_winui_set_scale_for_testing(SwiftOmniUIObjectRef han
     }
 }
 
+extern "C" void swiftomniui_winui_set_native_clip_for_testing(
+    SwiftOmniUIObjectRef handle, bool enabled, double x, double y, double width, double height, double dx, double dy
+) {
+    try {
+        auto element = as<xaml::UIElement>(handle);
+        if (!enabled) { element.Clip(nullptr); return; }
+        media::RectangleGeometry clip;
+        clip.Rect({static_cast<float>(x), static_cast<float>(y), static_cast<float>(width), static_cast<float>(height)});
+        media::TranslateTransform shift;
+        shift.X(dx);
+        shift.Y(dy);
+        clip.Transform(shift);
+        element.Clip(clip);
+    } catch (...) { report("setting a native template clip for testing"); }
+}
+
 namespace {
     /// What the screen reader was told, in order.
     std::vector<std::string> announcements;
@@ -324,8 +340,16 @@ namespace {
         if (what == "tint") return tint(object);
         if (what == "scope") return scope(object);
         if (auto bar = object.try_as<controls::TitleBar>()) return chrome(bar, what);
-        if (auto split = object.try_as<controls::SplitView>(); split && what == "paneOpen") {
-            return flag(split.IsPaneOpen());
+        if (auto split = object.try_as<controls::SplitView>()) {
+            if (what == "paneOpen") return flag(split.IsPaneOpen());
+            if (what == "paneDisplayMode") {
+                switch (split.DisplayMode()) {
+                case controls::SplitViewDisplayMode::Inline: return "inline";
+                case controls::SplitViewDisplayMode::Overlay: return "overlay";
+                case controls::SplitViewDisplayMode::CompactInline: return "compactInline";
+                case controls::SplitViewDisplayMode::CompactOverlay: return "compactOverlay";
+                }
+            }
         }
         if (auto tabs = object.try_as<controls::SelectorBar>()) {
             if (what == "tabs") {

@@ -226,6 +226,8 @@ typedef struct {
     void (*paneWidthChanged)(int64_t view);
     /// Classifies a synchronous native change before its asynchronous notification.
     bool (*isProgramWriting)(void);
+    /// A native pane's visual transition reached its final clipping/visibility state.
+    void (*paneTransitionCompleted)(int64_t view);
 } SwiftOmniUIWinUICallbacks;
 
 /// What the environment is, in groups, each read at once.
@@ -995,6 +997,8 @@ void swiftomniui_winui_title_bar_set_app_menu(SwiftOmniUIObjectRef bar, SwiftOmn
 
 /// A native SplitView; a trailing pane holds an auxiliary detail column. A zero breakpoint keeps it inline.
 SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, double expandsAt, bool trailing);
+/// Selects the initial display mode from a known client allocation before activation.
+void swiftomniui_winui_split_prepare_room(SwiftOmniUIObjectRef split, double width);
 void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef split);
 /// Releases one changed slot while leaving the other columns attached.
 void swiftomniui_winui_split_remove(SwiftOmniUIObjectRef split, SwiftOmniUIObjectRef child);
@@ -1208,6 +1212,9 @@ int32_t swiftomniui_winui_read(SwiftOmniUIObjectRef element, char const *what, c
 void swiftomniui_winui_set_theme_for_testing(SwiftOmniUIObjectRef element, int32_t theme);
 /// Writes UIElement.Scale directly, reporting whether XAML permits the facade. What a test does.
 bool swiftomniui_winui_set_scale_for_testing(SwiftOmniUIObjectRef element, double x, double y);
+/// Authored XAML rectangle and transform, as native SplitView templates use.
+void swiftomniui_winui_set_native_clip_for_testing(
+    SwiftOmniUIObjectRef element, bool enabled, double x, double y, double width, double height, double dx, double dy);
 
 /// The question showing over `element`'s window, in UTF-8, as far as `capacity` goes: its title, message, accepting
 /// and cancelling captions, its field's words (0x01 for none) and its choices, each ended by the unit separator
