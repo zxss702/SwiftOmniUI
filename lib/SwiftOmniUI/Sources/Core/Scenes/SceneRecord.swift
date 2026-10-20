@@ -17,7 +17,9 @@ final class SceneRecord: @unchecked Sendable {
 
     /// Launch is requested once on connection, then only by explicit activation.
     var launchRequested = true
-    var activationRequested = false
+    /// Read on every scene build so a new activation invalidates a carried scene.
+    @State var activationRequest = 0
+    private var handledActivation = 0
     var activationWindowKey: String?
     var pendingRestoredWindows: [(kind: String, value: String?)] = []
 
@@ -209,6 +211,8 @@ final class SceneRecord: @unchecked Sendable {
     /// Resolves the default window after declarations and restored windows are known.
     /// Ordinary body updates only update the policy; they never request presentation.
     @MainActor func applyLaunchPolicy(_ windows: Windows) {
+        let activation = activationRequest
+        let activating = activation != handledActivation
         let named = windows.groups.first {
             $0.valueType == nil && $0.launchBehavior == .presented
         } ?? windows.groups.first {
@@ -219,10 +223,9 @@ final class SceneRecord: @unchecked Sendable {
             && windows.main != nil && windows.launchBehavior != .suppressed)
         declaresMainWindow = usesMain || named != nil
 
-        guard launchRequested else { return }
+        guard launchRequested || activating else { return }
         launchRequested = false
-        let activating = activationRequested
-        activationRequested = false
+        handledActivation = activation
         activationWindowKey = nil
 
         let needsWindow = !mainIsOpen && self.windows.isEmpty
@@ -242,7 +245,7 @@ final class SceneRecord: @unchecked Sendable {
             }
             activationWindowKey = self.windows.first(where: { $0.type == named.type && $0.value == nil })?.key
         }
-        if activationWindowKey == nil {
+        if activationWindowKey == nil, !activating {
             activationWindowKey = mainIsOpen ? SceneElement.mainKey : self.windows.first?.key
         }
     }

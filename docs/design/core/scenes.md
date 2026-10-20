@@ -81,6 +81,11 @@ targets that default even when editors are already open. An existing default
 window is reused; other windows and their state stay in place. Initial connection
 still accepts restored windows before considering automatic presentation.
 
+Activation requests use an observed sequence number read on every scene build.
+A request therefore invalidates the scene even when its declaration and window
+list have not changed; it cannot be lost when the differ carries an unchanged
+scene. Explicit activation never falls back to an arbitrary editor window key.
+
 The host offers saved windows before the first render. Eligible restored windows
 are accepted before automatic launch, so a saved editor does not also create a
 welcome window merely because its declaration uses `.presented`.

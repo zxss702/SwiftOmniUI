@@ -54,8 +54,8 @@ final class Scenes: @unchecked Sendable {
         }
     }
 
-    /// A plain activation reuses an open window, or asks the current launch policy
-    /// for one when none remains. After the last scene closes it starts a fresh scene.
+    /// A plain activation reopens the default window alongside existing editors.
+    /// After the last scene closes it starts a fresh scene.
     func reopenInitialWindow() -> String? {
         let standing = _list.storage.value
         if standing.isEmpty {
@@ -63,7 +63,7 @@ final class Scenes: @unchecked Sendable {
             return _list.storage.value.first?.id
         }
         guard let record = standing.first(where: { $0.declaresMainWindow }) else { return nil }
-        record.launchRequested = true
+        record.activationRequest &+= 1
         Renderer.shared.setNeedsRender()
         return record.id
     }
