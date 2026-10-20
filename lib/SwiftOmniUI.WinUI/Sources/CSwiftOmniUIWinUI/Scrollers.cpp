@@ -6,7 +6,6 @@
 // Design: docs/design/platforms/winui/layout.md#scrolling
 
 #include "Relay.h"
-#include "CompositionClips.h"
 
 #include <algorithm>
 #include <cmath>
@@ -79,9 +78,9 @@ namespace {
                 right = std::min(right, double(bounds.X) + bounds.Width);
                 bottom = std::min(bottom, double(bounds.Y) + bounds.Height);
             };
-            // Every rectangle belongs to this same native geometry snapshot.
-            // A nested scroller exposes only the part its ancestors display;
-            // retelling its rows must not expand that part to its full viewport.
+            // Virtualization follows layout viewports. A native pane transition,
+            // clipShape or alpha mask changes presentation, not the allocation
+            // whose rows must already exist before it is revealed.
             for (xaml::DependencyObject at = element; at; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
                 auto visual = at.try_as<xaml::UIElement>();
                 if (!visual) continue;
@@ -91,23 +90,6 @@ namespace {
                     if (!std::isfinite(across) || !std::isfinite(down) || across <= 0 || down <= 0)
                         return SwiftOmniUIViewportNotReady;
                     intersect(visual, {0, 0, static_cast<float>(across), static_cast<float>(down)});
-                }
-                // GetElementVisual is not a read-only query. In particular,
-                // ScrollPresenter animates its content's XAML Scale and
-                // Translation; acquiring that content's handout Visual here
-                // prevents those native animations from starting on Loaded.
-                if (auto clip = visual.Clip()) {
-                    // Native templates animate their RectangleGeometry, not
-                    // the element's ActualSize. Bounds includes Geometry.Transform.
-                    intersect(visual, clip.Bounds());
-                }
-                if (elementCompositionClip(visual)) {
-                    // SOUI's geometric clips are authored in the view's bounds.
-                    // Their bounding rectangle also bounds a nonrectangular path.
-                    auto size = visual.ActualSize();
-                    if (!std::isfinite(size.x) || !std::isfinite(size.y) || size.x < 0 || size.y < 0)
-                        return SwiftOmniUIViewportNotReady;
-                    intersect(visual, {0, 0, size.x, size.y});
                 }
             }
             double values[]{left, top, std::max(0.0, right - left), std::max(0.0, bottom - top), displayed.X, displayed.Y};

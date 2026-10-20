@@ -8,7 +8,7 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 final class WinUIViewportClippingTests: XCTestCase {
-    func testNativeClipRectangleAndItsTransformDefineTheVisibleWindow() throws {
+    func testNativePresentationClipPreservesTheLayoutWindowAndMountedRows() throws {
         try onUIThread {
             let host = WinUIRenderer.running(reducesMotion: true) {
                 ScrollView {
@@ -27,17 +27,17 @@ final class WinUIViewportClippingTests: XCTestCase {
                 return value
             }
             let full = viewport()
-            swiftomniui_winui_set_native_clip_for_testing(scroll.scroller.handle, true, 10, 20, 100, 60, 15, 25)
-            let clipped = viewport()
-            let scrollOrigin = scroll.scroller.origin, rowOrigin = lazy.origin
-            XCTAssertEqual(clipped[0], scrollOrigin.x - rowOrigin.x + 25, accuracy: 1)
-            XCTAssertEqual(clipped[1], scrollOrigin.y - rowOrigin.y + 45, accuracy: 1)
-            XCTAssertEqual(clipped[2], 100, accuracy: 1)
-            XCTAssertEqual(clipped[3], 60, accuracy: 1)
-            XCTAssertEqual(scroll.scroller.laidOutFrame, nativeSize, "clipping does not resize the control")
-
-            swiftomniui_winui_set_native_clip_for_testing(scroll.scroller.handle, true, 0, 0, 0, 60, 0, 0)
-            XCTAssertEqual(viewport()[2], 0, "a real empty clip remains an empty viewport")
+            let identities = lazy.mounted.mapValues { $0.view.number }
+            let built = lazy.cells.built
+            for width in [100.0, 0, 100, 260] {
+                swiftomniui_winui_set_native_clip_for_testing(scroll.scroller.handle, true, 10, 20, width, 60, 15, 25)
+                lazy.viewportReported(Rect(0, 0, 0, 0))
+                WinUIDoorbell.commitPending()
+                XCTAssertEqual(viewport(), full, "presentation clipping does not change the scroll allocation")
+                XCTAssertEqual(lazy.cells.built, built)
+                XCTAssertEqual(lazy.mounted.mapValues { $0.view.number }, identities)
+                XCTAssertEqual(scroll.scroller.laidOutFrame, nativeSize)
+            }
             swiftomniui_winui_set_native_clip_for_testing(scroll.scroller.handle, false, 0, 0, 0, 0, 0, 0)
             XCTAssertEqual(viewport(), full)
         }
@@ -221,7 +221,7 @@ final class WinUIViewportClippingTests: XCTestCase {
         }
     }
 
-    func testCompositionClipResizesChangeTheCurrentViewportWithoutScrolling() throws {
+    func testCompositionClipResizesPreserveTheAllocatedScrollWindow() throws {
         try onUIThread {
             let height = State(wrappedValue: 180.0)
             let host = WinUIRenderer.running(reducesMotion: true) {
@@ -250,21 +250,17 @@ final class WinUIViewportClippingTests: XCTestCase {
                 var viewport = [Double](repeating: .nan, count: 6)
                 XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &viewport),
                                SwiftOmniUIViewportReady)
-                XCTAssertEqual(viewport[3], expected, accuracy: 1)
-                if expected == 0 {
-                    XCTAssertNil(lazy.span)
-                    XCTAssertTrue(lazy.cells.built.isEmpty)
-                } else {
-                    let span = try XCTUnwrap(lazy.span)
-                    XCTAssertEqual(span.upperBound - span.lowerBound, expected, accuracy: 1)
-                }
+                XCTAssertEqual(viewport[3], 600, accuracy: 1)
+                let span = try XCTUnwrap(lazy.span)
+                XCTAssertEqual(span.upperBound - span.lowerBound, 600, accuracy: 1)
+                XCTAssertFalse(lazy.cells.built.isEmpty)
                 XCTAssertFalse(lazy.isWaitingForViewport)
                 XCTAssertLessThan(lazy.mounted.count, 40)
             }
         }
     }
 
-    func testZeroWidthClipMakesAVerticalLazyWindowEmpty() throws {
+    func testZeroWidthClipKeepsTheVerticalLazyAllocationReady() throws {
         try onUIThread {
             let width = State(wrappedValue: 180.0)
             let host = WinUIRenderer.running(reducesMotion: true) {
@@ -286,15 +282,10 @@ final class WinUIViewportClippingTests: XCTestCase {
                 var viewport = [Double](repeating: .nan, count: 6)
                 XCTAssertEqual(swiftomniui_winui_scroller_viewport(scroll.scroller.handle, lazy.handle, &viewport),
                                SwiftOmniUIViewportReady)
-                XCTAssertEqual(viewport[2], expected, accuracy: 1)
+                XCTAssertEqual(viewport[2], 260, accuracy: 1)
                 XCTAssertFalse(lazy.isWaitingForViewport)
-                if expected == 0 {
-                    XCTAssertNil(lazy.span, "both axes must intersect, even for a vertical container")
-                    XCTAssertTrue(lazy.cells.built.isEmpty)
-                } else {
-                    XCTAssertNotNil(lazy.span)
-                    XCTAssertFalse(lazy.cells.built.isEmpty)
-                }
+                XCTAssertNotNil(lazy.span)
+                XCTAssertFalse(lazy.cells.built.isEmpty)
             }
         }
     }

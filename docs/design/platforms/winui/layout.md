@@ -259,19 +259,19 @@ bridge distinguishes ready, not ready and failed queries, writing geometry
 only on success. A not-ready request waits through weak native Loaded and
 LayoutUpdated subscriptions and resumes when the native viewport exists;
 there is no guessed native-room rectangle or dispatcher retry loop. Ready
-rectangles are the current native intersection of ancestor scroll presenters
-and clipping bounds, transformed into the descendant's coordinates. An empty
+rectangles are the current native intersection of ancestor scroll presenters'
+layout viewports, transformed into the descendant's coordinates. An empty
 intersection is an offscreen window, not an attachment failure. Effective
 viewport notifications trigger a fresh complete read instead of mixing an
 old event's size with a new origin. Failed queries report an explicit native
 error and do not register a pending retry.
 
-Native `UIElement.Clip` uses the geometry's `Bounds`, which already includes
-its `Geometry.Transform`; a SplitView template's animated clip can differ
-from that element's allocation. SOUI's own composition clips use their
-authored view bounds separately. Neither query acquires a handout Visual.
-Pane transition completion asks lazy descendants to read the final viewport
-even when the scroll offset has stayed unchanged.
+Native `UIElement.Clip`, composition clips and alpha masks control drawing;
+they do not alter the layout viewport or destroy its mounted rows. In
+particular, a SplitView's temporarily empty animated clip must not clear a
+prepared sidebar. Nested scroll presenters still intersect their actual
+allocated windows, so an inner scroller outside its outer scroll viewport
+remains virtualized. Viewport queries never acquire a handout Visual.
 
 A lazy run under the scroller answers the document's cross size with the
 widest row measured in the room it was given, and keeps that width for as
