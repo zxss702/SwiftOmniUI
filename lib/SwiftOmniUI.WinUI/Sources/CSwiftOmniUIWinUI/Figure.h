@@ -1,9 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-// A figure: the relay's panel for what WinUI gives no automation peer - a
-// shape's Path, a colour box - and the peer assistive technology meets it and a
-// canvas by.
+// A figure: a colour box's native panel, and the shared image automation peer
+// used by colour boxes, Composition vector shapes and canvases.
 // Design: docs/design/platforms/winui/controls.md#what-assistive-technology-meets
 #pragma once
 

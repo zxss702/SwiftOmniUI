@@ -818,7 +818,8 @@ void swiftomniui_winui_shape_set(SwiftOmniUIObjectRef shape, double radius, Swif
 /// A content divider: a native rectangle filled by the live DividerStrokeColorDefaultBrush ThemeResource.
 SwiftOmniUIObjectRef swiftomniui_winui_divider_make(void);
 
-/// A shape: one WinUI Path, drawn by `swiftomniui_winui_path_draw` and painted by `swiftomniui_winui_path_paint`.
+/// A shape: a zero-intrinsic-size XAML node drawing a Composition vector path.
+/// Geometry and paint updates never invalidate native Measure.
 SwiftOmniUIObjectRef swiftomniui_winui_path_make(int64_t view);
 
 /// Paints a shape: its fill and outline, the outline's width, its dashes and their offset in outline widths, its ends

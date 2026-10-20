@@ -99,12 +99,32 @@ class GTKTextView: GTKView {
         gtk_label_set_selectable(widget.opaque, selectable ? 1 : 0)
     }
 
-    var onTextLayout: ((TextLayoutReport) -> Void)?
+    var onTextLayout: ((TextLayoutReport) -> Void)? {
+        didSet { if onTextLayout != nil { publishTextLayout() } }
+    }
+    private var textLayoutPending = false
+    private var lastLayoutSerial: UInt32?
+    private var lastLayoutOrigin: Point?
 
     func publishTextLayout() {
+        guard onTextLayout != nil, !textLayoutPending else { return }
+        textLayoutPending = true
+        GTKDoorbell.afterLayout { [weak self] in
+            guard let self else { return }
+            self.textLayoutPending = false
+            self.reportTextLayout()
+        }
+    }
+
+    private func reportTextLayout() {
         guard let onTextLayout, let layout = gtk_label_get_layout(widget.opaque) else { return }
         var originX: Int32 = 0, originY: Int32 = 0
         gtk_label_get_layout_offsets(widget.opaque, &originX, &originY)
+        let serial = pango_layout_get_serial(layout)
+        let origin = Point(Double(originX), Double(originY))
+        guard serial != lastLayoutSerial || origin != lastLayoutOrigin else { return }
+        lastLayoutSerial = serial
+        lastLayoutOrigin = origin
         var byteOffset: Int32 = 0
         var glyphs: [NativeTextLayout.Glyph] = []
         for character in text {

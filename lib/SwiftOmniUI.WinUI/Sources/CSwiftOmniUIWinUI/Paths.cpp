@@ -116,8 +116,8 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_path_make(int64_t view) {
         drawing.Shapes().Append(compositor.CreateSpriteShape(compositor.CreatePathGeometry()));
         winrt::get_self<PathPanel>(held.as<xaml::IFrameworkElementOverrides>())->drawing = drawing;
         xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(held, drawing);
-        // The XAML node supplies input and automation; the vector is its drawing.
-        held.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+        // Gesture registration owns the hit area, as for other SOUI panels.
+        // A decorative vector must not acquire a rectangular input surface.
         return detach(held);
     } catch (...) { report("making a shape"); return nullptr; }
 }

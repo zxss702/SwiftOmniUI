@@ -24,7 +24,7 @@ public struct AsyncImage<Content: View>: View {
     private let content: (AsyncImagePhase) -> Content
     @State private var phase = AsyncImagePhase.empty
 
-    public init(url: URL?, scale: Double = 1, @ViewBuilder content: @escaping (AsyncImagePhase) -> Content) {
+    public init(url: URL?, @ViewBuilder content: @escaping (AsyncImagePhase) -> Content) {
         self.url = url
         self.content = content
     }

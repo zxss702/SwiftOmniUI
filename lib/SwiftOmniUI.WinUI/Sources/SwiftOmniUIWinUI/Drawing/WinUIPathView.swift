@@ -5,7 +5,8 @@
 @_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIWinUI
 
-/// One of the six shapes: a WinUI Path, its geometry drawn for the room it is given, filled and outlined.
+/// One of the six shapes: a Composition path in a zero-intrinsic-size XAML node,
+/// its geometry drawn for the room it is given, filled and outlined.
 /// Design: docs/design/platforms/winui/drawing.md#the-shapes
 @MainActor
 final class WinUIPathView: WinUIView {
@@ -25,7 +26,7 @@ final class WinUIPathView: WinUIView {
     /// The outline drawn, which the figure is inset by half of; none without a colour.
     private var outlineWidth = 0.0
 
-    /// Where a geometry of the shape's own stands before it is placed, as WinUI measures it.
+    /// The device-independent geometry's bounds before placement.
     private var bounds = Rect(x: 0, y: 0, width: 0, height: 0)
 
     /// The geometry and the room it was last drawn for.

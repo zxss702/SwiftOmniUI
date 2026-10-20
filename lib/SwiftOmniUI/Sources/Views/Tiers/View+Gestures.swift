@@ -190,6 +190,12 @@ extension View {
 
     // MARK: Pointer
 
+    /// Continuously reports a pointer's position in the view's local space.
+    public func onContinuousHover(perform: @escaping (HoverPhase) -> Void) -> ModifiedContent {
+        onPointerMoved { perform(.active($0)) }
+            .onPointerExited { perform(.ended) }
+    }
+
     /// Runs when a pointer enters the view.
     ///
     /// A pointer is a mouse, a trackpad or a pen; on a touch-only device these

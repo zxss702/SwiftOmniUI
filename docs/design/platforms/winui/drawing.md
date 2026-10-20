@@ -96,35 +96,39 @@ logical chain, preserving animation and opacity across native toolbar hosting.
 
 ## The shapes
 
-Each of the six shapes is one WinUI `Path` in a figure of the relay's (see
-[what assistive technology meets](controls.md#what-assistive-technology-meets)),
-whose geometry the host hands over for the room its layout gives it, again
-whenever that room changes. A
-rectangle and an ellipse fill the room, drawn half their outline in from its
-edges so the outline stays inside, as WinUI's own `Rectangle` does - the
-outline drawn, none without a colour (`BoxArithmetic.outlineWidth`), while
-the `Path` holds the width the tree gave - then
-moved by their transform; a rectangle's corners are its own arcs, each
-corner its radius. A line, a
-path, a polygon and a polyline draw a geometry of their own - a path's structured commands,
-its arcs converted by the shared geometry code - placed in the room by their
-aspect: fitted, covering, stretched or at their own size, centred, then
-moved by their transform. Path keeps local coordinates unless an aspect is
-explicitly set, as every host places them
-([a shape's own geometry](../../host/layout.md#a-shapes-own-geometry)). WinUI
-measures the geometry's bounds, once for each geometry, and the host hands
-the relay the place the arithmetic gives for the room; a geometry left where
-it stands takes no transform, since WinUI draws nothing of one given the
-identity. A shape has
-no size of its own and asks its layout for none: it is drawn in the place its
-layout gives it. WinUI cuts an element to the place it is put in where it
-measured larger, so a figure a lean or a cap takes past its room would be
-cut there: the figure measures its `Path` with no bound, which tells how far
-it reaches, and puts it in a place from the room's corner as far as that -
-the frame SwiftOmniUI reports stays the room. WinUI measures dashes and their offset in outline widths. Public `StrokeStyle`
-uses path lengths, divided by the current width for WinUI, while the old SPI
-setters retain their width units; a mitred corner's limit WinUI measures against half the
-outline's width and SwiftOmniUI against the whole, so it is doubled.
+Each of the six shapes is a retained, zero-intrinsic-size XAML panel
+with a Composition `ShapeVisual` and `CompositionSpriteShape`. The panel supplies
+identity, input and the existing image automation peer; only its vector drawing
+changes with allocation. There is no measured XAML `Path` child.
+
+This is a layout contract: rewriting `Path.Data` while a background is being
+arranged marks native Measure dirty. WinUI can then stop before arranging the
+following content, retaining that content's old allocation until another input.
+Composition geometry and brushes update drawing without invalidating Measure;
+reordering children, remeasuring during Arrange and later repair passes are not
+part of shape placement.
+
+A rectangle and ellipse fill the allocated room, inset by half the visible
+outline so the stroke stays inside it. Each rectangle corner retains its own
+radius. Authored paths retain their local coordinates unless an aspect is
+explicitly set ([a shape's own geometry](../../host/layout.md#a-shapes-own-geometry)).
+The placement transform is baked into device-independent Direct2D geometry
+before stroking, so nonuniform scaling changes the figure without stretching
+its authored line width. Clips and drawn paths share the `IGeometrySource2D`
+bridge, including the even-odd fill rule. Geometry is not a native size request;
+drawing extending beyond the panel's allocation remains visible unless an
+ancestor explicitly clips it.
+
+Solid and gradient brushes are Composition brushes mapped over the figure.
+Radial gradients retain the per-axis radii supplied by `HostBrush.reach`.
+Dashes and phase retain the relay's outline-width units. Public `StrokeStyle`
+path lengths are divided by the current width at the Swift boundary; miter
+limits are doubled because the native API measures against half the line width.
+
+Shape drawing checks must use presented desktop pixels over a known backdrop,
+as mask checks already do. `RenderTargetBitmap` omits Composition child visuals
+and cannot verify these vectors or their composited alpha. Property inspection
+reads the actual `CompositionSpriteShape`, without retaining a hidden XAML shape.
 
 
 ## A mask

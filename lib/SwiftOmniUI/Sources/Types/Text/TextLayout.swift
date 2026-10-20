@@ -149,6 +149,11 @@ extension Text {
             public let typographicBounds: TypographicBounds
             /// The source grapheme, when the native typesetter reports it.
             public let text: String?
+
+            public init(typographicBounds: TypographicBounds, text: String? = nil) {
+                self.typographicBounds = typographicBounds
+                self.text = text
+            }
         }
 
         /// Where the first line stands.
@@ -163,7 +168,7 @@ extension Text {
         /// Two layouts agree when they were folded of the same report's
         /// generation - the box standing behind them reads live either way.
         public static func == (lhs: Layout, rhs: Layout) -> Bool {
-            lhs.box === rhs.box && lhs.version == rhs.version
+            lhs.box.identity == rhs.box.identity && lhs.version == rhs.version
         }
     }
 
@@ -185,6 +190,9 @@ extension Text {
 /// host's `textLayoutChanged`. Shared by reference: the seed's layout and the
 /// handler's writes are the same box.
 final class TextLayoutBox: @unchecked Sendable {
+    /// Stable across a Text value rebuilding, distinct between sibling labels.
+    private(set) var identity: ObjectIdentifier?
+    init() { identity = ObjectIdentifier(self) }
     /// The lines the host last said the text stands on.
     var lines: [Text.Layout.Line] = []
 
@@ -200,7 +208,14 @@ final class TextLayoutBox: @unchecked Sendable {
     /// element keeps saying where its words stand until the host says again.
     /// The attributes are the new node's own and stay.
     func inherit(from other: TextLayoutBox) {
-        lines = other.lines
+        identity = other.identity
+        lines = other.lines.map { line in
+            Text.Layout.Line(typographicBounds: line.typographicBounds, runs: line.runs.map { run in
+                var run = run
+                run.attributes = attributes
+                return run
+            })
+        }
         version = other.version
     }
 }

@@ -41,6 +41,38 @@ private final class PresentedLayoutOwner: WinUISingleChildView {
 }
 
 final class WinUILayoutPlanConsumptionTests: XCTestCase {
+    func testDrawingAResizedBackgroundDoesNotInterruptTheFollowingNativeAllocation() throws {
+        try onUIThread {
+            let background = WinUIPathView()
+            background.draw(.rectangle([20, 20, 20, 20], transform: nil))
+            let content = PlanConsumptionChild()
+            let root = WinUIZStackView()
+            var fill = WinUILayoutItem(view: background)
+            fill.values.isLayoutDecoration = true
+            fill.values.horizontal = 3
+            fill.values.vertical = 3
+            var body = WinUILayoutItem(view: content)
+            body.values.horizontal = 3
+            body.values.vertical = 3
+            root.setItems([fill, body]) // The drawing deliberately precedes content.
+            WinUITestHost.window.show(root)
+            defer { WinUITestHost.window.show(nil) }
+            WinUITestHost.pump()
+
+            for width in [320.0, 368, 320, 351.25, 368] {
+                root.prepareMeasure(width: width, height: 128)
+                swiftomniui_winui_arrange(root.handle, 0, 0, width, 128)
+                // Inspect this call, before pumping, UpdateLayout or another
+                // input could consume a measurement dirtied by Path.Data.
+                XCTAssertEqual(background.laidOutFrame.width, width, accuracy: 0.001)
+                XCTAssertEqual(content.allocatedBounds.width, width, accuracy: 0.001)
+                XCTAssertEqual(content.laidOutFrame.width, width, accuracy: 0.001)
+                XCTAssertEqual(content.laidOutFrame.height, 128, accuracy: 0.001)
+                XCTAssertEqual(background.desiredSize, LayoutSize(width: 0, height: 0))
+            }
+        }
+    }
+
     func testInvalidationReachesTheLayoutOwnerBeneathAnIdleBlurPresenter() {
         onUIThread {
             let content = WinUIZStackView()

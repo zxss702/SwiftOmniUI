@@ -223,6 +223,33 @@ namespace {
         return std::nullopt;
     }
 
+    std::optional<std::string> painted(winrt::Microsoft::UI::Composition::CompositionSpriteShape const &shape,
+                                       std::string_view what) {
+        namespace composition = winrt::Microsoft::UI::Composition;
+        auto solid = [](composition::CompositionBrush const &brush) -> std::string {
+            auto color = brush ? brush.try_as<composition::CompositionColorBrush>() : composition::CompositionColorBrush{nullptr};
+            if (!color) return "";
+            auto value = color.Color();
+            char words[10];
+            std::snprintf(words, sizeof words, "#%02X%02X%02X%02X", value.A, value.R, value.G, value.B);
+            return words;
+        };
+        if (what == "fill") return solid(shape.FillBrush());
+        if (what == "stroke") return solid(shape.StrokeBrush());
+        if (what == "strokeThickness") return number(shape.StrokeThickness());
+        if (what == "dashes") {
+            std::string words;
+            for (auto dash : shape.StrokeDashArray()) words += (words.empty() ? "" : ";") + number(dash);
+            return words;
+        }
+        if (what == "dashOffset") return number(shape.StrokeDashOffset());
+        if (what == "cap") return number(static_cast<int32_t>(shape.StrokeStartCap()));
+        if (what == "join") return number(static_cast<int32_t>(shape.StrokeLineJoin()));
+        if (what == "miter") return number(shape.StrokeMiterLimit());
+        if (what == "stretch" || what == "radius" || what == "ellipse") return "0";
+        return std::nullopt;
+    }
+
     /// A command bar's button of either kind - a page's action, or the bar's own button a view carries - as a test
     /// reads one: its label, whether it can be chosen, its icon, and the element automation names.
     struct Command {
@@ -368,7 +395,9 @@ namespace {
             if (auto found = block(text, what)) return found;
         }
         if (auto found = field(object, what)) return found;
-        if (auto shape = figureShape(object)) {
+        if (auto shape = pathSprite(object)) {
+            if (auto found = painted(shape, what)) return found;
+        } else if (auto shape = figureShape(object)) {
             if (auto found = painted(shape, what)) return found;
         }
         if (auto panel = object.try_as<controls::Panel>(); panel && what.rfind("box.", 0) == 0) {

@@ -208,7 +208,11 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                                "a fixed-height composer must close the old controls' horizontal space")
                 // The 48 DIP strip released by the old HStack must be painted,
                 // rather than merely included in the TextBox's logical frame.
-                XCTAssertEqual(fill.pixels(at: [(composer.laidOutFrame.width - 2, 64)]), [0xFFFF_FFFF])
+                let window = try XCTUnwrap(host.window)
+                host.settle {
+                    fill.presentedPixels(at: [(composer.laidOutFrame.width - 2, 64)], in: window) == [0xFFFF_FFFF]
+                }
+                XCTAssertEqual(fill.presentedPixels(at: [(composer.laidOutFrame.width - 2, 64)], in: window), [0xFFFF_FFFF])
             }
         }
     }
