@@ -78,7 +78,7 @@ final class WinUIImageView: WinUIView {
         hasWrittenTint = false
         writeTint(font.color?.argb)
         picturePlace = nil
-        if let placed { draw(in: placed) }
+        if let committedFrame { draw(in: committedFrame) }
         placingLayout?.invalidateMeasurements()
     }
 
@@ -109,9 +109,8 @@ final class WinUIImageView: WinUIView {
         return intrinsic
     }
 
-    override func layout(_ place: Rect) {
+    override func commitGeometry(in place: Rect) {
         draw(in: place)
-        super.layout(place)
     }
 
     /// Places the picture and synchronously supplies any additional SVG pixels

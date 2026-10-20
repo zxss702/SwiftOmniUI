@@ -70,6 +70,16 @@ class WinUIView {
         (placingLayout as? WinUILazyView)?.rowMeasurementChanged(self)
     }
     var rootSafeAreaContext: ((Rect) -> SafeAreaContext)?
+    private var presentationContext: SafeAreaContext?
+
+    /// Native pages keep their live root provider. A predicted allocation's
+    /// context exists only while preparing that allocation.
+    func withPresentationContext<Result>(_ context: SafeAreaContext, _ body: () -> Result) -> Result {
+        let previous = presentationContext
+        presentationContext = context
+        defer { presentationContext = previous }
+        return body()
+    }
 
     /// A native toolbar owns the widget, while the source modifier still owns
     /// its layout contribution, animation ancestry and parent-space report.
@@ -152,7 +162,7 @@ class WinUIView {
     }
 
     func layoutSafeArea(in bounds: Rect) -> SafeAreaContext {
-        let context = safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds)
+        let context = presentationContext ?? safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds)
         // The inherited regions belong to the last allocation. Measurement
         // probes and animation frames may already use a different proposal.
         // Keep each edge's distance from the allocation, not its old size.
@@ -212,6 +222,10 @@ class WinUIView {
 
     /// Where the view was last placed, in DIPs of its parent; nil before its first place.
     private(set) var placed: Rect?
+
+    /// Geometry committed with the native allocation, distinct from the next
+    /// presentation sample waiting for its parent's Arrange.
+    private(set) var committedFrame: Rect?
 
     /// How opaque the view's own property draws it, and whether it shows, as the host last wrote them.
     private(set) var opacity = 1.0
@@ -431,7 +445,7 @@ class WinUIView {
     /// Design: docs/design/platforms/winui/drawing.md#a-tipped-view
     private func writeTransform() {
         let drawn = drawing
-        let size = placed ?? Rect(x: 0, y: 0, width: 0, height: 0)
+        let size = committedFrame ?? Rect(x: 0, y: 0, width: 0, height: 0)
         swiftomniui_winui_set_transform(
             presentationHandle, drawn.translationX, drawn.translationY, drawn.rotation,
             drawn.scaleX, drawn.scaleY, drawn.pivotX * size.width, drawn.pivotY * size.height)
@@ -604,13 +618,13 @@ class WinUIView {
     /// Design: docs/design/platforms/winui/layout.md#a-place-between-passes
     func layout(_ place: Rect) {
         let moved = placed != place
-        if nativeSafeBarOwner == nil, let placingLayout {
-            setLayoutContext(placingLayout.context(for: self, at: place)
-                .ignoring(sourceElement?.ignoresSafeArea))
-        }
-        let resized = placed.map { $0.width != place.width || $0.height != place.height } ?? true
         if nativeSafeBarOwner == nil { placed = place }
         if Self.arranging > 0 {
+            if nativeSafeBarOwner == nil, let placingLayout {
+                setLayoutContext(placingLayout.context(for: self, at: place)
+                    .ignoring(sourceElement?.ignoresSafeArea))
+            }
+            let resized = committedFrame.map { $0.width != place.width || $0.height != place.height } ?? true
             let room = wordsRoom ?? place
             WinUILayoutDiagnostics.record("place", view: self,
                 "frame=\(WinUILayoutDiagnostics.rect(place)) measureRoom=\(WinUILayoutDiagnostics.rect(room)) resized=\(resized)")
@@ -620,6 +634,21 @@ class WinUIView {
             if let layout = self as? WinUILayoutView, placingLayout != nil {
                 layout.standsAt = place.width
             }
+            committedFrame = place
+            if resized, sourceElement?.type == .textEditor {
+                WinUILayoutDiagnostics.record("editor.commit", view: self,
+                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room))")
+            }
+            // Paths, brushes and transform pivots belong to this allocation.
+            // A sampled animation frame must not draw at its new size while
+            // XAML still holds the previous frame's native rectangle.
+            commitGeometry(in: place)
+            if resized, transform != .identity || placedDrawing != nil { writeTransform() }
+            if resized {
+                for what in paintsBySize.keys.sorted() {
+                    paintsBySize[what]?(LayoutSize(width: place.width, height: place.height))
+                }
+            }
             withNativeArrange {
                 swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
             }
@@ -628,18 +657,21 @@ class WinUIView {
             // No queued measurement from an older animation frame can overwrite it.
             placingLayout?.invalidateArrange()
         }
-        if resized, transform != .identity || placedDrawing != nil { writeTransform() }
-        if resized {
-            for what in paintsBySize.keys.sorted() { paintsBySize[what]?(LayoutSize(width: place.width, height: place.height)) }
-        }
     }
+
+    /// Size-dependent drawing committed with the actual native Arrange.
+    func commitGeometry(in bounds: Rect) {}
+
+    /// Prepare logical content before its native owner makes it visible.
+    /// This phase may request/mount rows and never runs inside native layout.
+    func preparePresentation(in bounds: Rect, viewport: Rect?) -> Bool { true }
 
     /// Paints `what` with `paint` at the view's size now, and again at each new size where its brushes follow the
     /// size of what they paint (`WinUIBrush.followsSize`).
     /// Design: docs/design/platforms/winui/drawing.md#a-box-and-its-brush
     func paint(_ what: String, followsSize: Bool, _ paint: @escaping (LayoutSize) -> Void) {
         paintsBySize[what] = followsSize ? paint : nil
-        let frame = placedFrame
+        let frame = committedFrame ?? Rect(0, 0, 0, 0)
         paint(LayoutSize(width: frame.width, height: frame.height))
     }
 

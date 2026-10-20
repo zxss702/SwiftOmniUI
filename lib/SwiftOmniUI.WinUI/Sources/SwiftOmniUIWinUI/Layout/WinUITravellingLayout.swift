@@ -19,12 +19,45 @@ class WinUITravellingLayout: WinUILayoutView {
     /// here in between.
     private var arrivalMotion: HostLayoutMotion?
     private var pendingPresentationFrame = false
+    private struct GeometryDriver {
+        weak var element: MountedElement?
+        var properties: Set<Prop>
+    }
+    private var geometryDrivers: [UInt64: GeometryDriver] = [:]
 
     func followsPresentationFrame() { pendingPresentationFrame = true }
 
+    /// Ownership lasts as long as the geometry channel, including content
+    /// patches arriving between its frames. A one-frame marker cannot express
+    /// that dependency and lets a second layout animation take over mid-flight.
+    func followPresentation(of element: MountedElement, properties: Set<Prop>) {
+        guard !properties.isEmpty else { return }
+        let previous = geometryDrivers[element.mount]?.properties ?? []
+        geometryDrivers[element.mount] = GeometryDriver(element: element, properties: previous.union(properties))
+        pendingPresentationFrame = true
+    }
+
     func takePresentationFrame() -> Bool {
         defer { pendingPresentationFrame = false }
-        return pendingPresentationFrame
+        var active = false
+        for (mount, driver) in geometryDrivers {
+            guard let element = driver.element, let animator = element.winUI.host?.runtime.animator else {
+                geometryDrivers[mount] = nil
+                continue
+            }
+            let properties = driver.properties.filter { property in
+                if let binding = element.driven[property], binding.mode != .in {
+                    return animator.animation(for: .state(binding.state)) != nil
+                }
+                return animator.animation(for: .described(DescribedKey(mount: mount, property: property))) != nil
+            }
+            if properties.isEmpty { geometryDrivers[mount] = nil }
+            else {
+                geometryDrivers[mount] = GeometryDriver(element: element, properties: properties)
+                active = true
+            }
+        }
+        return pendingPresentationFrame || active
     }
 
     /// Keeps the motion a patch named. A patch that names none leaves the last one standing:

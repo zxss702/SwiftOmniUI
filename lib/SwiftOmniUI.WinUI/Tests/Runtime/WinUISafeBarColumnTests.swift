@@ -133,6 +133,7 @@ final class WinUISafeBarColumnTests: XCTestCase {
             window.show(split, present: false)
             window.request(WindowFrame(width: WinUISidebarView.expandsAt + 8, height: 700))
             window.prepareFirstPresentation(split: split)
+            XCTAssertTrue(split.preparePresentation(in: Rect(0, 0, window.contentSize.width, window.contentSize.height), viewport: nil))
             XCTAssertTrue(split.isPresented)
             XCTAssertEqual(WinUIStrings.read {
                 swiftomniui_winui_read(split.sidebar.handle, "paneOpen", $0, $1)
@@ -157,6 +158,7 @@ final class WinUISafeBarColumnTests: XCTestCase {
             XCTAssertFalse(split.isPresented)
             window.request(WindowFrame(width: WinUISidebarView.expandsAt + 8, height: 700))
             window.prepareFirstPresentation(split: split)
+            XCTAssertTrue(split.preparePresentation(in: Rect(0, 0, window.contentSize.width, window.contentSize.height), viewport: nil))
             XCTAssertTrue(split.isPresented)
         }
     }

@@ -162,6 +162,35 @@ final class WinUIScrollView: WinUILayoutView {
         box.clips ? bounds : layoutSafeArea(in: bounds).viewport(in: bounds, axes: orientation)
     }
 
+    override func preparePresentation(in bounds: Rect, viewport incoming: Rect?) -> Bool {
+        let room = resolve(in: bounds)
+        let visible: Rect
+        if let incoming {
+            let x = max(room.x, incoming.x), y = max(room.y, incoming.y)
+            visible = Rect(x, y, max(0, min(room.x + room.width, incoming.x + incoming.width) - x),
+                           max(0, min(room.y + room.height, incoming.y + incoming.height) - y))
+        } else { visible = room }
+        while true {
+            let size = Self.querySize { document.contentSize(width: room.width) }
+            let extent = Rect(0, 0,
+                orientation == .horizontal || orientation == .both ? max(room.width, size.width) : room.width,
+                orientation == .vertical || orientation == .both ? max(room.height, size.height) : room.height)
+            let position: Point
+            if let programTarget { position = programTarget }
+            else if let defaultAnchor, !anchoredOnce {
+                position = Point(defaultAnchor.x * max(0, extent.width - room.width),
+                                 defaultAnchor.y * max(0, extent.height - room.height))
+            } else { position = offset }
+            let bounded = Point(min(max(0, position.x), max(0, extent.width - room.width)),
+                                min(max(0, position.y), max(0, extent.height - room.height)))
+            let viewport = Rect(bounded.x + visible.x - room.x, bounded.y + visible.y - room.y,
+                                visible.width, visible.height)
+            guard document.preparePresentation(in: extent, viewport: viewport) else { return false }
+            let current = Self.querySize { document.contentSize(width: room.width) }
+            if current == size { return true }
+        }
+    }
+
     override func safeAreaChanged() {
         if let context = safeAreaContext { _ = resolve(in: context.layout) }
         super.safeAreaChanged()

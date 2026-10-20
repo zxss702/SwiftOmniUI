@@ -85,7 +85,7 @@ changes several visual-state updates to setters; its leading inline pane
 keeps the same layout. This comparison does not establish a native SDK
 regression or replace a Windows runtime comparison. The host retains 2.5.1
 and its performance opt-ins while fixing its own initial pane state, first
-display-mode selection, clip geometry, and transition-completion handling
+display-mode selection, layout/presentation boundaries and content preparation
 ([split views](pages.md#a-split-view)).
 
 The head hands the thread to `SwiftOmniUIWinUI.run(applicationID:initializing:)`.
@@ -128,15 +128,16 @@ DLLs cannot configure the executable's main-thread stack.
 
 ## Layout diagnostics
 
-The relay writes `%TEMP%/SwiftOmniUI-layout-<pid>.log`, with a `v2` header.
+The relay writes `%TEMP%/SwiftOmniUI-layout-<pid>.log`, with a `v3` header.
 It retains the first 8192 events, 256 recent split/viewport/runtime state
-changes, and a rolling tail of 4096 events. Foreground tail writes use a
+changes, a separate 512-event pane/editor presentation history that scrolling
+cannot evict, and a rolling tail of 4096 events. Foreground tail writes use a
 one-second throttle; a one-shot thread-pool timer also saves the final idle
 tail. An unhandled XAML exception forces a synchronous snapshot.
 File access is serialized, and stopping diagnostics cancels and joins the
 timer before closing the file. Diagnostics never request layout or animation
 frames. The records include runtime compatibility/optional-change settings,
-pane configuration/completion, viewport state, and realized lazy ranges;
+pane configuration, viewport state, and realized lazy ranges;
 they exclude the user's input text.
 
 Earlier `v1` logs stopped appending after the startup prefix unless an

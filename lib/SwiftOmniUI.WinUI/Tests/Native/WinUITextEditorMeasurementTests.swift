@@ -9,6 +9,65 @@ import SwiftOmniUIConformance
 import XCTest
 
 final class WinUITextEditorMeasurementTests: XCTestCase {
+    func testComposerIntermediateFramesShareOneHeightAndBottomEdge() throws {
+        try onUIThread {
+            let words = State(wrappedValue: "")
+            let clock = TestClock()
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView { Text("Conversation") }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        HStack(alignment: .bottom) {
+                            Button("Attach") {}.frame(width: 40, height: 40)
+                            TextEditor(words.projectedValue)
+                                .scrollContentBackground(.hidden)
+                                .frame(height: words.wrappedValue.isEmpty ? 40 : 128)
+                                .background { RoundedRectangle(cornerRadius: 20).fill(Color.white).id("fill") }
+                                .id("input")
+                            if words.wrappedValue.isEmpty {
+                                HStack {
+                                    Button("Send") {}.frame(width: 40, height: 40)
+                                    Button("Pause") {}.frame(width: 40, height: 40)
+                                }
+                            } else {
+                                VStack {
+                                    Button("Send") {}.frame(width: 40, height: 40)
+                                    Button("Pause") {}.frame(width: 40, height: 40)
+                                }
+                            }
+                        }.padding(16).buttonStyle(.plain)
+                    }
+            }
+            let input = try XCTUnwrap(host.view(id: .manual("input")))
+            let nativeEditor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            let bottom = input.origin.y + input.laidOutFrame.height
+            let began = clock.now
+            withAnimation(.eased(200, .linear)) { words.wrappedValue = "a" }
+            host.step()
+            for elapsed in [0.0, 16, 32, 50, 100, 150, 200] {
+                clock.now = began + elapsed
+                host.frame()
+                let expected = 40 + 88 * elapsed / 200
+                let fill = try XCTUnwrap(host.view(id: .manual("fill")))
+                XCTAssertEqual(input.laidOutFrame.height, expected, accuracy: 1)
+                XCTAssertEqual(fill.laidOutFrame.height, expected, accuracy: 1)
+                XCTAssertEqual(fill.committedFrame?.height ?? -1, expected, accuracy: 1)
+                XCTAssertEqual(input.origin.y + input.laidOutFrame.height, bottom, accuracy: 1)
+                XCTAssertTrue(host.views(WinUITextEditorView.self).first === nativeEditor)
+                if elapsed == 50 {
+                    // A content patch between geometry frames must not acquire
+                    // another layout animation or restart the height channel.
+                    words.wrappedValue = "additional content while expanding"
+                    host.step()
+                    host.layOut()
+                    XCTAssertEqual(input.laidOutFrame.height, expected, accuracy: 1,
+                                   "the content patch itself must not introduce an intermediate jump")
+                    XCTAssertEqual(input.origin.y + input.laidOutFrame.height, bottom, accuracy: 1)
+                }
+            }
+            XCTAssertFalse(host.runtime.animator.isMoving)
+        }
+    }
+
     func testScrollingEditorAsksForOneNativeLineWithoutAnAllocatedHeight() {
         onUIThread {
             let editor = WinUITextEditorView()

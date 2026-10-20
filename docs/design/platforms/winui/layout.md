@@ -273,6 +273,21 @@ prepared sidebar. Nested scroll presenters still intersect their actual
 allocated windows, so an inner scroller outside its outer scroll viewport
 remains virtualized. Viewport queries never acquire a handout Visual.
 
+Before a window or pane is revealed, presentation preparation propagates its
+current allocation independently of native Loaded/EffectiveViewport events.
+It runs outside Measure/Arrange so requested rows can be mounted. Pending
+requests resume only through their patch acknowledgements. Content extents
+refine the same plan before it commits; the preparation never substitutes a
+previous native frame for the incoming allocation.
+
+A layout's Measure outputs do not increment its content revision or enqueue another
+ancestor measure. Real property and native-resource changes invalidate their
+dependencies; native size corrections refine an active plan synchronously.
+Geometry animations retain their ownership across intervening content
+patches. Paths, canvases, images, brushes and transform pivots commit their
+size-dependent drawing with the actual native Arrange, rather than when an
+animation first samples the next rectangle.
+
 A lazy run under the scroller answers the document's cross size with the
 widest row measured in the room it was given, and keeps that width for as
 long as that is the room: the rows a moving window leaves behind do not

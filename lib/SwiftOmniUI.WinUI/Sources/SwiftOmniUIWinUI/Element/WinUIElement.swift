@@ -54,13 +54,26 @@ final class WinUIElement: NativeElement {
 
     func layoutItemChanged(followingPresentation: Bool = false) {
         cachedLayoutValues = nil
-        if followingPresentation { (view as? WinUITravellingLayout)?.followsPresentationFrame() }
+        let geometry = followingPresentation ? Set(Self.layoutInputs.filter { property in
+            if let binding = element.driven[property], binding.mode != .in {
+                return host?.runtime.animator.animation(for: .state(binding.state)) != nil
+            }
+            return host?.runtime.animator.animation(
+                for: .described(DescribedKey(mount: element.mount, property: property))) != nil
+        }) : []
+        if followingPresentation {
+            (view as? WinUITravellingLayout)?.followsPresentationFrame()
+            (view as? WinUITravellingLayout)?.followPresentation(of: element, properties: geometry)
+        }
         var owners: [WinUIElement] = []
         var owner = parent
         while let each = owner {
             each.layoutItemsDirty = true
             each.cachedLayoutValues = nil
-            if followingPresentation { (each.view as? WinUITravellingLayout)?.followsPresentationFrame() }
+            if followingPresentation {
+                (each.view as? WinUITravellingLayout)?.followsPresentationFrame()
+                (each.view as? WinUITravellingLayout)?.followPresentation(of: element, properties: geometry)
+            }
             owners.append(each)
             owner = each.parent
         }

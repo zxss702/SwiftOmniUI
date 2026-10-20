@@ -260,9 +260,6 @@ enum WinUICallbacks {
             paneWidthChanged: { view in
                 MainActor.assumeIsolated { (WinUIView.find(view) as? WinUISidebarView)?.paneWidthChanged() }
             },
-            isProgramWriting: { MainActor.assumeIsolated { ProgramWrite.isWriting } },
-            paneTransitionCompleted: { view in
-                MainActor.assumeIsolated { (WinUIView.find(view) as? WinUISidebarView)?.transitionCompleted() }
-            })
+            isProgramWriting: { MainActor.assumeIsolated { ProgramWrite.isWriting } })
     }
 }

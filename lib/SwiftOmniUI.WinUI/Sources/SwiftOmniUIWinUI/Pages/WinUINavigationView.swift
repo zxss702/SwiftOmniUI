@@ -60,6 +60,14 @@ final class WinUINavigationView: WinUILayoutView {
         Self.querySize { SingleChildArithmetic.size(of: items.last, padding: EdgeInsets(0), width: width) }
     }
 
+    override func preparePresentation(in bounds: Rect, viewport: Rect?) -> Bool {
+        guard let page = items.last?.view else { return true }
+        return page.withPresentationContext(layoutSafeArea(in: bounds).child(
+            in: bounds, preservingOutsets: page.sourceElement?.observesSafeArea == true)) {
+                page.preparePresentation(in: bounds, viewport: viewport)
+            }
+    }
+
     override func safeAreaChanged() {
         super.safeAreaChanged()
         if let page = items.last?.view {

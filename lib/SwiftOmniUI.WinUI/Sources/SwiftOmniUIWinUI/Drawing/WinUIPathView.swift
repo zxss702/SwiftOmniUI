@@ -50,7 +50,7 @@ final class WinUIPathView: WinUIView {
         outlineWidth = ShapeArithmetic.strokeWidth(outline)
         painting = (fill, stroke, dashes, dashOffset, cap, join, miter)
         sendPainting()
-        if let placed { draw(in: placed) }
+        if let committedFrame { draw(in: committedFrame) }
     }
 
     /// Hands WinUI the painting, its brushes over the figure's box: WinUI maps a shape's brush over its geometry.
@@ -81,7 +81,7 @@ final class WinUIPathView: WinUIView {
             bounds = Rect(x: read[0], y: read[1], width: read[2], height: read[3])
         }
         self.geometry = geometry
-        if let placed { draw(in: placed) }
+        if let committedFrame { draw(in: committedFrame) }
     }
 
     /// A shape has no size of its own: it takes the room its layout gives it, and asks WinUI for none.
@@ -90,9 +90,8 @@ final class WinUIPathView: WinUIView {
         return LayoutSize(width: 0, height: 0)
     }
 
-    override func layout(_ place: Rect) {
+    override func commitGeometry(in place: Rect) {
         draw(in: place)
-        super.layout(place)
     }
 
     /// Runs `draw` with a transform's six numbers as WinUI's matrix takes them; with none where there is none, or

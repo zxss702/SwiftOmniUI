@@ -20,7 +20,7 @@ final class WinUICanvasView: WinUIView {
         super.init { number in swiftomniui_winui_canvas_make(number) }
     }
 
-    override func layout(_ place: Rect) {
+    override func commitGeometry(in place: Rect) {
         if let element = sourceElement,
            place.width.isFinite, place.height.isFinite,
            place.width > 0, place.height > 0 {
@@ -32,7 +32,6 @@ final class WinUICanvasView: WinUIView {
                 }
             }
         }
-        super.layout(place)
     }
 
     /// The drawing, its instructions in the order they were written; nil draws nothing.

@@ -18,6 +18,14 @@ final class WinUIWindowController {
     /// What the window shows, by the host layer's rule.
     private let presentation = WindowPresentation()
     private var traits: WindowTraits?
+    private(set) var isPreparingPresentation = false
+    private struct PreparedContent: Equatable {
+        let identity: ObjectIdentifier
+        let revision: Int
+        let hierarchy: Int
+        let size: LayoutSize
+    }
+    private var preparedContent: PreparedContent?
 
     /// The sheets the window shows, one for each page its modal stack presents, the last on top.
     private var sheets: [(element: MountedElement, sheet: WinUISheetView)] = []
@@ -50,6 +58,31 @@ final class WinUIWindowController {
         }
         let split = presentation.arrangement?.visibleSplitView?.winUI.view as? WinUISplitView
         window.prepareFirstPresentation(split: split)
+        let size = window.contentSize
+        if let content = window.content {
+            let input = PreparedContent(identity: ObjectIdentifier(content), revision: content.measurementRevision,
+                                        hierarchy: content.hierarchyRevision, size: size)
+            if isPreparingPresentation || preparedContent != input || split?.needsPresentationPreparation == true {
+                let wasPreparing = isPreparingPresentation
+                isPreparingPresentation = !content.preparePresentation(
+                    in: Rect(0, 0, size.width, size.height), viewport: nil)
+                if wasPreparing != isPreparingPresentation || preparedContent == nil {
+                    WinUILayoutDiagnostics.record("presentation.prepare", view: content,
+                        "ready=\(!isPreparingPresentation) room=\(WinUILayoutDiagnostics.size(size))")
+                }
+                if !isPreparingPresentation {
+                    preparedContent = PreparedContent(identity: ObjectIdentifier(content), revision: content.measurementRevision,
+                                                      hierarchy: content.hierarchyRevision, size: size)
+                    // This is the allocation commit of the prepared content,
+                    // before visibility, not an animation-completion repair.
+                    (content as? WinUILayoutView)?.invalidateArrange()
+                }
+            }
+        } else {
+            isPreparingPresentation = false
+            preparedContent = nil
+        }
+        guard !isPreparingPresentation else { return }
         window.presentContent()
     }
 

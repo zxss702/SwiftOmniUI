@@ -153,10 +153,15 @@ and `.doubleColumn` do not briefly open before the application closes them.
 The known initial client width selects Inline/Overlay before activation;
 detached configuration at ActualWidth zero does not select another mode.
 
-PaneOpened and PaneClosed schedule one coalesced page invalidation and lazy
-viewport reconciliation after native layout. A real empty animated clip may
-retire rows, and reaching the final visible pane does not necessarily change
-the scroll offset. Final realization therefore has its own lifecycle event.
+Presentation has a preparation phase before native visibility. The current
+window allocation is propagated through layouts, navigation pages and scroll
+documents. Lazy containers request that allocation's identities, wait for the
+normal patch acknowledgement, and measure attached rows. Only a completed
+preparation commits `IsPaneOpen` or first window activation. Split column
+widths come from the same pure arithmetic used by the native configuration.
+Changing a request replaces the pending preparation; old viewport notices do
+not replace it. An animated clip changes drawing without retiring layout rows.
+There are no PaneOpened/PaneClosed repair passes or completion callbacks.
 The shared page path includes every visible column for appearance/disappearance.
 
 ## A native arrangement

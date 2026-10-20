@@ -8,6 +8,24 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 final class WinUISidebarLifecycleTests: XCTestCase {
+    func testPreparationDoesNotReplaceANativePagesLiveSafeAreaProvider() {
+        onUIThread {
+            let navigation = WinUINavigationView()
+            let page = WinUISingleChildView()
+            navigation.setItems([WinUILayoutItem(view: page)])
+            let bounds = Rect(0, 0, 300, 200)
+            navigation.setLayoutContext(SafeAreaContext(bounds: bounds, layout: bounds,
+                                                       container: Rect(0, 12, 300, 188)))
+            XCTAssertTrue(navigation.preparePresentation(in: bounds, viewport: nil))
+            XCTAssertNil(page.safeAreaContext)
+            XCTAssertEqual(page.layoutSafeArea(in: bounds).safe.y, 12)
+            navigation.setLayoutContext(SafeAreaContext(bounds: bounds, layout: bounds,
+                                                       container: Rect(0, 32, 300, 168)))
+            XCTAssertEqual(page.layoutSafeArea(in: bounds).safe.y, 32,
+                           "native chrome changes still reach the page after preparation")
+        }
+    }
+
     func testExplicitlyClosedBindingOwnsTheFirstWidePresentation() throws {
         try onUIThread {
             let shown = State(wrappedValue: false)
@@ -61,25 +79,7 @@ final class WinUISidebarLifecycleTests: XCTestCase {
         }
     }
 
-    func testTransitionCompletionsCoalesceAndWaitForNativeLayoutToEnd() {
-        onUIThread {
-            let split = WinUISplitView()
-            let pane = WinUISingleChildView(), detail = WinUISingleChildView()
-            split.setItems([WinUILayoutItem(view: pane), WinUILayoutItem(view: detail)])
-            WinUIDoorbell.commitPending()
-            let revisions = [pane.measurementRevision, detail.measurementRevision]
-            split.withNativeArrange {
-                split.sidebar.transitionCompleted()
-                split.middle.transitionCompleted()
-                XCTAssertEqual([pane.measurementRevision, detail.measurementRevision], revisions)
-            }
-            WinUIDoorbell.commitPending()
-            XCTAssertEqual(pane.measurementRevision, revisions[0] + 1)
-            XCTAssertEqual(detail.measurementRevision, revisions[1] + 1)
-        }
-    }
-
-    func testNativePaneCompletionRestoresItsRowsWithoutAnOffsetChange() throws {
+    func testPanePresentationHasPreparedRowsBeforeItsFirstVisibleFrame() throws {
         try onUIThread {
             let shown = State(wrappedValue: true)
             let host = WinUIRenderer.running(room: WinUITestHost.wideRoom) {
@@ -94,21 +94,21 @@ final class WinUISidebarLifecycleTests: XCTestCase {
             let split = try XCTUnwrap(host.views(WinUISplitView.self).first)
             let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
-            let original = split.sidebar.onTransitionCompleted
-            var completed = 0
-            split.sidebar.onTransitionCompleted = { completed += 1; original?() }
             for open in [false, true, false, true] {
-                let before = completed
                 shown.wrappedValue = open
                 host.step()
-                host.settle { completed > before }
-                XCTAssertGreaterThan(completed, before, "the native template must report its final state")
+                XCTAssertEqual(Self.read("paneOpen", from: split.sidebar), open ? "1" : "0")
                 if open {
-                    host.settle { !lazy.mounted.isEmpty && lazy.span != nil }
-                    host.frame()
+                    // This is before advancing the native transition, with no
+                    // completion callback or scrolling supplied to fill rows.
                     XCTAssertFalse(lazy.mounted.isEmpty)
-                    XCTAssertNotNil(lazy.span)
-                    XCTAssertFalse(lazy.isWaitingForViewport)
+                    let identities = lazy.mounted.mapValues { $0.view.number }
+                    for _ in 0..<8 {
+                        host.layOut()
+                        host.frame()
+                        XCTAssertFalse(lazy.mounted.isEmpty)
+                        XCTAssertEqual(lazy.mounted.mapValues { $0.view.number }, identities)
+                    }
                     XCTAssertEqual(scroll.scroller.standing.offset.y, 0, accuracy: 1)
                 }
             }

@@ -226,8 +226,6 @@ typedef struct {
     void (*paneWidthChanged)(int64_t view);
     /// Classifies a synchronous native change before its asynchronous notification.
     bool (*isProgramWriting)(void);
-    /// A native pane's visual transition reached its final clipping/visibility state.
-    void (*paneTransitionCompleted)(int64_t view);
 } SwiftOmniUIWinUICallbacks;
 
 /// What the environment is, in groups, each read at once.
@@ -999,6 +997,8 @@ void swiftomniui_winui_title_bar_set_app_menu(SwiftOmniUIObjectRef bar, SwiftOmn
 SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, double expandsAt, bool trailing);
 /// Selects the initial display mode from a known client allocation before activation.
 void swiftomniui_winui_split_prepare_room(SwiftOmniUIObjectRef split, double width);
+/// Pure allocation using the same constraints as native layout: pane x/width, content x/width.
+bool swiftomniui_winui_split_room(SwiftOmniUIObjectRef split, double width, bool open, bool contentShown, double *sizes);
 void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef split);
 /// Releases one changed slot while leaving the other columns attached.
 void swiftomniui_winui_split_remove(SwiftOmniUIObjectRef split, SwiftOmniUIObjectRef child);
