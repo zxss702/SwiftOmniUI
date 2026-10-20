@@ -9,6 +9,11 @@ asks the tree for through the host layer's `ItemsCells`
 activates and tells the screen reader. The list is a room: it asks for
 none, and stands the scrolled window over the place it is given.
 
+The native list/grid has eight points of CSS padding on every edge inside
+the scrolled window. This padding scrolls with the content; the scroller
+keeps its full allocation. Grid column counts use the remaining content
+width after the two horizontal insets.
+
 The factory's `bind` and `unbind` are the host layer's `hold` and
 `endShowing` ([one cell an entry](../../host/items.md#one-cell-an-entry)):
 GTK binds a row again for an entry it shows again, so nothing stands for

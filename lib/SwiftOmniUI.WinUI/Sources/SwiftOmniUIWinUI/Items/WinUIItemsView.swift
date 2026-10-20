@@ -40,6 +40,9 @@ final class WinUIItemsView: WinUILayoutView {
         self.reducesMotion = reducesMotion
         super.init()
         list.owner = self
+        // ItemsView's template puts this padding on the ItemsRepeater inside
+        // its ScrollView, so it scrolls with the content and leaves bars flush.
+        swiftomniui_winui_set_padding(list.handle, 8, 8, 8, 8)
         list.placingLayout = self
         setChildren([list])
     }

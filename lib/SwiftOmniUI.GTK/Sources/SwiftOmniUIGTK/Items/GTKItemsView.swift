@@ -32,6 +32,9 @@ final class GTKItemsView: GTKLayoutView {
     /// The width the list was last given.
     private var width = 0.0
 
+    /// Inside the scroller: the native list owns this room, not its viewport.
+    private let contentPadding = EdgeInsets(8)
+
     /// Every cell set up, by its list item.
     private(set) var made: [OpaquePointer: GTKItemCell] = [:]
 
@@ -138,6 +141,7 @@ final class GTKItemsView: GTKLayoutView {
         }
         selection = chosen
         listenToChoice()
+        gtk_widget_add_css_class(made, GTKStyleSheet.padding(contentPadding))
         gtk_scrolled_window_set_child(scroller.widget.opaque, made)
         list = made
         styleList()
@@ -210,7 +214,8 @@ final class GTKItemsView: GTKLayoutView {
     /// Stands each entry as the host layer places it (`ItemsPlacement`): a grid's columns from the width it is given,
     /// and each bound cell's room.
     private func place() {
-        let placement = ItemsPlacement(cells.entries, layout: shape, width: width, spanning: false)
+        let contentWidth = max(0, width - contentPadding.left - contentPadding.right)
+        let placement = ItemsPlacement(cells.entries, layout: shape, width: contentWidth, spanning: false)
         guard placement != self.placement else { return }
         self.placement = placement
         if case .grid = shape, let list {

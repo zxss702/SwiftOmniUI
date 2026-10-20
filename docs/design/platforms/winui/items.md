@@ -6,6 +6,11 @@ an element factory of the relay's: each entry's cell is a panel of the
 host's, stood in an `ItemContainer`, holding the entry's subtree it asks the
 tree for through the host layer's `ItemsCells` ([items](../../host/items.md)).
 WinUI scrolls, reuses its containers, chooses, invokes and tells Narrator.
+
+The default eight-DIP inset on every edge belongs to `ItemsView.Padding`.
+WinUI's template applies it to the ItemsRepeater inside its ScrollView, so
+the inset contributes to the scrolling content extent, not the viewport's
+outer margin. Scrollbars keep the full viewport edge.
 The list is a room: it asks for none, and stands where its layout puts it
 ([its room](#its-room)).
 
