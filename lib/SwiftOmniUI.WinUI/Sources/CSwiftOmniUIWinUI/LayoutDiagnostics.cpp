@@ -5,20 +5,31 @@
 
 #include <algorithm>
 #include <array>
+#include <deque>
+#include <io.h>
 #include <mutex>
+#include <string_view>
 
 namespace swiftomniui {
     namespace {
-        // Temporary startup diagnostics. Retain the beginning and a bounded
-        // tail, rather than letting a layout cycle fill the user's disk.
+        // Retain startup, a compact state history and the recent bounded tail.
+        // Nonfatal interactions must reach the file too, not just crash dumps.
         struct LayoutDiagnostics {
             static constexpr size_t capacity = 4096;
             std::mutex lock;
             std::array<std::string, capacity> recent;
+            std::deque<std::string> states;
             size_t next = 0;
             uint64_t sequence = 0;
             ULONGLONG started = GetTickCount64();
+            ULONGLONG savedAt = started;
+            ULONGLONG prefixFlushedAt = started;
+            uint64_t savedSequence = 0;
+            int64_t tailOffset = -1;
             FILE *file = nullptr;
+            PTP_TIMER snapshotTimer = nullptr;
+            bool snapshotPending = false;
+            bool stopping = false;
 
             LayoutDiagnostics() {
                 wchar_t directory[MAX_PATH + 1]{};
@@ -31,53 +42,123 @@ namespace swiftomniui {
                         std::fprintf(stderr, "[SOUI layout] log: %s\n", utf8.c_str());
                     }
                 }
-                std::fprintf(stderr, "[SOUI layout] diagnostics active; retaining first 8192 and last 4096 events, pid=%lu\n",
+                std::fprintf(stderr, "[SOUI layout] diagnostics active; retaining startup, state history and recent events, pid=%lu\n",
                              static_cast<unsigned long>(GetCurrentProcessId()));
                 std::fflush(stderr);
                 if (file) {
-                    std::fprintf(file, "SOUI layout diagnostics v1 pid=%lu; sizes in DIPs; no input text\n",
+                    std::fprintf(file, "SOUI layout diagnostics v2 pid=%lu; sizes in DIPs; no input text\n",
                                  static_cast<unsigned long>(GetCurrentProcessId()));
                     std::fflush(file);
+                    snapshotTimer = CreateThreadpoolTimer([](PTP_CALLBACK_INSTANCE, void *context, PTP_TIMER) {
+                        try {
+                            auto &state = *static_cast<LayoutDiagnostics *>(context);
+                            std::lock_guard guard(state.lock);
+                            state.snapshotPending = false;
+                            if (!state.stopping && state.sequence != state.savedSequence) state.saveTail("idle", true);
+                        } catch (...) {} // Diagnostics must not terminate a thread-pool callback.
+                    }, this, nullptr);
                 }
             }
 
-            ~LayoutDiagnostics() { if (file) std::fclose(file); }
+            ~LayoutDiagnostics() {
+                { std::lock_guard guard(lock); stopping = true; }
+                if (snapshotTimer) {
+                    SetThreadpoolTimer(snapshotTimer, nullptr, 0, 0);
+                    WaitForThreadpoolTimerCallbacks(snapshotTimer, TRUE);
+                    CloseThreadpoolTimer(snapshotTimer);
+                }
+                if (file) {
+                    std::lock_guard guard(lock);
+                    saveTail("shutdown", true);
+                    std::fclose(file);
+                    file = nullptr;
+                }
+            }
+
+            // Caller holds the lock. Replacing this section bounds disk usage;
+            // no geometry, XAML calls, or layout requests occur during a write.
+            void saveTail(char const *reason, bool force = false) {
+                if (!file || (!force && (sequence == savedSequence || GetTickCount64() - savedAt < 1000))) return;
+                if (tailOffset < 0) {
+                    if (sequence <= capacity * 2 && !force) return;
+                    tailOffset = _ftelli64(file);
+                }
+                if (_fseeki64(file, tailOffset, SEEK_SET) != 0) return;
+                std::fprintf(file, "\n--- state history; snapshot=%s; event=%llu ---\n", reason,
+                             static_cast<unsigned long long>(sequence));
+                for (auto const &state : states) std::fprintf(file, "%s\n", state.c_str());
+                auto count = static_cast<size_t>(std::min<uint64_t>(sequence, capacity));
+                auto begin = sequence < capacity ? size_t{0} : next;
+                std::fprintf(file, "--- recent %zu events ---\n", count);
+                for (size_t index = 0; index < count; ++index)
+                    std::fprintf(file, "%s\n", recent[(begin + index) % capacity].c_str());
+                auto end = _ftelli64(file);
+                std::fflush(file);
+                if (end >= 0) _chsize_s(_fileno(file), static_cast<uint64_t>(end));
+                savedAt = GetTickCount64();
+                savedSequence = sequence;
+            }
+
+            void scheduleSnapshot() {
+                if (!snapshotTimer || snapshotPending || stopping) return;
+                snapshotPending = true;
+                LARGE_INTEGER interval;
+                interval.QuadPart = -10'000'000LL; // One second, relative, in 100ns units.
+                FILETIME due{interval.LowPart, static_cast<DWORD>(interval.HighPart)};
+                SetThreadpoolTimer(snapshotTimer, &due, 0, 0);
+            }
 
             void record(char const *message) {
                 std::lock_guard guard(lock);
+                if (stopping) return;
                 char prefix[128]{};
                 std::snprintf(prefix, sizeof(prefix), "#%llu +%llums tid=%lu ",
                               static_cast<unsigned long long>(++sequence),
                               static_cast<unsigned long long>(GetTickCount64() - started),
                               static_cast<unsigned long>(GetCurrentThreadId()));
                 recent[next] = std::string(prefix) + (message ? message : "");
-                // Every written event is flushed before XAML continues, so an
-                // LLDB-DAP failure cannot discard the startup prefix as well.
+                auto const &line = recent[next];
+                std::string_view event = message ? message : "";
+                if (event.substr(0, 6) == "split." || event.substr(0, 9) == "viewport."
+                    || event.substr(0, 12) == "lazy.window " || event.substr(0, 8) == "runtime.") {
+                    if (states.size() == 256) states.pop_front();
+                    states.push_back(line);
+                }
                 if (file && sequence <= capacity * 2) {
-                    std::fprintf(file, "%s\n", recent[next].c_str());
-                    if (sequence == capacity * 2)
-                        std::fprintf(file, "--- startup prefix limit; recent events retained for exception dump ---\n");
-                    std::fflush(file);
+                    std::fprintf(file, "%s\n", line.c_str());
+                    if (sequence == capacity * 2) {
+                        std::fprintf(file, "--- startup prefix limit; state history and recent events follow ---\n");
+                        tailOffset = _ftelli64(file);
+                    }
+                    // Per-event fflush made diagnostics part of startup stalls.
+                    // Failure dumps still synchronously flush the entire tail.
+                    if (sequence % 64 == 0 || GetTickCount64() - prefixFlushedAt >= 100) {
+                        std::fflush(file);
+                        prefixFlushedAt = GetTickCount64();
+                    }
                 }
                 next = (next + 1) % capacity;
+                if (sequence > capacity * 2) {
+                    saveTail("running");
+                    scheduleSnapshot();
+                }
             }
 
             void failure(int32_t code, char const *message) {
                 std::lock_guard guard(lock);
+                if (stopping) return;
                 std::fprintf(stderr, "[SOUI layout] unhandled XAML exception HRESULT=0x%08x: %s\n",
                              static_cast<unsigned>(code), message ? message : "");
                 auto count = static_cast<size_t>(std::min<uint64_t>(sequence, capacity));
                 auto begin = sequence < capacity ? size_t{0} : next;
-                if (file) {
-                    std::fprintf(file, "\n--- unhandled XAML exception HRESULT=0x%08x: %s; last %zu of %llu events ---\n",
-                                 static_cast<unsigned>(code), message ? message : "", count,
-                                 static_cast<unsigned long long>(sequence));
-                }
+                char reason[1024]{};
+                std::snprintf(reason, sizeof(reason), "unhandled XAML exception HRESULT=0x%08x: %s",
+                              static_cast<unsigned>(code), message ? message : "");
+                saveTail(reason, true);
                 std::fprintf(stderr, "[SOUI layout] last %zu events follow; the file contains the full retained tail\n",
                              std::min(count, size_t{256}));
                 for (size_t index = 0; index < count; ++index) {
                     auto const &line = recent[(begin + index) % capacity];
-                    if (file) std::fprintf(file, "%s\n", line.c_str());
                     if (count - index <= 256) std::fprintf(stderr, "%s\n", line.c_str());
                 }
                 if (file) std::fflush(file);

@@ -286,6 +286,10 @@ namespace swiftomniui {
                 options.PatchLevel1({SWIFTOMNIUI_WINDOWS_APP_SDK_MAJOR, SWIFTOMNIUI_WINDOWS_APP_SDK_MINOR,
                                      SWIFTOMNIUI_WINDOWS_APP_SDK_PATCH});
                 options.Apply();
+                auto message = std::string("runtime.compat sdk=") + std::to_string(SWIFTOMNIUI_WINDOWS_APP_SDK_MAJOR)
+                    + "." + std::to_string(SWIFTOMNIUI_WINDOWS_APP_SDK_MINOR) + "."
+                    + std::to_string(SWIFTOMNIUI_WINDOWS_APP_SDK_PATCH);
+                traceLayout(message.c_str());
             });
         }
 
@@ -303,6 +307,7 @@ namespace swiftomniui {
                     if (!settings::XamlOptionalChanges::EnableChange(change))
                         throw winrt::hresult_error(E_NOTIMPL, L"The deployed WinUI runtime does not support the pinned XAML optimizations.");
                 }
+                traceLayout("runtime.xaml defaultStyleOptimizations=1 iconNoGridOptimization=1 optimizeApplyStyles=1 deferContextFlyoutInit=1 compositionEngine=default");
             });
         }
 
