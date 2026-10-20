@@ -67,7 +67,7 @@ final class WinUIWindow {
     }
 
     isolated deinit {
-        swiftomniui_winui_window_set_safe_area_bars(handle, nil, 0, false, 0)
+        if !isClosed { swiftomniui_winui_window_set_safe_area_bars(handle, nil, 0, false, 0) }
         for host in safeBars { host.releaseBar() }
         swiftomniui_winui_release(handle)
     }

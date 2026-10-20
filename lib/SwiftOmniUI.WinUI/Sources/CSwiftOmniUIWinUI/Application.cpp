@@ -71,6 +71,8 @@ namespace swiftomniui {
         /// Reports each URL an activation carries - the files it names, the link it followed.
         void reportActivation(lifecycle::AppActivationArguments const &args) {
             try {
+                traceLayout(("runtime.activation.dispatch kind=" + std::to_string(static_cast<int32_t>(args.Kind()))
+                    + " callback=" + (callbacks.activated ? "true" : "false")).c_str());
                 if (args.Kind() == lifecycle::ExtendedActivationKind::Launch) {
                     if (callbacks.activated) callbacks.activated();
                 } else if (args.Kind() == lifecycle::ExtendedActivationKind::File && callbacks.urlOpened) {
@@ -87,6 +89,7 @@ namespace swiftomniui {
                         callbacks.urlOpened(winrt::to_string(link.Uri().RawUri().c_str()).c_str());
                     }
                 }
+                traceLayout("runtime.activation.dispatched");
             } catch (...) {
                 report("reporting an activation");
             }
@@ -101,6 +104,7 @@ namespace swiftomniui {
                 if (!activationReady || shuttingDown) return;
                 waiting.swap(pendingActivations);
             }
+            traceLayout(("runtime.activation.drain count=" + std::to_string(waiting.size())).c_str());
             for (auto const &args : waiting) reportActivation(args.get());
             swiftomniui_winui_keep_scene_alive(windowsAlive);
         }
@@ -109,11 +113,20 @@ namespace swiftomniui {
             winrt::Microsoft::UI::Dispatching::DispatcherQueue dispatcher{nullptr};
             {
                 std::lock_guard lock(activationLock);
-                if (shuttingDown) return;
+                if (shuttingDown) {
+                    traceLayout("runtime.activation.rejected shuttingDown=true");
+                    return;
+                }
                 pendingActivations.emplace_back(args);
                 if (activationReady) dispatcher = queue;
+                traceLayout(("runtime.activation.received kind=" + std::to_string(static_cast<int32_t>(args.Kind()))
+                    + " ready=" + (activationReady ? "true" : "false")
+                    + " queued=" + std::to_string(pendingActivations.size())).c_str());
             }
-            if (dispatcher) dispatcher.TryEnqueue(guarded("handling application activation", [] { drainActivations(); }));
+            if (dispatcher) {
+                auto accepted = dispatcher.TryEnqueue(guarded("handling application activation", [] { drainActivations(); }));
+                traceLayout(accepted ? "runtime.activation.enqueue accepted=true" : "runtime.activation.enqueue accepted=false");
+            }
         }
 
         struct RedirectionWait {
@@ -174,10 +187,13 @@ namespace swiftomniui {
             for (int attempt = 0; attempt < 3; ++attempt) {
                 auto target = lifecycle::AppInstance::FindOrRegisterForKey(key);
                 if (!target) continue; // The key can disappear between the SDK's registration and lookup.
+                traceLayout(("runtime.activation.primary pid=" + std::to_string(target.ProcessId())
+                    + " current=" + (target.IsCurrent() ? "true" : "false")).c_str());
                 if (target.IsCurrent()) return true;
                 AllowSetForegroundWindow(target.ProcessId());
                 try {
                     if (!redirectActivation(target, args)) continue;
+                    traceLayout(("runtime.activation.redirected pid=" + std::to_string(target.ProcessId())).c_str());
                 } catch (...) {
                     auto replacement = lifecycle::AppInstance::FindOrRegisterForKey(key);
                     if (!replacement) continue;
@@ -236,11 +252,13 @@ namespace swiftomniui {
                 }
                 // The first render may temporarily have no windows. Shutdown becomes eligible only after launch.
                 DispatcherShutdownMode(xaml::DispatcherShutdownMode::OnExplicitShutdown);
+                traceLayout("runtime.activation.launch.begin");
                 callbacks.launched();
                 {
                     std::lock_guard lock(activationLock);
                     activationReady = true;
                 }
+                traceLayout("runtime.activation.launch.ready");
                 drainActivations();
             }
 
@@ -380,6 +398,7 @@ extern "C" int32_t swiftomniui_winui_run_single_instance(
         registeredPrimary = false;
         instance = lifecycle::AppInstance::GetCurrent();
         auto args = instance.GetActivatedEventArgs();
+        traceLayout(("runtime.activation.start kind=" + std::to_string(static_cast<int32_t>(args.Kind()))).c_str());
         // Subscribe before publishing the key: another launch can redirect as soon as registration succeeds.
         activationListener = instance.Activated(guarded("receiving application activation",
             [](IInspectable const &, lifecycle::AppActivationArguments const &args) { receiveActivation(args); }));
