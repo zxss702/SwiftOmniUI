@@ -53,14 +53,15 @@ class WinUITextView: WinUIView {
             let labels = Self.loadedMeasurements
             Self.loadedMeasurements = []
             Self.loadedMeasurementsPending = false
-            var changedLayouts: [WinUILayoutView] = []
+            var changedLayouts: [WinUIView] = []
             for label in labels {
                 label.loadedMeasurePending = false
                 guard !label.isDetached, label.isAttached,
                       label.sourceElement?.isDeparting != true,
                       label.measuredAttachmentGeneration != label.attachmentGeneration else { continue }
                 label.measuredAttachmentGeneration = label.attachmentGeneration
-                if label.refreshMeasurementsAfterAttachment(), let layout = label.placingLayout {
+                if label.refreshMeasurementsAfterAttachment(),
+                   let layout: WinUIView = label.placingLayout ?? label.nativeContentOwner {
                     changedLayouts.append(layout)
                 }
             }

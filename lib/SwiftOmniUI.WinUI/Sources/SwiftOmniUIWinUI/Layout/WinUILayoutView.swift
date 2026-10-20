@@ -325,7 +325,12 @@ class WinUILayoutView: WinUIView {
         WinUILayoutDiagnostics.record("invalidate.tree", view: self, file: file, line: line)
         invalidateOwnMeasurements()
         if self is WinUILazyView { return }
-        ((self as? WinUIScrollDocument)?.scrollView ?? placingLayout)?.invalidateMeasurements(file: file, line: line)
+        if let parent = (self as? WinUIScrollDocument)?.scrollView ?? placingLayout {
+            parent.invalidateMeasurements(file: file, line: line)
+        } else if let owner = nativeContentOwner {
+            owner.invalidateMeasure()
+            owner.placingLayout?.invalidateMeasurements(file: file, line: line)
+        }
     }
 
     /// One layout's caches and native pass, without revisiting a shared
@@ -345,14 +350,18 @@ class WinUILayoutView: WinUIView {
     /// Native TextBlock.Loaded may arrive for many labels in the same pass.
     /// Refresh only the distinct layouts above labels whose measured sizes
     /// actually moved; a shared ancestor is invalidated exactly once.
-    static func commitAttachedTextMeasurements(_ starting: [WinUILayoutView]) {
+    static func commitAttachedTextMeasurements(_ starting: [WinUIView]) {
         var visited: Set<ObjectIdentifier> = []
         for layout in starting {
-            var next: WinUILayoutView? = layout
+            var next: WinUIView? = layout
             while let current = next {
                 guard visited.insert(ObjectIdentifier(current)).inserted else { break }
-                let parent = (current as? WinUIScrollDocument)?.scrollView ?? current.placingLayout
-                if !current.isDetached { current.invalidateOwnMeasurements() }
+                let parent: WinUIView? = (current as? WinUIScrollDocument)?.scrollView
+                    ?? current.placingLayout ?? current.nativeContentOwner
+                if !current.isDetached {
+                    if let layout = current as? WinUILayoutView { layout.invalidateOwnMeasurements() }
+                    else { current.invalidateMeasure() }
+                }
                 if current is WinUILazyView { break }
                 next = parent
             }

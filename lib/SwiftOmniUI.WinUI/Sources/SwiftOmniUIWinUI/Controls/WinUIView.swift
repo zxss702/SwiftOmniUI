@@ -32,6 +32,11 @@ class WinUIView {
 
     /// The layout that places this view, which a place written between passes asks to arrange again.
     weak var placingLayout: WinUILayoutView?
+    /// Native controls own arbitrary SwiftUI label roots without placing them
+    /// through a SOUI stack. Size corrections must cross that ownership edge.
+    weak var nativeContentOwner: WinUIView? {
+        didSet { if nativeContentOwner !== oldValue { nativeParentChanged() } }
+    }
     /// A native container such as SplitView places a page without a Swift
     /// placingLayout. Structural changes inside that page still need a fresh
     /// native arrangement at the same window size.

@@ -15,6 +15,7 @@ final class WinUIMenuButtonView: WinUIView {
 
     /// The entries as they were last written.
     private(set) var shown = WinUIMenu()
+    private weak var labelRoot: WinUIView?
 
     /// The platform's menu button, or - `toolbar` - the same button dressed as the bar's: no ground of its own,
     /// the bar's faint fill under the pointer.
@@ -25,6 +26,12 @@ final class WinUIMenuButtonView: WinUIView {
 
     /// The face the press opens the menu from: the label child's view; nil for the chevron alone.
     func setFace(_ face: WinUIView?) {
+        if labelRoot !== face {
+            if labelRoot?.nativeContentOwner === self { labelRoot?.nativeContentOwner = nil }
+            labelRoot = face
+            face?.nativeContentOwner = self
+            invalidateMeasure()
+        }
         swiftomniui_winui_menu_button_set_face(handle, face?.presentationHandle)
     }
 
@@ -60,6 +67,8 @@ final class WinUIMenuButtonView: WinUIView {
     }
 
     override func detach() {
+        if labelRoot?.nativeContentOwner === self { labelRoot?.nativeContentOwner = nil }
+        labelRoot = nil
         swiftomniui_winui_menu_set_shortcuts(handle, number, nil, nil, nil, 0)
         super.detach()
         shown = WinUIMenu()

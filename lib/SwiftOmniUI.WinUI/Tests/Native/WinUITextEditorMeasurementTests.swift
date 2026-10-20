@@ -118,13 +118,13 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                             HStack(alignment: .bottom) {
                                 if words.wrappedValue.isEmpty {
                                     HStack {
-                                        Button("A") {}.frame(width: 40, height: 40).id("attach-horizontal")
-                                        Button("V") {}.frame(width: 40, height: 40)
+                                        Button {} label: { Text("A").frame(width: 40, height: 40) }.id("attach-horizontal")
+                                        Button {} label: { Text("V").frame(width: 40, height: 40) }
                                     }
                                 } else {
                                     VStack {
-                                        Button("A") {}.frame(width: 40, height: 40).id("attach-vertical")
-                                        Button("V") {}.frame(width: 40, height: 40)
+                                        Button {} label: { Text("A").frame(width: 40, height: 40) }.id("attach-vertical")
+                                        Button {} label: { Text("V").frame(width: 40, height: 40) }
                                     }
                                 }
                                 TextEditor(words.projectedValue.transaction(.init(animation: motion)))
@@ -132,16 +132,16 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                                     .id("composer")
                                 if words.wrappedValue.isEmpty {
                                     HStack {
-                                        Button("S") {}.frame(width: 40, height: 40).id("send-horizontal")
-                                        Button("P") {}.frame(width: 40, height: 40)
+                                        Button {} label: { Text("S").frame(width: 40, height: 40) }.id("send-horizontal")
+                                        Button {} label: { Text("P").frame(width: 40, height: 40) }
                                     }
                                 } else {
                                     VStack {
-                                        Button("S") {}.frame(width: 40, height: 40).id("send-vertical")
-                                        Button("P") {}.frame(width: 40, height: 40)
+                                        Button {} label: { Text("S").frame(width: 40, height: 40) }.id("send-vertical")
+                                        Button {} label: { Text("P").frame(width: 40, height: 40) }
                                     }
                                 }
-                            }.padding(16)
+                            }.padding(16).buttonStyle(.plain).id("composer-row")
                         }
                 }
             }
@@ -151,24 +151,32 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
 
             for value in ["中", "中文\nsecond", "", "another input", ""] {
                 editor.type(value)
-                for _ in 0..<8 { host.step(); host.frame() }
-                for _ in 0..<5 {
-                    clock.now += 50
+                host.step()
+                let began = clock.now
+                for elapsed in [0.0, 16, 33, 50, 100, 150, 200] {
+                    clock.now = began + elapsed
                     host.frame()
-                    host.step()
                     XCTAssertTrue(host.views(WinUITextEditorView.self).first === editor)
                     XCTAssertTrue(swiftomniui_winui_focused(editor.handle))
                     XCTAssertEqual(editor.text, value)
+                    let composer = try XCTUnwrap(host.view(id: .manual("composer-row")))
                     let orientation = value.isEmpty ? "horizontal" : "vertical"
                     for name in ["attach", "send"] {
                         let control = try XCTUnwrap(host.view(id: .manual("\(name)-\(orientation)")))
                         XCTAssertTrue(control.isAttached)
                         XCTAssertEqual(control.laidOutFrame.width, 40, accuracy: 1)
                         XCTAssertEqual(control.laidOutFrame.height, 40, accuracy: 1)
-                        XCTAssertGreaterThanOrEqual(control.origin.x, 0)
+                        XCTAssertGreaterThanOrEqual(control.origin.x, composer.origin.x - 1)
                         XCTAssertLessThanOrEqual(control.origin.x + control.laidOutFrame.width,
-                                                 (host.window?.content?.laidOutFrame.width ?? 0) + 1)
+                                                 composer.origin.x + composer.laidOutFrame.width + 1)
+                        XCTAssertGreaterThanOrEqual(control.origin.y, composer.origin.y - 1)
+                        XCTAssertLessThanOrEqual(control.origin.y + control.laidOutFrame.height,
+                                                 composer.origin.y + composer.laidOutFrame.height + 1)
                     }
+                    XCTAssertGreaterThan(editor.laidOutFrame.width, 0)
+                    XCTAssertGreaterThanOrEqual(editor.origin.x, composer.origin.x - 1)
+                    XCTAssertLessThanOrEqual(editor.origin.x + editor.laidOutFrame.width,
+                                             composer.origin.x + composer.laidOutFrame.width + 1)
                 }
                 XCTAssertEqual(editor.laidOutFrame.height, value.isEmpty ? 40 : 128, accuracy: 1)
                 sidebar.wrappedValue.toggle()
@@ -176,6 +184,47 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                 XCTAssertTrue(host.views(WinUITextEditorView.self).first === editor)
                 XCTAssertTrue(swiftomniui_winui_focused(editor.handle))
             }
+        }
+    }
+
+    func testTypingAndReversingAnExpansionKeepsTheEditorSelectionAndLocalBounds() throws {
+        try onUIThread {
+            let words = State(wrappedValue: "")
+            let clock = TestClock()
+            let host = WinUIRenderer.running(clock: clock) {
+                HStack(alignment: .bottom) {
+                    Button {} label: { Text("A").frame(width: 40, height: 40) }
+                    TextEditor(words.projectedValue)
+                        .frame(height: words.wrappedValue.isEmpty ? 40 : 128)
+                        .animation(.linear(duration: 0.2))
+                        .id("input")
+                    Button {} label: { Text("S").frame(width: 40, height: 40) }
+                }.buttonStyle(.plain).frame(width: 480).id("row")
+            }
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            let identity = editor.handle
+            XCTAssertTrue(swiftomniui_winui_focus(identity, true))
+            for (time, value) in [(0.0, "a"), (33, "a second edit"), (50, ""), (66, "resumed")] {
+                clock.now = time
+                editor.type(value)
+                host.step()
+                editor.select(start: 0, length: value.isEmpty ? 0 : 1)
+                host.frame()
+                let row = try XCTUnwrap(host.view(id: .manual("row")))
+                XCTAssertEqual(editor.handle, identity)
+                XCTAssertTrue(swiftomniui_winui_focused(identity))
+                XCTAssertEqual(editor.text, value)
+                XCTAssertGreaterThan(editor.laidOutFrame.width, 0)
+                XCTAssertGreaterThanOrEqual(editor.origin.x, row.origin.x - 1)
+                XCTAssertLessThanOrEqual(editor.origin.x + editor.laidOutFrame.width,
+                                         row.origin.x + row.laidOutFrame.width + 1)
+                var facts = [Int32](repeating: -1, count: 9)
+                swiftomniui_winui_field_facts(identity, &facts)
+                XCTAssertEqual(Array(facts[5...6]), [0, value.isEmpty ? 0 : 1])
+            }
+            clock.now = 266
+            host.frame()
+            XCTAssertEqual(editor.laidOutFrame.height, 128, accuracy: 1)
         }
     }
 }

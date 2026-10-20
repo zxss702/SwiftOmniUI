@@ -12,12 +12,19 @@ final class WinUIButtonView: WinUIView {
 
     private var hasViewLabel = false
     private var caption = ""
+    private weak var labelRoot: WinUIView?
     override var controlStateOpacity: Double { hasViewLabel && !enabled ? 0.5 : 1 }
 
     /// An arbitrary label may paint its own foreground/background. Native
     /// ForegroundDisabled alone cannot affect those explicitly drawn colors.
     func setFace(_ face: WinUIView?) {
         guard face != nil || hasViewLabel else { return }
+        if labelRoot !== face {
+            if labelRoot?.nativeContentOwner === self { labelRoot?.nativeContentOwner = nil }
+            labelRoot = face
+            face?.nativeContentOwner = self
+            invalidateMeasure()
+        }
         hasViewLabel = face != nil
         if let face {
             swiftomniui_winui_button_set_face(handle, face.presentationHandle)
@@ -118,6 +125,8 @@ final class WinUIButtonView: WinUIView {
     }
 
     override func detach() {
+        if labelRoot?.nativeContentOwner === self { labelRoot?.nativeContentOwner = nil }
+        labelRoot = nil
         setShortcut(nil)
         super.detach()
         onClicked = nil
