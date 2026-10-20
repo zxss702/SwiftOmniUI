@@ -6,7 +6,7 @@
 import CSwiftOmniUIWinUI
 
 /// A menu living in the view: a WinUI `Button` whose `Flyout` a press opens,
-/// the label child its face, a chevron beside it the indicator shows or hides.
+/// the label child filling the content column, a chevron in its own auto column.
 /// Design: docs/design/platforms/winui/pages.md#menus
 @MainActor
 final class WinUIMenuButtonView: WinUIView {

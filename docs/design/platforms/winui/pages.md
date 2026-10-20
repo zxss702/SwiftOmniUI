@@ -218,6 +218,13 @@ they are. The window takes the overlay out when it no longer describes it.
 
 ## Menus
 
+A view's `Menu` trigger is a native Button with a two-column Grid: the label
+receives the remaining finite content width and the chevron takes an Auto
+column. This lets a label's flexible frame and alignment operate inside a
+wide form row instead of centring a natural-width StackPanel. The columns
+have a 2 DIP gap in content and a 6 DIP gap in the toolbar; hiding the
+indicator also removes the gap. Popup entries remain native MenuFlyout items.
+
 The visible page's menus stand on WinUI's `MenuBar` in a row of the window
 beneath its chrome, above the window's tabs - each menu one of the bar's,
 its entries within it - while the page has any; a page with none leaves no

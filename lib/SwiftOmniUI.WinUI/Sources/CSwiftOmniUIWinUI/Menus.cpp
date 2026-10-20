@@ -262,17 +262,26 @@ extern "C" void swiftomniui_winui_set_context_menu(
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_menu_button_make(int64_t view) {
     try {
-        // A menu living in the view: a `Button` whose `Flyout` a press opens, its face a row - the label child
-        // before a chevron the indicator setting shows or hides.
+        // Give the label a finite share of the button's content width. A
+        // horizontal StackPanel measures it unbounded, losing flexible frame
+        // alignment and centring the whole label/chevron at its natural size.
         controls::Button button;
-        controls::StackPanel face;
-        face.Orientation(controls::Orientation::Horizontal);
-        face.Spacing(2);
+        button.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
+        button.VerticalContentAlignment(xaml::VerticalAlignment::Center);
+        controls::Grid face;
+        controls::ColumnDefinition labelColumn, indicatorColumn;
+        labelColumn.Width(xaml::GridLengthHelper::FromValueAndType(1, xaml::GridUnitType::Star));
+        indicatorColumn.Width(xaml::GridLengthHelper::Auto());
+        face.ColumnDefinitions().Append(labelColumn);
+        face.ColumnDefinitions().Append(indicatorColumn);
+        face.ColumnSpacing(2);
+        face.Tag(winrt::box_value(2.0));
         controls::TextBlock chevron;
         chevron.FontFamily(xaml::Media::FontFamily(L"Segoe Fluent Icons, Segoe MDL2 Assets"));
         chevron.FontSize(12);
         chevron.Text(L"\uE70D");
         chevron.VerticalAlignment(xaml::VerticalAlignment::Center);
+        controls::Grid::SetColumn(chevron, 1);
         face.Children().Append(chevron);
         button.Content(face);
         button.Click(guarded("handling Click",
@@ -294,7 +303,12 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_toolbar_menu_button_make(int64
     // under the pointer.
     try {
         auto handle = swiftomniui_winui_menu_button_make(view);
-        if (handle) swiftomniui_winui_toolbar_button_set_look(handle);
+        if (handle) {
+            swiftomniui_winui_toolbar_button_set_look(handle);
+            auto face = borrow<controls::Button>(handle).Content().as<controls::Grid>();
+            face.ColumnSpacing(6);
+            face.Tag(winrt::box_value(6.0));
+        }
         return handle;
     } catch (...) {
         report("making a toolbar menu button");
@@ -304,7 +318,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_toolbar_menu_button_make(int64
 
 extern "C" void swiftomniui_winui_menu_button_set_face(SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef content) {
     try {
-        auto face = borrow<controls::Button>(handle).Content().as<controls::StackPanel>();
+        auto face = borrow<controls::Button>(handle).Content().as<controls::Grid>();
         auto children = face.Children();
         auto replacement = content ? as<xaml::UIElement>(content) : xaml::UIElement{nullptr};
         if ((children.Size() > 1 ? children.GetAt(0) : xaml::UIElement{nullptr}) == replacement) return;
@@ -317,9 +331,10 @@ extern "C" void swiftomniui_winui_menu_button_set_face(SwiftOmniUIObjectRef hand
 
 extern "C" void swiftomniui_winui_menu_button_set_indicator(SwiftOmniUIObjectRef handle, int32_t shown) {
     try {
-        auto face = borrow<controls::Button>(handle).Content().as<controls::StackPanel>();
+        auto face = borrow<controls::Button>(handle).Content().as<controls::Grid>();
         face.Children().GetAt(face.Children().Size() - 1)
             .Visibility(shown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+        face.ColumnSpacing(shown ? winrt::unbox_value_or<double>(face.Tag(), 2.0) : 0);
     } catch (...) {
         report("showing a menu button's chevron or hiding it");
     }
