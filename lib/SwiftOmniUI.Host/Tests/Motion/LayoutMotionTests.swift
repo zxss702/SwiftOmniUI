@@ -9,6 +9,23 @@ import XCTest
 /// arrives, and a child on its way bends, keeps its way, or stops as it leaves.
 @MainActor
 final class LayoutMotionTests: XCTestCase {
+    func testFillingDecorationUsesAllocatedSizeWhileItsPositionStillAnimates() {
+        let layout = HandWoundLayout()
+        let decoration = Placed()
+        layout.arrange([(decoration, 1, Rect(80, 0, 100, 40))], measured: [1], decorations: [1])
+        layout.arrange([(decoration, 1, Rect(40, 0, 148, 80))], measured: [1], decorations: [1])
+        XCTAssertEqual(decoration.placedFrame, Rect(80, 0, 148, 80),
+                       "a filling decoration cannot retain its old width when its content receives more room")
+        layout.frame(at: 100)
+        XCTAssertEqual(decoration.placedFrame, Rect(60, 0, 148, 80))
+        layout.arrange([(decoration, 1, Rect(40, 0, 124, 60))], patched: false,
+                       measured: [1], followingPresentation: true, decorations: [1])
+        XCTAssertEqual(decoration.placedFrame, Rect(60, 0, 124, 60))
+        layout.frame(at: 200)
+        XCTAssertEqual(decoration.placedFrame, Rect(40, 0, 124, 60))
+        XCTAssertFalse(layout.animator.isMoving)
+    }
+
     func testMeasurementRefinementsKeepTheOriginalDeadlineAndSampledVelocity() throws {
         let layout = HandWoundLayout()
         let moved = Placed()
@@ -605,7 +622,7 @@ private final class HandWoundLayout {
         heights: [UInt64: Double] = [:],
         measured: Set<UInt64> = [], refining: Bool = false, height: Double? = nil,
         followingPresentation: Bool = false, presentedLanes: AnimationLanes = [],
-        presentedItems: [UInt64: AnimationLanes] = [:]
+        presentedItems: [UInt64: AnimationLanes] = [:], decorations: Set<UInt64> = []
     ) {
         if patched { places.patchArrived() }
         places.begin(width: width, refining: refining, height: height,
@@ -614,6 +631,7 @@ private final class HandWoundLayout {
             var values = LayoutValues()
             values.width = measured.contains(child.mount) ? nil : 100
             values.height = heights[child.mount]
+            values.isLayoutDecoration = decorations.contains(child.mount)
             places.place(child.view, mount: child.mount, at: child.place, values: values) { [unowned self] law, _ in
                 self.fades[child.mount] = law
             }

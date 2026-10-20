@@ -655,8 +655,17 @@ class WinUIView {
             }
             if editorGeometryChanged, let editor = self as? WinUITextEditorView {
                 let height = swiftomniui_winui_editor_allocated_height(handle)
+                var decorations: [String] = []
+                var owner = placingLayout
+                while let layout = owner {
+                    for item in layout.items where item.values.isLayoutDecoration {
+                        let committed = item.view.committedFrame.map(WinUILayoutDiagnostics.rect) ?? "uncommitted"
+                        decorations.append("\(item.view.number):allocated=\(committed),native=\(WinUILayoutDiagnostics.rect(item.view.laidOutFrame))")
+                    }
+                    owner = layout.placingLayout
+                }
                 WinUILayoutDiagnostics.record("editor.commit", view: self,
-                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) control=\(WinUILayoutDiagnostics.rect(editor.controlFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize)) heightConstraint=\(height)")
+                    "frame=\(WinUILayoutDiagnostics.rect(place)) room=\(WinUILayoutDiagnostics.rect(room)) native=\(WinUILayoutDiagnostics.rect(laidOutFrame)) control=\(WinUILayoutDiagnostics.rect(editor.controlFrame)) desired=\(WinUILayoutDiagnostics.size(desiredSize)) heightConstraint=\(height) decorations=[\(decorations.joined(separator: ";"))]")
             }
         } else if moved {
             // The parent's next Arrange prepares the latest presentation slot.

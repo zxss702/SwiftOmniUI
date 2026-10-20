@@ -84,6 +84,21 @@
         var stated: AnimationLanes = []
         if values.width != nil { stated.insert(.width) }
         if values.height != nil { stated.insert(.height) }
+        // A filling background/overlay gets its extent from this allocation.
+        // Its parent already presents that geometry; a second placement-size
+        // journey leaves the decoration behind the content's current bounds.
+        // Natural-size overlays still animate their layout, and position,
+        // authored dimensions and drawing properties retain their own rules.
+        if values.isLayoutDecoration {
+            if values.horizontal == 3 || values.flex != nil
+                || values.expandingAxes == .horizontal || values.expandingAxes == .both {
+                stated.insert(.width)
+            }
+            if values.vertical == 3 || values.flex != nil
+                || values.expandingAxes == .vertical || values.expandingAxes == .both {
+                stated.insert(.height)
+            }
+        }
         var placement = arrangement
         let presented = presentedItems[mount] ?? []
         placement.lanes.subtract(presented)

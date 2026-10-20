@@ -138,7 +138,9 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                                     .safeAreaPadding(.vertical, 12)
                                     .safeAreaPadding(.leading, 12)
                                     .frame(height: 128)
-                                    .background(Color.white, in: RoundedRectangle(cornerRadius: 20))
+                                    .background {
+                                        RoundedRectangle(cornerRadius: 20).fill(Color.white).id("new-fill")
+                                    }
                                 Rectangle().fill(Color.clear).frame(height: 16).offset(y: -120)
                             }.frame(height: 128).id("new-composer")
                             if words.wrappedValue.isEmpty {
@@ -158,6 +160,7 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
             let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
             let composer = try XCTUnwrap(host.view(id: .manual("new-composer")))
             let row = try XCTUnwrap(host.view(id: .manual("new-composer-row")))
+            let fill = try XCTUnwrap(host.view(id: .manual("new-fill")))
             let emptyWidth = composer.laidOutFrame.width
             let bottom = composer.origin.y + composer.laidOutFrame.height
             for text in ["a", "more input", "", "again"] {
@@ -174,6 +177,9 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                     XCTAssertEqual(swiftomniui_winui_editor_allocated_height(editor.handle), 104, accuracy: 0.001)
                     XCTAssertGreaterThan(editor.laidOutFrame.width, 40)
                     XCTAssertGreaterThan(composer.laidOutFrame.width, 52)
+                    XCTAssertEqual(fill.committedFrame?.width ?? -1, composer.laidOutFrame.width, accuracy: 0.001,
+                                   "the rounded background must cover this sample's full input allocation")
+                    XCTAssertEqual(fill.committedFrame?.height ?? -1, 128, accuracy: 0.001)
                     XCTAssertEqual(editor.laidOutFrame.width, composer.laidOutFrame.width - 12, accuracy: 1,
                                    "native width must follow the currently allocated composer, including animation samples")
                     XCTAssertEqual(editor.controlFrame.width, editor.laidOutFrame.width, accuracy: 0.001)
@@ -194,6 +200,9 @@ final class WinUITextEditorMeasurementTests: XCTestCase {
                 }
                 XCTAssertEqual(composer.laidOutFrame.width, emptyWidth + (text.isEmpty ? 0 : 48), accuracy: 1,
                                "the editor must receive the width released by changing two buttons from a row to a column")
+                // The 48 DIP strip released by the old HStack must be painted,
+                // rather than merely included in the TextBox's logical frame.
+                XCTAssertEqual(fill.pixels(at: [(composer.laidOutFrame.width - 2, 64)]), [0xFFFF_FFFF])
             }
         }
     }

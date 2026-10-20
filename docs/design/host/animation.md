@@ -131,6 +131,13 @@ child stands on the way. Why an arrangement happens decides everything:
   height changed is this case even with a patch: its room is its parent's to say.
 - The first arrangement arrives: the first thing anyone sees is the thing itself.
 
+A filling background or overlay takes each allocated extent directly from its
+parent. It does not start a second placement-width/height journey over the
+content's presentation geometry. Its alignment position and drawing properties
+can still animate, as can the layout of a natural-size overlay. This ownership
+also ends an older placement-size journey when a view becomes a filling
+decoration, before any same-destination reuse.
+
 A size a child states for itself arrives while its place animates: a stated
 size is either still or already animating on its own. Where a frame under the
 layout is read, every child arrives, because each frame of an animation would
