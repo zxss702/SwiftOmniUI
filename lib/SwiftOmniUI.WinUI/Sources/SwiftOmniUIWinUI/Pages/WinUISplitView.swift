@@ -224,7 +224,9 @@ final class WinUISplitView: WinUILayoutView {
         let columns = three
             ? middle.room(width: outer.content.width, open: true, contentShown: isContentPresented)
             : (pane: Rect(0, 0, 0, 0), content: Rect(0, 0, outer.content.width, 0))
-        let rowHeight = detailRow.map { Self.querySize { $0.measure(width: columns.content.width, height: nil).height } } ?? 0
+        let rowHeight = detailRow.map { row in
+            Self.querySize { row.measure(width: columns.content.width, height: nil).height }
+        } ?? 0
         if let detailRow, !three || isContentPresented {
             prepare(detailRow, frame: Rect(outer.content.x + columns.content.x, 0, columns.content.width, rowHeight))
         }
