@@ -147,7 +147,16 @@ sidebar and its ScrollPresenter attached. Native column configuration
 is coalesced outside MeasureOverride/ArrangeOverride.
 
 Whether the sidebar shows follows the binding and native pane events. The
-first wide room opens it once; after that the user and the application decide.
+first wide room opens an automatic presentation once. An explicit sidebar
+binding or non-automatic column visibility owns the first frame too; `false`
+and `.doubleColumn` do not briefly open before the application closes them.
+The known initial client width selects Inline/Overlay before activation;
+detached configuration at ActualWidth zero does not select another mode.
+
+PaneOpened and PaneClosed schedule one coalesced page invalidation and lazy
+viewport reconciliation after native layout. A real empty animated clip may
+retire rows, and reaching the final visible pane does not necessarily change
+the scroll offset. Final realization therefore has its own lifecycle event.
 The shared page path includes every visible column for appearance/disappearance.
 
 ## A native arrangement

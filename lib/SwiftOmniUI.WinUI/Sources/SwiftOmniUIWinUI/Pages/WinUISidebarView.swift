@@ -15,6 +15,7 @@ final class WinUISidebarView: WinUIView {
 
     /// What the view does when its pane opens or closes of WinUI's accord.
     var onPresented: ((Bool) -> Void)?
+    var onTransitionCompleted: (() -> Void)?
 
     init(trailing: Bool = false) {
         super.init { number in swiftomniui_winui_split_make(number, trailing ? 0 : Self.expandsAt, trailing) }
@@ -31,6 +32,7 @@ final class WinUISidebarView: WinUIView {
     }
 
     func clear() { swiftomniui_winui_split_clear(handle) }
+    func prepareFirstRoom(width: Double) { swiftomniui_winui_split_prepare_room(handle, width) }
     func remove(_ view: WinUIView) { swiftomniui_winui_split_remove(handle, view.presentationHandle) }
     var minimumRoom: Double { swiftomniui_winui_split_minimum_width(handle) }
 
@@ -46,8 +48,11 @@ final class WinUISidebarView: WinUIView {
         onPresented?(open)
     }
 
+    func transitionCompleted() { onTransitionCompleted?() }
+
     override func detach() {
         super.detach()
         onPresented = nil
+        onTransitionCompleted = nil
     }
 }

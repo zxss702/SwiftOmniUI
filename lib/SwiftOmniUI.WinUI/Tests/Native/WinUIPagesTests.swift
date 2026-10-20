@@ -117,7 +117,7 @@ final class WinUIPagesTests: XCTestCase {
     /// scroller's content there is as wide as the scroller.
     func testADetailBesideTheSidebarTakesTheRoomBesideIt() throws {
         try onUIThread {
-            let open = State(wrappedValue: false)
+            let open = State(wrappedValue: true)
             let host = WinUIRenderer.running(room: WinUITestHost.wideRoom) {
                 NavigationSplitView(open.projectedValue) {
                     TitledPage(title: "Menu")
@@ -128,7 +128,6 @@ final class WinUIPagesTests: XCTestCase {
                 }
             }
             let window = try XCTUnwrap(host.window)
-            host.settle { open.wrappedValue }
             window.titleBar.chose(-2)
             host.runtime.pump.turn()
             window.titleBar.chose(-2)

@@ -38,6 +38,9 @@ extension WinUIElement {
             tabs.onSelection = { [weak self] previous, selected in self?.tabChosen(from: previous, to: selected) }
         case .navigationSplitView:
             guard let split = view as? WinUISplitView else { return }
+            let visibility = value(.columnVisibility).flatMap(NavigationSplitViewVisibility.init(propValue:))
+            split.automaticallyOpensSidebar = value(.isSidebarVisible) == nil
+                && (visibility == nil || visibility == .automatic)
             // The split's first room is decided inside a layout pass, and said once the pass is over.
             split.onPresentationChanged = { [weak self] presented in
                 WinUIDoorbell.afterPass { [weak self] in self?.sidebarShown(presented) }

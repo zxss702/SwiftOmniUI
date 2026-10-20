@@ -194,6 +194,7 @@ class WinUILazyView: WinUITravellingLayout {
     private var retellQueued = false
     /// WinUI's effective viewport is the compositor's window in this panel's coordinates.
     private var effectiveViewport: Rect?
+    private var diagnosticViewport: WinUIScrollViewport?
     private var lastTargetViewport: Rect?
 
     /// The viewport the scroller's own notices last named - newer than the
@@ -394,9 +395,22 @@ class WinUILazyView: WinUITravellingLayout {
         viewportChanged(rect)
     }
 
+    /// A pane can finish its clipping animation without moving its scroller.
+    /// Reconcile that real native window even after an empty one retired rows.
+    func nativeViewportChanged() {
+        lastTargetViewport = nil
+        retell()
+    }
+
     private func currentNativeViewport() -> Rect? {
         guard let scroll = watching else { return nil }
-        switch scroll.scroller.viewport(of: self) {
+        let result = scroll.scroller.viewport(of: self)
+        if result != diagnosticViewport {
+            diagnosticViewport = result
+            WinUILayoutDiagnostics.record("viewport.read", view: self,
+                "state=\(result) mounted=\(mounted.count) built=\(cells.built) extent=\(measuredExtent)")
+        }
+        switch result {
         case .ready(let rect):
             isWaitingForViewport = false
             return rect
@@ -504,6 +518,10 @@ class WinUILazyView: WinUITravellingLayout {
         while true {
             let built = cells.built
             tellWindow(span ?? 0..<0, realize: realize ?? 0..<0, demand: incoming)
+            if cells.built != built {
+                WinUILayoutDiagnostics.record("lazy.window", view: self,
+                    "previous=\(built) built=\(cells.built) mounted=\(mounted.count) current=\(cells.requestedItemsAreCurrent)")
+            }
             // Complete only this viewport. Shorter-than-estimated rows can expose
             // further rows; those are visible work, not next-frame prefetch.
             guard WinUIView.arranging == 0, WinUIView.measuring == 0,

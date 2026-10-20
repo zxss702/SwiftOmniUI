@@ -55,6 +55,39 @@ uses the native Style's resolved FontSize/FontWeight setters, traversing
 BasedOn before derived setters, cached by the sealed Style identity. No
 hidden visual tree is needed for measuring text or sizing symbols.
 
+### Compatibility with the previous 1.8 deployment
+
+The 2026-10-14 upgrade (`8664008b53134260eb206f4fedefa7f51bf32b10`)
+changed both the deployed components and the optional XAML behaviors:
+
+| Input | Previous deployment | Current deployment |
+| --- | --- | --- |
+| Windows App SDK | 1.8 | 2.5.1 |
+| WinUI | 1.8.260528001 | 2.3.9 |
+| Foundation | 1.8.260527000 | 2.3.12 |
+| InteractiveExperiences | 1.8.260525001 | 2.1.9 |
+| C++/WinRT | 3.0.260818.1 | 3.0.260818.1 |
+| WebView2 | 1.0.3179.45 | 1.0.4258.31 |
+
+`OptimizeApplyStyles` defers applying a style until the element enters the
+tree; `DefaultStyleOptimizations` selects optimized control templates. Both
+are explicit host opt-ins, not evidence that every native measurement or
+layout algorithm changed. Detached controls must not assume their eventual
+style is already applied, and the host must reconcile native viewport changes
+without requiring a scroll event.
+
+The source comparison of Microsoft's 1.8.9 (`e5e4cc817e24f89415a4cf44826130818492b42e`)
+and 2.5.1 (`ba3a8d59e6de4e2b86ca4f61c78bc26ccf129afd`) releases found no
+changes in `SplitView_Partial.cpp`, the original SplitView template,
+`ScrollPresenter.cpp`, or `LayoutManager.cpp`. The
+[optimized SplitView template](https://github.com/microsoft/microsoft-ui-xaml/blob/ba3a8d59e6de4e2b86ca4f61c78bc26ccf129afd/src/controls/dev/SplitView/SplitView_themeresources_perf2026.xaml)
+changes several visual-state updates to setters; its leading inline pane
+keeps the same layout. This comparison does not establish a native SDK
+regression or replace a Windows runtime comparison. The host retains 2.5.1
+and its performance opt-ins while fixing its own initial pane state, first
+display-mode selection, clip geometry, and transition-completion handling
+([split views](pages.md#a-split-view)).
+
 The head hands the thread to `SwiftOmniUIWinUI.run(applicationID:initializing:)`.
 The relay loads the Windows App SDK, then uses `AppInstance.FindOrRegisterForKey`
 to select one process for the application ID, or the executable's full path
@@ -92,6 +125,25 @@ The relay's startup object requests an 8 MiB executable stack with
 reconciliation can exhaust that budget at ordinary view nesting depths.
 The request travels with the object linked into the consuming executable;
 DLLs cannot configure the executable's main-thread stack.
+
+## Layout diagnostics
+
+The relay writes `%TEMP%/SwiftOmniUI-layout-<pid>.log`, with a `v2` header.
+It retains the first 8192 events, 256 recent split/viewport/runtime state
+changes, and a rolling tail of 4096 events. Foreground tail writes use a
+one-second throttle; a one-shot thread-pool timer also saves the final idle
+tail. An unhandled XAML exception forces a synchronous snapshot.
+File access is serialized, and stopping diagnostics cancels and joins the
+timer before closing the file. Diagnostics never request layout or animation
+frames. The records include runtime compatibility/optional-change settings,
+pane configuration/completion, viewport state, and realized lazy ranges;
+they exclude the user's input text.
+
+Earlier `v1` logs stopped appending after the startup prefix unless an
+exception was reported. A file ending at that prefix contains no evidence
+about subsequent nonfatal sidebar flickering or blank content. Interpret
+the current state-history and recent-tail sections by event number because
+retained history can overlap the startup and recent events.
 
 ## A windowed application
 

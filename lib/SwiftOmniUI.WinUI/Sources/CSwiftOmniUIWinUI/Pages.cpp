@@ -139,16 +139,19 @@ namespace {
 
     // The native pane remembers a user-resized width independently of the modifier's ideal.
     // Tag holds minimum, ideal, maximum, user width, breakpoint, and content minimum/maximum.
-    void sizeSplit(controls::SplitView const &split) {
+    void sizeSplit(controls::SplitView const &split, double width) {
         auto widths = split.Tag().as<SplitWidths>();
         auto content = split.Content().as<controls::Grid>();
-        auto width = split.ActualWidth();
         bool alone = content.Visibility() == xaml::Visibility::Collapsed;
         auto pane = split.Pane().as<controls::Grid>();
         auto grip = pane.Children().GetAt(1);
         bool resizable = widths.GetAt(0) < widths.GetAt(2);
-        bool beside = widths.GetAt(4) == 0 || alone
-            || width >= std::max(widths.GetAt(4), widths.GetAt(0) + widths.GetAt(5));
+        // Before attachment there is no native allocation. Do not undo the
+        // initial mode selected from the window's known client width.
+        bool beside = split.DisplayMode() == controls::SplitViewDisplayMode::Inline;
+        if (width > 0 || widths.GetAt(4) == 0 || alone)
+            beside = widths.GetAt(4) == 0 || alone
+                || width >= std::max(widths.GetAt(4), widths.GetAt(0) + widths.GetAt(5));
         auto mode = beside ? controls::SplitViewDisplayMode::Inline : controls::SplitViewDisplayMode::Overlay;
         if (split.DisplayMode() != mode) {
             // Inline columns reveal the window surface. An overlay needs the
@@ -173,6 +176,8 @@ namespace {
         // Keep its Measure and Arrange proposals on the same native boundary.
         if (pane.Width() != length) pane.Width(length);
     }
+
+    void sizeSplit(controls::SplitView const &split) { sizeSplit(split, split.ActualWidth()); }
 
 }
 
@@ -507,11 +512,25 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
             [view](controls::SplitView const &, controls::SplitViewPaneClosingEventArgs const &) {
                 callbacks.presented(view, false);
             }));
+        split.PaneOpened(guarded("handling PaneOpened",
+            [view](controls::SplitView const &, IInspectable const &) {
+                if (callbacks.paneTransitionCompleted) callbacks.paneTransitionCompleted(view);
+            }));
+        split.PaneClosed(guarded("handling PaneClosed",
+            [view](controls::SplitView const &, IInspectable const &) {
+                if (callbacks.paneTransitionCompleted) callbacks.paneTransitionCompleted(view);
+            }));
         return detach(split);
     } catch (...) {
         report("making a split view");
         return nullptr;
     }
+}
+
+extern "C" void swiftomniui_winui_split_prepare_room(SwiftOmniUIObjectRef handle, double width) {
+    try {
+        if (std::isfinite(width) && width > 0) sizeSplit(borrow<controls::SplitView>(handle), width);
+    } catch (...) { report("preparing a split view's initial room"); }
 }
 
 extern "C" void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef handle) {

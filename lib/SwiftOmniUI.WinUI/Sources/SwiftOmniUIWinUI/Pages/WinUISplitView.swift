@@ -7,13 +7,14 @@
 /// A NavigationSplitView: the sidebar page in WinUI's own navigation pane - beside the detail page where the window is wide,
 /// over it and closed by a click beside it where it is narrow - which WinUI places, as it places any Windows app's.
 /// Whether the sidebar shows is SwiftOmniUI's binding, which the window's chrome toggles and which follows what WinUI
-/// shows. The host's one adaptation is that a window wide enough for both panes opens with the sidebar shown; after
-/// that, the user and the application decide.
+/// shows. An automatic presentation can open in a wide first room; an explicit
+/// application preference owns the initial presentation as well.
 /// Design: docs/design/platforms/winui/pages.md#a-split-view
 @MainActor
 final class WinUISplitView: WinUILayoutView {
     /// Whether the sidebar shows.
     private(set) var isPresented = false
+    var automaticallyOpensSidebar = true
 
     /// What the split does when the sidebar shows or hides of its own accord - its first room, a click beside it,
     /// the window's room changing.
@@ -53,6 +54,7 @@ final class WinUISplitView: WinUILayoutView {
 
     private var adaptation = SidebarAdaptation()
     private var configurationPending = false
+    private var columnLayoutRefreshPending = false
     private struct NativeSlot {
         let owner: WinUISidebarView
         let position: Int // pane, toolbar row, content
@@ -73,6 +75,8 @@ final class WinUISplitView: WinUILayoutView {
                 onPresentationChanged?(open)
             }
         }
+        sidebar.onTransitionCompleted = { [weak self] in self?.columnsFinishedTransitioning() }
+        middle.onTransitionCompleted = { [weak self] in self?.columnsFinishedTransitioning() }
         setChildren([sidebar])
     }
 
@@ -188,8 +192,11 @@ final class WinUISplitView: WinUILayoutView {
     /// Establish a wide window's initial pane while it is still detached, so
     /// its first native frame has the sidebar content instead of a closed pane.
     func prepareFirstPresentation(width: Double) {
-        guard width.isFinite, width >= WinUISidebarView.expandsAt else { return }
-        adaptToFirstRoom(width: width)
+        guard width.isFinite, width > 0 else { return }
+        // Select Inline/Overlay before opening the pane or activating XAML.
+        // ActualWidth is still zero while this window is detached.
+        sidebar.prepareFirstRoom(width: width)
+        if width >= WinUISidebarView.expandsAt { adaptToFirstRoom(width: width) }
     }
 
     private func safeArea(for page: WinUIView, in bounds: Rect) -> SafeAreaContext {
@@ -229,11 +236,35 @@ final class WinUISplitView: WinUILayoutView {
 
     /// The host's one adaptation: a window wide enough for both panes opens with its sidebar shown, and says so.
     private func adaptToFirstRoom(width: Double) {
-        guard adaptation.room(width, breakpoint: WinUISidebarView.expandsAt, shown: isPresented) else { return }
+        let opens = adaptation.room(width, breakpoint: WinUISidebarView.expandsAt, shown: isPresented)
+        guard automaticallyOpensSidebar, opens else { return }
 
         present(true)
         if let visibility = effectiveVisibility { onVisibilityChanged?(visibility) }
         else { onPresentationChanged?(true) }
+    }
+
+    private func columnsFinishedTransitioning() {
+        WinUILayoutDiagnostics.record("split.transition", view: self,
+            "open=\(isPresented) content=\(isContentPresented)")
+        guard !columnLayoutRefreshPending else { return }
+        columnLayoutRefreshPending = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.columnLayoutRefreshPending = false
+            guard !self.isDetached else { return }
+            func reconcile(_ element: MountedElement) {
+                (element.winUI.view as? WinUILazyView)?.nativeViewportChanged()
+                for child in element.children { reconcile(child) }
+            }
+            for page in self.pages {
+                if let layout = page.view as? WinUILayoutView {
+                    layout.invalidateOwnMeasurements()
+                    layout.invalidateArrange()
+                } else { page.view.invalidateMeasure() }
+                if let element = page.view.sourceElement { reconcile(element) }
+            }
+        }
     }
 
     private func configure() {
@@ -248,6 +279,8 @@ final class WinUISplitView: WinUILayoutView {
             }
             return
         }
+        WinUILayoutDiagnostics.record("split.configure", view: self,
+            "open=\(isPresented) content=\(isContentPresented) automatic=\(automaticallyOpensSidebar) pages=\(pages.map { $0.view.number })")
         ProgramWrite.perform {
             let three = pages.count > 2 && SplitColumnWidth(detailWidthBounds, defaultIdeal: 320).maximum != 0
             var next: [NativeSlot] = []

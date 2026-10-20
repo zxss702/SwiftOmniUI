@@ -266,6 +266,13 @@ viewport notifications trigger a fresh complete read instead of mixing an
 old event's size with a new origin. Failed queries report an explicit native
 error and do not register a pending retry.
 
+Native `UIElement.Clip` uses the geometry's `Bounds`, which already includes
+its `Geometry.Transform`; a SplitView template's animated clip can differ
+from that element's allocation. SOUI's own composition clips use their
+authored view bounds separately. Neither query acquires a handout Visual.
+Pane transition completion asks lazy descendants to read the final viewport
+even when the scroll offset has stayed unchanged.
+
 A lazy run under the scroller answers the document's cross size with the
 widest row measured in the room it was given, and keeps that width for as
 long as that is the room: the rows a moving window leaves behind do not
