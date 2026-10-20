@@ -57,6 +57,8 @@ namespace {
 
         /// How the entries stand: down (0), across (1) or in columns (2).
         int32_t shape = 0;
+        int32_t selectionMode = 0;
+        bool invokable = false;
 
         /// Whether the program is choosing, which the user's choice is not told of.
         bool choosing = false;
@@ -119,9 +121,24 @@ namespace {
             int64_t number = 0;
             auto panel = callbacks.itemCell(view, kind, &number);
             controls::ItemContainer container;
+            dress(container, kind);
             if (panel) container.Child(as<xaml::UIElement>(panel));
             made[winrt::get_abi(container)] = {number, kind, container};
             return container;
+        }
+
+        /// Content-only rows and section chrome are not a second button around
+        /// their descendants. Keep the native template, but omit its feedback.
+        void dress(controls::ItemContainer const &container, int32_t kind) {
+            bool interactive = kind == 0 && (selectionMode != 0 || invokable);
+            auto resources = container.Resources();
+            auto clear = xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0});
+            for (auto key : {L"ItemContainerPointerOverBackground", L"ItemContainerPressedBackground",
+                             L"ItemContainerPointerOverBorderBrush", L"ItemContainerPressedBorderBrush"}) {
+                auto name = winrt::box_value(key);
+                if (!interactive) resources.Insert(name, clear);
+                else if (resources.HasKey(name)) resources.Remove(name);
+            }
         }
 
         /// Tells what stands in view once the list has laid out the cells it asked for or put aside: what the view
@@ -323,6 +340,13 @@ extern "C" void swiftomniui_winui_items_set_choice(
             auto list = weak.get();
             if (!list) return;
             cells->choosing = true;
+            if (cells->selectionMode != mode || cells->invokable != invokable) {
+                cells->selectionMode = mode;
+                cells->invokable = invokable;
+                for (auto const &[_, made] : cells->made) {
+                    if (auto container = made.container.get()) cells->dress(container, made.kind);
+                }
+            }
             list.SelectionMode(
                 mode == 2 ? controls::ItemsViewSelectionMode::Multiple
                     : mode == 1 ? controls::ItemsViewSelectionMode::Single : controls::ItemsViewSelectionMode::None);
