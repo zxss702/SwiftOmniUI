@@ -49,7 +49,7 @@ import CSwiftOmniUIGTK
     private func attach() {
         guard let view, gtk_widget_get_mapped(view.widget) != 0,
               let next = gtk_widget_get_root(view.widget) else { return }
-        let widget = UnsafeMutablePointer<GtkWidget>(OpaquePointer(next))
+        let widget = UnsafeMutablePointer<GtkWidget>(next)
         guard root != widget else { return }
         disconnect(); root = widget; g_object_ref(widget)
         let click = gtk_gesture_click_new()!
