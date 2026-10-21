@@ -121,6 +121,14 @@ extension VisualElement {
 }
 
 extension View {
+    /// How this view's content swaps, including after a modifier has erased
+    /// the concrete `VisualElement` type. Uses the same host property as the
+    /// element-level modifier.
+    @_disfavoredOverload
+    public func contentTransition(_ transition: ContentTransition) -> ModifiedContent {
+        setting(VisualElementContract.contentTransition, transition.token)
+    }
+
     /// The matched-geometry identity of this view's rendered element - the
     /// view-level spelling for calls on a chain already standing as `some
     /// View`:
