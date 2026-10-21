@@ -30,6 +30,7 @@ class GTKTextView: GTKView {
 
     /// The label's own words, shown while it shows no runs.
     func setText(_ text: String) {
+        guard ownText != text else { return }
         ownText = text
         if runs == nil { gtk_label_set_text(widget.opaque, text) }
         shownWordsChanged()
@@ -38,6 +39,7 @@ class GTKTextView: GTKView {
     /// Runs of words shown in place of the label's own, each in its own look; nil shows its own words again.
     /// Design: docs/design/platforms/gtk/controls.md#runs-of-words
     func setRuns(_ runs: [TextRun]?) {
+        guard self.runs != runs else { return }
         self.runs = runs
         gtk_label_set_text(widget.opaque, runs.map { $0.map(\.text).joined() } ?? ownText)
         writeLook()
@@ -53,7 +55,9 @@ class GTKTextView: GTKView {
 
     /// Changes how the words look.
     func setLook(_ change: (inout TextLook) -> Void) {
+        let previous = look
         change(&look)
+        guard look != previous else { return }
         writeLook()
     }
 
@@ -72,6 +76,13 @@ class GTKTextView: GTKView {
         }
         gtk_label_set_attributes(widget.opaque, list)
         pango_attr_list_unref(list)
+        if let layout = gtk_label_get_layout(widget.opaque) {
+            let spacing = Int32((look.lineSpacing * Double(PANGO_SCALE)).rounded())
+            if pango_layout_get_spacing(layout) != spacing {
+                pango_layout_set_spacing(layout, spacing)
+                gtk_widget_queue_resize(widget)
+            }
+        }
     }
 
     /// How words too long for the width break, and how many lines show before they are cut (`LineBreak.lines`): a
@@ -102,6 +113,7 @@ class GTKTextView: GTKView {
     var onTextLayout: ((TextLayoutReport) -> Void)? {
         didSet { if onTextLayout != nil { publishTextLayout() } }
     }
+    private static var pendingTextLayouts: [GTKTextView] = []
     private var textLayoutPending = false
     private var lastLayoutSerial: UInt32?
     private var lastLayoutOrigin: Point?
@@ -109,10 +121,19 @@ class GTKTextView: GTKView {
     func publishTextLayout() {
         guard onTextLayout != nil, !textLayoutPending else { return }
         textLayoutPending = true
-        GTKDoorbell.afterLayout { [weak self] in
-            guard let self else { return }
-            self.textLayoutPending = false
-            self.reportTextLayout()
+        Self.pendingTextLayouts.append(self)
+        guard Self.pendingTextLayouts.count == 1 else { return }
+        GTKDoorbell.afterLayout {
+            let labels = Self.pendingTextLayouts
+            Self.pendingTextLayouts = []
+            let publish = {
+                for label in labels {
+                    label.textLayoutPending = false
+                    label.reportTextLayout()
+                }
+            }
+            if let runtime = GTKRenderer.shared?.runtime { runtime.performUserTransaction(publish) }
+            else { publish() }
         }
     }
 

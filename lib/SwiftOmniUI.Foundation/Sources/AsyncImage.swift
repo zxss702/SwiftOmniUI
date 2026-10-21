@@ -30,7 +30,10 @@ public struct AsyncImage<Content: View>: View {
     }
 
     public var body: some View {
-        content(phase).task(id: url) {
+        // The loading job belongs to a stable layout, not the phase's leaf.
+        // Empty -> Image changes the leaf type; attaching the job there would
+        // cancel/restart it and continuously reset the phase back to empty.
+        ZStack { content(phase) }.task(id: url) {
             phase = .empty
             guard let url else { return }
             do {

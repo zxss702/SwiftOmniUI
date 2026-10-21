@@ -42,6 +42,11 @@ formatted nor parsed.
 
 ## A pan is measured from its start
 
+A drag's `startLocation` and `location` are local to its receiving view. GTK and
+WinUI track the press in window coordinates, then transform both positions into
+the receiver before dispatch. Translation keeps the window-space delta so moving
+the receiver does not feed back into the next drag report.
+
 A pan's totals are measured from where the pan began, on every platform,
 which is what makes moving a view a matter of assigning them to its
 translation. Android measures a pan against a frame that moves with the

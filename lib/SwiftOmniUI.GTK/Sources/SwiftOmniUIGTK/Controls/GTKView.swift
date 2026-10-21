@@ -434,7 +434,16 @@ class GTKView {
 
     /// What the view heard, past the hold above - what the hold itself uses when a popup's going settles it.
     func deliver(_ heard: HeardInput) {
-        onHeard?(heard)
+        if case .drag(let phase, let x, let y, let at, let from) = heard,
+           let root = gtk_widget_get_root(widget).map(GTKWidget.init) {
+            func local(_ point: Point) -> Point {
+                var input = graphene_point_t(x: Float(point.x), y: Float(point.y))
+                var output = graphene_point_t()
+                guard gtk_widget_compute_point(root, widget, &input, &output) != 0 else { return point }
+                return Point(Double(output.x), Double(output.y))
+            }
+            onHeard?(.drag(phase, x: x, y: y, at: local(at), from: local(from)))
+        } else { onHeard?(heard) }
     }
 
     /// Tells `action` when the keyboard comes into the view or a part of it, and when it leaves; nil tells no one.

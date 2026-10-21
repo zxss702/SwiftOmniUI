@@ -36,6 +36,8 @@
 
     /// A line's height as a multiple of the font's own.
     public var lineHeight: Double?
+    /// Extra space between baselines beyond the font's natural line height.
+    public var lineSpacing = 0.0
 
     /// The lines under or through the words.
     public var decorations = TextDecorations.none
@@ -66,6 +68,7 @@
         look.background = background ?? other.background
         look.letterSpacing = letterSpacing != 0 ? letterSpacing : other.letterSpacing
         look.lineHeight = lineHeight ?? other.lineHeight
+        look.lineSpacing = lineSpacing != 0 ? lineSpacing : other.lineSpacing
         look.decorations = decorations.isEmpty ? other.decorations : decorations
         look.baselineOffset = baselineOffset ?? other.baselineOffset
         return look
@@ -107,6 +110,7 @@ extension MountedElement {
         look.color = value(.foregroundStyle)
         look.letterSpacing = number(.characterSpacing) ?? 0
         look.lineHeight = number(.lineHeight)
+        look.lineSpacing = number(.lineSpacing) ?? 0
         look.decorations = value(.textDecorations)?.enumeration.map { TextDecorations(rawValue: $0) } ?? .none
         look.baselineOffset = number(.baselineOffset)
         return look

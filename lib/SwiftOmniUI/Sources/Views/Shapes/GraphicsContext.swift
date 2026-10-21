@@ -41,6 +41,25 @@ public struct GraphicsContext: Sendable {
 }
 
 extension GraphicsContext {
+    /// Draws an isolated group, preserving the caller's transforms and paint.
+    public mutating func drawLayer(content: (inout GraphicsContext) throws -> Void) rethrows {
+        var layer = GraphicsContext()
+        try content(&layer)
+        commands += [Draw.saveState()] + layer.commands + [Draw.restoreState()]
+    }
+
+    public mutating func translateBy(x: Double, y: Double) {
+        commands.append(Draw.translate(dx: x, dy: y))
+    }
+
+    public mutating func scaleBy(x: Double, y: Double) {
+        commands.append(Draw.scale(sx: x, sy: y))
+    }
+
+    public mutating func rotate(by angle: Angle) {
+        commands.append(Draw.rotate(angle.degrees))
+    }
+
     /// Fills `path` in the shading's colour, `style`'s rule deciding which
     /// points are inside.
     public mutating func fill(_ path: Path, with shading: Shading, style: FillStyle) {

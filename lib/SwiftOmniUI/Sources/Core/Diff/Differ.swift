@@ -148,13 +148,14 @@ final class Differ {
     /// Design: docs/design/core/identity-and-diffing.md#the-clean-walk
     func revisit(
         _ rendered: RenderedNode,
-        changed: Set<ObjectIdentifier>
+        changed: Set<ObjectIdentifier>,
+        refreshPreferences: Bool = false
     ) -> (node: RenderedNode, patch: HostPatch) {
         customLayoutOwners.removeAll(keepingCapacity: true)
         customLayoutsWithChangedValues.removeAll(keepingCapacity: true)
         describeAll = false
         self.changed = changed
-        affected = Renderer.shared.affectedNodes(reading: changed)
+        affected = refreshPreferences ? nil : Renderer.shared.affectedNodes(reading: changed)
         stylesMoved = false
         walkStamp += 1
         seedScope()

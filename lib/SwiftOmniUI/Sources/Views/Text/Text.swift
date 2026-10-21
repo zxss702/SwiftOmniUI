@@ -101,12 +101,9 @@ public struct Text: VisualElement, TextElement, FontElement, TextAlignmentElemen
                 as: TextLayoutReport.self)
             else { return }
             box.fill(report)
-            // A host-pushed report is no state's doing: the render it asks
-            // for is an untracked one - and only where an ear stands, which
-            // is how the folded answers move.
-            if DispatchContext.differ?.watchesTextLayout == true {
-                Renderer.shared.setNeedsRender()
-            }
+            // Native geometry changes the retained preference's answer.
+            // Refold those answers without rebuilding authored view bodies.
+            Renderer.shared.setNeedsTextPreferenceRender()
         }
         return node
     }

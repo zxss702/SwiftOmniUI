@@ -17,6 +17,7 @@ final class WinUIItemsView: WinUILayoutView {
     let list = WinUIItemsList()
 
     private var shape = ItemsLayout.list()
+    private var hasAppliedLayout = false
     private var style = ListStyleKind.automatic
     private var choice: Choice?
 
@@ -57,8 +58,8 @@ final class WinUIItemsView: WinUILayoutView {
             self.style = style
             swiftomniui_winui_items_set_style(list.handle, style.rawValue)
         }
-        if let changes = cells.takeEntries() { writeEntries(changes) }
-        if layout != shape {
+        if !hasAppliedLayout || layout != shape {
+            hasAppliedLayout = true
             shape = layout
             let (kind, spacing, minimum): (Int32, Double, Double) = switch layout {
             case .list(let spacing): (0, spacing, 0)
@@ -68,6 +69,7 @@ final class WinUIItemsView: WinUILayoutView {
             swiftomniui_winui_items_set_layout(list.handle, kind, spacing, minimum)
             invalidateMeasurements()
         }
+        if let changes = cells.takeEntries() { writeEntries(changes) }
         write(Choice(chosen: cells.selected, mode: mode, invokable: cells.element?.handler(.itemActivated) != nil))
     }
 

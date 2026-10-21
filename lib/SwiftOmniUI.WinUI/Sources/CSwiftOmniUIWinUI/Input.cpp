@@ -295,6 +295,17 @@ extern "C" bool swiftomniui_winui_press(SwiftOmniUIObjectRef handle) {
     }
 }
 
+extern "C" bool swiftomniui_winui_point_from_root(SwiftOmniUIObjectRef handle, double x, double y, double *local) {
+    try {
+        auto inverse = as<xaml::UIElement>(handle).TransformToVisual(nullptr).Inverse();
+        if (!inverse) return false;
+        auto point = inverse.TransformPoint(Point(static_cast<float>(x), static_cast<float>(y)));
+        local[0] = point.X;
+        local[1] = point.Y;
+        return true;
+    } catch (...) { report("converting a pointer to local coordinates"); return false; }
+}
+
 extern "C" bool swiftomniui_winui_hits(SwiftOmniUIObjectRef handle, double x, double y) {
     try {
         auto element = as<xaml::UIElement>(handle);

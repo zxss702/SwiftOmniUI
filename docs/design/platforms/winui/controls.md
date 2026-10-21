@@ -34,15 +34,21 @@ block's `TextPointer`s after layout. UTF-16 rectangles are joined into Swift
 graphemes; raised inline text is transformed back into the owning label's
 coordinates. Labels without a layout reader do no per-character geometry work.
 Reports are invalidated by text, typography, wrapping, alignment and size changes.
+Each native run's pointer advances sequentially, with transforms shared across
+its character queries. Dirty labels publish together in one transaction; clean
+labels schedule no geometry work. Reports refold retained preferences rather
+than rebuilding authored view bodies.
 
 `pointerStyle` sets WinUI's `ProtectedCursor` through its projected protected
 interface, after the element is loaded; removing it restores inheritance.
 Continuous hover uses the native pointer events in local coordinates.
 
-WinUI spaces letters in thousandths of an em and lines in DIPs, where SwiftOmniUI
-gives the first in points and the second as a multiple of the font's own
-line: both are worked out against the font's size, a line of Segoe UI taken as
-four thirds of it. The lines a label's break allows are the host layer's
+WinUI spaces letters in thousandths of an em. SwiftOmniUI converts letter
+spacing from points using the font size. `.lineHeight` multiplies the font's
+native measured line height and `.lineSpacing` adds DIPs between baselines.
+The native font measurement is cached by family, size, weight, slant and stretch.
+`BaselineToBaseline` spacing keeps a single line from gaining extra outer space.
+The lines a label's break allows are the host layer's
 ([runs of words](../../host/tree.md#runs-of-words)); a `TextBlock` cuts words
 short only at their end, so a label cut at its start or in its middle is cut
 at its end.

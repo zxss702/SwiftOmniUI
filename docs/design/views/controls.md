@@ -103,6 +103,9 @@ A canvas drawing travels as data - its canvas calls, in order - because an
 object with a draw method is the one thing the boundary cannot carry; the host
 replays the calls on the platform's own canvas. A drawing reading a state is
 described again when the state changes, and so redrawn.
+`GraphicsContext.drawLayer` isolates a group's native drawing state;
+`translateBy`, `scaleBy` and `rotate` append the existing native transform
+commands, allowing a retained diagram scene to reuse its compiled paths.
 
 A path stores normalized commands: absolute moves, lines, quadratic and cubic
 curves, elliptical arcs and closes. Imperative construction appends these

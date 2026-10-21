@@ -37,6 +37,7 @@ extension WinUIRegistrations {
                 view.setLetterSpacing(spacing ?? 0)
             }
             label.property(LineHeightElementContract.lineHeight) { view, height in view.setLineHeight(height) }
+            label.property(LineHeightElementContract.lineSpacing) { view, spacing in view.setLineSpacing(spacing ?? 0) }
             label.property(DecorableTextElementContract.textDecorations) { view, decorations in
                 view.setDecorations(decorations)
             }

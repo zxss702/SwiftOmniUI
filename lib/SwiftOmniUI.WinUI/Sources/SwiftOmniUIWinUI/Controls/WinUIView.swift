@@ -867,7 +867,14 @@ class WinUIView {
 
     /// What the view heard, past the hold above - what the hold itself uses when a popup's going settles it.
     func deliver(_ heard: HeardInput) {
-        onHeard?(heard)
+        if case .drag(let phase, let x, let y, let at, let from) = heard {
+            func local(_ point: Point) -> Point {
+                var output = [Double](repeating: 0, count: 2)
+                guard swiftomniui_winui_point_from_root(handle, point.x, point.y, &output) else { return point }
+                return Point(output[0], output[1])
+            }
+            onHeard?(.drag(phase, x: x, y: y, at: local(at), from: local(from)))
+        } else { onHeard?(heard) }
     }
 
     /// A press the relay tells - down, moved, let go or taken away, at `point` of the window's content: a drag by the

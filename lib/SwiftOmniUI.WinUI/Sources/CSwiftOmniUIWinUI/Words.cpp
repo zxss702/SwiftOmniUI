@@ -14,6 +14,8 @@
 #include <cwctype>
 #include <functional>
 #include <memory>
+#include <map>
+#include <tuple>
 #include <string>
 #include <vector>
 
@@ -340,11 +342,34 @@ extern "C" void swiftomniui_winui_text_set_alignment(SwiftOmniUIObjectRef handle
     }
 }
 
+extern "C" double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRef handle) {
+    try {
+        auto block = labelWords(handle);
+        using Key = std::tuple<std::wstring, double, uint16_t, int32_t, int32_t>;
+        static std::map<Key, double> heights;
+        auto family = block.FontFamily().Source();
+        Key key{std::wstring(family.c_str(), family.size()), block.FontSize(), block.FontWeight().Weight,
+                static_cast<int32_t>(block.FontStyle()), static_cast<int32_t>(block.FontStretch())};
+        if (auto found = heights.find(key); found != heights.end()) return found->second;
+        controls::TextBlock probe;
+        probe.FontFamily(block.FontFamily());
+        probe.FontSize(block.FontSize());
+        probe.FontWeight(block.FontWeight());
+        probe.FontStyle(block.FontStyle());
+        probe.FontStretch(block.FontStretch());
+        probe.Text(L"Mg");
+        probe.Measure({10000, 10000});
+        auto height = probe.DesiredSize().Height;
+        if (height > 0) heights.emplace(std::move(key), height);
+        return height;
+    } catch (...) { report("reading natural line height"); return 0; }
+}
+
 extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, int32_t characterSpacing, double lineHeight) {
     try {
         auto block = labelWords(handle);
         block.CharacterSpacing(characterSpacing);
-        block.LineStackingStrategy(lineHeight > 0 ? xaml::LineStackingStrategy::BlockLineHeight
+        block.LineStackingStrategy(lineHeight > 0 ? xaml::LineStackingStrategy::BaselineToBaseline
                                                   : xaml::LineStackingStrategy::MaxHeight);
         block.LineHeight(lineHeight > 0 ? lineHeight : 0);
     } catch (...) {
@@ -364,18 +389,22 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
         int32_t at = 0;
         for (int32_t index = 0; index < count; ++index) {
             auto const &run = runs[index];
-            // A picture or a glyph in the line stands as an inline element; a run raised on its baseline is a
-            // block of its words shifted up in one too.
-            if ((run.glyph && *run.glyph) || (run.image && *run.image) || run.baseline != 0) {
+            // Symbols are font glyphs, so retain TextBlock's native Run path.
+            // InlineUIContainer is not supported by TextBlock.
+            if (run.glyph && *run.glyph) {
+                documents::Run mark;
+                auto glyph = text(run.glyph);
+                mark.Text(glyph);
+                mark.FontFamily(media::FontFamily(L"Segoe Fluent Icons, Segoe MDL2 Assets"));
+                if (run.size > 0) mark.FontSize(run.size);
+                if (run.hasColor) mark.Foreground(media::SolidColorBrush(color(run.color)));
+                inlines.Append(mark);
+                at += static_cast<int32_t>(glyph.size());
+                continue;
+            }
+            if ((run.image && *run.image) || run.baseline != 0) {
                 documents::InlineUIContainer holder;
-                if (run.glyph && *run.glyph) {
-                    controls::TextBlock mark;
-                    mark.FontFamily(media::FontFamily(L"Segoe Fluent Icons, Segoe MDL2 Assets"));
-                    mark.Text(text(run.glyph));
-                    if (run.size > 0) mark.FontSize(run.size);
-                    if (run.hasColor) mark.Foreground(media::SolidColorBrush(color(run.color)));
-                    holder.Child(mark);
-                } else if (run.image && *run.image) {
+                if (run.image && *run.image) {
                     controls::Image picture;
                     auto file = pictureFile(run.image);
                     if (!file.empty()) picture.Source(pictureSource(file));
@@ -575,18 +604,21 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
         auto block = labelWords(handle);
         auto coordinates = as<xaml::UIElement>(handle);
         int32_t at = 0;
+        auto transform = block.TransformToVisual(coordinates);
         auto append = [&](documents::TextPointer const &start, std::wstring_view string,
                           xaml::UIElement const &owner = nullptr) {
+            auto position = start;
+            auto local = owner ? owner.TransformToVisual(block) : nullptr;
             for (int32_t i = 0; i < static_cast<int32_t>(string.size()) && at < capacity; ++i, ++at) {
-                auto position = start.GetPositionAtOffset(i, documents::LogicalDirection::Forward);
-                if (!position) continue;
+                if (!position) return;
                 auto rect = position.GetCharacterRect(documents::LogicalDirection::Forward);
-                if (owner) rect = owner.TransformToVisual(block).TransformBounds(rect);
-                rect = block.TransformToVisual(coordinates).TransformBounds(rect);
+                if (local) rect = local.TransformBounds(rect);
+                rect = transform.TransformBounds(rect);
                 rectangles[at * 4] = rect.X;
                 rectangles[at * 4 + 1] = rect.Y;
                 rectangles[at * 4 + 2] = rect.Width;
                 rectangles[at * 4 + 3] = rect.Height;
+                position = position.GetPositionAtOffset(1, documents::LogicalDirection::Forward);
             }
         };
         if (block.Inlines().Size() == 0) {

@@ -27,6 +27,7 @@ public final class Renderer: @unchecked Sendable {
     /// Whether a render was asked for without naming a state, which makes the next
     /// render build the whole tree.
     private var untracked = true
+    private var textPreferencesChanged = false
 
     /// The transaction the next render runs under - what a `withAnimation` or
     /// `withTransaction` write left behind.
@@ -187,6 +188,16 @@ public final class Renderer: @unchecked Sendable {
         UIThreadExecutor.shared.poke()
     }
 
+    /// Native text reports change preference values, not authored view inputs.
+    /// Refold the retained tree without rebuilding the application or reparsing text.
+    func setNeedsTextPreferenceRender() {
+        guarded.withLock {
+            dirty = true
+            textPreferencesChanged = true
+        }
+        UIThreadExecutor.shared.poke()
+    }
+
     /// Records that a state was read. While a view is built, the view becomes
     /// its reader; anywhere else it costs nearly nothing.
     ///
@@ -329,6 +340,7 @@ public final class Renderer: @unchecked Sendable {
             changed.removeAll()
             names.removeAll()
             untracked = false
+            textPreferencesChanged = false
             pendingTransaction = nil
         }
     }
@@ -347,12 +359,13 @@ public final class Renderer: @unchecked Sendable {
         // Taken and cleared in one locked step, so a write landing during this render
         // asks for the next one.
         // Design: docs/design/core/render.md#taking-the-changes
-        let (changedNow, untrackedNow, namesNow, transactionNow):
-            (Set<ObjectIdentifier>, Bool, [ObjectIdentifier: String], Transaction?) = guarded.withLock {
-            let taken = (changed, untracked, names, pendingTransaction)
+        let (changedNow, untrackedNow, namesNow, transactionNow, textPreferencesNow):
+            (Set<ObjectIdentifier>, Bool, [ObjectIdentifier: String], Transaction?, Bool) = guarded.withLock {
+            let taken = (changed, untracked, names, pendingTransaction, textPreferencesChanged)
             changed.removeAll()
             names.removeAll()
             untracked = false
+            textPreferencesChanged = false
             dirty = false
             pendingTransaction = nil
             rendering = true
@@ -386,7 +399,7 @@ public final class Renderer: @unchecked Sendable {
         if let current = rendered, walks {
             // The clean walk: every cause named its state and none was a root read.
             // Design: docs/design/core/render.md#three-roads
-            result = differ.revisit(current, changed: changedNow)
+            result = differ.revisit(current, changed: changedNow, refreshPreferences: textPreferencesNow)
         } else {
             let (built, reads) = ReadScope.observed { root }
 
@@ -453,19 +466,20 @@ public final class Renderer: @unchecked Sendable {
                 run(handler)
             }
 
-            let (wrote, wroteUntracked, wroteNames):
-                (Set<ObjectIdentifier>, Bool, [ObjectIdentifier: String]) = guarded.withLock {
-                let taken = (changed, untracked, names)
+            let (wrote, wroteUntracked, wroteNames, wroteTextPreferences):
+                (Set<ObjectIdentifier>, Bool, [ObjectIdentifier: String], Bool) = guarded.withLock {
+                let taken = (changed, untracked, names, textPreferencesChanged)
                 changed.removeAll()
                 names.removeAll()
                 untracked = false
+                textPreferencesChanged = false
                 dirty = false
                 rendering = true
                 return taken
             }
 
             // Nothing they wrote is read anywhere.
-            if wrote.isEmpty && !wroteUntracked {
+            if wrote.isEmpty && !wroteUntracked && !wroteTextPreferences {
                 guarded.withLock { rendering = false }
                 break
             }
@@ -475,7 +489,7 @@ public final class Renderer: @unchecked Sendable {
             let settled: (node: RenderedNode, patch: HostPatch)
 
             if let current = rendered, !wroteUntracked, rootReads.isDisjoint(with: wrote) {
-                settled = differ.revisit(current, changed: wrote)
+                settled = differ.revisit(current, changed: wrote, refreshPreferences: wroteTextPreferences)
             } else {
                 let (built, reads) = ReadScope.observed { root }
 

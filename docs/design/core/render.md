@@ -41,6 +41,11 @@ ancestors contribute only the path of patches down to them. It is sound only
 when every cause of the render named the state it wrote; a plain
 `setNeedsRender()` names nothing and forces a build.
 
+Native text geometry has a separate preference invalidation. It walks the
+retained tree to refold `Text.LayoutKey` answers, bypassing the state-reader
+pruning for that walk but preserving authored bodies. A host batches a layout
+pass's text reports, so character geometry does not cause a root build per label.
+
 The root build reads the open scenes, whatever the application's `scene`
 reads, and the application session's styles and animation. Those reads are kept
 as `rootReads`; a change to any of them means the application has to be

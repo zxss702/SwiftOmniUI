@@ -36,6 +36,12 @@ offsets reuse the previous report. Labels outside such a reader do no per-charac
 geometry work. Cross-block selection can use these rectangles without laying out
 a second copy of the text.
 
+Labels allocated in one pass publish their geometry in one user transaction.
+Equal text, runs and typography skip native writes. Geometry changes refold the
+retained `Text.LayoutKey` preferences without rebuilding application bodies.
+`.lineSpacing` adds logical pixels between Pango lines; it is separate from
+the line-height multiplier.
+
 `pointerStyle` writes the widget's native cursor name; removing it restores
 inheritance. Continuous hover reports local pointer positions and exit through
 the existing native motion controller.

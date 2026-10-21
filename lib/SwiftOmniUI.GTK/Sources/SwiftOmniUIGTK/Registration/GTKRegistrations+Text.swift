@@ -39,6 +39,9 @@ extension GTKRegistrations {
             label.property(LineHeightElementContract.lineHeight) { view, height in
                 view.setLook { $0.lineHeight = height }
             }
+            label.property(LineHeightElementContract.lineSpacing) { view, spacing in
+                view.setLook { $0.lineSpacing = spacing ?? 0 }
+            }
             label.property(DecorableTextElementContract.textDecorations) { view, decorations in
                 view.setLook { $0.decorations = decorations ?? .none }
             }

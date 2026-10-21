@@ -11,16 +11,17 @@
 /// row, and as wide as its column in a grid; a size stated on the item's view
 /// is kept.
 public enum ItemsLayout: Equatable, Sendable, HostRepresentable {
-    /// One item under another, each as wide as the list, `spacing` apart.
-    case list(spacing: Double = 0)
+    /// One item under another, each as wide as the list, eight points apart
+    /// unless `spacing` is stated explicitly.
+    case list(spacing: Double = 8)
 
     /// One item beside another, each as tall as the row, `spacing` apart,
-    /// scrolled across.
-    case row(spacing: Double = 0)
+    /// scrolled across. The default spacing is eight points.
+    case row(spacing: Double = 8)
 
     /// As many columns as fit items at least `minimumItemWidth` wide, the
-    /// columns sharing the width, `spacing` apart both ways.
-    case grid(minimumItemWidth: Double, spacing: Double = 0)
+    /// columns sharing the width, `spacing` apart both ways; eight by default.
+    case grid(minimumItemWidth: Double, spacing: Double = 8)
 
     /// Which of the three a layout is, as the number that crosses.
     /// Design: docs/design/types/vocabularies.md#a-kind-first

@@ -4,6 +4,12 @@ What a platform's collection holds of one List, and what it tells the
 tree, is decided once in the host layer (`ItemsCells`); a backend is the
 toolkit's collection and its calls.
 
+`ItemsLayout` defaults to eight points between items, whether stacked down,
+across or in a grid. An explicit `spacing: 0` remains zero. This is separate
+from the list's content padding. A backend applies the first layout even
+when it equals the host's default, before publishing entries, so the native
+collection receives that spacing on its first frame.
+
 The entries cross as one property, every identity in order. A backend takes
 them as they change (`takeEntries`) and shows one cell for each. When the
 collection asks a cell for an entry (`hold`) that the tree has not built,

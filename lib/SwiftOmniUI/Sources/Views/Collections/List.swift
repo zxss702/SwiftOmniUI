@@ -125,8 +125,8 @@ extension List {
         let write: ([Id]) -> Void
     }
 
-    /// Down, across, or in columns; a list with nothing between its items
-    /// where this is not said.
+    /// Down, across, or in columns; eight points between items by default.
+    /// An explicit zero keeps adjacent items flush.
     ///
     ///     List(tags) { Tag($0) }.itemsLayout(.row(spacing: 8))
     @_spi(Host) public func itemsLayout(_ layout: ItemsLayout) -> Self {

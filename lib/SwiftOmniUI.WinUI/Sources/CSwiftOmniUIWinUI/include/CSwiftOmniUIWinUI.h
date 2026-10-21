@@ -520,6 +520,7 @@ int32_t swiftomniui_winui_text_runs(SwiftOmniUIObjectRef text, double *values, i
 void swiftomniui_winui_text_set_lines(SwiftOmniUIObjectRef text, bool wraps, int32_t lines, bool trims);
 void swiftomniui_winui_text_set_alignment(SwiftOmniUIObjectRef text, int32_t horizontal);
 void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef text, int32_t characterSpacing, double lineHeight);
+double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRef text);
 void swiftomniui_winui_text_set_decorations(SwiftOmniUIObjectRef text, bool underline, bool strikethrough);
 
 SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view);
@@ -1047,6 +1048,7 @@ void swiftomniui_winui_hear(SwiftOmniUIObjectRef element, int64_t view, uint32_t
 
 /// The host says the press the view `view` heard is a drag: the view holds the pointer from the move it heard it in.
 void swiftomniui_winui_press_dragged(int64_t view);
+bool swiftomniui_winui_point_from_root(SwiftOmniUIObjectRef view, double x, double y, double *local);
 
 /// The system's drag distance, across and down, in DIPs.
 void swiftomniui_winui_drag_distance(double *distance);

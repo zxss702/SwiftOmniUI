@@ -66,6 +66,8 @@ An absolute file path is also a picture source. The Foundation `AsyncImage`
 phase initializer downloads URL images outside layout and hands its cached file
 to the same native decoder; file URLs use their existing local file. The phase
 reports transport and missing-file errors to the caller's content closure.
+The loading task belongs to a stable container around the phase's content;
+switching from a placeholder to an image must not cancel and restart that task.
 
 A picture shown as an icon is a `GtkImage` of the file's icon, a given number
 of logical pixels across: GTK reads the file - an SVG through gdk-pixbuf's

@@ -87,46 +87,61 @@ class WinUITextView: WinUIView {
     }
 
     func requestTextLayout() {
-        guard onTextLayout != nil, !textLayoutPending else { return }
+        guard onTextLayout != nil, textLayoutDirty, !textLayoutPending else { return }
         textLayoutPending = true
-        WinUIDoorbell.afterPass { [weak self] in
-            guard let self else { return }
-            self.textLayoutPending = false
-            guard let report = self.onTextLayout, self.textLayoutDirty, self.isAttached else { return }
-            let text = self.text
-            let count = text.utf16.count
-            guard count > 0 else {
-                self.textLayoutDirty = false
-                report(TextLayoutReport(lines: [])); return
-            }
-            var rectangles = [Double](repeating: 0, count: count * 4)
-            guard swiftomniui_winui_text_character_rects(self.handle, &rectangles, Int32(count)) == count else { return }
-            guard stride(from: 3, to: rectangles.count, by: 4).contains(where: { rectangles[$0] > 0 }) else { return }
-            self.textLayoutDirty = false
-            self.lastTextLayoutSize = LayoutSize(width: self.laidOutFrame.width, height: self.laidOutFrame.height)
-            var offset = 0, line = 0
-            var last: Rect?
-            var glyphs: [NativeTextLayout.Glyph] = []
-            for character in text {
-                let string = String(character)
-                let start = offset
-                let n = string.utf16.count
-                offset += n
-                var rect = Rect(rectangles[start * 4], rectangles[start * 4 + 1],
-                                rectangles[start * 4 + 2], rectangles[start * 4 + 3])
-                for index in (start + 1)..<offset {
-                    let r = Rect(rectangles[index * 4], rectangles[index * 4 + 1],
-                                 rectangles[index * 4 + 2], rectangles[index * 4 + 3])
-                    if r.height > 0 { rect = NativeTextLayout.union(rect, r) }
+        Self.pendingTextLayouts.append(self)
+        guard Self.pendingTextLayouts.count == 1 else { return }
+        WinUIDoorbell.afterPass {
+            let labels = Self.pendingTextLayouts
+            Self.pendingTextLayouts = []
+            let publish = {
+                for label in labels {
+                    label.textLayoutPending = false
+                    label.publishTextLayout()
                 }
-                guard rect.height > 0 else { continue }
-                if let previous = last,
-                   rect.y >= previous.y + previous.height - 0.5 || rect.y + rect.height <= previous.y + 0.5 { line += 1 }
-                glyphs.append(.init(text: string, rect: rect, line: line))
-                last = rect
             }
-            report(NativeTextLayout.report(glyphs))
+            if let runtime = WinUIRenderer.shared?.runtime { runtime.performUserTransaction(publish) }
+            else { publish() }
         }
+    }
+
+    private static var pendingTextLayouts: [WinUITextView] = []
+
+    private func publishTextLayout() {
+        guard let report = onTextLayout, textLayoutDirty, isAttached else { return }
+        let text = self.text
+        let count = text.utf16.count
+        guard count > 0 else {
+            textLayoutDirty = false
+            report(TextLayoutReport(lines: [])); return
+        }
+        var rectangles = [Double](repeating: 0, count: count * 4)
+        guard swiftomniui_winui_text_character_rects(handle, &rectangles, Int32(count)) == count else { return }
+        guard stride(from: 3, to: rectangles.count, by: 4).contains(where: { rectangles[$0] > 0 }) else { return }
+        textLayoutDirty = false
+        lastTextLayoutSize = LayoutSize(width: laidOutFrame.width, height: laidOutFrame.height)
+        var offset = 0, line = 0
+        var last: Rect?
+        var glyphs: [NativeTextLayout.Glyph] = []
+        for character in text {
+            let string = String(character)
+            let start = offset
+            let n = string.utf16.count
+            offset += n
+            var rect = Rect(rectangles[start * 4], rectangles[start * 4 + 1],
+                            rectangles[start * 4 + 2], rectangles[start * 4 + 3])
+            for index in (start + 1)..<offset {
+                let r = Rect(rectangles[index * 4], rectangles[index * 4 + 1],
+                             rectangles[index * 4 + 2], rectangles[index * 4 + 3])
+                if r.height > 0 { rect = NativeTextLayout.union(rect, r) }
+            }
+            guard rect.height > 0 else { continue }
+            if let previous = last,
+               rect.y >= previous.y + previous.height - 0.5 || rect.y + rect.height <= previous.y + 0.5 { line += 1 }
+            glyphs.append(.init(text: string, rect: rect, line: line))
+            last = rect
+        }
+        report(NativeTextLayout.report(glyphs))
     }
 
     /// The words shown.
@@ -196,6 +211,12 @@ class WinUITextView: WinUIView {
         writeSpacing()
     }
 
+    func setLineSpacing(_ spacing: Double) {
+        guard look.lineSpacing != spacing else { return }
+        look.lineSpacing = spacing
+        writeSpacing()
+    }
+
     /// A line under the words, or through them.
     func setDecorations(_ decorations: TextDecorations?) {
         swiftomniui_winui_text_set_decorations(
@@ -222,7 +243,9 @@ class WinUITextView: WinUIView {
     private func writeSpacing() {
         let size = look.size ?? Self.platformFontSize
         let thousandths = Int32((look.letterSpacing(inEmsOf: size) * 1000).rounded())
-        let line = look.lineHeight.map { $0 * size * Self.lineHeightOfFont } ?? 0
+        let natural = look.lineHeight != nil || look.lineSpacing != 0
+            ? swiftomniui_winui_text_natural_line_height(handle) : 0
+        let line = natural > 0 ? max(0, natural * (look.lineHeight ?? 1) + look.lineSpacing) : 0
         swiftomniui_winui_text_set_spacing(handle, thousandths, line)
         invalidateTextLayout()
     }
