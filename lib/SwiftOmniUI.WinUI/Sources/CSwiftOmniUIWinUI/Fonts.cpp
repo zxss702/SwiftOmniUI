@@ -30,7 +30,7 @@ extern "C" int32_t swiftomniui_winui_register_font(char const *path) {
 
 namespace {
     struct FontFileFace { winrt::com_ptr<IDWriteFontFace> face; };
-    struct FontOutline final : winrt::implements<FontOutline, ID2D1SimplifiedGeometrySink> {
+    struct FontOutline : winrt::implements<FontOutline, ID2D1SimplifiedGeometrySink> {
         std::string path;
         void point(char kind, float x, float y) {
             char bytes[96]; std::snprintf(bytes, sizeof bytes, "%c%.9g %.9g ", kind, x, -y); path += bytes;

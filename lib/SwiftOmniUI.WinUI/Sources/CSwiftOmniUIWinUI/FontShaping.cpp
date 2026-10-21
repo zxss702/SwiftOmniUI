@@ -13,7 +13,7 @@ IDWriteFontFace *swiftomniui_native_font_face(void *value);
 using namespace swiftomniui;
 
 namespace {
-    struct FontTextAnalysis final : winrt::implements<FontTextAnalysis,
+    struct FontTextAnalysis : winrt::implements<FontTextAnalysis,
         IDWriteTextAnalysisSource, IDWriteTextAnalysisSink> {
         WCHAR const *text;
         UINT32 length;
