@@ -19,7 +19,7 @@ import CNativeFontShaping
             listening = true
             for property in ["gtk-font-name", "gtk-theme-name", "gtk-xft-dpi"] {
                 connectNotify(UnsafeMutableRawPointer(settings), property, number: 0) { _, _, _ in
-                    MainActor.assumeIsolated { cache.removeAll() }
+                    MainActor.assumeIsolated { GTKSystemFontMetrics.cache.removeAll() }
                 }
             }
         }
