@@ -82,6 +82,7 @@ public struct Text: VisualElement, TextElement, FontElement, TextAlignmentElemen
         // The text's position feeds `Layout.origin` without treating every
         // text as a business geometry read that suppresses layout animation.
         let anchorBox = AnchorBox()
+        node.anchorBoxes.append(anchorBox)
         node.addHandler(.textFrameChanged) {
             guard let numbers = MemberValues.carried(
                 EventBuffer.current, by: "textFrameChanged", as: [Double].self),

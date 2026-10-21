@@ -9,6 +9,15 @@ import CSwiftOmniUIGTK
 /// Design: docs/design/platforms/gtk/controls.md#words
 @MainActor
 class GTKTextView: GTKView {
+    override func firstTextBaseline(in size: LayoutSize) -> Double? {
+        guard let layout = gtk_label_get_layout(widget.opaque) else { return nil }
+        var logical = PangoRectangle()
+        pango_layout_get_pixel_extents(layout, nil, &logical)
+        let extra = max(0, size.height - Double(logical.height))
+        let shift = extra * Double(gtk_label_get_yalign(widget.opaque))
+        return Double(pango_layout_get_baseline(layout)) / Double(PANGO_SCALE) + shift
+    }
+
     /// How the words look.
     private(set) var look = TextLook()
 

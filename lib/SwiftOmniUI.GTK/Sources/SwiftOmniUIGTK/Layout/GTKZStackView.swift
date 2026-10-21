@@ -8,6 +8,17 @@
 /// Design: docs/design/platforms/gtk/drawing.md#a-placed-child
 @MainActor
 class GTKZStackView: GTKTravellingLayout {
+    override func firstTextBaseline(in size: LayoutSize) -> Double? {
+        let places = ZStackArithmetic.places(of: items, in: Rect(0, 0, size.width, size.height),
+                                            padding: padding, direction: direction)
+        return zip(items, places).compactMap { item, place -> Double? in
+            guard let place, item.isShown, !item.departing else { return nil }
+            let baseline = item.values.verticalGuide.flatMap { $0.slot == 4 ? $0.offset : nil }
+                ?? item.view.firstTextBaseline(in: LayoutSize(width: place.width, height: place.height))
+            return baseline.map { place.y + $0 }
+        }.min()
+    }
+
     /// The placement a state drives, one per child; nil while each child stands in its own area.
     var placement: HostPlacementRun? {
         didSet {

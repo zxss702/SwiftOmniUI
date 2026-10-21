@@ -8,6 +8,7 @@
 #include "Automation.h"
 
 #include <algorithm>
+#include <memory>
 #include <string>
 
 #include <winrt/Windows.System.h>
@@ -130,6 +131,23 @@ extern "C" void swiftomniui_winui_text_set_text(SwiftOmniUIObjectRef handle, cha
     } catch (...) {
         report("setting a label's words");
     }
+}
+
+extern "C" void swiftomniui_winui_text_after_layout(
+    SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t)
+) {
+    try {
+        auto block = borrow<controls::Border>(handle).Child().as<controls::TextBlock>();
+        auto token = std::make_shared<winrt::event_token>();
+        *token = block.LayoutUpdated(guarded("publishing arranged text geometry",
+            [weak = winrt::make_weak(block), token, view, ready](auto const &, auto const &) {
+                if (auto block = weak.get()) {
+                    if (!block.IsLoaded() || block.ActualWidth() <= 0 || block.ActualHeight() <= 0) return;
+                    block.LayoutUpdated(*token);
+                    if (ready) ready(view);
+                }
+            }));
+    } catch (...) { report("waiting for native text layout"); }
 }
 
 extern "C" void swiftomniui_winui_text_set_background(SwiftOmniUIObjectRef handle, SwiftOmniUIBrush background) {

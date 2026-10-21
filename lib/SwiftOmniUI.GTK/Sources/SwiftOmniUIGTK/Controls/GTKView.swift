@@ -9,6 +9,9 @@ import CSwiftOmniUIGTK
 /// Design: docs/design/platforms/gtk/c-api.md#a-view-and-its-number
 @MainActor
 class GTKView {
+    /// A native text baseline for the measured allocation, when this view has one.
+    func firstTextBaseline(in size: LayoutSize) -> Double? { nil }
+
     /// The widget, held until this is released.
     let widget: GTKWidget
 

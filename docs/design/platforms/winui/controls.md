@@ -33,11 +33,23 @@ reading `Text.LayoutKey` requests source-grapheme rectangles from the live text
 block's `TextPointer`s after layout. UTF-16 rectangles are joined into Swift
 graphemes; raised inline text is transformed back into the owning label's
 coordinates. Labels without a layout reader do no per-character geometry work.
+`GetCharacterRect` supplies a zero-width caret, not a glyph rectangle. A source
+character's extent joins its leading forward-affinity caret and trailing
+backward-affinity caret; the latter stays on the preceding row at a soft wrap.
+When XAML has not produced geometry yet, a one-shot `LayoutUpdated` handler
+reschedules the dirty report after arrangement.
 Reports are invalidated by text, typography, wrapping, alignment and size changes.
 Each native run's pointer advances sequentially, with transforms shared across
 its character queries. Dirty labels publish together in one transaction; clean
 labels schedule no geometry work. Reports refold retained preferences rather
 than rebuilding authored view bodies.
+
+Custom layouts read a label's measured `BaselineOffset` through
+`LayoutSubview.dimensions(in:)`. A background/overlay ZStack forwards its
+content's first baseline, including the content's placement and explicit
+baseline guide. Standalone whitespace whose `DesiredSize.Width` is zero uses
+DirectWrite's width including trailing whitespace, cached by native font and
+spacing, so an inline flow does not collapse spaces between separate labels.
 
 `pointerStyle` sets WinUI's `ProtectedCursor` through its projected protected
 interface, after the element is loaded; removing it restores inheritance.

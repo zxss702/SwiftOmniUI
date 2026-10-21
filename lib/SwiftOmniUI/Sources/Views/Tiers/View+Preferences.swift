@@ -76,6 +76,7 @@ extension View {
 
         return revised { node in
             // The host's own frame reports keep the anchor's answer current.
+            node.anchorBoxes.append(box)
             node.addHandler(.frameChanged) {
                 guard let numbers = MemberValues.carried(
                     EventBuffer.current, by: "frameChanged", as: [Double].self),

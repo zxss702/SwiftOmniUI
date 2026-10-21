@@ -332,10 +332,20 @@ observer only when the key's answer actually moved. `backgroundPreferenceValue`
 and `overlayPreferenceValue` are observers whose action writes a state the
 layer reads; the settling passes build the layer again with the fresh answer.
 
+Preference seeds, observers and transforms written on a composed view follow
+its body's root during expansion, including a body that splices several roots.
+They use the same landing path as frame handlers; retaining only ordinary
+properties would leave a `Text.LayoutKey` reader silent even though its native
+labels still report geometry.
+
 `.anchorPreference` writes an `Anchor` - a box holding the element's last
 reported frame - into the offered value. The modifier hears `frameChanged`
 on the element itself, so the box answers with the host's own measurement;
 `GeometryProxy[anchor]` resolves it into the reader's space.
+Reconciliation retains anchor storage in modifier order on the same mounted
+element, including Text's origin anchor. Rebuilding an authored value preserves
+the anchor's identity and last frame: the host reports changed geometry and need
+not repeat an unchanged frame to initialize a replacement Swift value.
 
 ## Created and destroying
 

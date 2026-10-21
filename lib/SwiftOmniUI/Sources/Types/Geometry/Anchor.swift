@@ -33,7 +33,7 @@ public struct Anchor<Value>: Sendable {
 extension Anchor: Equatable {
     /// Two anchors agree when they watch the same element.
     public static func == (one: Anchor, other: Anchor) -> Bool {
-        one.box === other.box
+        one.box.identity == other.box.identity
     }
 }
 
@@ -58,8 +58,22 @@ extension AnchorSource where Value == Rect {
 /// the anchor's modifier hears; `@unchecked Sendable` as every write and read
 /// happens on the render's own thread.
 final class AnchorBox: @unchecked Sendable {
+    private final class Storage {
+        var frame: Rect?
+    }
+    private var storage = Storage()
+
+    var identity: ObjectIdentifier { ObjectIdentifier(storage) }
+
     /// The last frame the host reported, in window coordinates.
-    var frame: Rect?
+    var frame: Rect? {
+        get { storage.frame }
+        set { storage.frame = newValue }
+    }
+
+    /// Rebuilding a value does not recreate its mounted element. Both old
+    /// preference values and the new frame handler must watch that same frame.
+    func inherit(from other: AnchorBox) { storage = other.storage }
 }
 
 extension GeometryProxy {

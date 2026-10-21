@@ -469,10 +469,17 @@ SwiftOmniUIObjectRef swiftomniui_winui_text_make(void);
 void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef element, int32_t style);
 void swiftomniui_winui_text_set_selectable(SwiftOmniUIObjectRef element, bool selectable);
 int32_t swiftomniui_winui_text_character_rects(SwiftOmniUIObjectRef element, double *rectangles, int32_t capacity);
+/// The measured first-line baseline, including the label's vertical alignment.
+double swiftomniui_winui_text_baseline(SwiftOmniUIObjectRef element, double height);
+/// Width of an all-whitespace label, whose XAML DesiredSize can be zero.
+double swiftomniui_winui_text_whitespace_width(SwiftOmniUIObjectRef element);
 
 /// Native attachment completes the label's pre-attachment measurement. The
 /// callback names the live view; no native handler retains a Swift object.
 void swiftomniui_winui_text_on_loaded(SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t));
+/// One-shot notification after XAML has arranged a label whose geometry was
+/// unavailable. The handler removes itself; it does not poll on every frame.
+void swiftomniui_winui_text_after_layout(SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t));
 /// What a label is drawn over: a colour, a gradient, or none - still hit across its bounds.
 void swiftomniui_winui_text_set_background(SwiftOmniUIObjectRef label, SwiftOmniUIBrush background);
 

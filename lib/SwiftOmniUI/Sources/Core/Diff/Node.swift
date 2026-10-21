@@ -386,6 +386,10 @@ public struct Node {
     /// (Preferences.swift).
     var preferenceSeeds: [PreferenceSeed] = []
 
+    /// Frame anchors owned by this element, in modifier order. Reconciliation
+    /// preserves their storage when the authored value is rebuilt.
+    var anchorBoxes: [AnchorBox] = []
+
     /// The `.onPreferenceChange` listeners this node carries, in written
     /// order; the differ fires each whose key's folded answer moved.
     var preferenceObservers: [PreferenceObserver] = []

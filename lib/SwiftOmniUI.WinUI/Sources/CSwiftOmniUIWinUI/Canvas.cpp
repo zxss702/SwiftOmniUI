@@ -729,7 +729,7 @@ extern "C" int32_t swiftomniui_winui_measure_text(
             return 0;
         DWRITE_TEXT_METRICS metrics;
         if (FAILED(layout->GetMetrics(&metrics))) return 0;
-        out[0] = metrics.width;
+        out[0] = metrics.widthIncludingTrailingWhitespace;
         out[1] = metrics.height;
         return 1;
     } catch (...) {

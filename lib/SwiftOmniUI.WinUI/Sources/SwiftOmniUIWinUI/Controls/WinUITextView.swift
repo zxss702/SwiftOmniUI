@@ -9,6 +9,20 @@ import CSwiftOmniUIWinUI
 /// Design: docs/design/platforms/winui/controls.md#words
 @MainActor
 class WinUITextView: WinUIView {
+    override func measure(width: Double?, height: Double?) -> LayoutSize {
+        var measured = super.measure(width: width, height: height)
+        if measured.width == 0 {
+            let whitespace = swiftomniui_winui_text_whitespace_width(handle)
+            if whitespace > 0 { measured.width = min(whitespace, width ?? .infinity) }
+        }
+        return measured
+    }
+
+    override func firstTextBaseline(in size: LayoutSize) -> Double? {
+        let baseline = swiftomniui_winui_text_baseline(handle, size.height)
+        return baseline >= 0 ? baseline : nil
+    }
+
     override var takesDirection: Bool { true }
 
     /// The font's size, the space between the letters and the height of a line - what the spacing is measured
@@ -76,6 +90,7 @@ class WinUITextView: WinUIView {
     private var textLayoutPending = false
     private var lastTextLayoutSize: LayoutSize?
     private var textLayoutDirty = true
+    private var textLayoutAwaitingNative = false
 
     func invalidateTextLayout() { textLayoutDirty = true; requestTextLayout() }
 
@@ -116,8 +131,11 @@ class WinUITextView: WinUIView {
             report(TextLayoutReport(lines: [])); return
         }
         var rectangles = [Double](repeating: 0, count: count * 4)
-        guard swiftomniui_winui_text_character_rects(handle, &rectangles, Int32(count)) == count else { return }
-        guard stride(from: 3, to: rectangles.count, by: 4).contains(where: { rectangles[$0] > 0 }) else { return }
+        guard swiftomniui_winui_text_character_rects(handle, &rectangles, Int32(count)) == count,
+              stride(from: 3, to: rectangles.count, by: 4).contains(where: { rectangles[$0] > 0 }) else {
+            awaitNativeTextLayout()
+            return
+        }
         textLayoutDirty = false
         lastTextLayoutSize = LayoutSize(width: laidOutFrame.width, height: laidOutFrame.height)
         var offset = 0, line = 0
@@ -142,6 +160,18 @@ class WinUITextView: WinUIView {
             last = rect
         }
         report(NativeTextLayout.report(glyphs))
+    }
+
+    private func awaitNativeTextLayout() {
+        guard !textLayoutAwaitingNative else { return }
+        textLayoutAwaitingNative = true
+        swiftomniui_winui_text_after_layout(handle, number) { number in
+            MainActor.assumeIsolated {
+                guard let text = WinUIView.find(number) as? WinUITextView else { return }
+                text.textLayoutAwaitingNative = false
+                text.requestTextLayout()
+            }
+        }
     }
 
     /// The words shown.

@@ -5,6 +5,10 @@ field - and hears what the user does to them. The value a control carries
 belongs to a state; the host writes the control where the tree changed that
 value and reports the user's change back ([patches](../../host/patches.md)).
 
+Custom layouts read the first text baseline from the measured label's Pango
+layout, including its vertical alignment. Background/overlay ZStacks forward
+the content's baseline and explicit guide through `LayoutSubview.dimensions(in:)`.
+
 ## Words
 
 A label's words are a `GtkLabel`'s, and how they look is one list of Pango

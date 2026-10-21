@@ -597,6 +597,52 @@ extern "C" void swiftomniui_winui_text_style(SwiftOmniUIObjectRef handle, double
     }
 }
 
+extern "C" double swiftomniui_winui_text_baseline(SwiftOmniUIObjectRef handle, double height) {
+    try {
+        auto block = labelWords(handle);
+        auto extra = std::max(0.0, height - static_cast<double>(block.DesiredSize().Height));
+        auto shift = block.VerticalAlignment() == xaml::VerticalAlignment::Center ? extra / 2
+            : block.VerticalAlignment() == xaml::VerticalAlignment::Bottom ? extra : 0;
+        return block.BaselineOffset() + shift;
+    } catch (...) { report("reading the first text baseline"); return -1; }
+}
+
+extern "C" double swiftomniui_winui_text_whitespace_width(SwiftOmniUIObjectRef handle) {
+    try {
+        auto block = labelWords(handle);
+        auto words = block.Text();
+        auto family = block.FontFamily().Source();
+        auto size = block.FontSize();
+        auto weight = block.FontWeight().Weight;
+        auto style = block.FontStyle();
+        auto spacing = block.CharacterSpacing();
+        if (block.Inlines().Size()) {
+            // Attributed Text stores even a standalone space in a Run.
+            if (block.Inlines().Size() != 1) return 0;
+            auto run = block.Inlines().GetAt(0).try_as<documents::Run>();
+            if (!run) return 0;
+            words = run.Text();
+            family = run.FontFamily().Source(); size = run.FontSize();
+            weight = run.FontWeight().Weight; style = run.FontStyle(); spacing = run.CharacterSpacing();
+        }
+        if (words.empty() || !std::all_of(words.begin(), words.end(), [](wchar_t ch) { return ch == L' ' || ch == L'\t'; }))
+            return 0;
+        auto key = std::make_tuple(std::wstring(family.c_str(), family.size()), size, weight,
+                                   static_cast<int32_t>(style), spacing,
+                                   std::wstring(words.c_str(), words.size()));
+        static std::map<decltype(key), double> widths;
+        if (auto found = widths.find(key); found != widths.end()) return found->second;
+        double extent[2] = {};
+        if (!swiftomniui_winui_measure_text(winrt::to_string(words).c_str(), winrt::to_string(family).c_str(),
+                size, weight, style != winrt::Windows::UI::Text::FontStyle::Normal, 0, extent)) return 0;
+        auto width = extent[0] + std::max<int32_t>(0, static_cast<int32_t>(words.size()) - 1)
+            * spacing * size / 1000;
+        if (widths.size() >= 256) widths.clear();
+        widths.emplace(key, width);
+        return width;
+    } catch (...) { report("measuring whitespace in a text flow"); return 0; }
+}
+
 extern "C" int32_t swiftomniui_winui_text_character_rects(
     SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity
 ) {
@@ -612,13 +658,26 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
             for (int32_t i = 0; i < static_cast<int32_t>(string.size()) && at < capacity; ++i, ++at) {
                 if (!position) return;
                 auto rect = position.GetCharacterRect(documents::LogicalDirection::Forward);
+                auto next = position.GetPositionAtOffset(1, documents::LogicalDirection::Forward);
+                // GetCharacterRect is a caret rectangle: XAML leaves Width
+                // zero. The backward affinity at the trailing boundary keeps
+                // the final glyph on its own row at a soft wrap.
+                if (next) {
+                    auto end = next.GetCharacterRect(documents::LogicalDirection::Backward);
+                    if (rect.Height > 0 && end.Height > 0 &&
+                        std::abs(rect.Y - end.Y) < 0.5f) {
+                        auto left = std::min(rect.X, end.X);
+                        rect.Width = std::abs(end.X - rect.X);
+                        rect.X = left;
+                    }
+                }
                 if (local) rect = local.TransformBounds(rect);
                 rect = transform.TransformBounds(rect);
                 rectangles[at * 4] = rect.X;
                 rectangles[at * 4 + 1] = rect.Y;
                 rectangles[at * 4 + 2] = rect.Width;
                 rectangles[at * 4 + 3] = rect.Height;
-                position = position.GetPositionAtOffset(1, documents::LogicalDirection::Forward);
+                position = next;
             }
         };
         if (block.Inlines().Size() == 0) {

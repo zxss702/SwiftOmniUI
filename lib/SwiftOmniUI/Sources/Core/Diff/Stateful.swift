@@ -372,6 +372,11 @@ extension Node {
             // And its engines, registered against the element its body ends on.
             node.engines += written.engines
 
+            // Preferences written on a composed view belong to its body's
+            // root, just like its events. Dropping these loses both the
+            // Text.LayoutKey reader and the selection anchors above it.
+            node.absorbPreferenceWrites(of: written)
+
             // And slot children written on it - a `.contextMenu` - after its own.
             node.children += written.children
 
@@ -397,6 +402,7 @@ extension Node {
             child.destroying += written.destroying
             child.tasks += written.tasks
             child.engines += written.engines
+            child.absorbPreferenceWrites(of: written)
             child.children += written.children
             child.lazyIdentity = written.lazyIdentity ?? child.lazyIdentity
             if child.session == nil { child.session = written.session }
@@ -526,9 +532,7 @@ extension Node {
         focusedValues = focusedValues.overlaid(with: fragment.focusedValues)
         sceneFocusedValues = sceneFocusedValues.overlaid(with: fragment.sceneFocusedValues)
 
-        preferenceSeeds = fragment.preferenceSeeds + preferenceSeeds
-        preferenceObservers += fragment.preferenceObservers
-        preferenceTransforms += fragment.preferenceTransforms
+        absorbPreferenceWrites(of: fragment)
         layoutValues.merge(fragment.layoutValues) { _, wrote in wrote }
         destinations.merge(fragment.destinations) { _, wrote in wrote }
         if itemDestination == nil { itemDestination = fragment.itemDestination }
@@ -542,5 +546,14 @@ extension Node {
 
         if session == nil { session = fragment.session }
         if aim == nil { aim = fragment.aim }
+    }
+
+    /// Preference metadata follows the same root as the modifier's frame
+    /// handlers, through both composed views and transparent fragments.
+    mutating func absorbPreferenceWrites(of written: Node) {
+        preferenceSeeds = written.preferenceSeeds + preferenceSeeds
+        anchorBoxes = written.anchorBoxes + anchorBoxes
+        preferenceObservers += written.preferenceObservers
+        preferenceTransforms += written.preferenceTransforms
     }
 }

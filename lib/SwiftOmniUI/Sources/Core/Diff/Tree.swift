@@ -144,6 +144,8 @@ final class RenderedNode {
     /// which rebuilds the folded answers from them and its children.
     var preferenceSeeds: [PreferenceSeed] = []
 
+    var anchorBoxes: [AnchorBox] = []
+
     /// The `.transformPreference` rewrites of this element's offer, same
     /// keeping.
     var preferenceTransforms: [PreferenceTransform] = []

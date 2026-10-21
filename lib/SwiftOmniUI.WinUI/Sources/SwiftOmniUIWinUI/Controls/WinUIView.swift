@@ -9,6 +9,9 @@ import CSwiftOmniUIWinUI
 /// Design: docs/design/platforms/winui/relay.md#a-view-and-its-number
 @MainActor
 class WinUIView {
+    /// A native text baseline for the measured allocation, when this view has one.
+    func firstTextBaseline(in size: LayoutSize) -> Double? { nil }
+
     /// The element, held until this is released.
     let handle: SwiftOmniUIObjectRef
 

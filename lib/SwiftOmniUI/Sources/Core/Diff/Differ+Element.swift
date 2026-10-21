@@ -690,6 +690,15 @@ extension Differ {
                 || changedChildren.contains { !$0.fresh && !$0.isEmpty }
         }
 
+        // Native frames are only reported when they change. A fresh anchor
+        // value on the same mounted element must retain the last frame and
+        // identity before preferences are compared, including Text's origin.
+        if let previous, previous.anchorBoxes.count == node.anchorBoxes.count {
+            for (box, before) in zip(node.anchorBoxes, previous.anchorBoxes) where box !== before {
+                box.inherit(from: before)
+            }
+        }
+
         // A text rebuilt under one element takes the last layout report over:
         // its folded answer keeps saying where the words stand until the host
         // says again.
@@ -766,6 +775,7 @@ extension Differ {
         result.visualInput = visualInput
         result.visualState = visualState
         result.preferenceSeeds = node.preferenceSeeds
+        result.anchorBoxes = node.anchorBoxes
         result.preferenceTransforms = node.preferenceTransforms
         result.preferenceValues = folded
         result.preferenceWatches = preferenceWatches

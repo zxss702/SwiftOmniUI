@@ -48,6 +48,7 @@ final class WinUICustomLayoutView: WinUITravellingLayout {
                 measureDimensions: { proposal in
                     let measured = item.size(offered: proposal)
                     var guides: [Int32: Double] = [:]
+                    if let baseline = item.view.firstTextBaseline(in: measured) { guides[4] = baseline }
                     var explicit: Set<Int32> = []
                     if let guide = item.values.horizontalGuide {
                         guides[guide.slot] = guide.offset

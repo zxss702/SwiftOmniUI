@@ -45,6 +45,7 @@ final class GTKCustomLayoutView: GTKTravellingLayout {
                 measureDimensions: { proposal in
                     let measured = item.size(offered: proposal.width)
                     var guides: [Int32: Double] = [:]
+                    if let baseline = item.view.firstTextBaseline(in: measured) { guides[4] = baseline }
                     var explicit: Set<Int32> = []
                     if let guide = item.values.horizontalGuide {
                         guides[guide.slot] = guide.offset
