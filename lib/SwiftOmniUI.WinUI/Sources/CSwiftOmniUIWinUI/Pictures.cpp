@@ -720,7 +720,7 @@ extern "C" bool swiftomniui_winui_image_set_pixels(SwiftOmniUIObjectRef handle, 
         auto source = memoryPicture(rgba, width, height); if (!source) return false;
         auto grid = imageGrid(handle); auto image = imageChild(grid);
         symbolBox(grid).Visibility(xaml::Visibility::Collapsed); image.Visibility(xaml::Visibility::Visible);
-        image.Source(source); image.Stretch(media::Stretch::Fill);
+        image.Source(source); image.Stretch(xaml::Media::Stretch::Fill);
         image.Width(logicalWidth); image.Height(logicalHeight);
         auto state = imageState(grid); state->path.clear(); state->svg = false;
         state->size = {static_cast<float>(logicalWidth), static_cast<float>(logicalHeight)};
