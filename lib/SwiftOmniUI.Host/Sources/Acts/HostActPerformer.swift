@@ -62,6 +62,15 @@
         case .openFiles, .openFolders, .saveFile, .readFile, .launchFile, .launchLink, .revealFile:
             guard let files else { return fail(call, notPerformed(call)) }
             perform(call, files: files)
+        case .copyImage:
+            guard let value = call.arguments.first, let image = ImageSource(propValue: value)?.bitmap else {
+                return fail(call, "copyImage requires decoded image pixels")
+            }
+            toolkit.copyImage(image)
+            reply(call, [])
+        case .copyRichText:
+            toolkit.copyRichText(html: call.arguments.first?.string ?? "", plainText: call.arguments.value(1)?.string ?? "")
+            reply(call, [])
         case .copyText:
             toolkit.copyText(call.arguments.first?.string ?? "")
             reply(call, [])

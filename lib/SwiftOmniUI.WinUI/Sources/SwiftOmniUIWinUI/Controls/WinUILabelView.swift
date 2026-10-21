@@ -5,17 +5,15 @@
 @_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIWinUI
 
-/// A Text: a `TextBlock` - its words, or runs of them each in its own colour, size, weight, family, letter spacing
-/// and background - standing in a `Border`, which draws what the label is drawn over and stands the words across its
-/// height.
+/// A Text: a native `TextBlock`, or a `RichTextBlock` paragraph when it contains inline images/baseline offsets,
+/// standing in a `Border` which supplies its background and vertical alignment.
 /// Design: docs/design/platforms/winui/controls.md#runs-of-words
 @MainActor
 final class WinUILabelView: WinUITextView {
     /// The label's own words, and the runs shown in their place; nil while it shows its own.
     private var ownText = ""
     private var runs: [TextRun]?
-    private var runsFontSize: Double?
-    private var runsLetterSpacing = 0.0
+    private var runsLook: TextLook?
 
     override func setText(_ text: String) {
         ownText = text
@@ -42,13 +40,12 @@ final class WinUILabelView: WinUITextView {
     /// Runs of words shown in place of the label's own (`MountedElement.textRuns`), each in its own look over the
     /// label's; nil shows its own words again.
     func setRuns(_ runs: [TextRun]?) {
-        let spacingChanged = runsFontSize != look.size || runsLetterSpacing != look.letterSpacing
-        guard self.runs != runs || (runs != nil && spacingChanged) else { return }
-        let paintOnly = !spacingChanged && Self.onlyRunPaintChanged(from: self.runs, to: runs)
+        let lookChanged = runsLook != look
+        guard self.runs != runs || (runs != nil && lookChanged) else { return }
+        let paintOnly = !lookChanged && Self.onlyRunPaintChanged(from: self.runs, to: runs)
         self.runs = runs
         invalidateTextLayout()
-        runsFontSize = look.size
-        runsLetterSpacing = look.letterSpacing
+        runsLook = look
         guard let runs else {
             super.setText(ownText)
             invalidateMeasure()
@@ -57,9 +54,10 @@ final class WinUILabelView: WinUITextView {
 
         var repainted = false
         WinUIStrings.withCStrings(runs.map(\.text)) { texts in
-            WinUIStrings.withCStrings(runs.map { $0.look.family ?? "" }) { families in
+            WinUIStrings.withCStrings(runs.map { $0.look.winUIFontFamily ?? "" }) { families in
                 WinUIStrings.withCStrings(runs.map { run in
                     guard let source = run.image, source.symbol == nil else { return "" }
+                    if source.bitmap != nil { return "@memory" }
                     return PictureArithmetic.files(for: source.file).joined(separator: "\n")
                 }) { images in
                     WinUIStrings.withCStrings(runs.map { $0.image?.symbol ?? "" }) { glyphs in
@@ -89,7 +87,14 @@ final class WinUILabelView: WinUITextView {
                 }
             }
         }
-        if !repainted { invalidateMeasure() }
+        if !repainted {
+            for (index, run) in runs.enumerated() {
+                guard let bitmap = run.image?.bitmap else { continue }
+                swiftomniui_winui_text_set_run_pixels(handle, Int32(index), bitmap.pixels.rgba,
+                    Int32(bitmap.pixels.width), Int32(bitmap.pixels.height), bitmap.size.width, bitmap.size.height)
+            }
+            invalidateMeasure()
+        }
     }
 
     /// Native Run objects can retain their text layout when just their paint

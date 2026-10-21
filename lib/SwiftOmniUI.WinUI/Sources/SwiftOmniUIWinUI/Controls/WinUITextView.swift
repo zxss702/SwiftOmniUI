@@ -200,7 +200,7 @@ class WinUITextView: WinUIView {
     }
 
     func setTextFont(_ font: TextLook) {
-        setFont(size: font.size, attributes: font.attributes, family: font.family,
+        setFont(size: font.size, attributes: font.attributes, family: font.winUIFontFamily,
                 textStyle: font.textStyle, weight: font.weight)
         look.size = wordsStyle.size
         look.attributes = font.attributes
@@ -269,14 +269,20 @@ class WinUITextView: WinUIView {
         prepareMeasure(width: bound.width, height: bound.height)
     }
 
-    /// WinUI spaces letters in thousandths of an em and lines in DIPs: both measured against the font's size.
+    /// WinUI spaces letters in thousandths of an em. Its native MaxHeight line
+    /// strategy takes a minimum line height, while taller text and inline images
+    /// retain their complete ascent/descent. Unlike a fixed baseline interval,
+    /// this cannot compress an inline formula into the body font's line height.
     private func writeSpacing() {
         let size = look.size ?? Self.platformFontSize
         let thousandths = Int32((look.letterSpacing(inEmsOf: size) * 1000).rounded())
         let natural = look.lineHeight != nil || look.lineSpacing != 0
             ? swiftomniui_winui_text_natural_line_height(handle) : 0
-        let line = natural > 0 ? max(0, natural * (look.lineHeight ?? 1) + look.lineSpacing) : 0
-        swiftomniui_winui_text_set_spacing(handle, thousandths, line)
+        // RichTextBlock has no public additive spacing property for variable
+        // line heights. Normal body lines receive this requested spacing; a
+        // taller native line can exceed the minimum rather than be clipped.
+        let minimumLineHeight = natural > 0 ? max(0, natural * (look.lineHeight ?? 1) + look.lineSpacing) : 0
+        swiftomniui_winui_text_set_spacing(handle, thousandths, minimumLineHeight)
         invalidateTextLayout()
     }
 }

@@ -64,6 +64,7 @@ extension Text {
     /// reads live - the same instance keeps answering what the words do, so a
     /// preference written once stays current.
     public struct Layout: Equatable, RandomAccessCollection, @unchecked Sendable {
+        public typealias TypographicBounds = SwiftOmniUICore.TypographicBounds
         /// The report the host last handed over, shared by the seed that
         /// offered this layout and the handler that hears the host.
         let box: TextLayoutBox
@@ -81,6 +82,9 @@ extension Text {
         ///         let origin = geometry[layout.origin]
         ///     }
         public let origin: Anchor<Point>
+
+        /// SwiftUI-compatible proxy access without re-typesetting the text.
+        public var layout: Layout { self }
 
         /// A layout reading `box`, at its generation now.
         init(box: TextLayoutBox, anchorBox: AnchorBox) {
@@ -175,12 +179,14 @@ extension Text {
     /// What a `Text` writes for its ancestors: the host's answer to how it
     /// laid the words out, collected as every `Text.Layout` the subtree
     /// offers, in written order.
+    public typealias LayoutProxy = Layout
+
     public struct LayoutKey: PreferenceKey {
         /// A subtree that wrote nothing answers no layouts.
-        public static var defaultValue: [Layout] { [] }
+        public static var defaultValue: [LayoutProxy] { [] }
 
         /// Every text's layouts join the answer, in written order.
-        public static func reduce(value: inout [Layout], nextValue: () -> [Layout]) {
+        public static func reduce(value: inout [LayoutProxy], nextValue: () -> [LayoutProxy]) {
             value.append(contentsOf: nextValue())
         }
     }

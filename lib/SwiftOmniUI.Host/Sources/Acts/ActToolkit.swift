@@ -28,6 +28,8 @@
     func announce(_ words: String)
 
     /// Puts `text` on the clipboard. A host with no clipboard writes nothing.
+    func copyImage(_ image: BitmapImage)
+    func copyRichText(html: String, plainText: String)
     func copyText(_ text: String)
 
     /// Takes the on-screen keyboard down; whether one was up.
@@ -56,6 +58,8 @@
 extension ActToolkit {
     /// The default: a host without a clipboard writes nothing.
     public func copyText(_ text: String) {}
+    public func copyImage(_ image: BitmapImage) {}
+    public func copyRichText(html: String, plainText: String) { copyText(plainText) }
 }
 
 /// Where a host's answers to acts go: the core, which hands each to the caller waiting on it.

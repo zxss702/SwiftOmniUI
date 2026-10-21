@@ -16,6 +16,7 @@ class GTKView {
     let widget: GTKWidget
 
     /// The number the widget's signals hand back.
+    var selectionInteraction: GTKSelectionInteraction?
     let number: Int64
 
     /// The layout that places this view, which a place written between passes asks to allocate again.
@@ -475,6 +476,8 @@ class GTKView {
     /// The element left the tree: the view lets go of everything that would call back into it. An override
     /// calls this first.
     func detach() {
+        selectionInteraction?.dispose()
+        selectionInteraction = nil
         GTKHoverHold.letGo(of: self)
         hear([]) { _ in }
         setFocusChanged(nil)

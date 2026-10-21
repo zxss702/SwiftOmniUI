@@ -112,6 +112,10 @@ extension WinUIElement {
             case .isVisible: view.setShown(isShown)
             // Ignored, the view and all in it are passed over: a click goes to what is under it.
             case .ignoresInput: view.setIgnoresInput(element.bool(.ignoresInput) == true)
+            case .selectionActive, .selectionDragPoint:
+                view.updateSelectionInteraction(active: value(.selectionActive)?.bool ?? false,
+                    point: value(.selectionDragPoint)?.numbers ?? [],
+                    send: { [weak self] event, values in self?.send(event, values) })
             case .pointerStyle:
                 swiftomniui_winui_set_pointer_style(view.handle, value(.pointerStyle)?.enumeration ?? -1)
             case .hint:

@@ -147,6 +147,11 @@ public struct Text: VisualElement, TextElement, FontElement, TextAlignmentElemen
         if let source = image.imageSource {
             span.write(SpanContract.image, source)
         }
+        // Image font traits matter for native symbol glyphs too. Keep them on
+        // the inline span rather than dropping the image's requested size.
+        for property: Prop in [.fontSize, .fontTextStyle, .fontFamily, .fontWeight, .fontAttributes, .fontDesign, .foregroundStyle] {
+            if let value = image.node.controlContent.props[property] { span.props[property] = value }
+        }
         node.children = [Node(contract: SpansContract.self, children: [span])]
     }
 

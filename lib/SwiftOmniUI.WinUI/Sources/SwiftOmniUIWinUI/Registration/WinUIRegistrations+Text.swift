@@ -59,7 +59,7 @@ extension WinUIRegistrations {
             if let text = view as? WinUITextView {
                 text.setTextFont(look)
             } else {
-                view.setFont(size: look.size, attributes: look.attributes, family: look.family,
+                view.setFont(size: look.size, attributes: look.attributes, family: look.winUIFontFamily,
                              textStyle: look.textStyle, weight: look.weight)
             }
         }

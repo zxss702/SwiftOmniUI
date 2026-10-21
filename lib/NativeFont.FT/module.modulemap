@@ -1,0 +1,5 @@
+module CFreeType [system] {
+    header "FontFace.h"
+    link "freetype"
+    export *
+}

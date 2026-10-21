@@ -44,6 +44,11 @@ public enum SwiftOmniUIGTK {
         initialization = initialize
         defer { initialization = nil }
         PicturePixels.read = { name in MainActor.assumeIsolated { GTKPictures.pixels(of: name) } }
+        BitmapImage.decode = { bytes in MainActor.assumeIsolated { GTKImageCodec.decode(bytes) } }
+        BitmapImage.encodePNG = { pixels in MainActor.assumeIsolated { GTKImageCodec.encode(pixels) } }
+        BitmapImage.rasterize = { size, scale, drawing in MainActor.assumeIsolated { GTKCanvasView.bitmap(size: size, scale: scale, drawing: drawing) } }
+        FontFace.open = { path in MainActor.assumeIsolated { GTKFontFaces.open(path) } }
+        FontMetrics.read = { descriptor in MainActor.assumeIsolated { GTKSystemFontMetrics.read(descriptor) } }
         Fonts.add = { path in MainActor.assumeIsolated { GTKFonts.register(path) } }
         for path in Fonts.pending { _ = Fonts.add?(path) }
         Fonts.pending.removeAll()

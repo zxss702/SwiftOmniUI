@@ -64,6 +64,9 @@ namespace swiftomniui {
     controls::TextBlock wordsOf(IInspectable const &element);
 
     /// The text block of the label `handle` names; throws for any other element.
+    xaml::Media::ImageSource memoryPicture(uint8_t const *rgba, int32_t width, int32_t height);
+    controls::RichTextBlock richWords(SwiftOmniUIObjectRef handle);
+    void syncRichWords(SwiftOmniUIObjectRef handle);
     controls::TextBlock labelWords(SwiftOmniUIObjectRef handle);
 
     /// Font values from the system's current text style, read through a reused

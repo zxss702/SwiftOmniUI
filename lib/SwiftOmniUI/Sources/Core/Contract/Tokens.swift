@@ -285,6 +285,8 @@ extension NodeType {
     static let shadow = VisualElementContract.shadow.token
     static let scrollOffset = ScrollViewContract.scrollOffset.token
     static let resizability = WindowSceneContract.resizability.token
+    static let selectionActive = ViewContract.selectionActive.token
+    static let selectionDragPoint = ViewContract.selectionDragPoint.token
     static let pointerStyle = ViewContract.pointerStyle.token
     static let layoutPriority = ViewContract.layoutPriority.token
     static let horizontalGuide = ViewContract.horizontalGuide.token
@@ -397,6 +399,10 @@ extension NodeType {
     static let dropCompleted = ViewContract.dropCompleted.token
     static let dropPaths = ViewContract.dropPaths.token
     static let frameChanged = ViewContract.frameChanged.token
+    static let windowPointerPressed = ViewContract.windowPointerPressed.token
+    static let copyRequested = ViewContract.copyRequested.token
+    static let selectAllRequested = ViewContract.selectAllRequested.token
+    static let dragScrolled = ViewContract.dragScrolled.token
     static let drawingSizeChanged = ViewContract.drawingSizeChanged.token
     static let textFrameChanged = Event("textFrameChanged")
     static let namedFramesChanged = ViewContract.namedFramesChanged.token
@@ -466,6 +472,8 @@ extension NodeType {
     static let persistValue = AppContract.persistValue.token
     static let persistSceneValue = AppContract.persistSceneValue.token
     static let handlerFailed = AppContract.handlerFailed.token
+    static let copyImage = AppContract.copyImage.token
+    static let copyRichText = AppContract.copyRichText.token
     static let copyText = AppContract.copyText.token
     static let openFiles = AppContract.openFiles.token
     static let openFolders = AppContract.openFolders.token

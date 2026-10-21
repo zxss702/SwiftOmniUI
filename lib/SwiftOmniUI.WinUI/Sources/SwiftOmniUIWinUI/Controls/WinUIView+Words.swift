@@ -37,3 +37,15 @@ extension WinUIView {
         return (style[0], Int(style[1]), Int(style[2]), Int(style[3]), UInt32(style[4]))
     }
 }
+
+/// Match the same native family resolution used by Font.metrics.
+extension TextLook {
+    var winUIFontFamily: String? {
+        if let family, !family.isEmpty { return family }
+        switch design {
+        case .monospaced: return "Consolas"
+        case .serif: return "Cambria"
+        default: return nil
+        }
+    }
+}

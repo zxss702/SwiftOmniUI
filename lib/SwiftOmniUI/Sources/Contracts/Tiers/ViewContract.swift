@@ -56,6 +56,16 @@ public enum ViewContract: Contract {
     /// The pointer's look while it is over the view; `.pointerStyle` writes it.
     public static let pointerStyle = ElementProperty<Self, PointerStyle>("pointerStyle", layer: .native)
 
+    /// Enables desktop copy/select-all commands for a custom text selection.
+    public static let selectionActive = ElementProperty<Self, Bool>("selectionActive", layer: .native)
+    /// The current drag point in the view; an empty array ends edge autoscrolling.
+    public static let selectionDragPoint = ElementProperty<Self, [Double]>("selectionDragPoint", layer: .native)
+    public static let windowPointerPressed = ElementEvent<Self, Void>("windowPointerPressed", layer: .native)
+    public static let copyRequested = ElementEvent<Self, Void>("copyRequested", layer: .native)
+    public static let selectAllRequested = ElementEvent<Self, Void>("selectAllRequested", layer: .native)
+    /// A stationary pointer expressed in content coordinates after native scrolling.
+    public static let dragScrolled = ElementEvent<Self, Point>("dragScrolled", layer: .native)
+
     /// How loudly the view asks for its natural size when the layout runs
     /// short - a higher one keeps its size while lower ones give theirs up;
     /// `.layoutPriority` writes it.
@@ -188,7 +198,8 @@ public enum ViewContract: Contract {
         layoutPriority,
         namedFramesChanged, safeAreaInsetsChanged, padding, panTouchCount,
         panUpdated, panXChannel, panYChannel, pinchUpdated, pointerEntered, pointerExited,
-        pointerMoved, pointerPressed, pointerReleased, pointerStyle, swipeDirection, swipeThreshold, swiped,
+        pointerMoved, pointerPressed, pointerReleased, pointerStyle,
+        selectionActive, selectionDragPoint, windowPointerPressed, copyRequested, selectAllRequested, dragScrolled, swipeDirection, swipeThreshold, swiped,
         tag, tapCount, tapGesture, verticalAlignment, verticalContentAlignment, verticalGuide,
     ]
 }

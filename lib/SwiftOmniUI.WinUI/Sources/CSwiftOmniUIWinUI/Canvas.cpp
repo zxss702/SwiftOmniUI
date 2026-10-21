@@ -750,3 +750,41 @@ extern "C" int32_t swiftomniui_winui_canvases(void) {
 extern "C" uint64_t swiftomniui_winui_canvas_paints(SwiftOmniUIObjectRef handle) {
     try { return canvas(handle)->paints; } catch (...) { return 0; }
 }
+
+extern "C" bool swiftomniui_winui_bitmap_render(
+    int32_t width, int32_t height, double scale, uint8_t *rgba,
+    int32_t const *ints, int32_t intCount, double const *numbers, int32_t numberCount,
+    char const *words, int32_t const *lengths, int32_t wordCount
+) {
+    try {
+        if (!rgba || width <= 0 || height <= 0 || width > 32768 || height > 32768 || !std::isfinite(scale) || scale <= 0) return false;
+        prepare(); Drawing drawing;
+        if (intCount) drawing.ints.assign(ints, ints + intCount);
+        if (numberCount) drawing.numbers.assign(numbers, numbers + numberCount);
+        for (int32_t i = 0, at = 0; i < wordCount; at += lengths[i++])
+            drawing.words.emplace_back(winrt::to_hstring(std::string_view(words + at, lengths[i])));
+        winrt::com_ptr<ID2D1DeviceContext> context;
+        winrt::check_hresult(devices.device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, context.put()));
+        D2D1_BITMAP_PROPERTIES1 properties{};
+        properties.pixelFormat = {DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED};
+        properties.dpiX = properties.dpiY = 96;
+        properties.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
+        winrt::com_ptr<ID2D1Bitmap1> target;
+        winrt::check_hresult(context->CreateBitmap(D2D1::SizeU(width, height), nullptr, 0, &properties, target.put()));
+        context->SetTarget(target.get()); context->BeginDraw(); context->Clear(D2D1::ColorF(0, 0, 0, 0));
+        ReplayResources resources;
+        replay(context.get(), D2D1::Matrix3x2F::Scale(static_cast<float>(scale), static_cast<float>(scale)), drawing, resources);
+        winrt::check_hresult(context->EndDraw()); context->SetTarget(nullptr);
+        properties.bitmapOptions = static_cast<D2D1_BITMAP_OPTIONS>(D2D1_BITMAP_OPTIONS_CPU_READ | D2D1_BITMAP_OPTIONS_CANNOT_DRAW);
+        winrt::com_ptr<ID2D1Bitmap1> readable;
+        winrt::check_hresult(context->CreateBitmap(D2D1::SizeU(width, height), nullptr, 0, &properties, readable.put()));
+        winrt::check_hresult(readable->CopyFromBitmap(nullptr, target.get(), nullptr));
+        D2D1_MAPPED_RECT mapped{}; winrt::check_hresult(readable->Map(D2D1_MAP_OPTIONS_READ, &mapped));
+        for (int32_t y = 0; y < height; ++y) for (int32_t x = 0; x < width; ++x) {
+            auto from = mapped.bits + static_cast<size_t>(y) * mapped.pitch + x * 4;
+            auto to = rgba + (static_cast<size_t>(y) * width + x) * 4;
+            to[0] = from[2]; to[1] = from[1]; to[2] = from[0]; to[3] = from[3];
+        }
+        winrt::check_hresult(readable->Unmap()); return true;
+    } catch (...) { report("rendering an in-memory bitmap"); return false; }
+}

@@ -118,10 +118,12 @@ case "GTK"?:
         .library(name: "SwiftOmniUIWebViewGTK", targets: ["SwiftOmniUIWebViewGTK"]),
     ]
     targets += [
+        .systemLibrary(name: "CFreeType", path: "lib/NativeFont.FT", pkgConfig: "freetype2"),
+        .systemLibrary(name: "CNativeFontShaping", path: "lib/NativeFont.Shaping", pkgConfig: "pangocairo"),
         .systemLibrary(name: "CSwiftOmniUIGTK", path: "lib/SwiftOmniUI.GTK/Sources/CSwiftOmniUIGTK", pkgConfig: "libadwaita-1"),
         .target(
             name: "SwiftOmniUIGTK",
-            dependencies: ["CSwiftOmniUIGTK", "SwiftOmniUICore",
+            dependencies: ["CSwiftOmniUIGTK", "CFreeType", "CNativeFontShaping", "SwiftOmniUICore",
                 "SwiftOmniUIHost"],
             path: "lib/SwiftOmniUI.GTK/Sources/SwiftOmniUIGTK",
             resources: [.copy("Resources/Icons")],

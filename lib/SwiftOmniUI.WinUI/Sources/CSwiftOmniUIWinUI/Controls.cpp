@@ -14,6 +14,7 @@
 #include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.ViewManagement.h>
+#include <winrt/Microsoft.UI.Xaml.Documents.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 
@@ -77,7 +78,10 @@ namespace {
 
 controls::TextBlock swiftomniui::wordsOf(IInspectable const &element) {
     if (auto block = element.try_as<controls::TextBlock>()) return block;
-    if (auto border = element.try_as<controls::Border>()) return border.Child().try_as<controls::TextBlock>();
+    if (auto border = element.try_as<controls::Border>()) {
+        if (auto block = border.Child().try_as<controls::TextBlock>()) return block;
+        return border.Tag().try_as<controls::TextBlock>();
+    }
     return nullptr;
 }
 
@@ -89,9 +93,29 @@ controls::TextBlock swiftomniui::labelWords(SwiftOmniUIObjectRef handle) {
 
 xaml::UIElement swiftomniui::metOf(IInspectable const &element) {
     if (auto border = element.try_as<controls::Border>()) {
-        if (auto block = border.Child().try_as<controls::TextBlock>()) return block;
+        auto child = border.Child();
+        if (child.try_as<controls::TextBlock>() || child.try_as<controls::RichTextBlock>()) return child;
     }
     return element.as<xaml::UIElement>();
+}
+
+controls::RichTextBlock swiftomniui::richWords(SwiftOmniUIObjectRef handle) {
+    auto border = as<IInspectable>(handle).try_as<controls::Border>();
+    return border ? border.Child().try_as<controls::RichTextBlock>() : nullptr;
+}
+void swiftomniui::syncRichWords(SwiftOmniUIObjectRef handle) {
+    auto rich = richWords(handle); if (!rich) return;
+    auto block = labelWords(handle);
+    rich.FontFamily(block.FontFamily()); rich.FontSize(block.FontSize());
+    rich.FontWeight(block.FontWeight()); rich.FontStyle(block.FontStyle()); rich.FontStretch(block.FontStretch());
+    rich.Foreground(block.Foreground()); rich.CharacterSpacing(block.CharacterSpacing());
+    rich.Language(block.Language()); rich.FlowDirection(block.FlowDirection());
+    rich.TextReadingOrder(block.TextReadingOrder()); rich.IsTextScaleFactorEnabled(block.IsTextScaleFactorEnabled());
+    rich.Padding(block.Padding()); rich.TextAlignment(block.TextAlignment());
+    rich.TextWrapping(block.TextWrapping()); rich.TextTrimming(block.TextTrimming()); rich.MaxLines(block.MaxLines());
+    rich.TextLineBounds(block.TextLineBounds()); rich.OpticalMarginAlignment(block.OpticalMarginAlignment());
+    rich.LineHeight(block.LineHeight()); rich.LineStackingStrategy(block.LineStackingStrategy());
+    rich.IsTextSelectionEnabled(block.IsTextSelectionEnabled()); rich.VerticalAlignment(block.VerticalAlignment());
 }
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_text_make(void) {
@@ -127,7 +151,12 @@ extern "C" void swiftomniui_winui_text_on_loaded(
 
 extern "C" void swiftomniui_winui_text_set_text(SwiftOmniUIObjectRef handle, char const *utf8) {
     try {
-        labelWords(handle).Text(text(utf8));
+        auto block = labelWords(handle);
+        if (richWords(handle)) {
+            auto border = borrow<controls::Border>(handle); border.Child(block); border.Tag(nullptr);
+        }
+        block.TextHighlighters().Clear();
+        block.Text(text(utf8));
     } catch (...) {
         report("setting a label's words");
     }
@@ -137,7 +166,7 @@ extern "C" void swiftomniui_winui_text_after_layout(
     SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t)
 ) {
     try {
-        auto block = borrow<controls::Border>(handle).Child().as<controls::TextBlock>();
+        auto block = borrow<controls::Border>(handle).Child().as<xaml::FrameworkElement>();
         auto token = std::make_shared<winrt::event_token>();
         *token = block.LayoutUpdated(guarded("publishing arranged text geometry",
             [weak = winrt::make_weak(block), token, view, ready](auto const &, auto const &) {
@@ -164,6 +193,7 @@ extern "C" void swiftomniui_winui_text_set_vertical(SwiftOmniUIObjectRef handle,
         labelWords(handle).VerticalAlignment(vertical == 1 ? xaml::VerticalAlignment::Center
                                              : vertical == 2 ? xaml::VerticalAlignment::Bottom
                                                              : xaml::VerticalAlignment::Stretch);
+        syncRichWords(handle);
     } catch (...) {
         report("standing a label's words across its height");
     }

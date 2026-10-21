@@ -11,6 +11,44 @@ import CSwiftOmniUIGTK
 /// Design: docs/design/platforms/gtk/drawing.md#a-canvas
 @MainActor
 final class GTKCanvasView: GTKPanelView {
+    private static var bitmapCanvas: GTKCanvasView?
+    static func bitmap(size: Size, scale: Double, drawing: [DrawCommand]) -> PicturePixels? {
+        let pixelWidth = (size.width * scale).rounded(.up)
+        let pixelHeight = (size.height * scale).rounded(.up)
+        guard scale.isFinite, scale > 0, size.width.isFinite, size.height.isFinite,
+              size.width > 0, size.height > 0,
+              pixelWidth.isFinite, pixelHeight.isFinite,
+              pixelWidth > 0, pixelHeight > 0, pixelWidth <= 32768, pixelHeight <= 32768 else { return nil }
+        let width = Int(pixelWidth), height = Int(pixelHeight)
+        if bitmapCanvas == nil { bitmapCanvas = GTKCanvasView() }
+        guard let canvas = bitmapCanvas, let snapshot = gtk_snapshot_new() else { return nil }
+        canvas.instructions = CanvasInstruction.instructions(drawing)
+        canvas.draw(snapshot, width: size.width, height: size.height)
+        let node = gtk_snapshot_free_to_node(snapshot)
+        defer { if let node { gsk_render_node_unref(node) } }
+        guard let surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, Int32(width), Int32(height)) else { return nil }
+        defer { cairo_surface_destroy(surface) }
+        guard cairo_surface_status(surface) == CAIRO_STATUS_SUCCESS, let cr = cairo_create(surface) else { return nil }
+        defer { cairo_destroy(cr) }
+        guard cairo_status(cr) == CAIRO_STATUS_SUCCESS else { return nil }
+        cairo_scale(cr, scale, scale)
+        if let node { gsk_render_node_draw(node, cr) }
+        cairo_surface_flush(surface)
+        guard cairo_status(cr) == CAIRO_STATUS_SUCCESS, cairo_surface_status(surface) == CAIRO_STATUS_SUCCESS,
+              let bytes = cairo_image_surface_get_data(surface) else { return nil }
+        let stride = Int(cairo_image_surface_get_stride(surface))
+        var rgba = [UInt8](repeating: 0, count: width * height * 4)
+        for y in 0..<height { for x in 0..<width {
+            let from = y * stride + x * 4, to = (y * width + x) * 4
+            #if _endian(little)
+            rgba[to] = bytes[from + 2]; rgba[to + 1] = bytes[from + 1]; rgba[to + 2] = bytes[from]; rgba[to + 3] = bytes[from + 3]
+            #else
+            rgba[to] = bytes[from + 1]; rgba[to + 1] = bytes[from + 2]; rgba[to + 2] = bytes[from + 3]; rgba[to + 3] = bytes[from]
+            #endif
+        } }
+        return PicturePixels(width: width, height: height, rgba: rgba)
+    }
+
     var onPressed: ((Point) -> Void)?
     var onDragged: ((Point) -> Void)?
     var onReleased: ((Point) -> Void)?

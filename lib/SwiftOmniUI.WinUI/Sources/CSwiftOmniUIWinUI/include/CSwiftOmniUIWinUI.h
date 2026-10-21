@@ -526,7 +526,9 @@ int32_t swiftomniui_winui_text_runs(SwiftOmniUIObjectRef text, double *values, i
 /// thousandths of an em, the height of a line in DIPs, 0 for the font's, and the lines under or through its words.
 void swiftomniui_winui_text_set_lines(SwiftOmniUIObjectRef text, bool wraps, int32_t lines, bool trims);
 void swiftomniui_winui_text_set_alignment(SwiftOmniUIObjectRef text, int32_t horizontal);
-void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef text, int32_t characterSpacing, double lineHeight);
+/// Character spacing in thousandths of an em; minimum native line height in DIPs (0 keeps native metrics).
+/// Larger inline fonts/images retain their height through WinUI's MaxHeight stacking strategy.
+void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef text, int32_t characterSpacing, double minimumLineHeight);
 double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRef text);
 void swiftomniui_winui_text_set_decorations(SwiftOmniUIObjectRef text, bool underline, bool strikethrough);
 
@@ -1258,6 +1260,53 @@ int32_t swiftomniui_winui_file_dialog(void);
 /// What was launched since the relay started - a file by its path, an address as written - in UTF-8, each ended by
 /// the unit separator (0x1F) but the last, as far as `capacity` goes; its whole length. What a test reads.
 int32_t swiftomniui_winui_launched(char *utf8, int32_t capacity);
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// Exact, process-private font-file access used by the portable graphics layer.
+void *swiftomniui_winui_font_open(char const *path, double *units);
+void swiftomniui_winui_font_close(void *face);
+uint16_t swiftomniui_winui_font_glyph(void *face, uint32_t scalar);
+bool swiftomniui_winui_font_metrics(void *face, uint16_t glyph, double *metrics);
+int32_t swiftomniui_winui_font_outline(void *face, uint16_t glyph, char *out, int32_t capacity);
+int32_t swiftomniui_winui_font_table(void *face, char const *tag, uint8_t *out, int32_t capacity);
+typedef struct SwiftOmniUIShapedGlyph {
+    uint16_t glyph;
+    uint32_t clusterStart, clusterLength;
+    double x, y, advance;
+    bool visible;
+} SwiftOmniUIShapedGlyph;
+void *swiftomniui_winui_font_shape(void *face, uint16_t const *text, int32_t length);
+int32_t swiftomniui_winui_shaped_glyph_count(void *shape);
+SwiftOmniUIShapedGlyph const *swiftomniui_winui_shaped_glyphs(void *shape);
+uint8_t const *swiftomniui_winui_shaped_breaks(void *shape);
+double swiftomniui_winui_shaped_width(void *shape);
+void swiftomniui_winui_shaped_close(void *shape);
+bool swiftomniui_winui_font_descriptor_metrics(char const *family, double size, int32_t textStyle,
+    double weight, int32_t attributes, int32_t design, double *metrics);
+
+bool swiftomniui_winui_bitmap_render(int32_t width, int32_t height, double scale, uint8_t *rgba,
+    int32_t const *ints, int32_t intCount, double const *numbers, int32_t numberCount,
+    char const *words, int32_t const *lengths, int32_t wordCount);
+bool swiftomniui_winui_image_set_pixels(SwiftOmniUIObjectRef element, uint8_t const *rgba,
+    int32_t width, int32_t height, double logicalWidth, double logicalHeight);
+void swiftomniui_winui_text_set_run_pixels(SwiftOmniUIObjectRef element, int32_t run, uint8_t const *rgba,
+    int32_t width, int32_t height, double logicalWidth, double logicalHeight);
+void swiftomniui_winui_selection_interaction(SwiftOmniUIObjectRef element, int64_t view, bool active,
+    bool dragging, double x, double y, void (*input)(int64_t, int32_t, double, double));
+void swiftomniui_winui_selection_interaction_clear(int64_t view);
+
+void *swiftomniui_winui_decode_image(uint8_t const *bytes, int64_t count, int32_t *size);
+void *swiftomniui_winui_encode_png(uint8_t const *rgba, int32_t width, int32_t height, int64_t *count);
+bool swiftomniui_winui_image_bytes(void *image, uint8_t *output, int64_t count);
+void swiftomniui_winui_image_bytes_close(void *image);
+void swiftomniui_winui_copy_image(uint8_t const *png, int64_t count);
+void swiftomniui_winui_copy_html(char const *html, char const *plainText);
 
 #ifdef __cplusplus
 }

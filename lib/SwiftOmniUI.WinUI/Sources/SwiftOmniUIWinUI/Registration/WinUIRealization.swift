@@ -66,6 +66,12 @@ enum WinUIRealization {
         .partial("View", "verticalGuide",
             missing: "WinUI's items name no text baseline: the baseline guides land on edges; the rest align."),
         .complete("View", "pointerStyle"),
+        .complete("View", "selectionActive"),
+        .complete("View", "selectionDragPoint"),
+        .complete("View", "windowPointerPressed"),
+        .complete("View", "copyRequested"),
+        .complete("View", "selectAllRequested"),
+        .complete("View", "dragScrolled"),
 
         // MARK: Entries - a control's or a part's own
         .unrealized("ActivityIndicator", "ignoresInput", why: hitOnlyWherePainted),

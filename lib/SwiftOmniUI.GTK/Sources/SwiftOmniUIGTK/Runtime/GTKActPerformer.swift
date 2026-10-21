@@ -46,6 +46,15 @@ final class GTKActPerformer {
             openFolders(call, window: window)
         case .revealFile, .launchFile, .launchLink:
             launch(call, window: window)
+        case .copyImage:
+            guard let value = call.arguments.first, let image = ImageSource(propValue: value)?.bitmap,
+                  let texture = GTKMemoryImages.texture(image) else { return fail(call, "copyImage requires decoded image pixels") }
+            gdk_clipboard_set_texture(gdk_display_get_clipboard(gdk_display_get_default()), texture)
+            g_object_unref(UnsafeMutableRawPointer(texture))
+            reply(call, [])
+        case .copyRichText:
+            GTKImageCodec.copy(html: call.arguments.first?.string ?? "", plainText: call.arguments.value(1)?.string ?? "")
+            reply(call, [])
         case .copyText:
             let text = call.arguments.first?.string ?? ""
             text.withCString { gdk_clipboard_set_text(gdk_display_get_clipboard(gdk_display_get_default()), $0) }

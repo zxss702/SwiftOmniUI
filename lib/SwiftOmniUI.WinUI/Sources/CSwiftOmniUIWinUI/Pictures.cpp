@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <limits>
 #include <string>
 #include <tuple>
 
@@ -700,4 +701,29 @@ extern "C" bool swiftomniui_winui_image_decoded_pixels(
         report("reading a synchronously decoded image's pixels");
         return false;
     }
+}
+
+xaml::Media::ImageSource swiftomniui::memoryPicture(uint8_t const *rgba, int32_t width, int32_t height) {
+    if (!rgba || width <= 0 || height <= 0 || width > 32768 || height > 32768) return nullptr;
+    if (static_cast<uint64_t>(width) * height * 4 > std::numeric_limits<uint32_t>::max()) return nullptr;
+    imaging::WriteableBitmap bitmap(width, height);
+    auto pixels = bitmap.PixelBuffer().data();
+    for (size_t i = 0, n = static_cast<size_t>(width) * height * 4; i < n; i += 4) {
+        pixels[i] = rgba[i + 2]; pixels[i + 1] = rgba[i + 1]; pixels[i + 2] = rgba[i]; pixels[i + 3] = rgba[i + 3];
+    }
+    bitmap.Invalidate(); return bitmap;
+}
+extern "C" bool swiftomniui_winui_image_set_pixels(SwiftOmniUIObjectRef handle, uint8_t const *rgba,
+    int32_t width, int32_t height, double logicalWidth, double logicalHeight) {
+    try {
+        if (!std::isfinite(logicalWidth) || !std::isfinite(logicalHeight) || logicalWidth <= 0 || logicalHeight <= 0) return false;
+        auto source = memoryPicture(rgba, width, height); if (!source) return false;
+        auto grid = imageGrid(handle); auto image = imageChild(grid);
+        symbolBox(grid).Visibility(xaml::Visibility::Collapsed); image.Visibility(xaml::Visibility::Visible);
+        image.Source(source); image.Stretch(media::Stretch::Fill);
+        image.Width(logicalWidth); image.Height(logicalHeight);
+        auto state = imageState(grid); state->path.clear(); state->svg = false;
+        state->size = {static_cast<float>(logicalWidth), static_cast<float>(logicalHeight)};
+        return true;
+    } catch (...) { report("showing an in-memory image"); return false; }
 }

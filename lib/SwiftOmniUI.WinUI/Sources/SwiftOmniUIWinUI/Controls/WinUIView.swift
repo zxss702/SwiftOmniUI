@@ -825,6 +825,7 @@ class WinUIView {
 
     /// What of the user's input the view listens for; what hears it.
     private(set) var hearing: Hearing = []
+    var selectionInput: ((Int32, Point) -> Void)?
     private var onHeard: ((HeardInput) -> Void)?
 
     /// The press the view heard, on its way to a drag by the host layer's rule.
@@ -900,6 +901,8 @@ class WinUIView {
     /// The element left the tree: the view lets go of everything that would call back into it. A view that
     /// overrides this lets go of what every view holds first, then of its own.
     func detach() {
+        swiftomniui_winui_selection_interaction_clear(number)
+        selectionInput = nil
         isDetached = true
         WinUIHoverHold.letGo(of: self)
         // The popups it presented stood with it, and their going settles what they held.

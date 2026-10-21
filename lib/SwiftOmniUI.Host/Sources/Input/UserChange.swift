@@ -37,6 +37,7 @@ extension MountedElement {
     public func send(_ event: Event, _ values: [HostValue], in runtime: HostRuntime) {
         if event == .clicked || event == .submitted || event == .itemActivated
             || event == .pinClicked || event == .pinDetailsClicked || event == .pressed
+            || event == .copyRequested || event == .selectAllRequested || event == .dragScrolled
             || event == .tapGesture || event == .swiped || event == .panUpdated || event == .pinchUpdated {
             guard isEnabled else { return }
         }

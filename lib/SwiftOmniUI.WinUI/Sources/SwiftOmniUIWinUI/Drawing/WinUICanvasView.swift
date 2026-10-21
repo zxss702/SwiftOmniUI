@@ -9,6 +9,23 @@ import CSwiftOmniUIWinUI
 /// Design: docs/design/platforms/winui/drawing.md#a-canvas
 @MainActor
 final class WinUICanvasView: WinUIView {
+    static func bitmap(size: Size, scale: Double, drawing: [DrawCommand]) -> PicturePixels? {
+        let pixelWidth = (size.width * scale).rounded(.up), pixelHeight = (size.height * scale).rounded(.up)
+        // Check the floating-point values before converting to Int: malformed
+        // or overflowing dimensions must fail rather than trap in Swift.
+        guard scale.isFinite, scale > 0, pixelWidth.isFinite, pixelHeight.isFinite,
+              pixelWidth > 0, pixelHeight > 0, pixelWidth <= 32768, pixelHeight <= 32768 else { return nil }
+        let width = Int(pixelWidth), height = Int(pixelHeight)
+        var rgba = [UInt8](repeating: 0, count: width * height * 4)
+        let flat = HostDrawing(drawing)
+        let words = flat.strings.flatMap { $0.utf8.map { CChar(bitPattern: $0) } }
+        let lengths = flat.strings.map { Int32($0.utf8.count) }
+        let result = swiftomniui_winui_bitmap_render(Int32(width), Int32(height), scale, &rgba,
+            flat.ints, Int32(flat.ints.count), flat.numbers, Int32(flat.numbers.count),
+            words, lengths, Int32(lengths.count))
+        return result ? PicturePixels(width: width, height: height, rgba: rgba) : nil
+    }
+
     /// What the canvas does as a press goes down on it, moves, and is lifted, at a point in DIPs of it.
     var onPressed: ((Point) -> Void)?
     var onDragged: ((Point) -> Void)?

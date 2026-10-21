@@ -64,7 +64,11 @@ final class WinUIImageView: WinUIView {
         file = source?.file ?? ""
         self.aspect = aspect
         var size = [0.0, 0.0]
-        if let name = source?.symbol {
+        if let bitmap = source?.bitmap {
+            found = swiftomniui_winui_image_set_pixels(handle, bitmap.pixels.rgba, Int32(bitmap.pixels.width),
+                Int32(bitmap.pixels.height), bitmap.size.width, bitmap.size.height)
+            size = [bitmap.size.width, bitmap.size.height]
+        } else if let name = source?.symbol {
             found = swiftomniui_winui_image_set_symbol(handle, name, aspect.rawValue, font.size ?? 0,
                 font.weight ?? (font.attributes.contains(.bold) ? 700 : 0), font.textStyle?.rawValue ?? -1, &size)
         } else {

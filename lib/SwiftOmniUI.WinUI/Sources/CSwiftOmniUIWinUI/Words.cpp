@@ -33,31 +33,41 @@ namespace documents = winrt::Microsoft::UI::Xaml::Documents;
 
 extern "C" void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef handle, int32_t style) {
     try {
-        using winrt::Microsoft::UI::Input::InputSystemCursorShape;
-        auto shape = InputSystemCursorShape::Arrow;
-        switch (style) {
-        case 1: case 2: case 3: case 11: shape = InputSystemCursorShape::IBeam; break;
-        case 4: case 5: case 6: case 7: case 8: shape = InputSystemCursorShape::Hand; break;
-        case 9: shape = InputSystemCursorShape::UniversalNo; break;
-        case 10: shape = InputSystemCursorShape::Cross; break;
-        case 12: shape = InputSystemCursorShape::SizeWestEast; break;
-        case 13: shape = InputSystemCursorShape::SizeNorthSouth; break;
-        case 14: shape = InputSystemCursorShape::SizeNorthwestSoutheast; break;
-        }
-        auto apply = [shape, style](xaml::FrameworkElement const &target) {
+        auto target = as<xaml::FrameworkElement>(handle);
+        auto currentKey = winrt::box_value(L"SwiftOmniUIPointerStyle");
+        auto pendingKey = winrt::box_value(L"SwiftOmniUIPointerStylePending");
+        target.Resources().Insert(currentKey, winrt::box_value(style));
+        auto apply = [currentKey](xaml::FrameworkElement const &target) {
+            auto style = winrt::unbox_value<int32_t>(target.Resources().Lookup(currentKey));
+            using winrt::Microsoft::UI::Input::InputSystemCursorShape;
+            auto shape = InputSystemCursorShape::Arrow;
+            switch (style) {
+            case 1: case 2: case 3: case 11: shape = InputSystemCursorShape::IBeam; break;
+            case 4: case 5: case 6: case 7: case 8: shape = InputSystemCursorShape::Hand; break;
+            case 9: shape = InputSystemCursorShape::UniversalNo; break;
+            case 10: shape = InputSystemCursorShape::Cross; break;
+            case 12: shape = InputSystemCursorShape::SizeWestEast; break;
+            case 13: shape = InputSystemCursorShape::SizeNorthSouth; break;
+            case 14: shape = InputSystemCursorShape::SizeNorthwestSoutheast; break;
+            }
             auto element = target.as<xaml::IUIElementProtected>();
             if (style < 0) element.ProtectedCursor(nullptr);
             else element.ProtectedCursor(winrt::Microsoft::UI::Input::InputSystemCursor::Create(shape));
         };
-        auto target = as<xaml::FrameworkElement>(handle);
         if (target.IsLoaded()) apply(target);
-        else {
+        else if (!target.Resources().HasKey(pendingKey)) {
             // ProtectedCursor requires a live XamlRoot. Unsubscribe before
-            // applying so later attachments do not accumulate callbacks.
+            // applying the latest value: style can change several times before
+            // attachment, and an earlier Loaded callback must not restore it.
+            target.Resources().Insert(pendingKey, winrt::box_value(true));
             auto token = std::make_shared<winrt::event_token>();
-            *token = target.Loaded([weak = winrt::make_weak(target), token, apply](auto const &, auto const &) {
+            *token = target.Loaded([weak = winrt::make_weak(target), token, pendingKey, apply](auto const &, auto const &) {
                 try {
-                    if (auto target = weak.get()) { target.Loaded(*token); apply(target); }
+                    if (auto target = weak.get()) {
+                        target.Loaded(*token);
+                        target.Resources().Remove(pendingKey);
+                        apply(target);
+                    }
                 } catch (...) { report("loaded pointer style"); }
             });
         }
@@ -65,12 +75,43 @@ extern "C" void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef handle,
 }
 
 extern "C" void swiftomniui_winui_text_set_selectable(SwiftOmniUIObjectRef handle, bool selectable) {
-    try { labelWords(handle).IsTextSelectionEnabled(selectable); }
+    try { labelWords(handle).IsTextSelectionEnabled(selectable); syncRichWords(handle); }
     catch (...) { report("text selectable"); }
 }
 
 namespace {
     uint64_t fontProbes = 0;
+
+    // WinUI takes an Image/Panel's bottom edge as its inline baseline; only a
+    // TextBlock/RichTextBlock can report a separate baseline and descent. Keep
+    // the image in a native paragraph whose baseline comes from its margin,
+    // and whose minimum height retains the pixels below that baseline. Without
+    // this host a negative baseline offset shortens the line's measured height.
+    controls::RichTextBlock inlineHost(xaml::UIElement const &child, double height) {
+        controls::RichTextBlock host;
+        host.UseLayoutRounding(false);
+        host.IsTextSelectionEnabled(false);
+        host.IsHitTestVisible(false);
+        host.FontSize(0.01);
+        host.Padding({0, 0, 0, 0});
+        host.TextWrapping(xaml::TextWrapping::NoWrap);
+        host.MinHeight(std::max(0.0, height));
+        host.Tag(child);
+        documents::Paragraph paragraph;
+        documents::InlineUIContainer content;
+        content.Child(child);
+        paragraph.Inlines().Append(content);
+        host.Blocks().Append(paragraph);
+        return host;
+    }
+
+    xaml::FrameworkElement inlineContent(documents::InlineUIContainer const &holder) {
+        auto child = holder.Child();
+        if (auto host = child.try_as<controls::RichTextBlock>())
+            if (auto content = host.Tag().try_as<xaml::FrameworkElement>()) return content;
+        return child.try_as<xaml::FrameworkElement>();
+    }
+
     winrt::Windows::UI::Color color(uint32_t argb) {
         return {static_cast<uint8_t>(argb >> 24), static_cast<uint8_t>(argb >> 16), static_cast<uint8_t>(argb >> 8),
                 static_cast<uint8_t>(argb)};
@@ -89,7 +130,7 @@ namespace {
     template <typename OnBlock, typename OnControl>
     void either(SwiftOmniUIObjectRef handle, OnBlock block, OnControl control) {
         auto object = as<IInspectable>(handle);
-        if (auto text = wordsOf(object)) block(text);
+        if (auto text = wordsOf(object)) { block(text); syncRichWords(handle); }
         else if (auto other = object.try_as<controls::Control>()) control(other);
     }
 
@@ -280,6 +321,18 @@ extern "C" void swiftomniui_winui_set_foreground(SwiftOmniUIObjectRef handle, bo
                 for (auto const &highlighter : block.TextHighlighters()) {
                     if (highlighter.Foreground() == previous) highlighter.Foreground(foreground);
                 }
+                if (auto rich = richWords(handle)) {
+                    for (auto const &highlighter : rich.TextHighlighters())
+                        if (highlighter.Foreground() == previous) highlighter.Foreground(foreground);
+                    for (auto const &value : rich.Blocks()) if (auto paragraph = value.try_as<documents::Paragraph>())
+                        for (auto const &inlineValue : paragraph.Inlines())
+                            if (auto holder = inlineValue.try_as<documents::InlineUIContainer>())
+                                if (auto child = inlineContent(holder).try_as<controls::TextBlock>()) {
+                                    auto key = winrt::box_value(L"SwiftOmniUIInlineInheritsForeground");
+                                    if (child.Resources().HasKey(key) && winrt::unbox_value<bool>(child.Resources().Lookup(key)))
+                                        child.Foreground(foreground);
+                                }
+                }
             },
             [&](controls::Control const &control) {
                 if (has) control.Foreground(brush);
@@ -327,6 +380,7 @@ extern "C" void swiftomniui_winui_text_set_lines(SwiftOmniUIObjectRef handle, bo
         block.TextWrapping(wraps ? xaml::TextWrapping::Wrap : xaml::TextWrapping::NoWrap);
         block.TextTrimming(trims ? xaml::TextTrimming::CharacterEllipsis : xaml::TextTrimming::None);
         block.MaxLines(std::max(0, lines));
+        syncRichWords(handle);
     } catch (...) {
         report("setting a label's lines");
     }
@@ -337,6 +391,7 @@ extern "C" void swiftomniui_winui_text_set_alignment(SwiftOmniUIObjectRef handle
         auto aligned = horizontal == 1 ? xaml::TextAlignment::Center
             : horizontal == 2 ? xaml::TextAlignment::End : xaml::TextAlignment::Start;
         labelWords(handle).TextAlignment(aligned);
+        syncRichWords(handle);
     } catch (...) {
         report("aligning a label's words");
     }
@@ -365,13 +420,19 @@ extern "C" double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRe
     } catch (...) { report("reading natural line height"); return 0; }
 }
 
-extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, int32_t characterSpacing, double lineHeight) {
+extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, int32_t characterSpacing, double minimumLineHeight) {
     try {
         auto block = labelWords(handle);
         block.CharacterSpacing(characterSpacing);
-        block.LineStackingStrategy(lineHeight > 0 ? xaml::LineStackingStrategy::BaselineToBaseline
-                                                  : xaml::LineStackingStrategy::MaxHeight);
-        block.LineHeight(lineHeight > 0 ? lineHeight : 0);
+        // Native BaselineToBaseline assigns a fixed advance even when a line
+        // contains a taller font or inline image. MaxHeight keeps the native
+        // line's complete ascent/descent and treats LineHeight as a minimum.
+        // WinUI exposes no additive spacing for individually varying line
+        // heights; this preserves the content instead of shrinking its line.
+        // See WinUI ParagraphNode::ApplyLineStackingStrategy.
+        block.LineStackingStrategy(xaml::LineStackingStrategy::MaxHeight);
+        block.LineHeight(std::isfinite(minimumLineHeight) && minimumLineHeight > 0 ? minimumLineHeight : 0);
+        syncRichWords(handle);
     } catch (...) {
         report("spacing a label's words");
     }
@@ -379,19 +440,45 @@ extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, 
 
 extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, SwiftOmniUIWordsRun const *runs, int32_t count) {
     try {
+        if (count < 0 || (count > 0 && !runs)) return;
         namespace documents = winrt::Microsoft::UI::Xaml::Documents;
         using winrt::Windows::UI::Text::TextDecorations;
         auto block = labelWords(handle);
+        bool needsRich = false;
+        for (int32_t i = 0; i < count; ++i)
+            needsRich = needsRich || (runs[i].image && *runs[i].image) || runs[i].baseline != 0;
+        auto rich = richWords(handle);
+        if (needsRich && !rich) {
+            rich = controls::RichTextBlock(); rich.UseLayoutRounding(false);
+            auto border = borrow<controls::Border>(handle); border.Tag(block); border.Child(rich);
+            syncRichWords(handle);
+        } else if (!needsRich && rich) {
+            auto border = borrow<controls::Border>(handle); border.Child(block); border.Tag(nullptr); rich = nullptr;
+        }
         auto inlines = block.Inlines();
         auto highlighters = block.TextHighlighters();
+        if (rich) {
+            rich.Blocks().Clear(); documents::Paragraph paragraph;
+            paragraph.TextDecorations(block.TextDecorations());
+            rich.Blocks().Append(paragraph); inlines = paragraph.Inlines(); highlighters = rich.TextHighlighters();
+        }
         inlines.Clear();
         highlighters.Clear();
         int32_t at = 0;
+        winrt::hstring plainText;
+        auto paintBackground = [&](SwiftOmniUIWordsRun const &run, int32_t length) {
+            if (!run.hasBackground || length <= 0) return;
+            documents::TextHighlighter highlighter;
+            highlighter.Background(media::SolidColorBrush(color(run.background)));
+            highlighter.Foreground(run.hasColor ? media::SolidColorBrush(color(run.color)) : block.Foreground());
+            highlighter.Ranges().Append(documents::TextRange{at, length});
+            highlighters.Append(highlighter);
+        };
         for (int32_t index = 0; index < count; ++index) {
             auto const &run = runs[index];
             // Symbols are font glyphs, so retain TextBlock's native Run path.
-            // InlineUIContainer is not supported by TextBlock.
-            if (run.glyph && *run.glyph) {
+            // Image-bearing text uses RichTextBlock's native paragraph layout.
+            if (run.glyph && *run.glyph && run.baseline == 0) {
                 documents::Run mark;
                 auto glyph = text(run.glyph);
                 mark.Text(glyph);
@@ -399,39 +486,73 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
                 if (run.size > 0) mark.FontSize(run.size);
                 if (run.hasColor) mark.Foreground(media::SolidColorBrush(color(run.color)));
                 inlines.Append(mark);
-                at += static_cast<int32_t>(glyph.size());
+                auto length = static_cast<int32_t>(glyph.size());
+                paintBackground(run, length);
+                at += length;
+                plainText = plainText + glyph;
                 continue;
             }
             if ((run.image && *run.image) || run.baseline != 0) {
                 documents::InlineUIContainer holder;
                 if (run.image && *run.image) {
                     controls::Image picture;
-                    auto file = pictureFile(run.image);
-                    if (!file.empty()) picture.Source(pictureSource(file));
-                    holder.Child(picture);
+                    if (std::string_view(run.image) != "@memory") {
+                        auto file = pictureFile(run.image);
+                        if (!file.empty()) picture.Source(pictureSource(file));
+                    }
+                    picture.Stretch(media::Stretch::Fill);
+                    picture.Margin({0, 0, 0, run.baseline});
+                    picture.Measure({INFINITY, INFINITY});
+                    auto height = std::max(0.0, static_cast<double>(picture.DesiredSize().Height) - run.baseline);
+                    if (run.baseline == 0) holder.Child(picture);
+                    else holder.Child(inlineHost(picture, height));
+                    plainText = plainText + L"\uFFFC";
                 } else {
                     controls::TextBlock part;
-                    part.Text(text(run.text));
+                    auto symbol = run.glyph && *run.glyph;
+                    part.Text(text(symbol ? run.glyph : run.text));
+                    // InlineUIContainer does not inherit text formatting into
+                    // its child. Apply the label's resolved look first.
+                    part.FontFamily(block.FontFamily()); part.FontSize(block.FontSize());
+                    part.FontWeight(block.FontWeight()); part.FontStyle(block.FontStyle());
+                    part.FontStretch(block.FontStretch()); part.Foreground(block.Foreground());
+                    part.UseLayoutRounding(false);
+                    part.Resources().Insert(winrt::box_value(L"SwiftOmniUIInlineInheritsForeground"), winrt::box_value(!run.hasColor));
+                    if (symbol) part.FontFamily(media::FontFamily(L"Segoe Fluent Icons, Segoe MDL2 Assets"));
                     if (run.hasColor) part.Foreground(media::SolidColorBrush(color(run.color)));
                     if (run.size > 0) part.FontSize(run.size);
                     if (run.bold) part.FontWeight(winrt::Microsoft::UI::Text::FontWeights::Bold());
                     if (run.italic) part.FontStyle(winrt::Windows::UI::Text::FontStyle::Italic);
-                    if (run.family && *run.family) part.FontFamily(media::FontFamily(text(run.family)));
+                    if (!symbol && run.family && *run.family) part.FontFamily(media::FontFamily(text(run.family)));
                     part.CharacterSpacing(run.spacing);
-                    media::TranslateTransform shift;
-                    shift.Y(-run.baseline);
-                    part.RenderTransform(shift);
-                    part.Tag(winrt::box_value(true)); // Raised text retains all of its source characters.
-                    holder.Child(part);
+                    auto decorations = TextDecorations::None;
+                    if (run.underline) decorations = decorations | TextDecorations::Underline;
+                    if (run.strikethrough) decorations = decorations | TextDecorations::Strikethrough;
+                    part.TextDecorations(decorations);
+                    part.Measure({INFINITY, INFINITY});
+                    auto height = static_cast<double>(part.DesiredSize().Height);
+                    controls::Border room;
+                    room.Child(part);
+                    // A Border uses its desired bottom edge as its baseline.
+                    // Its native margin supplies the requested ascent while
+                    // the RichTextBlock keeps the complete text height.
+                    room.Margin({0, 0, 0, part.BaselineOffset() + run.baseline - height});
+                    auto host = inlineHost(room, height);
+                    host.Tag(part);
+                    holder.Child(host);
+                    plainText = plainText + part.Text();
                 }
                 inlines.Append(holder);
-                at += (run.glyph && *run.glyph) || (run.image && *run.image) ? 1
+                auto length = (run.glyph && *run.glyph) || (run.image && *run.image) ? 1
                     : static_cast<int32_t>(text(run.text).size());
+                paintBackground(run, length);
+                at += length;
                 continue;
             }
             documents::Run piece;
             auto words = text(run.text);
             piece.Text(words);
+            plainText = plainText + words;
             if (run.hasColor) piece.Foreground(media::SolidColorBrush(color(run.color)));
             if (run.size > 0) piece.FontSize(run.size);
             if (run.bold) piece.FontWeight(winrt::Microsoft::UI::Text::FontWeights::Bold());
@@ -446,15 +567,13 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
 
             // A run's background is a highlighter over its part of the words; its own colour stays on them.
             auto length = static_cast<int32_t>(words.size());
-            if (run.hasBackground && length > 0) {
-                documents::TextHighlighter highlighter;
-                highlighter.Background(media::SolidColorBrush(color(run.background)));
-                highlighter.Foreground(run.hasColor ? media::SolidColorBrush(color(run.color)) : block.Foreground());
-                highlighter.Ranges().Append(documents::TextRange{at, length});
-                highlighters.Append(highlighter);
-            }
+            paintBackground(run, length);
             at += length;
         }
+        // The detached TextBlock remains the label's style/readback object.
+        // Do not leave its previous document alive when RichTextBlock owns the
+        // visible inlines, or generic text/automation reads see stale words.
+        if (rich) block.Text(plainText);
     } catch (...) {
         report("setting a label's runs of words");
     }
@@ -467,33 +586,62 @@ extern "C" bool swiftomniui_winui_text_recolor_runs(
         namespace documents = winrt::Microsoft::UI::Xaml::Documents;
         auto block = labelWords(handle);
         auto inlines = block.Inlines();
+        auto highlighters = block.TextHighlighters();
+        if (auto rich = richWords(handle)) {
+            if (rich.Blocks().Size() != 1) return false;
+            inlines = rich.Blocks().GetAt(0).as<documents::Paragraph>().Inlines();
+            highlighters = rich.TextHighlighters();
+        }
         if (count < 0 || inlines.Size() != static_cast<uint32_t>(count)) return false;
         std::vector<documents::Run> pieces;
+        std::vector<controls::TextBlock> children;
+        std::vector<int32_t> lengths;
         pieces.reserve(count);
-        // Validate before changing anything. Inline images and raised baselines
-        // have another native representation and keep the existing full path.
+        children.reserve(count);
+        lengths.reserve(count);
+        // Validate before changing anything. A paint-only update keeps native
+        // paragraphs and image objects, including their already uploaded pixels.
         for (int32_t index = 0; index < count; ++index) {
             auto piece = inlines.GetAt(index).try_as<documents::Run>();
             auto const &run = runs[index];
-            if (!piece || (run.glyph && *run.glyph) || (run.image && *run.image)
-                || run.baseline != 0 || piece.Text() != text(run.text)) return false;
+            auto symbol = run.glyph && *run.glyph;
+            auto image = run.image && *run.image;
+            auto words = text(symbol ? run.glyph : run.text);
+            controls::TextBlock child{nullptr};
+            if (piece) {
+                if (image || run.baseline != 0 || piece.Text() != words) return false;
+            } else {
+                auto holder = inlines.GetAt(index).try_as<documents::InlineUIContainer>();
+                if (!holder) return false;
+                auto content = inlineContent(holder);
+                child = content.try_as<controls::TextBlock>();
+                if (image) {
+                    if (!content.try_as<controls::Image>()) return false;
+                } else if (!child || child.Text() != words) return false;
+            }
             pieces.push_back(piece);
+            children.push_back(child);
+            lengths.push_back(image ? 1 : static_cast<int32_t>(words.size()));
         }
-        auto highlighters = block.TextHighlighters();
         uint32_t painted = 0;
         int32_t at = 0;
         for (int32_t index = 0; index < count; ++index) {
             auto const &piece = pieces[index];
             auto const &run = runs[index];
-            auto property = documents::TextElement::ForegroundProperty();
-            auto local = piece.ReadLocalValue(property) != xaml::DependencyProperty::UnsetValue();
-            if (run.hasColor) {
-                if (!local || argb(piece.Foreground()) != run.color)
-                    piece.Foreground(media::SolidColorBrush(color(run.color)));
-            } else if (local) {
-                piece.ClearValue(property);
+            if (piece) {
+                auto property = documents::TextElement::ForegroundProperty();
+                auto local = piece.ReadLocalValue(property) != xaml::DependencyProperty::UnsetValue();
+                if (run.hasColor) {
+                    if (!local || argb(piece.Foreground()) != run.color)
+                        piece.Foreground(media::SolidColorBrush(color(run.color)));
+                } else if (local) {
+                    piece.ClearValue(property);
+                }
+            } else if (auto child = children[index]) {
+                child.Foreground(run.hasColor ? media::SolidColorBrush(color(run.color)) : block.Foreground());
+                child.Resources().Insert(winrt::box_value(L"SwiftOmniUIInlineInheritsForeground"), winrt::box_value(!run.hasColor));
             }
-            auto length = static_cast<int32_t>(piece.Text().size());
+            auto length = lengths[index];
             if (run.hasBackground && length > 0) {
                 auto highlighter = painted < highlighters.Size()
                     ? highlighters.GetAt(painted) : documents::TextHighlighter();
@@ -531,24 +679,34 @@ extern "C" int32_t swiftomniui_winui_text_runs(SwiftOmniUIObjectRef handle, doub
         namespace documents = winrt::Microsoft::UI::Xaml::Documents;
         using winrt::Windows::UI::Text::TextDecorations;
         auto block = labelWords(handle);
+        auto inlines = block.Inlines();
+        auto highlighters = block.TextHighlighters();
+        if (auto rich = richWords(handle); rich && rich.Blocks().Size() == 1) {
+            inlines = rich.Blocks().GetAt(0).as<documents::Paragraph>().Inlines();
+            highlighters = rich.TextHighlighters();
+        }
         int32_t count = 0, at = 0;
-        for (auto const &piece : block.Inlines()) {
+        for (auto const &piece : inlines) {
             auto run = piece.try_as<documents::Run>();
-            if (!run) continue;
-            auto length = static_cast<int32_t>(run.Text().size());
+            controls::TextBlock child{nullptr};
+            if (auto holder = piece.try_as<documents::InlineUIContainer>())
+                child = inlineContent(holder).try_as<controls::TextBlock>();
+            auto length = run ? static_cast<int32_t>(run.Text().size())
+                : child ? static_cast<int32_t>(child.Text().size()) : 1;
             double background = 0;
-            for (auto const &highlighter : block.TextHighlighters())
+            for (auto const &highlighter : highlighters)
                 for (auto const &range : highlighter.Ranges())
                     if (range.StartIndex == at && range.Length == length) background = argb(highlighter.Background());
             if (6 * (count + 1) <= capacity) {
                 auto *slot = values + 6 * count;
-                slot[0] = run.ReadLocalValue(documents::TextElement::ForegroundProperty()) == xaml::DependencyProperty::UnsetValue()
-                    ? 0 : argb(run.Foreground());
-                slot[1] = run.ReadLocalValue(documents::TextElement::FontSizeProperty()) == xaml::DependencyProperty::UnsetValue()
-                    ? 0 : run.FontSize();
-                slot[2] = run.FontWeight().Weight;
-                slot[3] = run.FontStyle() == winrt::Windows::UI::Text::FontStyle::Italic ? 1 : 0;
-                auto lines = run.TextDecorations();
+                slot[0] = run ? (run.ReadLocalValue(documents::TextElement::ForegroundProperty()) == xaml::DependencyProperty::UnsetValue()
+                    ? 0 : argb(run.Foreground())) : child ? argb(child.Foreground()) : 0;
+                slot[1] = run ? (run.ReadLocalValue(documents::TextElement::FontSizeProperty()) == xaml::DependencyProperty::UnsetValue()
+                    ? 0 : run.FontSize()) : child ? child.FontSize() : 0;
+                slot[2] = run ? run.FontWeight().Weight : child ? child.FontWeight().Weight : block.FontWeight().Weight;
+                auto style = run ? run.FontStyle() : child ? child.FontStyle() : block.FontStyle();
+                slot[3] = style == winrt::Windows::UI::Text::FontStyle::Italic ? 1 : 0;
+                auto lines = run ? run.TextDecorations() : child ? child.TextDecorations() : TextDecorations::None;
                 slot[4] = ((lines & TextDecorations::Underline) == TextDecorations::Underline ? 1 : 0)
                     + ((lines & TextDecorations::Strikethrough) == TextDecorations::Strikethrough ? 2 : 0);
                 slot[5] = background;
@@ -570,6 +728,9 @@ extern "C" void swiftomniui_winui_text_set_decorations(SwiftOmniUIObjectRef hand
         if (underline) lines = lines | TextDecorations::Underline;
         if (strikethrough) lines = lines | TextDecorations::Strikethrough;
         labelWords(handle).TextDecorations(lines);
+        if (auto rich = richWords(handle))
+            for (auto const &value : rich.Blocks())
+                if (auto paragraph = value.try_as<documents::Paragraph>()) paragraph.TextDecorations(lines);
     } catch (...) {
         report("decorating a label's words");
     }
@@ -600,6 +761,12 @@ extern "C" void swiftomniui_winui_text_style(SwiftOmniUIObjectRef handle, double
 extern "C" double swiftomniui_winui_text_baseline(SwiftOmniUIObjectRef handle, double height) {
     try {
         auto block = labelWords(handle);
+        if (auto rich = richWords(handle)) {
+            auto extra = std::max(0.0, height - static_cast<double>(rich.DesiredSize().Height));
+            auto shift = rich.VerticalAlignment() == xaml::VerticalAlignment::Center ? extra / 2
+                : rich.VerticalAlignment() == xaml::VerticalAlignment::Bottom ? extra : 0;
+            return rich.BaselineOffset() + shift;
+        }
         auto extra = std::max(0.0, height - static_cast<double>(block.DesiredSize().Height));
         auto shift = block.VerticalAlignment() == xaml::VerticalAlignment::Center ? extra / 2
             : block.VerticalAlignment() == xaml::VerticalAlignment::Bottom ? extra : 0;
@@ -650,11 +817,13 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
         auto block = labelWords(handle);
         auto coordinates = as<xaml::UIElement>(handle);
         int32_t at = 0;
-        auto transform = block.TransformToVisual(coordinates);
+        auto rich = richWords(handle);
+        auto visual = rich ? rich.as<xaml::UIElement>() : block.as<xaml::UIElement>();
+        auto transform = visual.TransformToVisual(coordinates);
         auto append = [&](documents::TextPointer const &start, std::wstring_view string,
                           xaml::UIElement const &owner = nullptr) {
             auto position = start;
-            auto local = owner ? owner.TransformToVisual(block) : nullptr;
+            auto local = owner ? owner.TransformToVisual(visual) : nullptr;
             for (int32_t i = 0; i < static_cast<int32_t>(string.size()) && at < capacity; ++i, ++at) {
                 if (!position) return;
                 auto rect = position.GetCharacterRect(documents::LogicalDirection::Forward);
@@ -680,7 +849,7 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
                 position = next;
             }
         };
-        if (block.Inlines().Size() == 0) {
+        if (!rich && block.Inlines().Size() == 0) {
             auto words = block.Text();
             append(block.ContentStart(), std::wstring_view(words.c_str(), words.size()));
         } else {
@@ -691,11 +860,23 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
                 } else if (auto span = inlineValue.try_as<documents::Span>()) {
                     for (auto const &child : span.Inlines()) visit(child);
                 } else if (auto holder = inlineValue.try_as<documents::InlineUIContainer>()) {
-                    auto child = holder.Child().try_as<controls::TextBlock>();
-                    if (child && winrt::unbox_value_or<bool>(child.Tag(), false)) {
+                    auto content = inlineContent(holder);
+                    if (auto child = content.try_as<controls::TextBlock>()) {
                         auto words = child.Text();
                         append(child.ContentStart(), std::wstring_view(words.c_str(), words.size()), child);
-                    } else {
+                    } else if (content && at < capacity) {
+                        // InlineUIContainer has structural open/close positions,
+                        // not a character with two ordinary caret boundaries.
+                        // Use the native arranged image itself for the single
+                        // replacement character in SOUI's source text.
+                        auto rect = content.TransformToVisual(coordinates).TransformBounds(
+                            {0, 0, static_cast<float>(content.ActualWidth()), static_cast<float>(content.ActualHeight())});
+                        rectangles[at * 4] = rect.X;
+                        rectangles[at * 4 + 1] = rect.Y;
+                        rectangles[at * 4 + 2] = rect.Width;
+                        rectangles[at * 4 + 3] = rect.Height;
+                        ++at;
+                    } else if (at < capacity) {
                         append(inlineValue.ContentStart(), L"\uFFFC");
                     }
                 } else {
@@ -703,8 +884,28 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
                     append(inlineValue.ContentStart(), L"\uFFFC");
                 }
             };
-            for (auto const &inlineValue : block.Inlines()) visit(inlineValue);
+            if (rich) {
+                for (auto const &value : rich.Blocks()) if (auto paragraph = value.try_as<documents::Paragraph>())
+                    for (auto const &inlineValue : paragraph.Inlines()) visit(inlineValue);
+            } else {
+                for (auto const &inlineValue : block.Inlines()) visit(inlineValue);
+            }
         }
         return at;
     } catch (...) { report("reading native text geometry"); return 0; }
+}
+
+extern "C" void swiftomniui_winui_text_set_run_pixels(SwiftOmniUIObjectRef handle, int32_t index, uint8_t const *rgba,
+    int32_t width, int32_t height, double logicalWidth, double logicalHeight) {
+    try {
+        if (!std::isfinite(logicalWidth) || !std::isfinite(logicalHeight) || logicalWidth <= 0 || logicalHeight <= 0) return;
+        auto rich = richWords(handle); if (!rich || !rich.Blocks().Size() || index < 0) return;
+        auto inlines = rich.Blocks().GetAt(0).as<documents::Paragraph>().Inlines();
+        if (static_cast<uint32_t>(index) >= inlines.Size()) return;
+        auto holder = inlines.GetAt(index).try_as<documents::InlineUIContainer>(); if (!holder) return;
+        auto picture = inlineContent(holder).try_as<controls::Image>(); if (!picture) return;
+        auto source = memoryPicture(rgba, width, height); if (!source) return;
+        picture.Source(source); picture.Width(logicalWidth); picture.Height(logicalHeight);
+        if (auto host = holder.Child().try_as<controls::RichTextBlock>()) host.MinHeight(logicalHeight);
+    } catch (...) { report("showing a native inline image"); }
 }

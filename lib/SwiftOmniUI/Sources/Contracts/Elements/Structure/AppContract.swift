@@ -101,6 +101,8 @@ public enum AppContract: ElementContract, ApplicationTier {
     /// Writes text onto the clipboard - what `Pasteboard.copy` asks.
     ///
     /// See `Pasteboard.copy(_:)`.
+    public static let copyImage = ElementAct<Self, ImageSource, Void>("copyImage")
+    public static let copyRichText = ElementAct<Self, (String, String), Void>("copyRichText")
     public static let copyText = ElementAct<Self, String, Void>("copyText")
 
     /// Asks the user for folders to open in the dialog over the showing page -
@@ -154,7 +156,7 @@ public enum AppContract: ElementContract, ApplicationTier {
 
     /// The element's own members.
     public static let members: [any ContractMember] = [
-        alert, announce, chooseAction, chooseFiles, confirm, copyText, currentTime, currentTimeZone, handlerFailed,
+        alert, announce, chooseAction, chooseFiles, confirm, copyText, copyImage, copyRichText, currentTime, currentTimeZone, handlerFailed,
         hideOnScreenKeyboard, launchFile, launchLink, localizedString, openFiles, openFolders, persistSceneValue,
         persistValue, prompt, readFile, revealFile, saveFile, urlOpened, utcOffset,
     ]

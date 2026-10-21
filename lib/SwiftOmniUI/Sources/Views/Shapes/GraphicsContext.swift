@@ -24,8 +24,14 @@
 /// closure runs again as the canvas's size settles, so what depends on `size`
 /// is drawn at the size it lands.
 public struct GraphicsContext: Sendable {
+    public init() {}
     /// The instructions gathered so far, in drawing order.
     var commands: [DrawCommand] = []
+
+    /// Renders the recorded drawing to an immutable native bitmap.
+    public func makeImage(size: Size, scale: Double = 1) -> BitmapImage? {
+        BitmapImage.render(size: size, scale: scale, drawing: commands)
+    }
 
     /// What a fill or a stroke is drawn with.
     public enum Shading: Sendable {

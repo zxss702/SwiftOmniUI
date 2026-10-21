@@ -107,6 +107,13 @@ extension GTKElement {
             case .blur: view.setBlur(value(.blur)?.number ?? 0)
             case .isEnabled: view.setEnabled(value(.isEnabled)?.bool ?? true)
             case .isVisible: view.setShown(isShown)
+            case .selectionActive, .selectionDragPoint:
+                if view.selectionInteraction == nil {
+                    view.selectionInteraction = GTKSelectionInteraction(view: view,
+                        send: { [weak self] event, values in self?.send(event, values) })
+                }
+                view.selectionInteraction?.update(active: value(.selectionActive)?.bool ?? false,
+                    point: value(.selectionDragPoint)?.numbers ?? [])
             case .pointerStyle:
                 let style = value(.pointerStyle)?.enumeration.flatMap(PointerStyle.init(rawValue:))
                 let name: String? = style.map {

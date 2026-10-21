@@ -64,7 +64,8 @@ final class GTKImageView: GTKPanelView {
         symbolInvalidation = 0
         file = source?.file ?? ""
         self.aspect = aspect
-        path = source?.symbol == nil ? GTKPictures.path(of: file) : nil
+        path = source?.bitmap == nil && source?.symbol == nil && !file.isEmpty ? GTKPictures.path(of: file) : nil
+        let bitmapTexture = source?.bitmap.flatMap(GTKMemoryImages.texture)
         if let name = source?.symbol {
             symbol = GTKSymbols.paintable(of: name, size: Int32(symbolSize.rounded(.up)), scale: scale)
         }
@@ -75,7 +76,7 @@ final class GTKImageView: GTKPanelView {
                 }
             }
         }
-        found = symbol != nil || path != nil
+        found = bitmapTexture != nil || symbol != nil || path != nil
         if !found, let name = source?.symbol ?? (file.isEmpty ? nil : file) {
             GTKRenderer.log.error("no picture or symbol for \(name)")
         }
@@ -83,7 +84,8 @@ final class GTKImageView: GTKPanelView {
         var width: Int32 = 0
         var height: Int32 = 0
         if let path { _ = gdk_pixbuf_get_file_info(path, &width, &height) }
-        size = LayoutSize(width: Double(max(width, 0)), height: Double(max(height, 0)))
+        size = source?.bitmap.map { LayoutSize(width: $0.size.width, height: $0.size.height) }
+            ?? LayoutSize(width: Double(max(width, 0)), height: Double(max(height, 0)))
         if let symbol {
             let intrinsic = LayoutSize(width: Double(gdk_paintable_get_intrinsic_width(symbol)),
                                        height: Double(gdk_paintable_get_intrinsic_height(symbol)))
@@ -91,7 +93,7 @@ final class GTKImageView: GTKPanelView {
                 : LayoutSize(width: symbolSize, height: symbolSize)
         }
         isVector = path?.lowercased().hasSuffix(".svg") == true
-        replaceTexture(with: nil)
+        replaceTexture(with: bitmapTexture)
         drawn = nil
         placingLayout?.invalidateMeasurements()
         gtk_widget_queue_resize(widget)

@@ -12,7 +12,7 @@
     public static let performed: [any ContractMember] = [
         VisualElementContract.focus, VisualElementContract.unfocus,
         AppContract.alert, AppContract.announce, AppContract.chooseAction,
-        AppContract.confirm, AppContract.copyText, AppContract.currentTime, AppContract.currentTimeZone,
+        AppContract.confirm, AppContract.copyText, AppContract.copyImage, AppContract.copyRichText, AppContract.currentTime, AppContract.currentTimeZone,
         AppContract.handlerFailed, AppContract.hideOnScreenKeyboard, AppContract.localizedString,
         AppContract.persistValue, AppContract.prompt, AppContract.utcOffset,
     ]

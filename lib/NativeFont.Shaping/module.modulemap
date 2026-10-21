@@ -1,0 +1,6 @@
+module CNativeFontShaping [system] {
+    header "FontShaping.h"
+    link "harfbuzz"
+    link "pangocairo-1.0"
+    export *
+}

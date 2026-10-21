@@ -29,8 +29,9 @@
             func flush() {
                 guard let first = current.first else { return }
                 let bounds = current.dropFirst().reduce(first.rect) { union($0, $1.rect) }
+                let visible = current.filter { !$0.text.allSatisfy(\.isNewline) }
                 runs.append(TextLayoutReport.Run(rect: bounds, direction: first.direction, span: -1,
-                                                 slices: current.map(\.rect), sliceTexts: current.map(\.text)))
+                                                 slices: visible.map(\.rect), sliceTexts: visible.map(\.text)))
                 current.removeAll(keepingCapacity: true)
             }
             for glyph in glyphs {

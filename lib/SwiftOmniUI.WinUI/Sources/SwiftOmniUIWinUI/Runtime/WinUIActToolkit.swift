@@ -87,6 +87,11 @@ final class WinUIActToolkit: ActToolkit {
         if let content = renderer.userWindow?.content { swiftomniui_winui_announce(content.handle, words) }
     }
 
+    func copyImage(_ image: BitmapImage) {
+        guard let png = image.pngBytes() else { return }
+        png.withUnsafeBufferPointer { swiftomniui_winui_copy_image($0.baseAddress, Int64($0.count)) }
+    }
+    func copyRichText(html: String, plainText: String) { swiftomniui_winui_copy_html(html, plainText) }
     func copyText(_ text: String) {
         swiftomniui_winui_copy_text(text)
     }
