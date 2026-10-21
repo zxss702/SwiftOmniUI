@@ -81,7 +81,7 @@ namespace {
         static winrt::com_ptr<IDWriteTextAnalyzer> analyzer = [] {
             winrt::com_ptr<IDWriteFactory> factory;
             winrt::check_hresult(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,
-                __uuidof(IDWriteFactory), factory.put_unknown()));
+                __uuidof(IDWriteFactory), reinterpret_cast<IUnknown **>(factory.put())));
             winrt::com_ptr<IDWriteTextAnalyzer> result;
             winrt::check_hresult(factory->CreateTextAnalyzer(result.put()));
             return result;

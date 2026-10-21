@@ -60,7 +60,8 @@ IDWriteFontFace *swiftomniui_native_font_face(void *value) {
 extern "C" void *swiftomniui_winui_font_open(char const *path, double *units) {
     try {
         winrt::com_ptr<IDWriteFactory> factory;
-        winrt::check_hresult(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), factory.put_unknown()));
+        winrt::check_hresult(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+            reinterpret_cast<IUnknown **>(factory.put())));
         winrt::com_ptr<IDWriteFontFile> file;
         winrt::check_hresult(factory->CreateFontFileReference(text(path).c_str(), nullptr, file.put()));
         BOOL supported = FALSE; DWRITE_FONT_FILE_TYPE fileType; DWRITE_FONT_FACE_TYPE faceType; UINT32 count = 0;

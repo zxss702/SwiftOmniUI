@@ -39,7 +39,8 @@ namespace {
     winrt::com_ptr<IDWriteFactory> metricsFactory() {
         static auto factory = [] {
             winrt::com_ptr<IDWriteFactory> result;
-            winrt::check_hresult(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), result.put_unknown()));
+            winrt::check_hresult(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+                reinterpret_cast<IUnknown **>(result.put())));
             return result;
         }();
         return factory;
