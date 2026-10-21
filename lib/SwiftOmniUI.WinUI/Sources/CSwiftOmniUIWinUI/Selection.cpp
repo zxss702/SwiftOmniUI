@@ -6,6 +6,7 @@
 #include <memory>
 #include <unordered_map>
 #include <winrt/Microsoft.UI.Dispatching.h>
+#include <winrt/Microsoft.UI.Input.h>
 #include <winrt/Windows.System.h>
 
 using namespace swiftomniui;
@@ -21,7 +22,8 @@ namespace {
         int64_t number;
         winrt::weak_ref<xaml::FrameworkElement> element;
         xaml::UIElement root{nullptr};
-        xaml::Input::PointerEventHandler pointer{nullptr};
+        // AddHandler/RemoveHandler take the same boxed delegate instance.
+        IInspectable pointer{nullptr};
         winrt::event_token key{}, focus{}, loaded{}, unloaded{}, changed{};
         winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer timer{nullptr};
         controls::ScrollView scroll{nullptr};
@@ -73,7 +75,7 @@ namespace {
             auto next = view.XamlRoot().Content(); if (root == next) return;
             disconnect(); root = next;
             auto weak = weak_from_this();
-            pointer = guarded("following selection presses", [weak](IInspectable const &, xaml::Input::PointerRoutedEventArgs const &args) {
+            pointer = winrt::box_value(xaml::Input::PointerEventHandler(guarded("following selection presses", [weak](IInspectable const &, xaml::Input::PointerRoutedEventArgs const &args) {
                 auto state = weak.lock(); if (!state) return;
                 auto view = state->element.get(); if (!view) return;
                 auto position = args.GetCurrentPoint(view);
@@ -82,7 +84,7 @@ namespace {
                 state->ownsCommands = p.X >= 0 && p.Y >= 0 && p.X <= view.ActualWidth() && p.Y <= view.ActualHeight()
                     && !editing(args.OriginalSource().try_as<xaml::DependencyObject>());
                 state->input(state->number, 0, 0, 0);
-            });
+            })));
             root.AddHandler(xaml::UIElement::PointerPressedEvent(), pointer, true);
             focus = root.GotFocus(guarded("returning native edit commands", [weak](auto const &, xaml::RoutedEventArgs const &args) {
                 if (auto state = weak.lock(); state && editing(args.OriginalSource().try_as<xaml::DependencyObject>()))
