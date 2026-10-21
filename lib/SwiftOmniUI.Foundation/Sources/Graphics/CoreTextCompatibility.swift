@@ -217,7 +217,7 @@ public extension Image {
 }
 public typealias CTRun = CTLine
 public typealias CTTypesetter = NSAttributedString
-public nonisolated struct CTLineBoundsOptions: OptionSet {
+public nonisolated struct CTLineBoundsOptions: OptionSet, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
     public static let useGlyphPathBounds = Self(rawValue: 1)
