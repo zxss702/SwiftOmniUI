@@ -9,6 +9,8 @@ import CSwiftOmniUIGTK
     var active = false
     var point: Point?
     private var ownsCommands = false
+    // Borrowed only for identity comparison; the root owns the focused widget.
+    private var commandFocus: GTKWidget?
     private var root: GTKWidget?
     private var controllers: [OpaquePointer] = []
     private var tick: guint = 0
@@ -74,7 +76,7 @@ import CSwiftOmniUIGTK
             for controller in controllers { gtk_widget_remove_controller(root, controller) }
             g_object_unref(root)
         }
-        controllers = []; root = nil; ownsCommands = false; lastFrame = 0
+        controllers = []; root = nil; ownsCommands = false; commandFocus = nil; lastFrame = 0
     }
     private func pressed(x: Double, y: Double) {
         guard let root, let view else { return }
@@ -92,13 +94,18 @@ import CSwiftOmniUIGTK
                 current = gtk_widget_get_parent(widget)
             }
         }
+        commandFocus = gtk_root_get_focus(OpaquePointer(root))
         send(.windowPointerPressed, [])
     }
     private func keyPressed(_ key: guint, modifiers: GdkModifierType) -> Bool {
+        let focus = root.flatMap { gtk_root_get_focus(OpaquePointer($0)) }
+        // A click in selectable text may leave the old editor focused. A later
+        // keyboard focus change returns command ownership to the new control.
+        if focus != commandFocus { ownsCommands = false }
         guard active || ownsCommands,
               modifiers.rawValue & GDK_CONTROL_MASK.rawValue != 0,
               modifiers.rawValue & (GDK_ALT_MASK.rawValue | GDK_SHIFT_MASK.rawValue) == 0 else { return false }
-        if !ownsCommands, let root, let focus = gtk_root_get_focus(OpaquePointer(root)),
+        if !ownsCommands, let focus,
            g_type_check_instance_is_a(UnsafeMutablePointer<GTypeInstance>(OpaquePointer(focus)), gtk_editable_get_type()) != 0
             || gtk_widget_get_ancestor(focus, gtk_text_view_get_type()) != nil { return false }
         switch key {

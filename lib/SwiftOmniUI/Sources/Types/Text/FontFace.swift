@@ -46,7 +46,7 @@
     }
     /// Installed during desktop-host startup; native operations are consumed on
     /// the main actor by this face's initializer and methods.
-    @_spi(Host) public nonisolated(unsafe) static var open: ((String) -> Operations?)?
+    @_spi(Host) public nonisolated(unsafe) static var open: (@MainActor (String) -> Operations?)?
     private let operations: Operations
     private var metricsCache: [UInt16: [Double]] = [:]
     private var pathCache: [UInt16: Path] = [:]
