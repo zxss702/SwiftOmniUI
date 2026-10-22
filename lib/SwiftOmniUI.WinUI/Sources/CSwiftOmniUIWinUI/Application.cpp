@@ -496,7 +496,10 @@ extern "C" void swiftomniui_winui_hold_frames(bool hold) {
     try {
         if (hold) {
             rendering = xaml::Media::CompositionTarget::Rendering(
-                [](winrt::Windows::Foundation::IInspectable const &, winrt::Windows::Foundation::IInspectable const &) { callbacks.frame(); });
+                [](winrt::Windows::Foundation::IInspectable const &, winrt::Windows::Foundation::IInspectable const &args) {
+                    auto time = args.as<xaml::Media::RenderingEventArgs>().RenderingTime();
+                    callbacks.frame(static_cast<double>(time.count()) / 10000.0);
+                });
         } else {
             xaml::Media::CompositionTarget::Rendering(rendering);
         }

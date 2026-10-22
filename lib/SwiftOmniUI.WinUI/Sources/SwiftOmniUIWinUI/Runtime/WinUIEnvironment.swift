@@ -50,6 +50,9 @@ enum WinUIEnvironment {
     static func reportDisplay(to core: CoreLink, window: WinUIWindow) {
         let display = facts(SwiftOmniUIFactsDisplay, window: window.handle)
         guard display.count == 5 else { return }
+        if let frequency = Double(display[3]), frequency > 1 {
+            WinUIFrameClock.current?.refreshInterval = 1_000 / frequency
+        }
 
         core.setDisplayInfo(HostDisplayInfo(
             width: Double(display[0]) ?? 0, height: Double(display[1]) ?? 0, density: Double(display[2]) ?? 1,

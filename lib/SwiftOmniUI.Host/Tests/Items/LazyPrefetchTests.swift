@@ -7,6 +7,22 @@ import XCTest
 @MainActor final class LazyPrefetchTests: XCTestCase {
     private final class Owner {}
 
+    func testReadyWorkYieldsAfterOneUnitPerOwnerEvenAfterCommit() {
+        let queue = LazyPrefetchQueue()
+        let first = Owner(), second = Owner()
+        var calls = [0, 0]
+        var commits = 0
+        queue.schedule(owner: first, ready: { true }) { calls[0] += 1; return calls[0] < 100 }
+        queue.schedule(owner: second, ready: { true }) { calls[1] += 1; return calls[1] < 100 }
+        queue.drain { commits += 1 }
+        XCTAssertEqual(calls, [1, 1], "native readiness cannot drain the entire ahead window in one frame")
+        XCTAssertEqual(commits, 2)
+        XCTAssertTrue(queue.isPending)
+        queue.drain { commits += 1 }
+        XCTAssertEqual(calls, [2, 2])
+        XCTAssertEqual(commits, 4)
+    }
+
     func testNativeMeasurementReadinessPausesWithoutSpinning() {
         let queue = LazyPrefetchQueue()
         let owner = Owner()

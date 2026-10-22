@@ -15,10 +15,18 @@ final class WinUIFrameClock: FrameClock {
 
     /// What a frame does, handed that frame's time.
     var onFrame: ((Double) -> Void)?
+    private(set) var renderingTime: Double?
+    /// The reported display cadence, distinct from repeated XAML callbacks
+    /// arriving inside one physical refresh interval.
+    var refreshInterval = 0.0
 
     /// Whether something holds the clock. Frames come only while it does.
     var held = false {
-        didSet { if held != oldValue, ticksWithWinUI { swiftomniui_winui_hold_frames(held) } }
+        didSet {
+            if held != oldValue, ticksWithWinUI {
+                swiftomniui_winui_hold_frames(held)
+            }
+        }
     }
 
     /// Whether WinUI's composed frames drive the clock; a clock a test winds gets its frames from the test.
@@ -42,8 +50,10 @@ final class WinUIFrameClock: FrameClock {
     }
 
     /// A frame WinUI composes: the frame's work at this moment, on a clock WinUI's frames drive.
-    func frame() {
+    func frame(renderingTime: Double) {
         guard held, ticksWithWinUI else { return }
+        guard self.renderingTime != renderingTime else { return }
+        self.renderingTime = renderingTime
         onFrame?(now())
     }
 

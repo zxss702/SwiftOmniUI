@@ -7,6 +7,25 @@ import XCTest
 
 final class LazyGeometryTests: XCTestCase {
     @MainActor
+    func testTrimmingRowsDoesNotUnderestimatePreparationLatency() throws {
+        let runtime = HostRuntime.still()
+        var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+        patch.lazyRows = HostLazySource((0..<100).map(String.init))
+        runtime.tree.apply(patch, complete: true)
+        let element = try XCTUnwrap(runtime.tree.root)
+        let cells = LazyCells(element, in: runtime)
+        cells.takeItems()
+        var samples = 0
+        cells.onRowsRequested = { samples += 1 }
+        cells.show(0..<240)
+        XCTAssertEqual(samples, 1)
+        cells.show(0..<100)
+        XCTAssertEqual(samples, 1, "retiring rows does not measure the cost of preparing new rows")
+        cells.show(0..<400)
+        XCTAssertEqual(samples, 2)
+    }
+
+    @MainActor
     func testDrawingContentUpdatesKeepTheWindowUsedToRecognizeANewScrollAnchor() throws {
         let runtime = HostRuntime.still()
         var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)

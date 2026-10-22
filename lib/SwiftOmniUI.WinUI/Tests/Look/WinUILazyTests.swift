@@ -81,6 +81,132 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testNativeAnimatedVStackPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 0) }
+    func testNativeAnimatedHStackPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 1) }
+    func testNativeAnimatedVGridPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 2) }
+    func testNativeAnimatedHGridPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 3) }
+
+    private func checkPaintedScroll(kind: Int) throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) { SolidLazyPage(kind: kind) }
+            for _ in 0..<24 { host.step() }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let horizontal = kind % 2 == 1
+            giveExactGeometry(lazy, extent: horizontal ? 80 : 40, perRun: kind < 2 ? 1 : 4)
+            for _ in 0..<16 { host.step() }
+            let window = try XCTUnwrap(host.window)
+            let title = "SOUISolidScroll-\(kind)"
+            window.setTitle(title)
+            let name = Array(title.utf16) + [0]
+            let hwnd = try XCTUnwrap(name.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+            _ = SetForegroundWindow(hwnd)
+            XCTAssertTrue(SetWindowPos(hwnd, HWND(bitPattern: -1), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE)))
+            defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE)) }
+            for _ in 0..<8 { host.step() }
+            guard GetForegroundWindow() == hwnd else {
+                throw XCTSkip("Desktop pixel checks require an unobscured foreground test window")
+            }
+            let row = try XCTUnwrap(lazy.mounted[lazy.cells.orderedIdentities[0]])
+            let frame = scroll.scroller.laidOutFrame, origin = scroll.scroller.origin
+            let across = horizontal ? row.view.origin.y + 20 : row.view.origin.x + 40
+            let scale = Double(GetDpiForWindow(hwnd)) / 96
+            let points = [8.0, (horizontal ? frame.width : frame.height) - 8].map { along in
+                var point = POINT(x: LONG((horizontal ? origin.x + along : across) * scale),
+                                  y: LONG((horizontal ? across : origin.y + along) * scale))
+                XCTAssertTrue(ClientToScreen(hwnd, &point))
+                return point
+            }
+            let dc = try XCTUnwrap(GetDC(nil))
+            var initial = points.map { GetPixel(dc, $0.x, $0.y) }
+            host.settle {
+                initial = points.map { GetPixel(dc, $0.x, $0.y) }
+                return initial.allSatisfy { $0 & 255 > 160 && ($0 >> 8) & 255 < 100 }
+            }
+            _ = ReleaseDC(nil, dc)
+            guard GetForegroundWindow() == hwnd else {
+                throw XCTSkip("Another foreground window obscured the pixel fixture")
+            }
+            let colored = initial.allSatisfy { $0 & 255 > 160 && ($0 >> 8) & 255 < 100 }
+            XCTAssertTrue(colored, "kind \(kind): initial solid rows must be visible; pixels=\(initial), origin=\(origin), frame=\(frame), row=\(row.view.origin), points=\(points)")
+            guard colored else { return }
+            let probe = WinUILazyScreenProbe(window: hwnd, points: points)
+            probe.requiresForeground = true
+            let raw = Unmanaged.passRetained(probe).toOpaque()
+            let created = CreateThread(nil, 0, WinUILazyScreenProbe.entry, raw, 0, nil)
+            if created == nil { Unmanaged<WinUILazyScreenProbe>.fromOpaque(raw).release() }
+            let thread = try XCTUnwrap(created)
+            defer {
+                probe.lock.lock(); probe.stopped = true; probe.lock.unlock()
+                _ = WaitForSingleObject(thread, 2_000)
+                _ = CloseHandle(thread)
+            }
+            for target in [1_000.0, 4_000.0, 0] {
+                swiftomniui_winui_scroller_move(scroll.scroller.handle, horizontal ? target : 0,
+                                              horizontal ? 0 : target, true)
+                for _ in 0..<48 { host.step() }
+            }
+            probe.lock.lock(); probe.stopped = true; probe.lock.unlock()
+            XCTAssertEqual(WaitForSingleObject(thread, 2_000), 0)
+            probe.lock.lock(); let samples = probe.samples; probe.lock.unlock()
+            guard !samples.isEmpty else {
+                throw XCTSkip("Another foreground window obscured all scroll samples")
+            }
+            // Fractional row boundaries can blend red with the backdrop.
+            // Count exposed background, rather than a subpixel red seam.
+            let gaps = samples.filter { $0.pixel & 255 <= 160 || ($0.pixel >> 8) & 255 >= 220 }
+            XCTAssertTrue(gaps.isEmpty, "kind \(kind): \(gaps.count)/\(samples.count) unpainted edge samples; first=\(String(describing: gaps.first))")
+        }
+    }
+
+    func testMovingLazyWindowsPrefetchOnlyAheadAndReleaseIdleExtras() throws {
+        try onUIThread {
+            for kind in 0..<4 {
+                let host = WinUIRenderer.running(reducesMotion: true) {
+                    ExactLazyPage(kind: kind)
+                }
+                for _ in 0..<16 { host.step() }
+                let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+                let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+                let horizontal = kind % 2 == 1, perRun = kind < 2 ? 1 : 4
+                let extent = horizontal ? 80.0 : 40.0
+                giveExactGeometry(lazy, extent: extent, perRun: perRun)
+                for _ in 0..<16 { host.step() }
+                swiftomniui_winui_scroller_move(scroll.scroller.handle, horizontal ? 1_000 : 0,
+                                              horizontal ? 0 : 1_000, true)
+                var observedAhead = 0.0
+                var calculatedMaximum = 0.0
+                for _ in 0..<60 {
+                    host.step()
+                    guard let window = lazy.cells.window else { continue }
+                    let ahead = window.realize.upperBound - window.span.upperBound
+                    observedAhead = max(observedAhead, ahead)
+                    calculatedMaximum = max(calculatedMaximum,
+                        abs(WinUILazyPrefetch.distance(velocity: lazy.scrollVelocity,
+                            interval: lazy.scrollInterval, readiness: lazy.preparationDuration,
+                            neighbour: 0, observationLead: lazy.scrollObservationLead)))
+                    XCTAssertGreaterThanOrEqual(window.realize.lowerBound, window.span.lowerBound - 1,
+                                                "kind \(kind): no extra screen behind forward motion")
+                }
+                XCTAssertLessThanOrEqual(observedAhead, calculatedMaximum + 1,
+                                         "prefetch cannot exceed the measured necessary distance")
+                host.settle { !scroll.held && !host.runtime.lazyPrefetch.isPending }
+                for _ in 0..<8 { host.step() }
+                let span = try XCTUnwrap(lazy.span)
+                let first = max(0, Int((span.lowerBound / extent).rounded(.down)) - 1) * perRun
+                let last = min(1_000, (Int((span.upperBound / extent).rounded(.up)) + 1) * perRun)
+                XCTAssertEqual(lazy.cells.built, first..<last, "kind \(kind): idle retains only normal neighbours")
+                for item in lazy.mounted.values {
+                    XCTAssertEqual(item.view.laidOutFrame.width, 80, accuracy: 1)
+                    XCTAssertEqual(item.view.laidOutFrame.height, 40, accuracy: 1)
+                }
+                let work = [lazy.cells.requests, lazy.cells.measurements]
+                for _ in 0..<8 { host.step() }
+                XCTAssertEqual([lazy.cells.requests, lazy.cells.measurements], work, "stationary kind \(kind)")
+            }
+        }
+    }
+
     func testNavigationInSidebarBuildsOnlyTheMeasuredLazyWindow() throws {
         try onUIThread {
             let path = State(wrappedValue: [Int]()), builds = ModifiedLazyBuilds()
@@ -891,7 +1017,7 @@ final class WinUILazyTests: XCTestCase {
         }
     }
 
-    func testNativeScrollNoticeRealizesItsUpcomingWindowBeforeTheNextPass() throws {
+    func testScrollMetadataDoesNotReplaceTheNativeViewport() throws {
         try onUIThread {
             let host = WinUIRenderer.running(reducesMotion: true) {
                 ScrollView {
@@ -912,9 +1038,10 @@ final class WinUILazyTests: XCTestCase {
             let standing = scroll.scroller.standing.offset
             scroll.scroller.nextOffset = Point(0, standing.y + 4_000)
             for ear in scroll.scroller.ears { ear.moved() }
-            XCTAssertGreaterThan(lazy.cells.built.lowerBound, firstWindow.upperBound,
-                                 "the announced viewport is requested before another native layout pass")
-            XCTAssertGreaterThan(lazy.cells.requests, requested)
+            XCTAssertEqual(lazy.cells.built, firstWindow,
+                           "scroll metadata cannot replace the current native viewport")
+            XCTAssertEqual(lazy.cells.requests, requested,
+                           "native callbacks coalesce realization after the callback")
             XCTAssertLessThan(lazy.cells.built.count, 20,
                               "a distant fling requests the announced viewport before optional look-ahead")
             scroll.scroller.nextOffset = nil
@@ -2007,11 +2134,13 @@ final class WinUILazyTests: XCTestCase {
 
 /// Reads displayed pixels off the UI thread during scrolling and layout; polling does not cover every frame.
 private final class WinUILazyScreenProbe: @unchecked Sendable {
+    private let dpiContext = GetThreadDpiAwarenessContext()
     let lock = NSLock()
     let window: HWND
     let points: [POINT]
     var stopped = false
     var samples: [(time: Double, edge: Int, pixel: DWORD)] = []
+    var requiresForeground = false
 
     init(window: HWND, points: [POINT]) {
         self.window = window
@@ -2021,6 +2150,8 @@ private final class WinUILazyScreenProbe: @unchecked Sendable {
     nonisolated static let entry: @convention(c) (UnsafeMutableRawPointer?) -> DWORD = { raw in
         guard let raw else { return 1 }
         let probe = Unmanaged<WinUILazyScreenProbe>.fromOpaque(raw).takeRetainedValue()
+        let previousDPI = SetThreadDpiAwarenessContext(probe.dpiContext)
+        defer { _ = SetThreadDpiAwarenessContext(previousDPI) }
         guard let dc = GetDC(nil) else { return 1 }
         defer { _ = ReleaseDC(nil, dc) }
         while true {
@@ -2028,6 +2159,10 @@ private final class WinUILazyScreenProbe: @unchecked Sendable {
             let stopped = probe.stopped
             probe.lock.unlock()
             if stopped { return 0 }
+            if probe.requiresForeground, GetForegroundWindow() != probe.window {
+                Sleep(8)
+                continue
+            }
             for (edge, point) in probe.points.enumerated() {
                 guard let hit = WindowFromPoint(point),
                       GetAncestor(hit, UINT(GA_ROOT)) == probe.window else { continue }
@@ -2066,6 +2201,25 @@ private struct LazyRowsPage: View {
                 }
             }
         }
+    }
+}
+
+private struct SolidLazyPage: View {
+    let kind: Int
+
+    var body: some View {
+        ScrollView(kind % 2 == 1 ? .horizontal : .vertical) {
+            let rows = ForEach(0..<1_000) { _ in
+                Rectangle().fill(Color("#D03020")).frame(width: 80, height: 40)
+            }
+            if kind == 0 { LazyVStack(spacing: 0) { rows } }
+            else if kind == 1 { LazyHStack(spacing: 0) { rows } }
+            else if kind == 2 {
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(80)), count: 4), spacing: 0) { rows }
+            } else {
+                LazyHGrid(rows: Array(repeating: GridItem(.fixed(40)), count: 4), spacing: 0) { rows }
+            }
+        }.frame(width: 480, height: 240)
     }
 }
 

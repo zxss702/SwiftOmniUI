@@ -126,6 +126,9 @@ final class WinUIScrollEar {
     /// What the move says.
     let moved: () -> Void
 
+    /// A display-frame observation, separate from native layout/scroll notices.
+    var frame: (() -> Void)?
+
     /// What a program's move to a target says before the scroller moves: the landing to prepare for.
     var announce: ((Point) -> Void)?
 

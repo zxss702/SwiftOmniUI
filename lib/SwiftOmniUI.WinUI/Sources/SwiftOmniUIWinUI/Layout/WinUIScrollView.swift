@@ -248,6 +248,7 @@ final class WinUIScrollView: WinUILayoutView {
         } else {
             movement.holdEnded(rests: false)
         }
+        for ear in scroller.ears { ear.moved() }
     }
 
     /// Whether the scroller needs the display's frames.
@@ -257,12 +258,23 @@ final class WinUIScrollView: WinUILayoutView {
     /// under its own power, ahead of this thread's notices.
     var held: Bool { movement.holding }
 
+    /// Native ViewChanged offsets can lead the transform exposed by XAML.
+    /// Compare in document coordinates so nested lazy panels share the same lag.
+    func observationLead(on axis: StackArithmetic.Axis) -> Double {
+        guard case .ready(let rect) = scroller.viewport(of: document) else { return 0 }
+        let offset = scroller.standing.offset
+        return axis == .vertical ? offset.y - rect.y : offset.x - rect.x
+    }
+
     /// One frame of the display: what the scroller has to say, said here and nowhere else.
     func frame(now: Double) {
         // Keep the visible window current through inertia, independently of
         // how many native ViewChanged notifications arrived between frames.
         scroller.ears.removeAll { $0.owner == nil }
-        for ear in scroller.ears { ear.moved() }
+        for ear in scroller.ears {
+            if let frame = ear.frame { frame() }
+            else { ear.moved() }
+        }
         for report in movement.frame(now: now) {
             switch report {
             case .moved(let from, let to): onOffsetChanged?(from, to)

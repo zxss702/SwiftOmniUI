@@ -47,6 +47,9 @@
     /// Native hosts can hold optional work until the requested rows have been
     /// measured. The callback must not keep the native layout alive.
     public var prefetchReady: (() -> Bool)?
+    /// Starts a host's measurement of the time until newly requested rows are ready.
+    /// Capture the native owner weakly; its native preparation completes the sample.
+    public var onRowsRequested: (() -> Void)?
     /// Echoed by this lazy element's own render, independently of unrelated
     /// work still waiting elsewhere in the scene.
     private var requestedGeneration: Int?
@@ -358,8 +361,8 @@
         var lower = max(built.lowerBound, target.lowerBound)
         var upper = min(built.upperBound, target.upperBound)
         guard lower < upper else { prefetchPlan = nil; return false }
-        // One indivisible run, not one run per frame: the queue checks its
-        // deadline and native readiness again before adding the next run.
+        // A remembered size does not make rebuilding the row cheap. Complex
+        // subtrees and images still initialize on demand, one run at a time.
         let batch = plan.perRun
         if prefetchForward, upper < target.upperBound || lower == target.lowerBound {
             upper = min(target.upperBound, upper + batch)
@@ -378,10 +381,13 @@
     private func request(_ within: Range<Int>, keeping: Set<String>) {
         let identities = orderedIdentities
         guard let element, let runtime, within != built || retained != keeping else { return }
+        let addsRows = !within.isEmpty
+            && (within.lowerBound < built.lowerBound || within.upperBound > built.upperBound)
         if !inserting.isDisjoint(with: identities[within]) { animatesChanges = true }
         built = within
         retained = keeping
         requests += 1
+        if addsRows { onRowsRequested?() }
         Self.realizing = true
         // Retain actual moving rows, not all unbuilt rows between their old
         // and new positions. This keeps the window lazy during a large insertion.
@@ -444,6 +450,7 @@
         // patch, hover and row measure costing what the whole source costs.
         window = nil
         requests += 1
+        onRowsRequested?()
         let generation = nextRequestGeneration(for: element)
         element.send(.realizedChanged, [.strings(Array(identities)), .number(Double(generation))], in: runtime)
     }

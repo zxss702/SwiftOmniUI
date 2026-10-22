@@ -106,7 +106,7 @@ typedef struct {
     void (*turn)(void);
 
     /// A frame WinUI composes, while the host holds the frame clock.
-    void (*frame)(void);
+    void (*frame)(double renderingTime);
 
     /// A panel's MeasureOverride: `size` takes the width and height the view needs.
     void (*measure)(int64_t view, double width, double height, double *size);

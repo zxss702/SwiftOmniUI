@@ -83,7 +83,7 @@ enum WinUICallbacks {
         SwiftOmniUIWinUICallbacks(
             launched: { WinUIRenderer.launch() },
             turn: { MainActor.assumeIsolated { WinUIDoorbell.turn() } },
-            frame: { MainActor.assumeIsolated { WinUIFrameClock.current?.frame() } },
+            frame: { time in MainActor.assumeIsolated { WinUIFrameClock.current?.frame(renderingTime: time) } },
             measure: { view, width, height, size in
                 // The relay's own out-parameter, written on the thread that handed it over.
                 nonisolated(unsafe) let size = size

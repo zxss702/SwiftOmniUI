@@ -18,7 +18,7 @@
 
     public var isPending: Bool { jobs.values.contains { $0.owner != nil } }
 
-    /// `step` performs at most one bounded run and returns whether more remains.
+    /// `step` performs one bounded unit and returns whether more remains.
     /// It must capture its owner weakly.
     public func schedule(owner: AnyObject, ready: (() -> Bool)? = nil, step: @escaping () -> Bool) {
         serial &+= 1
@@ -28,11 +28,11 @@
 
     public func cancel(owner: AnyObject) { jobs[ObjectIdentifier(owner)] = nil }
 
-    /// Ready jobs may take another bounded step in this frame. A host still
-    /// waiting for native layout yields until a later frame; it never busy-waits.
-    /// Jobs without a readiness signal retain their one-step-per-frame contract.
+    /// Take one unit per ready owner, then return to native input and layout.
+    /// A ready signal permits work; it must never turn this drain into a loop
+    /// that materializes a whole predicted window in one UI frame.
     public func drain(commit: (() -> Void)? = nil) {
-        var pending = jobs.sorted { $0.value.serial < $1.value.serial }
+        let pending = jobs.sorted { $0.value.serial < $1.value.serial }
         var index = 0
         while index < pending.count {
             let (id, job) = pending[index]
@@ -49,7 +49,6 @@
                     serial &+= 1
                     let next = Job(owner: job.owner, serial: serial, ready: job.ready, step: job.step)
                     jobs[id] = next
-                    if job.ready != nil { pending.append((id, next)) }
                 } else { jobs[id] = nil }
             }
         }

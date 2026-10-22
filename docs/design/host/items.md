@@ -182,23 +182,34 @@ Further expansion resumes through the coalesced post-layout turn instead of
 rendering every unknown row inside one viewport callback. Surviving mounted
 rows keep their seats while that range is measured. Look-ahead
 and neighbour policy still bound realization; nothing requests the entire
-source merely because its rows have no measurements yet. The actual window (or
-a program jump's destination) is synchronous demand. A window the mounted
-rows do not cover is demand as well: its rows are asked for in the turn that
-asked, not left to the optional units of later frames. Only a window they
-already cover is narrowed to its demand. A viewport of optional
-neighbours on either side is prefetched on the UI thread in single-row (or
-single-grid-run) units, only while time remains in the frame's four millisecond
-work budget after visible rendering. A builder cannot be preempted; the deadline
-is checked between units. Ready owners rotate within the same frame. A WinUI
-owner stands optional work unless a change is still waiting for its rows,
-and yields it then: that work is what fills the window ahead of a moving one,
-and yielding until every mounted row has been measured yields exactly while
-the window moves - the frames of a fling. A row mounted before its own
-measurement arrives stands at its estimate, and the pass that follows corrects
-it. New sources, direction changes, jumps and detach cancel or replace
-stale work. Native layout and paint retain the rest of the frame. Images still
-load synchronously when their row is requested.
+source merely because its rows have no measurements yet. The actual window is
+mandatory demand; optional prediction must not synchronously fill a whole ahead
+window. Ordinary scroll notices return after requesting rows. Native measurement,
+arrangement and acknowledgement resume incremental realization. Only explicit
+program jumps prepare their landing synchronously. WinUI predicts the forward
+distance as measured scroll velocity multiplied by the sum of the observed frame
+interval and measured request-to-arrangement latency. The interval is at
+least the reported display refresh period; multiple XAML callbacks inside a
+refresh do not shorten it. Adjacent samples smooth velocity and preparation
+latency. The measured distance
+between the latest native scroll offset and XAML's document viewport is added
+in the moving direction. The existing adjacent row's actual coverage, including
+the partially visible edge row and spacing, is
+subtracted from that distance; idle views need no additional prefetch. The
+extension is clipped to the content bounds. Optional work requests at most one
+row (or whole grid run) per owner per frame, even when its geometry is known:
+remembering a size does not make rebuilding a complex subtree or images cheap.
+WinUI pauses optional work during row animations and native layout phases,
+and waits for the preceding unit's native measurement. Checking readiness never
+forces a native measure or a full-window layout pass. The frame clock
+deduplicates WinUI's rendering timestamps. Actual native offsets supply
+velocity samples on frames, rather than layout callbacks or animation endpoints.
+Native idle state clears the prediction; a delayed notice
+during a live gesture does not incorrectly turn its velocity into zero.
+New sources, direction changes, jumps and detach cancel or replace
+stale work. There is no fixed millisecond prefetch budget. Native layout and paint
+run normally between units. Images still load synchronously when their row is
+requested; distance prediction cannot make an indivisible expensive row cheap.
 
 Viewport-only reconciliation names retained source identities before
 materializing content. Those rows reuse their rendered subtrees without
