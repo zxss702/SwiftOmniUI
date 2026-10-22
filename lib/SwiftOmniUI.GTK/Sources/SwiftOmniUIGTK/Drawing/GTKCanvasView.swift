@@ -277,8 +277,13 @@ final class GTKCanvasView: GTKPanelView {
         defer { g_object_unref(UnsafeMutableRawPointer(layout)) }
         color.alpha *= Float(pen.alpha)
 
-        if let size = pen.fontSize, size > 0, let description = pango_font_description_new() {
-            pango_font_description_set_size(description, Int32((size * Double(PANGO_SCALE)).rounded()))
+        if let description = pango_font_description_new() {
+            if let size = pen.fontSize, size > 0 {
+                pango_font_description_set_absolute_size(description, size * Double(PANGO_SCALE))
+            }
+            if !pen.fontFamily.isEmpty { pango_font_description_set_family(description, pen.fontFamily) }
+            pango_font_description_set_weight(description, PangoWeight(rawValue: UInt32(min(1000, max(1, pen.fontWeight)))))
+            pango_font_description_set_style(description, pen.fontItalic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL)
             pango_layout_set_font_description(layout, description)
             pango_font_description_free(description)
         }
@@ -305,6 +310,7 @@ final class GTKCanvasView: GTKPanelView {
         var clip = Self.rect(Float(room.x - x), Float(room.y - y), Float(room.width), Float(room.height))
         gtk_snapshot_push_clip(snapshot, &clip)
         gtk_snapshot_append_layout(snapshot, layout, &color)
+        gtk_snapshot_pop(snapshot)
     }
 
     /// The path the flat curves draw; an empty one draws nothing.

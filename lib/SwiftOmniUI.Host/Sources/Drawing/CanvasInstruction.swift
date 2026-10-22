@@ -17,6 +17,7 @@
     case strokeWidth(Double)
     /// The text's size in points from here.
     case fontSize(Double)
+    case fontStyle(family: String, weight: Double, italic: Bool)
     /// How opaque everything is drawn from here, from nothing to whole.
     case alpha(Double)
     /// Outlines a line between two points.
@@ -135,6 +136,10 @@
             self = .completeStrokeStyle(StrokeStyle(lineWidth: width,
                 lineCap: LineCap(rawValue: cap) ?? .flat, lineJoin: LineJoin(rawValue: join) ?? .miter,
                 miterLimit: miter, dash: dash, dashPhase: phase))
+        case 28:
+            guard values.count == 3, let family = values[0].string,
+                  let weight = values[1].number, weight.isFinite, let italic = values[2].bool else { return nil }
+            self = .fontStyle(family: family, weight: weight, italic: italic)
         default: return nil
         }
     }

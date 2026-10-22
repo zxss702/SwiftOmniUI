@@ -30,6 +30,66 @@ private struct CutPage: View {
 }
 
 final class WinUIMotionTests: XCTestCase {
+    func testScaledTranslatedBlurredTabCaptionsDoNotAlternateEllipsis() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let selection = State(wrappedValue: 0)
+            let captions = ["负责人", "工程师"]
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView(.horizontal) {
+                    HStack {
+                        ForEach(0..<2) { index in
+                            let selected = selection.wrappedValue == index
+                            Button {
+                                withAnimation(.snappy) { selection.wrappedValue = index }
+                            } label: {
+                                HStack(spacing: 0) {
+                                    Color.blue
+                                        .frame(width: selected ? 24 : 32, height: selected ? 24 : 32)
+                                        .frame(width: 32, height: 32)
+                                        .padding(.leading, selected ? 4 : 0)
+                                    if selected {
+                                        Text(captions[index])
+                                            .font(.system(size: 14.1))
+                                            .tracking(0.13)
+                                            .lineLimit(1)
+                                            .padding(.trailing, 12)
+                                            .transition(.blur.combined(with: .scale(anchor: .leading))
+                                                .combined(with: .offset(x: -32)))
+                                    }
+                                }.frame(height: 32)
+                            }.id("caption-tab-\(index)")
+                        }
+                    }.padding(8).buttonStyle(.plain)
+                }.frame(width: 320, height: 64)
+            }
+
+            for index in [1, 0, 1] {
+                let start = clock.now
+                let button = try XCTUnwrap(host.view(id: .manual("caption-tab-\(index)")) as? WinUIButtonView)
+                try button.invoke()
+                host.step()
+                let label = try XCTUnwrap(host.views(WinUILabelView.self).first { $0.text == captions[index] })
+                let identity = label.handle
+                // Include the first presentation and spring overshoot; an
+                // assertion at rest alone misses the reported full/ellipsis flicker.
+                for elapsed in [0.0, 16, 48, 96, 160, 240, 400, 700, 1200] {
+                    clock.now = start + elapsed
+                    host.frame()
+                    let current = try XCTUnwrap(host.views(WinUILabelView.self).first {
+                        $0.text == captions[index] && $0.isAttached
+                    })
+                    XCTAssertEqual(current.handle, identity, "drawing must preserve the native paragraph")
+                    var result = [CChar](repeating: 0, count: 8)
+                    let count = swiftomniui_winui_read(current.handle, "isTextTrimmed", &result, Int32(result.count))
+                    XCTAssertEqual(count, 1)
+                    XCTAssertEqual(result[0], 48,
+                                   "caption \(captions[index]) must fit during transition at \(elapsed)ms")
+                }
+            }
+        }
+    }
+
     func testOrdinaryHoverUpdatesTheBackgroundWithoutWaitingForAnimationTime() throws {
         try onUIThread {
             let hovered = State(wrappedValue: false)

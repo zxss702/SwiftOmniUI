@@ -3,6 +3,7 @@
 #include "Relay.h"
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <unordered_map>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -30,6 +31,7 @@ namespace {
         controls::ScrollViewer viewer{nullptr};
         Input input;
         bool active = false, dragging = false, ownsCommands = false, pendingScroll = false;
+        std::chrono::steady_clock::time_point lastTick{};
         Point point{}, viewportPoint{};
         Selection(xaml::FrameworkElement const &view, int64_t id, Input callback)
             : number(id), element(view), input(callback) {}
@@ -128,6 +130,7 @@ namespace {
             else if (viewer) changed = viewer.ViewChanged(report);
         }
         void update(bool enabled, bool drag, double x, double y) {
+            if (drag != dragging) lastTick = std::chrono::steady_clock::now();
             active = enabled; dragging = drag; point = {static_cast<float>(x), static_cast<float>(y)};
             attach();
             if (pendingScroll) {
@@ -138,6 +141,9 @@ namespace {
         }
         void tick() {
             auto view = element.get(); if (!view || !dragging || !root) { timer.Stop(); return; }
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::clamp(std::chrono::duration<double>(now - lastTick).count(), 0.0, 0.05);
+            lastTick = now;
             if (pendingScroll) return;
             for (auto node = xaml::Media::VisualTreeHelper::GetParent(view); node; node = xaml::Media::VisualTreeHelper::GetParent(node)) {
                 auto native = node.try_as<controls::ScrollView>(); auto legacy = node.try_as<controls::ScrollViewer>();
@@ -150,9 +156,13 @@ namespace {
                 double limitX = native ? native.ScrollableWidth() : legacy.ScrollableWidth();
                 double limitY = native ? native.ScrollableHeight() : legacy.ScrollableHeight();
                 auto p = view.TransformToVisual(visual).TransformPoint(point);
-                auto step = [](double position, double extent) {
-                    return position < 28 ? -std::clamp((28.0 - position) / 28, 0.0, 1.0) * 16
-                        : position > extent - 28 ? std::clamp((position - extent + 28) / 28, 0.0, 1.0) * 16 : 0;
+                auto step = [elapsed](double position, double extent) {
+                    constexpr double edge = 32, speed = 360; // DIPs per second at the edge.
+                    auto penetration = position < edge ? -std::clamp((edge - position) / edge, 0.0, 1.0)
+                        : position > extent - edge ? std::clamp((position - extent + edge) / edge, 0.0, 1.0) : 0;
+                    // Ease in as the pointer enters the band. Timer delivery
+                    // delays must not change the scrolling velocity.
+                    return penetration * std::abs(penetration) * speed * elapsed;
                 };
                 double nextX = std::clamp(oldX + step(p.X, width), 0.0, std::max(0.0, limitX));
                 double nextY = std::clamp(oldY + step(p.Y, height), 0.0, std::max(0.0, limitY));

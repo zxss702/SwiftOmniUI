@@ -38,6 +38,7 @@ namespace {
         DrawEllipse, DrawArc, DrawPath, FillRectangle, FillRoundedRectangle, FillEllipse, FillArc, FillPath, DrawText,
         Translate, Rotate, Scale, SaveState, RestoreState, StrokeStyle, FillStyle,
         CompleteStrokeStyle = 27,
+        FontStyle = 28,
     };
 
     /// What every canvas draws with: Direct2D's device, made at the first drawing and again after Windows takes it
@@ -148,6 +149,9 @@ namespace {
         D2D1_COLOR_F stroke = D2D1::ColorF(D2D1::ColorF::Black);
         D2D1_COLOR_F text = D2D1::ColorF(D2D1::ColorF::Black);
         float width = 1, size = 14, alpha = 1;
+        std::wstring family;
+        int32_t weight = 400;
+        bool italic = false;
         D2D1_CAP_STYLE cap = D2D1_CAP_STYLE_FLAT;
         D2D1_LINE_JOIN join = D2D1_LINE_JOIN_MITER;
         bool evenOdd = false;
@@ -246,13 +250,16 @@ namespace {
     }
 
     /// `text` wrapped in the box `at`, set across it and down it as `across` and `down` say, cut at its edges.
-    void write(ID2D1DeviceContext *context, ID2D1Brush *brush, float size, double const *at, int32_t across,
+    void write(ID2D1DeviceContext *context, ID2D1Brush *brush, Pen const &pen, double const *at, int32_t across,
                int32_t down, std::wstring const &text, TextResource &resource) {
+        auto size = pen.size;
         if (size <= 0) return;
         if (!resource.layout) {
             TextResource next;
-            if (FAILED(devices.words->CreateTextFormat(devices.family.c_str(), nullptr, DWRITE_FONT_WEIGHT_NORMAL,
-                                                       DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size,
+            auto family = pen.family.empty() ? devices.family : pen.family == L"monospace" ? std::wstring(L"Consolas")
+                : pen.family == L"serif" ? std::wstring(L"Cambria") : pen.family;
+            if (FAILED(devices.words->CreateTextFormat(family.c_str(), nullptr, static_cast<DWRITE_FONT_WEIGHT>(pen.weight),
+                                                       pen.italic ? DWRITE_FONT_STYLE_ITALIC : DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size,
                                                        devices.language, next.format.put())))
                 return;
             next.format->SetTextAlignment(across == 1   ? DWRITE_TEXT_ALIGNMENT_CENTER
@@ -309,6 +316,13 @@ namespace {
             case FontSize:
                 if ((at = reader.numbers(1))) pen.size = static_cast<float>(std::max(0.0, *at));
                 break;
+            case FontStyle: {
+                auto word = reader.integer(), italic = reader.integer();
+                if (!(at = reader.numbers(1)) || word < 0 || static_cast<size_t>(word) >= drawing.words.size()) return;
+                pen.family = drawing.words[word]; pen.weight = static_cast<int32_t>(std::clamp(*at, 1.0, 999.0));
+                pen.italic = italic != 0;
+                break;
+            }
             case Alpha:
                 if ((at = reader.numbers(1))) pen.alpha = static_cast<float>(std::clamp(*at, 0.0, 1.0));
                 break;
@@ -361,7 +375,7 @@ namespace {
                 auto across = reader.integer(), down = reader.integer(), word = reader.integer();
                 if (!(at = reader.numbers(4)) || word < 0 || static_cast<size_t>(word) >= drawing.words.size()) return;
                 if (resources.texts.size() <= textIndex) resources.texts.resize(textIndex + 1);
-                write(context, paint(pen.text), pen.size, at, across, down, drawing.words[word],
+                write(context, paint(pen.text), pen, at, across, down, drawing.words[word],
                       resources.texts[textIndex++]);
                 break;
             }

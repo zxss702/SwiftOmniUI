@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Foundation
-#if canImport(FoundationNetworking)
+#if os(Linux)
+import SwiftOmniUINetworking
+#elseif canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
 @_spi(Host) import SwiftOmniUICore
@@ -62,7 +64,11 @@ private actor AsyncImageFiles {
         if let request = requests[url] { return try await request.value }
         if requests.count >= 128 { requests.removeAll(keepingCapacity: true) }
         let request = Task<URL, any Error> {
+            #if os(Linux)
+            let (data, response) = try await SwiftOmniUINetworking.URLSession.shared.data(from: url)
+            #else
             let (data, response) = try await URLSession.shared.data(from: url)
+            #endif
             if let response = response as? HTTPURLResponse, !(200..<300).contains(response.statusCode) {
                 throw URLError(.badServerResponse)
             }

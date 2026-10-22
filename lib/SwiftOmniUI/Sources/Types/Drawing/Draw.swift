@@ -46,6 +46,11 @@ public enum Draw {
         DrawCommand(.fontSize, [.number(value)])
     }
 
+    /// Font traits for Canvas text, independent of its size.
+    public static func fontStyle(family: String, weight: Double, italic: Bool) -> DrawCommand {
+        DrawCommand(.fontStyle, [.string(family), .number(weight), .bool(italic)])
+    }
+
     /// How opaque everything after this is, from 0 to 1.
     public static func alpha(_ value: Double) -> DrawCommand {
         DrawCommand(.alpha, [.number(value)])

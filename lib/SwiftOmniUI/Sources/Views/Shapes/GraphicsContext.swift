@@ -113,8 +113,8 @@ extension GraphicsContext {
     ///     `+` or `.spans` one's runs joined, a `Text($state)`'s read of the
     ///     state now - and the colour and size it wears are written ahead of
     ///     it, under a state saved for them so the pen's own hold. What the
-    ///     drawing has no instruction for - a weight, a family, a run's own
-    ///     look - stays behind.
+    ///     drawing preserves family, weight and slant as well. Per-run
+    ///     attributes within a concatenated text are not resolved here.
     ///   - rect: the box the words are drawn in and cut at.
     ///   - horizontalAlignment: where they sit across the box.
     ///   - verticalAlignment: and down it.
@@ -212,6 +212,14 @@ extension Text {
         if let size = node.props[FontElementContract.fontSize.token]?.number {
             look.append(Draw.fontSize(size))
         }
+        let attributes = node.props[.fontAttributes].flatMap(FontAttributes.init(propValue:)) ?? .none
+        let design = node.props[.fontDesign]?.enumeration ?? 0
+        let family = node.props[.fontFamily]?.name ?? (design == 3 ? "monospace" : design == 1 ? "serif" : "")
+        let weight = node.props[.fontWeight]?.number ?? (attributes.contains(.bold) ? 700 : 400)
+        if node.props[.fontFamily] != nil || node.props[.fontDesign] != nil
+            || node.props[.fontWeight] != nil || node.props[.fontAttributes] != nil {
+            look.append(Draw.fontStyle(family: family, weight: weight, italic: attributes.contains(.italic)))
+        }
         return look
     }
 }
@@ -225,5 +233,25 @@ extension Node {
         node.materialize()
         if let words = node.props[TextElementContract.text.token]?.string { return words }
         return node.children.map(\.spanWords).joined()
+    }
+}
+
+public extension GraphicsContext {
+    /// A text resolved for native Canvas layout. The native measurement uses
+    /// the same family, weight and absolute size as draw(_:at:anchor:).
+    struct ResolvedText {
+        let text: Text
+        let descriptor: FontMetrics.Descriptor
+        @MainActor public func measure(in size: Size) -> Size {
+            CanvasTextMeasurement.read?(text.drawnWords, descriptor, size) ?? .zero
+        }
+    }
+    @MainActor func resolve(_ text: Text) -> ResolvedText {
+        let props = text.node.props
+        return ResolvedText(text: text, descriptor: .init(
+            family: props[.fontFamily]?.name, size: props[.fontSize]?.number,
+            style: props[.fontTextStyle]?.enumeration ?? -1,
+            weight: props[.fontWeight]?.number, design: props[.fontDesign]?.enumeration ?? 0,
+            attributes: props[.fontAttributes]?.enumeration ?? 0))
     }
 }

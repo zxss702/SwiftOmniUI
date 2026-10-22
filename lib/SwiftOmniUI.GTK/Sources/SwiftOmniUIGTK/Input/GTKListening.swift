@@ -268,12 +268,16 @@ final class GTKListening {
 
     /// Where the event a controller handles is, on its window.
     private static func onWindow(_ controller: OpaquePointer?) -> Point? {
-        var x = 0.0
-        var y = 0.0
-        guard let controller, let event = gtk_event_controller_get_current_event(controller),
-              gdk_event_get_position(event, &x, &y) != 0
-        else { return nil }
-        return Point(x: x, y: y)
+        guard let controller, let widget = gtk_event_controller_get_widget(controller),
+              let root = gtk_widget_get_root(widget).map(GTKWidget.init) else { return nil }
+        var x = 0.0, y = 0.0
+        // Gesture coordinates belong to the controller's widget. A GDK
+        // event's position belongs to its surface, which is not GtkRoot's
+        // coordinate space (client decorations and popovers have transforms).
+        guard gtk_gesture_get_point(controller, gtk_gesture_single_get_current_sequence(controller), &x, &y) != 0 else { return nil }
+        var input = graphene_point_t(x: Float(x), y: Float(y)), output = graphene_point_t()
+        guard gtk_widget_compute_point(widget, root, &input, &output) != 0 else { return nil }
+        return Point(Double(output.x), Double(output.y))
     }
 
     /// Where the press a gesture follows is now, in its widget; nil while it follows none.

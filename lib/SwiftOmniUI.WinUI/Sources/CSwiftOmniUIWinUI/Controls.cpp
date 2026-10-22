@@ -142,10 +142,17 @@ extern "C" void swiftomniui_winui_text_on_loaded(
     SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t)
 ) {
     try {
-        borrow<controls::Border>(handle).Loaded(guarded("completing a loaded label's measurement",
+        auto label = borrow<controls::Border>(handle);
+        xaml::RoutedEventHandler loaded = guarded("completing a loaded label's measurement",
             [view, ready](IInspectable const &, xaml::RoutedEventArgs const &) {
                 if (ready) ready(view);
-            }));
+            });
+        // Delegates implement IUnknown, not IInspectable, so do not box
+        // the handler in a ResourceDictionary. Retain the C callback cookie.
+        label.Resources().Insert(winrt::box_value(L"SwiftOmniUITextLoadedView"), winrt::box_value(view));
+        label.Resources().Insert(winrt::box_value(L"SwiftOmniUITextLoadedCallback"),
+            winrt::box_value(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(ready))));
+        label.Loaded(loaded);
     } catch (...) { report("following a label's native attachment"); }
 }
 

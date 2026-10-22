@@ -53,6 +53,7 @@ public struct DrawCommand: Equatable, Sendable {
         case drawGeometry = 25
         case fillGeometry = 26
         case completeStrokeStyle = 27
+        case fontStyle = 28
     }
 
     /// Which canvas call this instruction is.

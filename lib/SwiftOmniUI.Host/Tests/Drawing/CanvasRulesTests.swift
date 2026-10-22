@@ -29,6 +29,23 @@ final class CanvasRulesTests: XCTestCase {
         ])
     }
 
+    /// Native Canvas text must retain its face and style across the wire and
+    /// restore them after a nested drawing layer.
+    func testFontTraitsSurviveInstructionDecodingAndSavedState() throws {
+        let instruction = try XCTUnwrap(CanvasInstruction.instructions([
+            Draw.fontStyle(family: "monospace", weight: 600, italic: true)
+        ]).first)
+        XCTAssertEqual(instruction, .fontStyle(family: "monospace", weight: 600, italic: true))
+        var pen = CanvasPen()
+        XCTAssertTrue(pen.take(instruction))
+        XCTAssertTrue(pen.take(.saveState))
+        XCTAssertTrue(pen.take(.fontStyle(family: "serif", weight: 400, italic: false)))
+        XCTAssertTrue(pen.take(.restoreState))
+        XCTAssertEqual(pen.fontFamily, "monospace")
+        XCTAssertEqual(pen.fontWeight, 600)
+        XCTAssertTrue(pen.fontItalic)
+    }
+
     /// A stroke's style and a fill's rule read as `Draw` wrote them.
     func testAStrokeStyleAndFillRuleReadAsDrawWroteThem() {
         let drawing = [
