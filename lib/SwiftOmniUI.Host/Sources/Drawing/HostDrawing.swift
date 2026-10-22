@@ -35,6 +35,7 @@
         static let saveState: Int32 = 21, restoreState: Int32 = 22
         static let strokeStyle: Int32 = 23, fillStyle: Int32 = 24
         static let completeStrokeStyle: Int32 = 27
+        static let fontStyle: Int32 = 28
     }
 
     private mutating func append(_ instruction: CanvasInstruction) {
@@ -44,6 +45,10 @@
         case .foregroundStyle(let color): colour(Kind.foregroundStyle, color)
         case .strokeWidth(let width): record(Kind.strokeWidth, [width])
         case .fontSize(let size): record(Kind.fontSize, [size])
+        case .fontStyle(let family, let weight, let italic):
+            ints += [Kind.fontStyle, Int32(strings.count), italic ? 1 : 0]
+            strings.append(family)
+            numbers.append(weight)
         case .alpha(let alpha): record(Kind.alpha, [alpha])
         case .drawLine(let from, let to): record(Kind.drawLine, [from.x, from.y, to.x, to.y])
         case .drawRectangle(let rect): record(Kind.drawRectangle, Self.numbers(rect))

@@ -21,6 +21,9 @@
 
     /// The text's size in points; the platform's own until set.
     public var fontSize: Double?
+    public var fontFamily = ""
+    public var fontWeight = 400.0
+    public var fontItalic = false
 
     /// How opaque everything is drawn, from nothing to whole: whole until set.
     public var alpha = 1.0
@@ -52,6 +55,8 @@
         case .foregroundStyle(let color): text = color
         case .strokeWidth(let width): strokeWidth = max(0, width)
         case .fontSize(let size): fontSize = max(0, size)
+        case .fontStyle(let family, let weight, let italic):
+            fontFamily = family; fontWeight = weight; fontItalic = italic
         case .alpha(let value): alpha = min(max(value, 0), 1)
         case .strokeStyle(let width, let cap, let join):
             strokeWidth = max(0, width)

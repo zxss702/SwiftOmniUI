@@ -52,9 +52,20 @@ var targets: [Target] = [
         ),
         .target(
             name: "SwiftOmniUIFoundation",
-            dependencies: ["SwiftOmniUICore"],
+            dependencies: ["SwiftOmniUICore",
+                .target(name: "SwiftOmniUINetworking", condition: .when(platforms: [.linux]))],
             path: "lib/SwiftOmniUI.Foundation/Sources",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
+        ),
+        .target(
+            name: "SwiftOmniUINetworking",
+            dependencies: [
+                .product(name: "AsyncHTTPClient", package: "async-http-client", condition: .when(platforms: [.linux])),
+                .product(name: "NIOCore", package: "swift-nio", condition: .when(platforms: [.linux])),
+                .product(name: "NIOHTTP1", package: "swift-nio", condition: .when(platforms: [.linux])),
+            ],
+            path: "lib/SwiftOmniUI.Networking/Sources",
+            swiftSettings: settings
         ),
         .target(
             name: "SwiftOmniUIConformance",
@@ -311,7 +322,11 @@ let package = Package(
     name: "SwiftOmniUIRoot",
     platforms: [.iOS(.v26), .macCatalyst(.v26), .macOS(.v15)],
     products: products,
-    dependencies: [.package(url: "https://github.com/zxss702/JsonData.git", branch: "main")],
+    dependencies: [
+        .package(url: "https://github.com/zxss702/JsonData.git", branch: "main"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.104.0"),
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.36.2"),
+    ],
     targets: targets,
     cxxLanguageStandard: .cxx20
 )

@@ -24,6 +24,19 @@ private struct SpannedPage: View {
 }
 
 final class WinUILabelViewTests: XCTestCase {
+    func testAnActuallyNarrowLabelStillUsesNativeEllipsis() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                Text("负责人").lineLimit(1).frame(width: 14)
+            }
+            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
+            var result = [CChar](repeating: 0, count: 8)
+            let count = swiftomniui_winui_read(label.handle, "isTextTrimmed", &result, Int32(result.count))
+            XCTAssertEqual(count, 1)
+            XCTAssertEqual(result[0], 49, "a genuinely constrained label still reports native trimming")
+        }
+    }
+
     func testForegroundPatchDoesNotReadOrResetTypography() throws {
         try onUIThread {
             let host = WinUIRenderer.running { Text("words") }

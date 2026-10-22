@@ -8,6 +8,18 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 @MainActor
+private final class FractionalIntrinsicPanel: WinUILayoutView {
+    let requirement: LayoutSize
+
+    init(requirement: LayoutSize) {
+        self.requirement = requirement
+        super.init()
+    }
+
+    override func contentSize(width: Double?) -> LayoutSize { requirement }
+}
+
+@MainActor
 private final class FractionalAllocationPanel: WinUISingleChildView {
     var fixedHeight: Double?
     var nativeMeasures = 0
@@ -60,6 +72,35 @@ private struct FractionalAllocationTree {
 }
 
 final class WinUIFractionalAllocationTests: XCTestCase {
+    func testNativeIntrinsicMeasurementContainsTheCompleteLogicalRequirement() {
+        onUIThread {
+            // A representable text extent plus icon/padding crosses a Float
+            // exponent boundary. Nearest conversion loses part of the text's
+            // measured width/height, despite there being no real compression.
+            let requirement = LayoutSize(width: Double(Float(42).nextUp) + 48,
+                                         height: Double(Float(14).nextUp) + 32)
+            XCTAssertLessThan(Double(Float(requirement.width)), requirement.width)
+            let panel = FractionalIntrinsicPanel(requirement: requirement)
+            let arithmetic = panel.naturalSize(width: nil)
+            let native = WinUILayoutView.querySize { panel.measure(width: nil, height: nil) }
+            XCTAssertEqual(native, arithmetic, "Swift and XAML must reserve the same intrinsic room")
+            XCTAssertGreaterThanOrEqual(native.width, requirement.width)
+            XCTAssertGreaterThanOrEqual(native.height, requirement.height)
+            XCTAssertLessThan(Double(Float(native.width).nextDown), requirement.width,
+                              "reserve only the smallest enclosing native extent, not pixel padding")
+            XCTAssertLessThan(Double(Float(native.height).nextDown), requirement.height)
+
+            // An actual smaller proposal still constrains native DesiredSize.
+            // Outward intrinsic conversion must not disable real compression.
+            let offered = LayoutSize(width: 80, height: 30)
+            let constrained = WinUILayoutView.querySize {
+                panel.measure(width: Optional(offered.width), height: Optional(offered.height))
+            }
+            XCTAssertLessThanOrEqual(constrained.width, offered.width)
+            XCTAssertLessThanOrEqual(constrained.height, offered.height)
+        }
+    }
+
     func testEquivalentFloatStackAllocationsKeepTheSameNativeTextProposals() {
         onUIThread {
             let owner = WinUISingleChildView()

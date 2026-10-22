@@ -173,6 +173,7 @@ namespace {
         if (what == "textAlignment") return number(static_cast<int32_t>(text.TextAlignment()));
         if (what == "wrapping") return number(static_cast<int32_t>(text.TextWrapping()));
         if (what == "trimming") return number(static_cast<int32_t>(text.TextTrimming()));
+        if (what == "isTextTrimmed") return flag(text.IsTextTrimmed());
         if (what == "maxLines") return number(text.MaxLines());
         if (what == "verticalAlignment") return number(static_cast<int32_t>(text.VerticalAlignment()));
         return std::nullopt;

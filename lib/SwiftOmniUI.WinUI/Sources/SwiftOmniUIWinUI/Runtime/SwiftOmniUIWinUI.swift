@@ -64,6 +64,7 @@ public enum SwiftOmniUIWinUI {
         BitmapImage.encodePNG = { pixels in MainActor.assumeIsolated { WinUIImageCodec.encode(pixels) } }
         BitmapImage.rasterize = { size, scale, drawing in MainActor.assumeIsolated { WinUICanvasView.bitmap(size: size, scale: scale, drawing: drawing) } }
         FontFace.open = { path in WinUIFontFaces.open(path) }
+        CanvasTextMeasurement.read = { text, descriptor, room in WinUISystemFontMetrics.measure(text, descriptor: descriptor, room: room) }
         FontMetrics.read = { descriptor in WinUISystemFontMetrics.read(descriptor) }
         Fonts.add = { path in swiftomniui_winui_register_font(path) > 0 }
         for path in Fonts.pending { _ = Fonts.add?(path) }

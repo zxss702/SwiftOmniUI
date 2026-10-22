@@ -477,6 +477,7 @@ class WinUILayoutView: WinUIView {
                 size = contentSize(proposal: proposal)
                 Self.queryingSize = querying
             }
+            size = Self.nativeDesiredSize(size)
             lastSizingWidth = proposal.width
             lastSizingHeight = proposal.height
             hasSizing = true
@@ -504,7 +505,7 @@ class WinUILayoutView: WinUIView {
             } else {
                 answer = LayoutSize(width: min(framed.width, width), height: min(framed.height, height))
             }
-            return answer
+            return Self.nativeDesiredSize(answer)
         }
     }
 
@@ -525,6 +526,21 @@ class WinUILayoutView: WinUIView {
     private static func nativeRect(_ rect: Rect) -> Rect {
         Rect(Double(Float(rect.x)), Double(Float(rect.y)),
              Double(Float(max(0, rect.width))), Double(Float(max(0, rect.height))))
+    }
+
+    /// An intrinsic extent is a requirement, rather than an offered slot.
+    /// XAML consumes Float sizes: rounding a Double sum down can make a
+    /// native button narrower than its own label, so TextBlock's Arrange
+    /// toggles CharacterEllipsis at what should be a fully fitting width.
+    /// Publish the smallest representable size that contains the requirement,
+    /// and use that same answer in Swift arithmetic and native Measure.
+    /// Proposals/positions keep their ordinary conversion in nativeRect.
+    private static func nativeDesiredSize(_ size: LayoutSize) -> LayoutSize {
+        func extent(_ value: Double) -> Double {
+            let native = Float(value)
+            return Double(native) < value ? Double(native.nextUp) : Double(native)
+        }
+        return LayoutSize(width: extent(size.width), height: extent(size.height))
     }
 
     private func planBounds(proposal: ProposedViewSize, natural: LayoutSize) -> Rect {
@@ -643,7 +659,7 @@ class WinUILayoutView: WinUIView {
         let proposal = Self.normalized(proposal)
         func compute() -> LayoutSize {
             Self.sizings += 1
-            return Self.querySize { contentSize(proposal: proposal) }
+            return Self.nativeDesiredSize(Self.querySize { contentSize(proposal: proposal) })
         }
         if !contentSizeDependsOnHeight || proposal.height == nil {
             return measurements.size(offering: proposal.width, measure: compute)

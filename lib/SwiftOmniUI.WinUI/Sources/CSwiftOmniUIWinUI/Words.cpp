@@ -424,17 +424,41 @@ extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, 
     try {
         auto block = labelWords(handle);
         block.CharacterSpacing(characterSpacing);
-        // Native BaselineToBaseline assigns a fixed advance even when a line
-        // contains a taller font or inline image. MaxHeight keeps the native
-        // line's complete ascent/descent and treats LineHeight as a minimum.
-        // WinUI exposes no additive spacing for individually varying line
-        // heights; this preserves the content instead of shrinking its line.
-        // See WinUI ParagraphNode::ApplyLineStackingStrategy.
+        // Keep the native variable-height line boxes: a fixed baseline
+        // interval can overlap tall inline formulas. measureWords removes
+        // the requested spacing when there is no inter-line boundary.
         block.LineStackingStrategy(xaml::LineStackingStrategy::MaxHeight);
         block.LineHeight(std::isfinite(minimumLineHeight) && minimumLineHeight > 0 ? minimumLineHeight : 0);
+        auto border = borrow<controls::Border>(handle);
+        border.Resources().Insert(winrt::box_value(L"SwiftOmniUITextLineHeight"), winrt::box_value(block.LineHeight()));
         syncRichWords(handle);
     } catch (...) {
         report("spacing a label's words");
+    }
+}
+
+void swiftomniui::measureWords(xaml::UIElement const &element, winrt::Windows::Foundation::Size const &proposal) {
+    auto border = element.try_as<controls::Border>();
+    auto key = winrt::box_value(L"SwiftOmniUITextLineHeight");
+    if (!border || !border.Resources().HasKey(key)) { element.Measure(proposal); return; }
+    auto height = winrt::unbox_value<double>(border.Resources().Lookup(key));
+    auto rich = border.Child().try_as<controls::RichTextBlock>();
+    auto block = border.Child().try_as<controls::TextBlock>();
+    if (!rich && !block) { element.Measure(proposal); return; }
+    // Always evaluate at this proposal. A previously single-line paragraph
+    // may wrap after a resize. XAML retains each completed measure normally.
+    if (rich) rich.LineHeight(height); else block.LineHeight(height);
+    element.Measure(proposal);
+    if (height <= 0) return;
+    auto first = rich ? rich.ContentStart() : block.ContentStart();
+    auto last = rich ? rich.ContentEnd() : block.ContentEnd();
+    auto top = first.GetCharacterRect(winrt::Microsoft::UI::Xaml::Documents::LogicalDirection::Forward);
+    auto bottom = last.GetCharacterRect(winrt::Microsoft::UI::Xaml::Documents::LogicalDirection::Backward);
+    if (top.Height > 0 && bottom.Height > 0 && std::abs(top.Y - bottom.Y) < 0.01f) {
+        // With no inter-line boundary there must be no line spacing.
+        // Keep the native content height, including any inline image.
+        if (rich) rich.LineHeight(0); else block.LineHeight(0);
+        element.Measure(proposal);
     }
 }
 
@@ -451,6 +475,22 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
         if (needsRich && !rich) {
             rich = controls::RichTextBlock(); rich.UseLayoutRounding(false);
             auto border = borrow<controls::Border>(handle); border.Tag(block); border.Child(rich);
+            // InlineUIContainer's native ObjectRun returns zero metrics when
+            // formatted outside its embedded-element host. Attach the loaded
+            // notification to the visible paragraph as well as the Border:
+            // replacing a plain label does not reload that Border.
+            auto viewKey = winrt::box_value(L"SwiftOmniUITextLoadedView");
+            auto callbackKey = winrt::box_value(L"SwiftOmniUITextLoadedCallback");
+            if (border.Resources().HasKey(viewKey) && border.Resources().HasKey(callbackKey)) {
+                auto view = winrt::unbox_value<int64_t>(border.Resources().Lookup(viewKey));
+                auto ready = reinterpret_cast<void (*)(int64_t)>(static_cast<uintptr_t>(
+                    winrt::unbox_value<uint64_t>(border.Resources().Lookup(callbackKey))));
+                rich.Loaded(guarded("completing an attached rich label's measurement",
+                    [view, ready](IInspectable const &sender, xaml::RoutedEventArgs const &) {
+                        sender.as<xaml::UIElement>().InvalidateMeasure();
+                        if (ready) ready(view);
+                    }));
+            }
             syncRichWords(handle);
         } else if (!needsRich && rich) {
             auto border = borrow<controls::Border>(handle); border.Child(block); border.Tag(nullptr); rich = nullptr;

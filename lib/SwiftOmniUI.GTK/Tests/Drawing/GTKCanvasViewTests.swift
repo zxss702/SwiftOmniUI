@@ -26,6 +26,20 @@ final class GTKCanvasViewTests: XCTestCase {
         XCTAssertEqual(colours, [Self.red, 0, Self.blue, 0])
     }
 
+    /// Text clipping must finish before a later diagram shape is recorded.
+    func testTextClipDoesNotConsumeFollowingDiagramShapes() throws {
+        let colours = try drawn(at: [(80, 45)]) {
+            Canvas {
+                Draw.foregroundStyle(Color("#0000FF"))
+                Draw.fontSize(14)
+                Draw.drawText("label", x: 0, y: 0, width: 30, height: 20)
+                Draw.fillColor(Color("#FF0000"))
+                Draw.fillRectangle(x: 70, y: 35, width: 20, height: 20)
+            }.frame(width: 100, height: 60)
+        }
+        XCTAssertEqual(colours, [Self.red])
+    }
+
     /// A canvas' transform turns what follows it: moved and spun, a box draws its own diamond, and a saved state
     /// would have put back what it held.
     func testATransformTurnsWhatFollowsIt() throws {

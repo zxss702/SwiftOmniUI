@@ -1,9 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 @_spi(Host) import SwiftOmniUICore
+@_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIGTK
 import CNativeFontShaping
 
 @MainActor enum GTKSystemFontMetrics {
+    private static var canvasProbe: GTKCanvasView?
+    static func measure(_ text: String, descriptor: FontMetrics.Descriptor, room: Size) -> Size? {
+        if canvasProbe == nil { canvasProbe = GTKCanvasView() }
+        var look = TextLook()
+        look.family = descriptor.family ?? (descriptor.design == 3 ? "monospace" : descriptor.design == 1 ? "serif" : nil)
+        look.size = descriptor.size
+        look.weight = descriptor.weight
+        look.attributes = FontAttributes(rawValue: descriptor.attributes)
+        return canvasProbe?.measureText(text, font: look, maximumWidth: room.width.isFinite ? room.width : nil)
+    }
     private struct Key: Hashable {
         let descriptor: FontMetrics.Descriptor
         let context: UInt32

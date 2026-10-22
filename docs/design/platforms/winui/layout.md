@@ -200,6 +200,15 @@ the layout's place is the control's size.
 
 ## Desired size
 
+Intrinsic requirements use the smallest enclosing XAML `Float` extent, both
+in the arithmetic cache and at the native Measure boundary. A Double sum of
+text, icon and padding widths can fall between two Floats; rounding it down
+gives a native button less room than its label needs. TextBlock re-evaluates
+ellipsis during Arrange, so repeated animated allocations can alternate
+between complete and trimmed text. This conversion adds no pixel padding.
+Finite proposals and presentation rectangles retain their ordinary conversion;
+translation/scale remain drawing transforms, and real compression still trims.
+
 Every panel reports its measured content size, with its frame applied and
 bounded by the native proposal. A logical `placingLayout` does not make its
 native desired size zero: XAML content presenters and effect wrappers also
