@@ -28,6 +28,13 @@ public struct GraphicsContext: Sendable {
     /// The instructions gathered so far, in drawing order.
     var commands: [DrawCommand] = []
 
+    /// Native glyph drawing for the Windows CoreText compatibility backend.
+    /// Uses the given fill colour and current transform, preserving font rasterization
+    /// rather than converting the glyph into ordinary filled geometry.
+    @_spi(Host) public mutating func drawFontGlyph(path: String, glyph: UInt16, size: Double, color: Color) {
+        commands += [Draw.fillColor(color), Draw.fontGlyph(path: path, glyph: glyph, size: size)]
+    }
+
     /// Renders the recorded drawing to an immutable native bitmap.
     public func makeImage(size: Size, scale: Double = 1) -> BitmapImage? {
         BitmapImage.render(size: size, scale: scale, drawing: commands)

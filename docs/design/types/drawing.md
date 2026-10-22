@@ -34,6 +34,12 @@ wrong instructions without a word from either side. The kinds are grouped
 in their declaration: what the canvas draws with, outlines, solid shapes,
 text, and where the canvas draws.
 
+The Windows CoreText compatibility backend also emits renderer-private record
+29 for a file-backed font glyph: font path, glyph ID and em size. `HostDrawing`
+places the path index and glyph ID in `ints`, and the em size in `numbers`.
+Its origin is a Y-up baseline and it uses the current fill colour. This is
+not a public Canvas text API; other hosts keep their existing glyph backend.
+
 ## Three lists for a relay
 
 A host whose canvas stands beneath a relay - Java through JNI, C++ behind a

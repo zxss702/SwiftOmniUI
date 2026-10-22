@@ -45,6 +45,8 @@
     case fillPath([HostCurveCommand])
     /// Writes text in a rectangle, placed across and down it as the alignments say.
     case drawText(String, in: Rect, horizontal: TextAlignment, vertical: TextAlignment)
+    /// A Windows CoreText bridge glyph in the current fill, at a Y-up baseline.
+    case drawFontGlyph(path: String, glyph: UInt16, size: Double)
     /// Moves what is drawn from here by a distance.
     case translate(x: Double, y: Double)
     /// Turns what is drawn from here by degrees.
@@ -140,6 +142,11 @@
             guard values.count == 3, let family = values[0].string,
                   let weight = values[1].number, weight.isFinite, let italic = values[2].bool else { return nil }
             self = .fontStyle(family: family, weight: weight, italic: italic)
+        case 29:
+            guard values.count == 3, let path = values[0].string, !path.isEmpty,
+                  let glyph = values[1].enumeration, glyph >= 0, glyph <= Int32(UInt16.max),
+                  let size = values[2].number, size.isFinite, size > 0 else { return nil }
+            self = .drawFontGlyph(path: path, glyph: UInt16(glyph), size: size)
         default: return nil
         }
     }

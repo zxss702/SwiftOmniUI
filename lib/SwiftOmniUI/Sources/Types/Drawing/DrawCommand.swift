@@ -54,6 +54,8 @@ public struct DrawCommand: Equatable, Sendable {
         case fillGeometry = 26
         case completeStrokeStyle = 27
         case fontStyle = 28
+        // Native file-backed glyphs, used by the desktop CoreText bridge.
+        case drawFontGlyph = 29
     }
 
     /// Which canvas call this instruction is.

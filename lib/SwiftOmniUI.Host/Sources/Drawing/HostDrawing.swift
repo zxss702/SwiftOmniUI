@@ -36,6 +36,7 @@
         static let strokeStyle: Int32 = 23, fillStyle: Int32 = 24
         static let completeStrokeStyle: Int32 = 27
         static let fontStyle: Int32 = 28
+        static let drawFontGlyph: Int32 = 29
     }
 
     private mutating func append(_ instruction: CanvasInstruction) {
@@ -69,6 +70,10 @@
             ints += [Kind.drawText, horizontal.rawValue, vertical.rawValue, Int32(strings.count)]
             numbers += Self.numbers(rect)
             strings.append(text)
+        case .drawFontGlyph(let path, let glyph, let size):
+            ints += [Kind.drawFontGlyph, Int32(strings.count), Int32(glyph)]
+            strings.append(path)
+            numbers.append(size)
         case .translate(let x, let y): record(Kind.translate, [x, y])
         case .rotate(let degrees): record(Kind.rotate, [degrees])
         case .scale(let x, let y): record(Kind.scale, [x, y])

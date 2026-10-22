@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -30,6 +32,7 @@ using winrt::Windows::Foundation::Point;
 using winrt::Windows::Foundation::Size;
 namespace input = winrt::Microsoft::UI::Xaml::Input;
 namespace media = winrt::Microsoft::UI::Xaml::Media;
+IDWriteFontFace *swiftomniui_native_font_face(void *value);
 
 namespace {
     /// The instructions' kinds, as SwiftOmniUI numbers them.
@@ -39,6 +42,7 @@ namespace {
         Translate, Rotate, Scale, SaveState, RestoreState, StrokeStyle, FillStyle,
         CompleteStrokeStyle = 27,
         FontStyle = 28,
+        DrawFontGlyph = 29,
     };
 
     /// What every canvas draws with: Direct2D's device, made at the first drawing and again after Windows takes it
@@ -111,10 +115,12 @@ namespace {
     struct ReplayResources {
         std::vector<PathResource> paths;
         std::vector<TextResource> texts;
+        std::map<std::wstring, std::shared_ptr<void>> fonts;
 
         void clear() {
             paths.clear();
             texts.clear();
+            fonts.clear();
         }
     };
 
@@ -377,6 +383,36 @@ namespace {
                 if (resources.texts.size() <= textIndex) resources.texts.resize(textIndex + 1);
                 write(context, paint(pen.text), pen, at, across, down, drawing.words[word],
                       resources.texts[textIndex++]);
+                break;
+            }
+            case DrawFontGlyph: {
+                auto word = reader.integer(), index = reader.integer();
+                if (!(at = reader.numbers(1)) || word < 0 || static_cast<size_t>(word) >= drawing.words.size()
+                    || index < 0 || index > UINT16_MAX || !std::isfinite(*at) || *at <= 0) return;
+                auto const &path = drawing.words[word];
+                auto found = resources.fonts.find(path);
+                if (found == resources.fonts.end()) {
+                    double units = 0;
+                    auto handle = swiftomniui_winui_font_open(winrt::to_string(path).c_str(), &units);
+                    if (!handle) winrt::throw_hresult(E_FAIL);
+                    found = resources.fonts.emplace(path,
+                        std::shared_ptr<void>(handle, swiftomniui_winui_font_close)).first;
+                }
+                auto glyph = static_cast<UINT16>(index);
+                FLOAT advance = 0;
+                DWRITE_GLYPH_RUN run{};
+                run.fontFace = swiftomniui_native_font_face(found->second.get());
+                run.fontEmSize = static_cast<FLOAT>(*at);
+                run.glyphCount = 1; run.glyphIndices = &glyph; run.glyphAdvances = &advance;
+                // The CoreText bridge uses Y-up baselines. DirectWrite uses
+                // Y-down glyphs; invert only its local glyph axes, then retain
+                // the caller's placement and the target's raster scale.
+                auto antialias = context->GetTextAntialiasMode();
+                context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+                context->SetTransform(D2D1::Matrix3x2F::Scale(1, -1) * pen.transform * base);
+                context->DrawGlyphRun(D2D1::Point2F(0, 0), &run, nullptr, paint(pen.fill), DWRITE_MEASURING_MODE_NATURAL);
+                context->SetTextAntialiasMode(antialias);
+                place();
                 break;
             }
             case Translate:

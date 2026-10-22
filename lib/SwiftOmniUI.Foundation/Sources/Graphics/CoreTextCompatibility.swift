@@ -29,10 +29,11 @@ public func CFRangeMake(_ location: Int, _ length: Int) -> NSRange { NSRange(loc
 }
 @MainActor public final class CGFont {
     let face: FontFace
+    let path: String
     private let names: OpenTypeGlyphNames
     public init?(_ provider: CGDataProvider) {
         guard let face = FontFace(path: provider.path) else { return nil }
-        self.face = face; self.names = OpenTypeGlyphNames(face: face)
+        self.face = face; self.path = provider.path; self.names = OpenTypeGlyphNames(face: face)
     }
     public func name(for glyph: CGGlyph) -> String? {
         names.names.indices.contains(Int(glyph)) ? names.names[Int(glyph)] : nil
@@ -255,7 +256,7 @@ public nonisolated struct CTLineBoundsOptions: OptionSet, Sendable {
     return remainder.length
 }
 
-/// Records CoreGraphics-style baseline coordinates as native Canvas paths.
+/// Records CoreGraphics-style baseline coordinates as native Canvas drawing.
 /// Each operation keeps its state so cached drawings can be replayed safely.
 @MainActor public final class CGContext {
     struct State {
@@ -264,7 +265,11 @@ public nonisolated struct CTLineBoundsOptions: OptionSet, Sendable {
         var textPosition = CGPoint.zero
     }
     struct Mark {
-        let path: Path
+        enum Content {
+            case path(Path)
+            case glyph(font: CTFont, id: CGGlyph)
+        }
+        let content: Content
         let state: State
         var line: StrokeStyle? = nil
     }
@@ -299,15 +304,22 @@ public nonisolated struct CTLineBoundsOptions: OptionSet, Sendable {
     public func setFillColor(_ color: Color) { state.fill = color }
     public func setStrokeColor(_ color: Color) { state.stroke = color }
     public func setBlendMode(_ mode: BlendMode) {}
-    public func fill(_ rect: CGRect) { marks.append(Mark(path: Path(Rect(rect.minX, rect.minY, rect.width, rect.height)), state: state)) }
+    public func fill(_ rect: CGRect) { marks.append(Mark(content: .path(Path(Rect(rect.minX, rect.minY, rect.width, rect.height))), state: state)) }
     func stroke(_ path: Path, width: CGFloat, cap: LineCap) {
-        marks.append(Mark(path: path, state: state, line: StrokeStyle(lineWidth: Double(width), lineCap: cap)))
+        marks.append(Mark(content: .path(path), state: state, line: StrokeStyle(lineWidth: Double(width), lineCap: cap)))
     }
     func glyph(_ glyph: CGGlyph, font: CTFont, at point: CGPoint) {
         saveGState()
         translateBy(x: point.x, y: point.y)
+        #if os(Windows)
+        // Keep the loaded face alive through bitmap replay. DirectWrite's
+        // font rasterizer provides coverage/gamma correction that ordinary
+        // filled outlines do not receive.
+        marks.append(Mark(content: .glyph(font: font, id: glyph), state: state))
+        #else
         scaleBy(x: font.scale, y: font.scale)
-        marks.append(Mark(path: font.path(glyph), state: state))
+        marks.append(Mark(content: .path(font.path(glyph)), state: state))
+        #endif
         restoreGState()
     }
     private func replay(into context: inout GraphicsContext, ascent: CGFloat) {
@@ -318,8 +330,14 @@ public nonisolated struct CTLineBoundsOptions: OptionSet, Sendable {
                 context.drawLayer { context in
                     context.translateBy(x: mark.state.x, y: mark.state.y)
                     context.scaleBy(x: mark.state.sx, y: mark.state.sy)
-                    if let line = mark.line { context.stroke(mark.path, with: .color(mark.state.stroke), style: line) }
-                    else { context.fill(mark.path, with: .color(mark.state.fill)) }
+                    switch mark.content {
+                    case .path(let path):
+                        if let line = mark.line { context.stroke(path, with: .color(mark.state.stroke), style: line) }
+                        else { context.fill(path, with: .color(mark.state.fill)) }
+                    case .glyph(let font, let id):
+                        context.drawFontGlyph(path: font.font.path, glyph: id,
+                                              size: Double(font.size), color: mark.state.fill)
+                    }
                 }
             }
         }

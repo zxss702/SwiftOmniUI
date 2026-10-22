@@ -6,6 +6,20 @@
 import XCTest
 
 final class HostDrawingTests: XCTestCase {
+    func testFileBackedGlyphKeepsItsFontAndSizeBetweenOtherDrawingCommands() {
+        let drawing = HostDrawing([
+            Draw.fillColor(Color("#204060")),
+            Draw.saveState(),
+            Draw.translate(dx: 4, dy: 30),
+            Draw.fontGlyph(path: "C:/fonts/math.otf", glyph: 5200, size: 17.5),
+            Draw.restoreState(),
+            Draw.drawText("after", x: 1, y: 2, width: 3, height: 4),
+        ])
+        XCTAssertEqual(drawing.ints, [0, Int32(bitPattern: 0xFF204060), 21, 18, 29, 0, 5200, 22, 17, 0, 0, 1])
+        XCTAssertEqual(drawing.numbers, [4, 30, 17.5, 1, 2, 3, 4])
+        XCTAssertEqual(drawing.strings, ["C:/fonts/math.otf", "after"])
+    }
+
     /// Each instruction lays its kind and whole numbers, its numbers and its text out in the three lists, in the
     /// order the drawing wrote them - an arc as the path the host layer works out for it.
     func testEachInstructionLaysItsValuesOutInTheThreeLists() {

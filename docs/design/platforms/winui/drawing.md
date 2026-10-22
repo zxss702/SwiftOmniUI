@@ -4,6 +4,20 @@ How the WinUI host paints what SwiftOmniUI draws of its own: a layout's box and
 the brushes it is painted with, and a child a placing layout stands and draws
 ([layout](layout.md)).
 
+## Font glyphs in cached images
+
+The CoreText compatibility bridge retains font path, glyph ID, em size and
+baseline placement for Windows bitmap rendering. Canvas replays these through
+Direct2D `DrawGlyphRun`, using the exact DirectWrite file face already opened
+for shaping and metrics. Ordinary `FillGeometry` skips the text rasterizer's
+coverage/gamma correction. Do not simulate font weight with an added stroke.
+
+The glyph's local Y axis is converted from CoreText to DirectWrite without
+changing surrounding geometry. Transparent formula bitmaps use grayscale text
+antialiasing and premultiplied RGBA throughout; ClearType assumes an opaque
+background. The native font cache shares file faces with live font owners and
+retains no unused faces. Cached formula images continue to own only pixels.
+
 ## A box and its brush
 
 A layout's box - its background, outline, shape and cut - is a WinUI shape

@@ -19,6 +19,13 @@
 /// until the next of its kind: a `fillColor` paints every `fill…` after it
 /// until another `fillColor` says otherwise.
 public enum Draw {
+    /// A renderer instruction for an already positioned glyph, at a Y-up
+    /// baseline origin. The Windows font bridge supplies the exact font file;
+    /// no family lookup or second shaping pass takes place.
+    @_spi(Host) public static func fontGlyph(path: String, glyph: UInt16, size: Double) -> DrawCommand {
+        DrawCommand(.drawFontGlyph, [.string(path), .enumeration(Int32(glyph)), .number(size)])
+    }
+
     // MARK: - What the canvas draws with
 
     /// The colour the `fill…` instructions paint with.

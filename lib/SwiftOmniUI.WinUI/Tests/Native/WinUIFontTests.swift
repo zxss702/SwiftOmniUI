@@ -8,6 +8,71 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 final class WinUIFontTests: XCTestCase {
+    func testClosingAReplayHandleKeepsTheOriginalFontUsable() throws {
+        try onUIThread {
+            let path = (ProcessInfo.processInfo.environment["WINDIR"] ?? "C:/Windows") + "/Fonts/segoeui.ttf"
+            var units = 0.0
+            let original = try XCTUnwrap(swiftomniui_winui_font_open(path, &units))
+            defer { swiftomniui_winui_font_close(original) }
+            let glyph = swiftomniui_winui_font_glyph(original, 0x46)
+            for _ in 0..<5 {
+                var replayUnits = 0.0
+                let replay = try XCTUnwrap(swiftomniui_winui_font_open(path, &replayUnits))
+                XCTAssertEqual(replayUnits, units)
+                XCTAssertEqual(swiftomniui_winui_font_glyph(replay, 0x46), glyph)
+                swiftomniui_winui_font_close(replay)
+                XCTAssertEqual(swiftomniui_winui_font_glyph(original, 0x46), glyph)
+            }
+        }
+    }
+
+    func testFileGlyphRasterizationKeepsBaselineColourAndTransparentAntialiasing() throws {
+        try onUIThread {
+            let path = (ProcessInfo.processInfo.environment["WINDIR"] ?? "C:/Windows") + "/Fonts/segoeui.ttf"
+            var units = 0.0
+            let font = try XCTUnwrap(swiftomniui_winui_font_open(path, &units))
+            defer { swiftomniui_winui_font_close(font) }
+            let glyph = swiftomniui_winui_font_glyph(font, 0x46) // F: distinguish top from bottom.
+            XCTAssertNotEqual(glyph, 0)
+            var metrics = [Double](repeating: 0, count: 5)
+            XCTAssertTrue(swiftomniui_winui_font_metrics(font, glyph, &metrics))
+
+            let size = 24.0, baseline = 32.0, rasterScale = 4.0
+            let pixels = try XCTUnwrap(WinUICanvasView.bitmap(size: Size(64, 48), scale: rasterScale, drawing: [
+                Draw.fillColor(Color("#FF0000")),
+                Draw.saveState(),
+                Draw.translate(dx: 8, dy: baseline),
+                Draw.scale(sx: 1, sy: -1),
+                Draw.fontGlyph(path: path, glyph: glyph, size: size),
+                Draw.restoreState(),
+                Draw.fillColor(Color("#0000FF")),
+                Draw.fillRectangle(x: 48, y: 40, width: 4, height: 4),
+            ]))
+            var minY = pixels.height, maxY = -1, partialAlpha = false
+            for y in 0..<pixels.height {
+                for x in 0..<Int(40 * rasterScale) {
+                    let at = (y * pixels.width + x) * 4
+                    let alpha = pixels.rgba[at + 3]
+                    guard alpha > 0 else { continue }
+                    minY = min(minY, y); maxY = max(maxY, y)
+                    partialAlpha = partialAlpha || alpha < 255
+                    XCTAssertEqual(pixels.rgba[at], alpha, "Glyph colour stays premultiplied red")
+                    XCTAssertEqual(pixels.rgba[at + 1], 0)
+                    XCTAssertEqual(pixels.rgba[at + 2], 0, "Grayscale AA must not add coloured ClearType fringes")
+                }
+            }
+            XCTAssertTrue(partialAlpha)
+            let expectedTop = (baseline - (metrics[2] + metrics[4]) * size / units) * rasterScale
+            let expectedBottom = (baseline - metrics[2] * size / units) * rasterScale
+            XCTAssertEqual(Double(minY), expectedTop, accuracy: 2)
+            XCTAssertEqual(Double(maxY + 1), expectedBottom, accuracy: 2)
+            let after = (Int(42 * rasterScale) * pixels.width + Int(50 * rasterScale)) * 4
+            XCTAssertEqual(Array(pixels.rgba[after..<(after + 4)]), [0, 0, 255, 255],
+                           "The glyph's axis conversion must not affect the following shape")
+            XCTAssertEqual(pixels.rgba[3], 0, "The formula background remains transparent")
+        }
+    }
+
     func testTextAndSymbolsReuseTheSystemStyleReaderAcrossRepeatedRows() throws {
         try onUIThread {
             let before = swiftomniui_winui_font_probes()
