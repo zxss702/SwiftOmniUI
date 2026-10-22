@@ -57,11 +57,11 @@ final class WinUILabelView: WinUITextView {
             WinUIStrings.withCStrings(runs.map { $0.look.winUIFontFamily ?? "" }) { families in
                 WinUIStrings.withCStrings(runs.map { run in
                     guard let source = run.image, source.symbol == nil else { return "" }
-                    if source.bitmap != nil { return "@memory" }
+                    if source.bitmap != nil { return "" }
                     return PictureArithmetic.files(for: source.file).joined(separator: "\n")
                 }) { images in
                     WinUIStrings.withCStrings(runs.map { $0.image?.symbol ?? "" }) { glyphs in
-                    let words = runs.indices.map { index in
+                    var words = runs.indices.map { index in
                         let run = runs[index]
                         let look = run.look
                         let color = look.color?.argb
@@ -77,22 +77,38 @@ final class WinUILabelView: WinUITextView {
                             strikethrough: look.decorations.contains(.strikethrough), family: families[index],
                             spacing: Int32((spacing * 1000).rounded()),
                             baseline: look.baselineOffset ?? 0, image: images[index],
-                            glyph: glyphs[index])
+                            glyph: glyphs[index], imageRGBA: nil,
+                            imagePixelWidth: Int32(run.image?.bitmap?.pixels.width ?? 0),
+                            imagePixelHeight: Int32(run.image?.bitmap?.pixels.height ?? 0),
+                            imageWidth: run.image?.bitmap?.size.width ?? 0,
+                            imageHeight: run.image?.bitmap?.size.height ?? 0)
                     }
                     if paintOnly {
                         repainted = swiftomniui_winui_text_recolor_runs(handle, words, Int32(words.count))
                     }
-                    if !repainted { swiftomniui_winui_text_set_runs(handle, words, Int32(words.count)) }
+                    if !repainted {
+                        // Give XAML complete inline objects before it measures
+                        // the paragraph. Updating a source-less image after
+                        // insertion crosses the InlineUIContainer layout boundary.
+                        var pixels: [UInt8] = []
+                        pixels.reserveCapacity(runs.reduce(0) { $0 + ($1.image?.bitmap?.pixels.rgba.count ?? 0) })
+                        var offsets = [Int](repeating: 0, count: runs.count)
+                        for (index, run) in runs.enumerated() {
+                            offsets[index] = pixels.count
+                            if let bitmap = run.image?.bitmap { pixels.append(contentsOf: bitmap.pixels.rgba) }
+                        }
+                        pixels.withUnsafeBufferPointer { bytes in
+                            for index in words.indices where words[index].imagePixelWidth > 0 {
+                                words[index].imageRGBA = bytes.baseAddress?.advanced(by: offsets[index])
+                            }
+                            swiftomniui_winui_text_set_runs(handle, words, Int32(words.count))
+                        }
+                    }
                     }
                 }
             }
         }
         if !repainted {
-            for (index, run) in runs.enumerated() {
-                guard let bitmap = run.image?.bitmap else { continue }
-                swiftomniui_winui_text_set_run_pixels(handle, Int32(index), bitmap.pixels.rgba,
-                    Int32(bitmap.pixels.width), Int32(bitmap.pixels.height), bitmap.size.width, bitmap.size.height)
-            }
             invalidateMeasure()
         }
     }

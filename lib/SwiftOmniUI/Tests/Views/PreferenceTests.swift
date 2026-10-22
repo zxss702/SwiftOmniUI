@@ -59,7 +59,9 @@ private struct Offer: View {
     @State var width: Double
 
     var body: some View {
-        ModifiedContent(node: label("offer"))
+        // A composed, Equatable view whose own inputs stay unchanged while
+        // the preference written on it moves (the Markdown background path).
+        Color.clear
             .preference(key: SumKey.self, value: width)
     }
 }
@@ -127,6 +129,29 @@ private struct Ear: View {
         _ = renders.revisit(changed: changed)
         XCTAssertEqual(heard.values, [5, 9],
                        "the rebuilt child offered again, the fold moved, the ear heard")
+    }
+
+    func testANativeTextLayoutReachesAComposedPreferenceBackground() throws {
+        let renders = Renders()
+        let heard = Received<Double>()
+        let tree = {
+            stack([Ear(heard: heard) {
+                Text("body").backgroundPreferenceValue(Text.LayoutKey.self) { layouts in
+                    Color.clear.preference(key: SumKey.self, value: Double(layouts.reduce(0) { $0 + $1.count }))
+                }
+            }.node], id: "root")
+        }
+        let patch = renders.settled(tree())
+        XCTAssertEqual(heard.values.last, 0)
+        let handler = try XCTUnwrap(findEvent(patch, "textLayoutChanged"))
+        let rect = Rect(0, 0, 40, 14)
+        let report = TextLayoutReport(line: rect, runs: [
+            .init(rect: rect, direction: .leftToRight, span: -1, slices: [rect], sliceTexts: ["body"]),
+        ])
+        XCTAssertTrue(renders.fire(handler, with: [report.propValue]))
+        renders.settled(tree(), changed: changed)
+        XCTAssertEqual(heard.values.last, 1,
+                       "the native layout must replace the background's initial empty offer")
     }
 
     func testATransformRewritesItsSubtreesAnswer() {

@@ -161,6 +161,12 @@ goes is compared by count, the closures being taken fresh by the carry. A slot
 child, an engine or a reading written on the view makes it build as it always
 did.
 
+A parent's preference seeds are compared by key and offered value too. A
+composed background can keep identical visual inputs while publishing a new
+text layout; carrying its previous seed would retain the initial empty layout.
+Preference observers and transforms contain closures that cannot be compared,
+so writing either on a composed view requires expansion with the fresh closure.
+
 A carried view takes the handlers the parent wrote on it afresh, under the ids
 it keeps: the parent's closure ran again, so what those handlers captured is
 what the parent computed this time. The placeholder is kept fresh for the same

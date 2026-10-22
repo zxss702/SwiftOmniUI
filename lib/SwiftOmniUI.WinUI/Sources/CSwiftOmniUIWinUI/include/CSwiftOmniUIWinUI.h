@@ -509,6 +509,12 @@ typedef struct {
     double baseline;
     char const *image;
     char const *glyph;
+    /// Borrowed until text_set_runs returns; the native Image owns a copy.
+    uint8_t const *imageRGBA;
+    int32_t imagePixelWidth;
+    int32_t imagePixelHeight;
+    double imageWidth;
+    double imageHeight;
 } SwiftOmniUIWordsRun;
 
 /// Shows `runs`, in order, as the text block's words, each as it says, in place of its words.
@@ -1294,8 +1300,6 @@ bool swiftomniui_winui_bitmap_render(int32_t width, int32_t height, double scale
     int32_t const *ints, int32_t intCount, double const *numbers, int32_t numberCount,
     char const *words, int32_t const *lengths, int32_t wordCount);
 bool swiftomniui_winui_image_set_pixels(SwiftOmniUIObjectRef element, uint8_t const *rgba,
-    int32_t width, int32_t height, double logicalWidth, double logicalHeight);
-void swiftomniui_winui_text_set_run_pixels(SwiftOmniUIObjectRef element, int32_t run, uint8_t const *rgba,
     int32_t width, int32_t height, double logicalWidth, double logicalHeight);
 void swiftomniui_winui_selection_interaction(SwiftOmniUIObjectRef element, int64_t view, bool active,
     bool dragging, double x, double y, void (*input)(int64_t, int32_t, double, double));

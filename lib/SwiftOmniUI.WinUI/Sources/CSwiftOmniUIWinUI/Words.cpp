@@ -446,7 +446,7 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
         auto block = labelWords(handle);
         bool needsRich = false;
         for (int32_t i = 0; i < count; ++i)
-            needsRich = needsRich || (runs[i].image && *runs[i].image) || runs[i].baseline != 0;
+            needsRich = needsRich || runs[i].imagePixelWidth > 0 || (runs[i].image && *runs[i].image) || runs[i].baseline != 0;
         auto rich = richWords(handle);
         if (needsRich && !rich) {
             rich = controls::RichTextBlock(); rich.UseLayoutRounding(false);
@@ -492,11 +492,19 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
                 plainText = plainText + glyph;
                 continue;
             }
-            if ((run.image && *run.image) || run.baseline != 0) {
+            auto hasImage = run.imagePixelWidth > 0 || (run.image && *run.image);
+            if (hasImage || run.baseline != 0) {
                 documents::InlineUIContainer holder;
-                if (run.image && *run.image) {
+                if (hasImage) {
                     controls::Image picture;
-                    if (std::string_view(run.image) != "@memory") {
+                    if (run.imagePixelWidth > 0) {
+                        if (!std::isfinite(run.imageWidth) || !std::isfinite(run.imageHeight)
+                            || run.imageWidth <= 0 || run.imageHeight <= 0) winrt::throw_hresult(E_INVALIDARG);
+                        auto source = memoryPicture(run.imageRGBA, run.imagePixelWidth, run.imagePixelHeight);
+                        if (!source) winrt::throw_hresult(E_INVALIDARG);
+                        picture.Source(source);
+                        picture.Width(run.imageWidth); picture.Height(run.imageHeight);
+                    } else {
                         auto file = pictureFile(run.image);
                         if (!file.empty()) picture.Source(pictureSource(file));
                     }
@@ -543,7 +551,7 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
                     plainText = plainText + part.Text();
                 }
                 inlines.Append(holder);
-                auto length = (run.glyph && *run.glyph) || (run.image && *run.image) ? 1
+                auto length = (run.glyph && *run.glyph) || hasImage ? 1
                     : static_cast<int32_t>(text(run.text).size());
                 paintBackground(run, length);
                 at += length;
@@ -605,7 +613,7 @@ extern "C" bool swiftomniui_winui_text_recolor_runs(
             auto piece = inlines.GetAt(index).try_as<documents::Run>();
             auto const &run = runs[index];
             auto symbol = run.glyph && *run.glyph;
-            auto image = run.image && *run.image;
+            auto image = run.imagePixelWidth > 0 || (run.image && *run.image);
             auto words = text(symbol ? run.glyph : run.text);
             controls::TextBlock child{nullptr};
             if (piece) {
@@ -893,19 +901,4 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
         }
         return at;
     } catch (...) { report("reading native text geometry"); return 0; }
-}
-
-extern "C" void swiftomniui_winui_text_set_run_pixels(SwiftOmniUIObjectRef handle, int32_t index, uint8_t const *rgba,
-    int32_t width, int32_t height, double logicalWidth, double logicalHeight) {
-    try {
-        if (!std::isfinite(logicalWidth) || !std::isfinite(logicalHeight) || logicalWidth <= 0 || logicalHeight <= 0) return;
-        auto rich = richWords(handle); if (!rich || !rich.Blocks().Size() || index < 0) return;
-        auto inlines = rich.Blocks().GetAt(0).as<documents::Paragraph>().Inlines();
-        if (static_cast<uint32_t>(index) >= inlines.Size()) return;
-        auto holder = inlines.GetAt(index).try_as<documents::InlineUIContainer>(); if (!holder) return;
-        auto picture = inlineContent(holder).try_as<controls::Image>(); if (!picture) return;
-        auto source = memoryPicture(rgba, width, height); if (!source) return;
-        picture.Source(source); picture.Width(logicalWidth); picture.Height(logicalHeight);
-        if (auto host = holder.Child().try_as<controls::RichTextBlock>()) host.MinHeight(logicalHeight);
-    } catch (...) { report("showing a native inline image"); }
 }

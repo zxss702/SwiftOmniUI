@@ -896,9 +896,24 @@ extension Differ {
             node.tasks.count == kept.tasks.count,
             node.environments.count == kept.environments.count,
             node.driven.count == kept.driven.count,
+            node.preferenceSeeds.count == kept.preferenceSeeds.count,
+            // These closures are inputs too. Carrying the old composition
+            // would retain its old observer/transform rather than the one
+            // the parent just supplied; closures cannot be compared.
+            node.preferenceObservers.isEmpty, kept.preferenceObservers.isEmpty,
+            node.preferenceTransforms.isEmpty, kept.preferenceTransforms.isEmpty,
             node.focusedValues.same(as: kept.focusedValues),
             node.sceneFocusedValues.same(as: kept.sceneFocusedValues)
         else { return false }
+
+        // A preference written on a composed view is part of its description.
+        // In particular, a Color background may publish a new Text.Layout
+        // generation while every visual property stays the same. Keeping its
+        // old seed would leave selection readers with the initial empty layout.
+        for (fresh, old) in zip(node.preferenceSeeds, kept.preferenceSeeds) {
+            guard fresh.box.key == old.box.key,
+                  fresh.box.same(fresh.value(), old.value()) else { return false }
+        }
 
         for (fresh, old) in zip(node.watches, kept.watches)
         where fresh.matches(old.value) != true {

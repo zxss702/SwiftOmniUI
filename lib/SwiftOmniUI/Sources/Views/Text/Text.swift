@@ -217,7 +217,17 @@ extension Text {
     /// else this text itself as one run carrying its own props.
     private var concatenatedSpans: [Node] {
         if let held = node.children.first(where: { $0.type == .spans }) {
-            return held.children
+            // Text(Image) already has a span. The offset written on that
+            // Text must travel with it when it joins another Text, just as
+            // the offset on a plain-text operand becomes its span's offset.
+            return held.children.map { child in
+                var child = child
+                if child.props[.baselineOffset] == nil,
+                   let offset = node.props[.baselineOffset] {
+                    child.props[.baselineOffset] = offset
+                }
+                return child
+            }
         }
         var span = Node(contract: SpanContract.self)
         span.props = node.props

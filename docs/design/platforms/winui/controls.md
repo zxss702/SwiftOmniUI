@@ -92,6 +92,13 @@ setter moves those shared highlighters to the new brush; explicit span brushes
 remain their own, even when they have the same colour. Changing the label's
 colour therefore needs no inline rebuild or measurement.
 
+Image-bearing text uses a native `RichTextBlock` paragraph with
+`InlineUIContainer` attachments. A memory image's pixels and logical dimensions
+cross with its run and are installed before the attachment joins the paragraph;
+there is no source-less attachment followed by a separate pixel update. Native
+image sources own their copied pixels after that call. Recolouring retains the
+existing attachments and does not copy or decode their pixels again.
+
 WinUI applies font and foreground patches independently: a colour-only patch
 does not reset typography or read native font metrics. Layout boxes likewise
 apply background, outline, and path-clip member groups independently, so changing
