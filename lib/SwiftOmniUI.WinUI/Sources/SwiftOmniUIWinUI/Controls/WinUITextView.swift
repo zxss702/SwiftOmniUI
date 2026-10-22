@@ -102,7 +102,8 @@ class WinUITextView: WinUIView {
     }
 
     func requestTextLayout() {
-        guard onTextLayout != nil, textLayoutDirty, !textLayoutPending else { return }
+        guard onTextLayout != nil || look.lineSpacing != 0 || look.lineHeight != nil else { return }
+        guard textLayoutDirty, !textLayoutPending else { return }
         textLayoutPending = true
         Self.pendingTextLayouts.append(self)
         guard Self.pendingTextLayouts.count == 1 else { return }
@@ -123,21 +124,31 @@ class WinUITextView: WinUIView {
     private static var pendingTextLayouts: [WinUITextView] = []
 
     private func publishTextLayout() {
-        guard let report = onTextLayout, textLayoutDirty, isAttached else { return }
+        guard textLayoutDirty, isAttached else { return }
         let text = self.text
         let count = text.utf16.count
         guard count > 0 else {
+            if swiftomniui_winui_text_resolve_spacing(handle, 1) { nativeTextLoaded() }
             textLayoutDirty = false
-            report(TextLayoutReport(lines: [])); return
+            onTextLayout?(TextLayoutReport(lines: [])); return
         }
         var rectangles = [Double](repeating: 0, count: count * 4)
-        guard swiftomniui_winui_text_character_rects(handle, &rectangles, Int32(count)) == count,
+        var nativeLineCount: Int32 = 0
+        guard swiftomniui_winui_text_character_geometry(handle, &rectangles, Int32(count), &nativeLineCount) == count,
               stride(from: 3, to: rectangles.count, by: 4).contains(where: { rectangles[$0] > 0 }) else {
+            awaitNativeTextLayout()
+            return
+        }
+        // Character positions belong to the completed native Arrange. Resolve
+        // spacing once from that layout; never reset LineHeight during Measure.
+        if swiftomniui_winui_text_resolve_spacing(handle, nativeLineCount) {
+            nativeTextLoaded()
             awaitNativeTextLayout()
             return
         }
         textLayoutDirty = false
         lastTextLayoutSize = LayoutSize(width: laidOutFrame.width, height: laidOutFrame.height)
+        guard let report = onTextLayout else { return }
         var offset = 0, line = 0
         var last: Rect?
         var glyphs: [NativeTextLayout.Glyph] = []
@@ -269,20 +280,19 @@ class WinUITextView: WinUIView {
         prepareMeasure(width: bound.width, height: bound.height)
     }
 
-    /// WinUI spaces letters in thousandths of an em. Its native MaxHeight line
-    /// strategy takes a minimum line height, while taller text and inline images
-    /// retain their complete ascent/descent. Unlike a fixed baseline interval,
-    /// this cannot compress an inline formula into the body font's line height.
+    /// XAML owns the continuous text and wrapping. The requested baseline
+    /// interval is enabled only after native Arrange reports multiple lines.
+    /// A single-line Text, including a concatenated Text, has no line gap.
     private func writeSpacing() {
         let size = look.size ?? Self.platformFontSize
         let thousandths = Int32((look.letterSpacing(inEmsOf: size) * 1000).rounded())
         let natural = look.lineHeight != nil || look.lineSpacing != 0
             ? swiftomniui_winui_text_natural_line_height(handle) : 0
-        // RichTextBlock has no public additive spacing property for variable
-        // line heights. Normal body lines receive this requested spacing; a
-        // taller native line can exceed the minimum rather than be clipped.
-        let minimumLineHeight = natural > 0 ? max(0, natural * (look.lineHeight ?? 1) + look.lineSpacing) : 0
-        swiftomniui_winui_text_set_spacing(handle, thousandths, minimumLineHeight)
+        let baselineAdvance = natural > 0 ? max(0, natural * (look.lineHeight ?? 1) + look.lineSpacing) : 0
+        // The separate lineHeight multiplier remains an explicit line-box
+        // request. Additive lineSpacing never enlarges a single-line Text.
+        let singleLineHeight = look.lineHeight.map { natural * $0 } ?? 0
+        swiftomniui_winui_text_set_spacing(handle, thousandths, baselineAdvance, singleLineHeight)
         invalidateTextLayout()
     }
 }

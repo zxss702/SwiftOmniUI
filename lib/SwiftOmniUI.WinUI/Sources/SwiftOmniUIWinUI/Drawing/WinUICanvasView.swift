@@ -10,6 +10,9 @@ import CSwiftOmniUIWinUI
 @MainActor
 final class WinUICanvasView: WinUIView {
     override func measure(width: Double?, height: Double?) -> LayoutSize {
+        // Complete XAML's normal Measure lifecycle before reporting the
+        // flexible drawing surface's accepted proposal to its parent.
+        _ = super.measure(width: width, height: height)
         let size = ProposedViewSize(width: width, height: height).replacingUnspecifiedDimensions()
         return LayoutSize(width: max(0, size.width), height: max(0, size.height))
     }

@@ -39,7 +39,7 @@ extern "C" void swiftomniui_winui_fill_place(SwiftOmniUIObjectRef handle) {
 extern "C" void swiftomniui_winui_measure(SwiftOmniUIObjectRef handle, double width, double height, double *size) {
     try {
         auto element = as<xaml::UIElement>(handle);
-        measureWords(element, Size(static_cast<float>(width), static_cast<float>(height)));
+        element.Measure(Size(static_cast<float>(width), static_cast<float>(height)));
         auto desired = element.DesiredSize();
         size[0] = desired.Width;
         size[1] = desired.Height;

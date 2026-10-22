@@ -469,6 +469,8 @@ SwiftOmniUIObjectRef swiftomniui_winui_text_make(void);
 void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef element, int32_t style);
 void swiftomniui_winui_text_set_selectable(SwiftOmniUIObjectRef element, bool selectable);
 int32_t swiftomniui_winui_text_character_rects(SwiftOmniUIObjectRef element, double *rectangles, int32_t capacity);
+int32_t swiftomniui_winui_text_character_geometry(SwiftOmniUIObjectRef element, double *rectangles, int32_t capacity, int32_t *lineCount);
+bool swiftomniui_winui_text_resolve_spacing(SwiftOmniUIObjectRef element, int32_t nativeLineCount);
 /// The measured first-line baseline, including the label's vertical alignment.
 double swiftomniui_winui_text_baseline(SwiftOmniUIObjectRef element, double height);
 /// Width of an all-whitespace label, whose XAML DesiredSize can be zero.
@@ -534,7 +536,7 @@ void swiftomniui_winui_text_set_lines(SwiftOmniUIObjectRef text, bool wraps, int
 void swiftomniui_winui_text_set_alignment(SwiftOmniUIObjectRef text, int32_t horizontal);
 /// Character spacing in thousandths of an em; minimum native line height in DIPs (0 keeps native metrics).
 /// Larger inline fonts/images retain their height through WinUI's MaxHeight stacking strategy.
-void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef text, int32_t characterSpacing, double minimumLineHeight);
+void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef text, int32_t characterSpacing, double baselineAdvance, double singleLineHeight);
 double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRef text);
 void swiftomniui_winui_text_set_decorations(SwiftOmniUIObjectRef text, bool underline, bool strikethrough);
 

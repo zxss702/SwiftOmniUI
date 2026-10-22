@@ -13,6 +13,7 @@
 #include <cwchar>
 #include <cwctype>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <map>
 #include <tuple>
@@ -397,69 +398,76 @@ extern "C" void swiftomniui_winui_text_set_alignment(SwiftOmniUIObjectRef handle
     }
 }
 
-extern "C" double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRef handle) {
-    try {
-        auto block = labelWords(handle);
-        using Key = std::tuple<std::wstring, double, uint16_t, int32_t, int32_t>;
-        static std::map<Key, double> heights;
-        auto family = block.FontFamily().Source();
-        Key key{std::wstring(family.c_str(), family.size()), block.FontSize(), block.FontWeight().Weight,
-                static_cast<int32_t>(block.FontStyle()), static_cast<int32_t>(block.FontStretch())};
-        if (auto found = heights.find(key); found != heights.end()) return found->second;
+namespace {
+    struct NaturalWordsMetrics { double height, baseline; };
+    NaturalWordsMetrics naturalWordsMetrics(controls::TextBlock const &block, documents::Run const &run = nullptr) {
+        using Key = std::tuple<std::wstring, double, uint16_t, int32_t, int32_t, std::wstring, bool, int32_t>;
+        static std::map<Key, NaturalWordsMetrics> metrics;
+        auto family = run ? run.FontFamily() : block.FontFamily();
+        auto size = run ? run.FontSize() : block.FontSize();
+        auto weight = run ? run.FontWeight() : block.FontWeight();
+        auto style = run ? run.FontStyle() : block.FontStyle();
+        auto stretch = run ? run.FontStretch() : block.FontStretch();
+        auto language = run ? run.Language() : block.Language();
+        Key key{std::wstring(family.Source().c_str()), size, weight.Weight, static_cast<int32_t>(style),
+                static_cast<int32_t>(stretch), std::wstring(language.c_str()), block.IsTextScaleFactorEnabled(),
+                static_cast<int32_t>(block.TextLineBounds())};
+        if (auto found = metrics.find(key); found != metrics.end()) return found->second;
         controls::TextBlock probe;
-        probe.FontFamily(block.FontFamily());
-        probe.FontSize(block.FontSize());
-        probe.FontWeight(block.FontWeight());
-        probe.FontStyle(block.FontStyle());
-        probe.FontStretch(block.FontStretch());
+        probe.UseLayoutRounding(false);
+        probe.FontFamily(family); probe.FontSize(size); probe.FontWeight(weight);
+        probe.FontStyle(style); probe.FontStretch(stretch); probe.Language(language);
+        probe.IsTextScaleFactorEnabled(block.IsTextScaleFactorEnabled());
+        probe.TextLineBounds(block.TextLineBounds());
         probe.Text(L"Mg");
         probe.Measure({10000, 10000});
-        auto height = probe.DesiredSize().Height;
-        if (height > 0) heights.emplace(std::move(key), height);
-        return height;
-    } catch (...) { report("reading natural line height"); return 0; }
+        NaturalWordsMetrics result{probe.DesiredSize().Height, probe.BaselineOffset()};
+        if (result.height > 0) metrics.emplace(std::move(key), result);
+        return result;
+    }
 }
 
-extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, int32_t characterSpacing, double minimumLineHeight) {
+extern "C" double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRef handle) {
+    try { return naturalWordsMetrics(labelWords(handle)).height; }
+    catch (...) { report("reading natural line height"); return 0; }
+}
+
+extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, int32_t characterSpacing, double baselineAdvance, double singleLineHeight) {
     try {
         auto block = labelWords(handle);
         block.CharacterSpacing(characterSpacing);
-        // Keep the native variable-height line boxes: a fixed baseline
-        // interval can overlap tall inline formulas. measureWords removes
-        // the requested spacing when there is no inter-line boundary.
-        block.LineStackingStrategy(xaml::LineStackingStrategy::MaxHeight);
-        block.LineHeight(std::isfinite(minimumLineHeight) && minimumLineHeight > 0 ? minimumLineHeight : 0);
-        auto border = borrow<controls::Border>(handle);
-        border.Resources().Insert(winrt::box_value(L"SwiftOmniUITextLineHeight"), winrt::box_value(block.LineHeight()));
-        syncRichWords(handle);
-    } catch (...) {
-        report("spacing a label's words");
-    }
+        auto resources = borrow<controls::Border>(handle).Resources();
+        resources.Insert(winrt::box_value(L"SwiftOmniUITextBaselineAdvance"),
+            winrt::box_value(std::isfinite(baselineAdvance) && baselineAdvance > 0 ? baselineAdvance : 0));
+        resources.Insert(winrt::box_value(L"SwiftOmniUITextSingleLineHeight"),
+            winrt::box_value(std::isfinite(singleLineHeight) && singleLineHeight > 0 ? singleLineHeight : 0));
+        // Only a native arranged paragraph can tell whether it wrapped.
+        // Keep the last resolved state until its next real layout completes.
+        auto countKey = winrt::box_value(L"SwiftOmniUITextLineCount");
+        auto count = resources.HasKey(countKey) ? winrt::unbox_value<int32_t>(resources.Lookup(countKey)) : 1;
+        swiftomniui_winui_text_resolve_spacing(handle, count);
+    } catch (...) { report("spacing a label's words"); }
 }
 
-void swiftomniui::measureWords(xaml::UIElement const &element, winrt::Windows::Foundation::Size const &proposal) {
-    auto border = element.try_as<controls::Border>();
-    auto key = winrt::box_value(L"SwiftOmniUITextLineHeight");
-    if (!border || !border.Resources().HasKey(key)) { element.Measure(proposal); return; }
-    auto height = winrt::unbox_value<double>(border.Resources().Lookup(key));
-    auto rich = border.Child().try_as<controls::RichTextBlock>();
-    auto block = border.Child().try_as<controls::TextBlock>();
-    if (!rich && !block) { element.Measure(proposal); return; }
-    // Always evaluate at this proposal. A previously single-line paragraph
-    // may wrap after a resize. XAML retains each completed measure normally.
-    if (rich) rich.LineHeight(height); else block.LineHeight(height);
-    element.Measure(proposal);
-    if (height <= 0) return;
-    auto first = rich ? rich.ContentStart() : block.ContentStart();
-    auto last = rich ? rich.ContentEnd() : block.ContentEnd();
-    auto top = first.GetCharacterRect(winrt::Microsoft::UI::Xaml::Documents::LogicalDirection::Forward);
-    auto bottom = last.GetCharacterRect(winrt::Microsoft::UI::Xaml::Documents::LogicalDirection::Backward);
-    if (top.Height > 0 && bottom.Height > 0 && std::abs(top.Y - bottom.Y) < 0.01f) {
-        // With no inter-line boundary there must be no line spacing.
-        // Keep the native content height, including any inline image.
-        if (rich) rich.LineHeight(0); else block.LineHeight(0);
-        element.Measure(proposal);
-    }
+extern "C" bool swiftomniui_winui_text_resolve_spacing(SwiftOmniUIObjectRef handle, int32_t nativeLineCount) {
+    try {
+        if (nativeLineCount < 1) return false;
+        auto resources = borrow<controls::Border>(handle).Resources();
+        resources.Insert(winrt::box_value(L"SwiftOmniUITextLineCount"), winrt::box_value(nativeLineCount));
+        auto key = winrt::box_value(L"SwiftOmniUITextBaselineAdvance");
+        auto requested = resources.HasKey(key) ? winrt::unbox_value<double>(resources.Lookup(key)) : 0;
+        auto block = labelWords(handle);
+        auto singleKey = winrt::box_value(L"SwiftOmniUITextSingleLineHeight");
+        auto single = resources.HasKey(singleKey) ? winrt::unbox_value<double>(resources.Lookup(singleKey)) : 0;
+        auto height = nativeLineCount > 1 ? requested : single;
+        auto changed = block.LineHeight() != height;
+        // XAML does the wrapping and baseline placement. Unlike MaxHeight,
+        // this strategy removes the outer leading on a multiline paragraph.
+        block.LineStackingStrategy(xaml::LineStackingStrategy::BaselineToBaseline);
+        block.LineHeight(height);
+        syncRichWords(handle);
+        return changed;
+    } catch (...) { report("resolving a native paragraph's line spacing"); return false; }
 }
 
 extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, SwiftOmniUIWordsRun const *runs, int32_t count) {
@@ -861,6 +869,13 @@ extern "C" double swiftomniui_winui_text_whitespace_width(SwiftOmniUIObjectRef h
 extern "C" int32_t swiftomniui_winui_text_character_rects(
     SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity
 ) {
+    return swiftomniui_winui_text_character_geometry(handle, rectangles, capacity, nullptr);
+}
+
+extern "C" int32_t swiftomniui_winui_text_character_geometry(
+    SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity, int32_t *lineCount
+) {
+    if (lineCount) *lineCount = 0;
     try {
         auto block = labelWords(handle);
         auto coordinates = as<xaml::UIElement>(handle);
@@ -868,68 +883,89 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
         auto rich = richWords(handle);
         auto visual = rich ? rich.as<xaml::UIElement>() : block.as<xaml::UIElement>();
         auto transform = visual.TransformToVisual(coordinates);
-        auto append = [&](documents::TextPointer const &start, std::wstring_view string,
-                          xaml::UIElement const &owner = nullptr) {
+        auto advance = rich ? rich.LineHeight() : block.LineHeight();
+        struct Row {
+            double ascent = 0, descent = 0;
+            void include(NaturalWordsMetrics const &metrics) {
+                ascent = std::max(ascent, metrics.baseline);
+                descent = std::max(descent, metrics.height - metrics.baseline);
+            }
+            double height() const { return ascent + descent; }
+        };
+        struct Glyph { winrt::Windows::Foundation::Rect rect; float row; bool ownBounds; };
+        std::map<float, Row> rows;
+        std::vector<Glyph> glyphs;
+        bool valid = true;
+        auto rowAt = [&](winrt::Windows::Foundation::Rect const &rect, NaturalWordsMetrics metrics) {
+            if (rect.Height <= 0) return rect.Y; // A trimmed character has no visible bounds.
+            auto found = rows.lower_bound(rect.Y - 0.5f);
+            if (found == rows.end() || std::abs(found->first - rect.Y) >= 0.5f)
+                found = rows.emplace(rect.Y, Row{}).first;
+            found->second.include(metrics);
+            return found->first;
+        };
+        auto append = [&](documents::TextPointer const &start, std::wstring_view string, NaturalWordsMetrics metrics,
+                          xaml::UIElement const &owner = nullptr, documents::TextPointer const &parent = nullptr) {
             auto position = start;
             auto local = owner ? owner.TransformToVisual(visual) : nullptr;
             for (int32_t i = 0; i < static_cast<int32_t>(string.size()) && at < capacity; ++i, ++at) {
-                if (!position) return;
+                if (!position) { valid = false; return; }
                 auto rect = position.GetCharacterRect(documents::LogicalDirection::Forward);
+                auto rowRect = parent ? parent.GetCharacterRect(documents::LogicalDirection::Forward) : rect;
+                auto row = rowAt(rowRect, metrics);
                 auto next = position.GetPositionAtOffset(1, documents::LogicalDirection::Forward);
-                // GetCharacterRect is a caret rectangle: XAML leaves Width
-                // zero. The backward affinity at the trailing boundary keeps
-                // the final glyph on its own row at a soft wrap.
+                // X comes from native caret affinities, including bidi and soft
+                // wraps. No second typesetter is used to choose line breaks.
                 if (next) {
                     auto end = next.GetCharacterRect(documents::LogicalDirection::Backward);
-                    if (rect.Height > 0 && end.Height > 0 &&
-                        std::abs(rect.Y - end.Y) < 0.5f) {
+                    if (rect.Height > 0 && end.Height > 0 && std::abs(rect.Y - end.Y) < 0.5f) {
                         auto left = std::min(rect.X, end.X);
-                        rect.Width = std::abs(end.X - rect.X);
-                        rect.X = left;
+                        rect.Width = std::abs(end.X - rect.X); rect.X = left;
                     }
                 }
                 if (local) rect = local.TransformBounds(rect);
-                rect = transform.TransformBounds(rect);
-                rectangles[at * 4] = rect.X;
-                rectangles[at * 4 + 1] = rect.Y;
-                rectangles[at * 4 + 2] = rect.Width;
-                rectangles[at * 4 + 3] = rect.Height;
+                glyphs.push_back({rect, row, owner != nullptr});
                 position = next;
             }
+            // A trailing explicit newline creates a native empty final line.
+            if (!string.empty() && (string.back() == L'\n' || string.back() == L'\r') && position && !parent)
+                rowAt(position.GetCharacterRect(documents::LogicalDirection::Forward), metrics);
+        };
+        auto metricsFor = [&](controls::TextBlock const &owner, documents::Run const &run = nullptr) {
+            return advance > 0 ? naturalWordsMetrics(owner, run) : NaturalWordsMetrics{};
         };
         if (!rich && block.Inlines().Size() == 0) {
             auto words = block.Text();
-            append(block.ContentStart(), std::wstring_view(words.c_str(), words.size()));
+            append(block.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(block));
         } else {
             std::function<void(documents::Inline const &)> visit = [&](documents::Inline const &inlineValue) {
                 if (auto run = inlineValue.try_as<documents::Run>()) {
                     auto words = run.Text();
-                    append(run.ContentStart(), std::wstring_view(words.c_str(), words.size()));
+                    append(run.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(block, run));
                 } else if (auto span = inlineValue.try_as<documents::Span>()) {
                     for (auto const &child : span.Inlines()) visit(child);
                 } else if (auto holder = inlineValue.try_as<documents::InlineUIContainer>()) {
                     auto content = inlineContent(holder);
                     if (auto child = content.try_as<controls::TextBlock>()) {
                         auto words = child.Text();
-                        append(child.ContentStart(), std::wstring_view(words.c_str(), words.size()), child);
+                        append(child.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(child),
+                               child, holder.ContentStart());
                     } else if (content && at < capacity) {
-                        // InlineUIContainer has structural open/close positions,
-                        // not a character with two ordinary caret boundaries.
-                        // Use the native arranged image itself for the single
-                        // replacement character in SOUI's source text.
-                        auto rect = content.TransformToVisual(coordinates).TransformBounds(
-                            {0, 0, static_cast<float>(content.ActualWidth()), static_cast<float>(content.ActualHeight())});
-                        rectangles[at * 4] = rect.X;
-                        rectangles[at * 4 + 1] = rect.Y;
-                        rectangles[at * 4 + 2] = rect.Width;
-                        rectangles[at * 4 + 3] = rect.Height;
-                        ++at;
+                        auto height = content.ActualHeight();
+                        auto baseline = height;
+                        if (auto paragraph = holder.Child().try_as<controls::RichTextBlock>()) baseline = paragraph.BaselineOffset();
+                        auto row = rowAt(holder.ContentStart().GetCharacterRect(documents::LogicalDirection::Forward),
+                                         {height, baseline});
+                        auto rect = content.TransformToVisual(visual).TransformBounds(
+                            {0, 0, static_cast<float>(content.ActualWidth()), static_cast<float>(height)});
+                        glyphs.push_back({rect, row, true}); ++at;
                     } else if (at < capacity) {
-                        append(inlineValue.ContentStart(), L"\uFFFC");
+                        append(inlineValue.ContentStart(), L"\uFFFC", metricsFor(block));
                     }
+                } else if (inlineValue.try_as<documents::LineBreak>()) {
+                    append(inlineValue.ContentStart(), L"\n", metricsFor(block));
                 } else {
-                    // Embedded glyphs occupy one replacement character.
-                    append(inlineValue.ContentStart(), L"\uFFFC");
+                    append(inlineValue.ContentStart(), L"\uFFFC", metricsFor(block));
                 }
             };
             if (rich) {
@@ -938,6 +974,39 @@ extern "C" int32_t swiftomniui_winui_text_character_rects(
             } else {
                 for (auto const &inlineValue : block.Inlines()) visit(inlineValue);
             }
+        }
+        if (!valid || (at > 0 && rows.empty())) return 0; // Native Arrange has not supplied visible positions.
+        if (lineCount) *lineCount = static_cast<int32_t>(std::max<size_t>(1, rows.size()));
+        NaturalWordsMetrics defaults{};
+        if (advance > 0) defaults = naturalWordsMetrics(block);
+        // Plain TextBlock can keep XAML's DirectWrite fast path. Its caret
+        // tops already follow the baseline interval. Rich text's first-line
+        // advance is trimmed instead; observe that native geometry rather
+        // than assuming every TextBlock uses the same internal formatter.
+        bool caretTopsFollowBaselines = false;
+        if (advance > 0 && rows.size() > 1) {
+            auto first = rows.begin(), second = std::next(first);
+            caretTopsFollowBaselines = std::abs(second->first - first->first - advance) < 0.5
+                && std::abs(advance - first->second.height()) > 0.5;
+        }
+        for (size_t i = 0; i < glyphs.size(); ++i) {
+            auto rect = glyphs[i].rect;
+            if (advance > 0 && rect.Height > 0 && !glyphs[i].ownBounds) {
+                // XAML's caret rectangles describe the full line advance,
+                // including the gap. Adapt them to the natural text alignment
+                // box using the same font metrics as the native baseline rule.
+                // This changes selection geometry, never text layout or drawing.
+                auto const &row = rows.at(glyphs[i].row);
+                auto height = row.height();
+                if (height > 0 && defaults.height > 0) {
+                    if (!caretTopsFollowBaselines && glyphs[i].row != rows.begin()->first)
+                        rect.Y += static_cast<float>((advance - height) * defaults.baseline / defaults.height);
+                    rect.Height = static_cast<float>(height);
+                }
+            }
+            rect = transform.TransformBounds(rect);
+            rectangles[i * 4] = rect.X; rectangles[i * 4 + 1] = rect.Y;
+            rectangles[i * 4 + 2] = rect.Width; rectangles[i * 4 + 3] = rect.Height;
         }
         return at;
     } catch (...) { report("reading native text geometry"); return 0; }
