@@ -174,11 +174,13 @@ An unspecified lazy stack gap resolves to the stack default of eight points;
 an explicit zero stays zero, including between a composed row's children.
 Cross-axis proposal changes still invalidate measurements.
 
-GTK and WinUI request a bounded viewport window
-together, then replace its estimates with the mounted rows' measurements.
-WinUI rechecks coverage after that render: newly measured tall rows may
-reduce the requested range, and shorter rows may extend it. It does not run
-a growing render and native arrangement for each unknown row. Look-ahead
+GTK requests a bounded viewport window together, then replaces its estimates
+with the mounted rows' measurements. WinUI lazy stacks measure each unknown
+row before expanding the requested range, so tall composite cards do not
+create a screenful of controls based on the provisional 44-point estimate.
+Further expansion resumes through the coalesced post-layout turn instead of
+rendering every unknown row inside one viewport callback. Surviving mounted
+rows keep their seats while that range is measured. Look-ahead
 and neighbour policy still bound realization; nothing requests the entire
 source merely because its rows have no measurements yet. The actual window (or
 a program jump's destination) is synchronous demand. A window the mounted

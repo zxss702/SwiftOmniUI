@@ -81,6 +81,26 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testNavigationInSidebarBuildsOnlyTheMeasuredLazyWindow() throws {
+        try onUIThread {
+            let path = State(wrappedValue: [Int]()), builds = ModifiedLazyBuilds()
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(Binding(get: { true }, set: { _ in })) { Text("Sidebar") } detail: {
+                    NavigationStack(path.projectedValue) { Text("Home") } destination: { _ in
+                        ScrollView { LazyVStack(spacing: 0) {
+                            ForEach(0..<100) { number in
+                                builds.numbers.insert(number)
+                                return Text("Card \(number)").frame(height: 360)
+                            }
+                        } }.frame(width: 320, height: 240)
+                    }
+                }
+            }
+            path.wrappedValue = [1]
+            for _ in 0..<12 { host.step() }
+            XCTAssertEqual(builds.numbers, Set(0..<2))
+        }
+    }
     func testViewportBeforeAttachmentRemainsPendingWithoutInventingGeometry() throws {
         try onUIThread {
             let host = WinUIRenderer.bare(reducesMotion: true)
@@ -555,8 +575,8 @@ final class WinUILazyTests: XCTestCase {
             }
             for _ in 0..<12 { host.step() }
             let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
-            XCTAssertEqual(builds.numbers, Set(0..<4))
-            XCTAssertEqual(lazy.mounted.count, 3)
+            XCTAssertEqual(builds.numbers, Set(0..<3))
+            XCTAssertEqual(lazy.mounted.count, 2)
             XCTAssertEqual(lazy.cells.extents.extent(of: lazy.cells.identities[0]), 0)
             XCTAssertFalse(lazy.cells.needsMeasurement)
             XCTAssertTrue(host.views(WinUITextView.self).contains { $0.text == "Card 1" })
@@ -604,12 +624,12 @@ final class WinUILazyTests: XCTestCase {
                 }
                 for _ in 0..<12 { host.step() }
                 let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
-                XCTAssertEqual(builds.numbers, Set(0..<3), "build the measured window, not the provisional 44-point window")
-                XCTAssertEqual(lazy.mounted.count, 3)
-                XCTAssertEqual(host.views(WinUIPickerView.self).count, 27)
+                XCTAssertEqual(builds.numbers, Set(0..<2), "one visible card and its neighbour, without discarded builds")
+                XCTAssertEqual(lazy.mounted.count, 2)
+                XCTAssertEqual(host.views(WinUIPickerView.self).count, 18)
                 XCTAssertFalse(lazy.cells.needsMeasurement)
-                XCTAssertEqual(lazy.cells.total, 3 * 360 + 97 * 44, accuracy: 1,
-                               "the three measured cards replace only their own provisional extents")
+                XCTAssertEqual(lazy.cells.total, 2 * 360 + 98 * 44, accuracy: 1,
+                               "only the two requested cards replace their provisional extents")
             }
         }
     }
@@ -1959,11 +1979,14 @@ final class WinUILazyTests: XCTestCase {
     func testTheScrollRoomIsTheWholeRunAtOnce() throws {
         try onUIThread {
             let host = WinUIRenderer.running { LazyRowsPage() }
-            host.settle { host.views(WinUILabelView.self).count > 4 }
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            host.settle {
+                lazy.cells.built.count > 4 && !lazy.cells.needsMeasurement
+                    && abs(lazy.laidOutFrame.height - lazy.cells.total) < 1
+            }
 
             // The document combines known forty-point rows and provisional
             // forty-four-point rows without building the whole source.
-            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
             let measured = lazy.cells.identities.filter { lazy.cells.extents.hasMeasurement(for: $0) }.count
             XCTAssertLessThan(measured, lazy.cells.identities.count)
             XCTAssertEqual(lazy.laidOutFrame.height, Double(measured) * 40 + Double(1_000 - measured) * 44, accuracy: 1)

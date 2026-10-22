@@ -48,7 +48,7 @@ import XCTest
         let name: String
 
         var body: some View {
-            var content = Text("unchanged").id(name)
+            var content = ModifiedContent(node: Text("unchanged").id(name).node)
             if let value = value.wrappedValue {
                 content = content.layoutValue(key: SpacingKey.self, value: value)
             }

@@ -30,7 +30,7 @@ private struct OffsetTaggedChild: View {
     let offset: State<Double?>
 
     var body: some View {
-        var content = Rectangle().frame(width: 40, height: 32).id("tagged-child")
+        var content = ModifiedContent(node: Rectangle().frame(width: 40, height: 32).id("tagged-child").node)
         if let offset = offset.wrappedValue {
             content = content.layoutValue(key: OffsetTag.self, value: offset)
         }

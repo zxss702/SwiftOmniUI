@@ -420,7 +420,7 @@ class WinUILazyView: WinUITravellingLayout {
     /// rectangle can already precede another allocation or compositor offset.
     /// Program jumps supply their explicit target separately.
     func viewportChanged(_ reported: Rect, effective: Bool = true, target override: Rect? = nil,
-                         bring: Point = .zero) {
+                         completingJump: Bool = false) {
         guard clip != nil else { return }
         watchClip()
         let rect: Rect
@@ -518,6 +518,10 @@ class WinUILazyView: WinUITravellingLayout {
                 needsArrangement = true
             }
             let after = grid ? cells.runs.revision : cells.extents.revision
+            if cells.needsMeasurement, !completingJump {
+                retell()
+                return
+            }
             guard cells.needsMeasurement || needsRowMeasurements || cells.window?.revision != after else { return }
             // A pending native proposal or a repeated range needs a layout pass,
             // not another synchronous attempt. Reentrant viewport changes are
@@ -667,7 +671,7 @@ class WinUILazyView: WinUITravellingLayout {
         let standing = scroll.scroller.standing.offset
         if axis == .vertical { rect.y += target.y - standing.y }
         else { rect.x += target.x - standing.x }
-        viewportChanged(rect, effective: false, target: rect)
+        viewportChanged(rect, effective: false, target: rect, completingJump: true)
     }
 
     /// Animation readiness only: a place in the air lands in the window it
@@ -916,7 +920,8 @@ final class WinUILazyStackView: WinUILazyView {
     }
 
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {
-        cells.show(span, realize: realize, keeping: travellingIdentities, prefetch: false, demand: demand)
+        cells.show(span, realize: realize, measureBeforeExpanding: true,
+                   keeping: travellingIdentities, prefetch: false, demand: demand)
     }
 }
 
