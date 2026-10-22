@@ -6,6 +6,30 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 final class WinUITextSpacingTests: XCTestCase {
+    func testFirstMeasureResolvesSpacingWithoutAttachmentSelectionOrScroll() throws {
+        onUIThread {
+            let label = WinUITextView()
+            label.setTextFont(size: 18, attributes: nil, family: nil)
+            label.setText("first\nsecond")
+            let natural = swiftomniui_winui_text_natural_line_height(label.handle)
+            label.setLineSpacing(24)
+            // No renderer, Loaded, text geometry, message pump or scroll.
+            let measured = label.measure(width: 300, height: nil)
+            XCTAssertEqual(measured.height, 2 * natural + 24, accuracy: 1)
+            XCTAssertEqual(Self.lineHeight(label), natural + 24, accuracy: 1)
+
+            label.setText("single")
+            XCTAssertEqual(label.measure(width: 300, height: nil).height, natural, accuracy: 1)
+            XCTAssertEqual(Self.lineHeight(label), 0)
+
+            label.setText("alpha beta gamma delta")
+            XCTAssertGreaterThan(label.measure(width: 70, height: nil).height, 2 * natural)
+            XCTAssertGreaterThan(Self.lineHeight(label), 24)
+            XCTAssertEqual(label.measure(width: 600, height: nil).height, natural, accuracy: 1)
+            XCTAssertEqual(Self.lineHeight(label), 0)
+        }
+    }
+
     @MainActor private static func lineHeight(_ label: WinUITextView) -> Double {
         var buffer = [CChar](repeating: 0, count: 64)
         _ = swiftomniui_winui_read(label.handle, "lineHeight", &buffer, Int32(buffer.count))

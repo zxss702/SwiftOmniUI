@@ -248,6 +248,34 @@
             return remaining
         }
 
+        // For intrinsic horizontal children, share the available width rather
+        // than subtracting an equal deficit from every ideal width. A short
+        // label accepts its ideal size first and returns the unused share to
+        // longer siblings. Equal subtraction erases markers beside paragraphs.
+        func compressIntrinsicRow(_ indices: [Int], amount: Double) -> Double {
+            let minimum = indices.reduce(0) { $0 + minima[$1] }
+            let total = indices.reduce(0) { $0 + extents[$1] }
+            var budget = max(minimum, total - amount)
+            var active = indices
+            while !active.isEmpty {
+                let share = budget / Double(active.count)
+                let constrained = active.filter { minima[$0] >= share }
+                let satisfied = constrained.isEmpty ? active.filter { extents[$0] <= share } : constrained
+                if satisfied.isEmpty {
+                    for index in active { extents[index] = share }
+                    break
+                }
+                for index in satisfied {
+                    let extent = minima[index] >= share ? minima[index] : extents[index]
+                    extents[index] = extent
+                    budget -= extent
+                }
+                let removed = Set(satisfied)
+                active.removeAll { removed.contains($0) }
+            }
+            return max(0, amount - (total - indices.reduce(0) { $0 + extents[$1] }))
+        }
+
         // Lower priorities give up room first. Within one priority, an input,
         // scroller or spacer accepts a smaller slot before an intrinsic button
         // or label does. Explicit sizes and all declared minima remain intact.
@@ -262,7 +290,10 @@
                 guard deficit > 0 else { break }
                 let group = shown.filter { items[$0].values.priority == priority }
                 deficit = distribute(group.filter { flexibleIndices.contains($0) }, amount: deficit, growing: false)
-                deficit = distribute(group.filter { !flexibleIndices.contains($0) }, amount: deficit, growing: false)
+                let intrinsic = group.filter { !flexibleIndices.contains($0) }
+                deficit = axis == .horizontal
+                    ? compressIntrinsicRow(intrinsic, amount: deficit)
+                    : distribute(intrinsic, amount: deficit, growing: false)
             }
             return extents
         }

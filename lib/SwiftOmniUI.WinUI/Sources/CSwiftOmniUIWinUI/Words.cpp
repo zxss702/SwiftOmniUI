@@ -441,33 +441,55 @@ extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, 
             winrt::box_value(std::isfinite(baselineAdvance) && baselineAdvance > 0 ? baselineAdvance : 0));
         resources.Insert(winrt::box_value(L"SwiftOmniUITextSingleLineHeight"),
             winrt::box_value(std::isfinite(singleLineHeight) && singleLineHeight > 0 ? singleLineHeight : 0));
-        // Only a native arranged paragraph can tell whether it wrapped.
-        // Keep the last resolved state until its next real layout completes.
-        auto countKey = winrt::box_value(L"SwiftOmniUITextLineCount");
-        auto count = resources.HasKey(countKey) ? winrt::unbox_value<int32_t>(resources.Lookup(countKey)) : 1;
-        swiftomniui_winui_text_resolve_spacing(handle, count);
+        block.LineStackingStrategy(xaml::LineStackingStrategy::BaselineToBaseline);
+        block.LineHeight(std::isfinite(baselineAdvance) && baselineAdvance > 0 ? baselineAdvance : 0);
+        syncRichWords(handle);
+        borrow<controls::Border>(handle).InvalidateMeasure();
     } catch (...) { report("spacing a label's words"); }
 }
 
-extern "C" bool swiftomniui_winui_text_resolve_spacing(SwiftOmniUIObjectRef handle, int32_t nativeLineCount) {
-    try {
-        if (nativeLineCount < 1) return false;
-        auto resources = borrow<controls::Border>(handle).Resources();
-        resources.Insert(winrt::box_value(L"SwiftOmniUITextLineCount"), winrt::box_value(nativeLineCount));
-        auto key = winrt::box_value(L"SwiftOmniUITextBaselineAdvance");
-        auto requested = resources.HasKey(key) ? winrt::unbox_value<double>(resources.Lookup(key)) : 0;
-        auto block = labelWords(handle);
-        auto singleKey = winrt::box_value(L"SwiftOmniUITextSingleLineHeight");
-        auto single = resources.HasKey(singleKey) ? winrt::unbox_value<double>(resources.Lookup(singleKey)) : 0;
-        auto height = nativeLineCount > 1 ? requested : single;
-        auto changed = block.LineHeight() != height;
-        // XAML does the wrapping and baseline placement. Unlike MaxHeight,
-        // this strategy removes the outer leading on a multiline paragraph.
-        block.LineStackingStrategy(xaml::LineStackingStrategy::BaselineToBaseline);
-        block.LineHeight(height);
+void swiftomniui::measureWords(SwiftOmniUIObjectRef handle, winrt::Windows::Foundation::Size available) {
+    auto border = as<IInspectable>(handle).try_as<controls::Border>();
+    if (!border) return;
+    auto resources = border.Resources();
+    auto key = winrt::box_value(L"SwiftOmniUITextBaselineAdvance");
+    if (!resources.HasKey(key)) return;
+    auto requested = winrt::unbox_value<double>(resources.Lookup(key));
+    auto block = labelWords(handle);
+    auto singleKey = winrt::box_value(L"SwiftOmniUITextSingleLineHeight");
+    auto single = resources.HasKey(singleKey) ? winrt::unbox_value<double>(resources.Lookup(singleKey)) : 0;
+    auto maximum = block.MaxLines();
+    auto height = requested;
+    if (requested != single && maximum != 1) {
+        // Use the same native paragraph and the same width for both probes.
+        // MaxLines is WinUI's own first-line measurement, including styled
+        // runs and inline images. No glyph scanning, guessed font heights,
+        // Arrange/UpdateLayout calls or replacement visual lines are used.
+        auto probe = available;
+        probe.Height = INFINITY;
+        block.LineHeight(requested);
         syncRichWords(handle);
-        return changed;
-    } catch (...) { report("resolving a native paragraph's line spacing"); return false; }
+        border.Measure(probe);
+        auto full = border.DesiredSize().Height;
+        try {
+            block.MaxLines(1);
+            syncRichWords(handle);
+            border.Measure(probe);
+            if (full <= border.DesiredSize().Height) height = single;
+        } catch (...) {
+            block.MaxLines(maximum);
+            syncRichWords(handle);
+            throw;
+        }
+        block.MaxLines(maximum);
+    } else if (maximum == 1) {
+        height = single;
+    }
+    // BaselineToBaseline already trims the outer leading for multiple
+    // lines. WinUI leaves trailing leading on a single line, so only that
+    // case removes the additive value, before the final native Measure.
+    block.LineHeight(height);
+    syncRichWords(handle);
 }
 
 extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, SwiftOmniUIWordsRun const *runs, int32_t count) {
@@ -550,8 +572,8 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
                             || run.imageWidth <= 0 || run.imageHeight <= 0) winrt::throw_hresult(E_INVALIDARG);
                         auto source = memoryPicture(run.imageRGBA, run.imagePixelWidth, run.imagePixelHeight);
                         if (!source) winrt::throw_hresult(E_INVALIDARG);
-                        picture.Source(source);
                         picture.Width(run.imageWidth); picture.Height(run.imageHeight);
+                        setMemoryPicture(picture, source);
                     } else {
                         auto file = pictureFile(run.image);
                         if (!file.empty()) picture.Source(pictureSource(file));

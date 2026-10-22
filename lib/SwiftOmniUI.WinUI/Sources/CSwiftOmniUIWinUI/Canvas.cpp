@@ -50,6 +50,7 @@ namespace {
     struct Devices {
         winrt::com_ptr<ID2D1Factory1> factory;
         winrt::com_ptr<IDWriteFactory> words;
+        winrt::com_ptr<IDWriteRenderingParams> glyphRendering;
         winrt::com_ptr<ID2D1Device> device;
         uint32_t made = 0;
         std::wstring family;
@@ -63,6 +64,11 @@ namespace {
                 D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &options, devices.factory.put_void()));
             winrt::check_hresult(DWriteCreateFactory(
                 DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown **>(devices.words.put())));
+            winrt::com_ptr<IDWriteRenderingParams> defaults;
+            winrt::check_hresult(devices.words->CreateRenderingParams(defaults.put()));
+            winrt::check_hresult(devices.words->CreateCustomRenderingParams(
+                defaults->GetGamma(), defaults->GetEnhancedContrast(), defaults->GetClearTypeLevel(),
+                DWRITE_PIXEL_GEOMETRY_FLAT, DWRITE_RENDERING_MODE_NATURAL_SYMMETRIC, devices.glyphRendering.put()));
             // Segoe UI Variable where Windows has it, Segoe UI before.
             winrt::com_ptr<IDWriteFontCollection> fonts;
             UINT32 index = 0;
@@ -408,10 +414,17 @@ namespace {
                 // Y-down glyphs; invert only its local glyph axes, then retain
                 // the caller's placement and the target's raster scale.
                 auto antialias = context->GetTextAntialiasMode();
+                winrt::com_ptr<IDWriteRenderingParams> rendering;
+                context->GetTextRenderingParams(rendering.put());
                 context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+                // Supersampled formula glyphs can exceed DirectWrite's default
+                // size threshold for outline rendering. Retain text coverage
+                // AA in both axes; inherit the system's gamma and contrast.
+                context->SetTextRenderingParams(devices.glyphRendering.get());
                 context->SetTransform(D2D1::Matrix3x2F::Scale(1, -1) * pen.transform * base);
                 context->DrawGlyphRun(D2D1::Point2F(0, 0), &run, nullptr, paint(pen.fill), DWRITE_MEASURING_MODE_NATURAL);
                 context->SetTextAntialiasMode(antialias);
+                context->SetTextRenderingParams(rendering.get());
                 place();
                 break;
             }

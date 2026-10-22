@@ -713,6 +713,106 @@ xaml::Media::ImageSource swiftomniui::memoryPicture(uint8_t const *rgba, int32_t
     }
     bitmap.Invalidate(); return bitmap;
 }
+
+namespace {
+    auto memoryOriginalKey() { return winrt::box_value(L"SwiftOmniUIMemoryOriginal"); }
+    auto memoryCurrentKey() { return winrt::box_value(L"SwiftOmniUIMemoryCurrent"); }
+    auto memoryRootKey() { return winrt::box_value(L"SwiftOmniUIMemoryRoot"); }
+    auto memoryRootTokenKey() { return winrt::box_value(L"SwiftOmniUIMemoryRootToken"); }
+
+    void refreshMemoryPicture(controls::Image const &image) {
+        auto resources = image.Resources();
+        if (!resources.HasKey(memoryOriginalKey())) return;
+        auto original = resources.Lookup(memoryOriginalKey()).as<imaging::WriteableBitmap>();
+        auto current = resources.Lookup(memoryCurrentKey()).as<imaging::WriteableBitmap>();
+        // Another source (for example a file image) may have replaced the
+        // memory image on this reused control. Never reinstall stale pixels.
+        if (image.Source() != current) {
+            resources.Remove(memoryOriginalKey()); resources.Remove(memoryCurrentKey());
+            return;
+        }
+        auto root = image.XamlRoot();
+        if (!root) return;
+        auto scale = root.RasterizationScale();
+        auto width = image.ActualWidth() > 0 ? image.ActualWidth() : image.Width();
+        auto height = image.ActualHeight() > 0 ? image.ActualHeight() : image.Height();
+        if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0) return;
+        auto across = std::max(1.0, std::ceil(width * scale));
+        auto down = std::max(1.0, std::ceil(height * scale));
+        // Retain the original for enlargements; prefilter only minification.
+        auto targetWidth = static_cast<UINT>(std::min(across, static_cast<double>(original.PixelWidth())));
+        auto targetHeight = static_cast<UINT>(std::min(down, static_cast<double>(original.PixelHeight())));
+        if (current.PixelWidth() == targetWidth && current.PixelHeight() == targetHeight) return;
+        imaging::WriteableBitmap resized{nullptr};
+        if (targetWidth == original.PixelWidth() && targetHeight == original.PixelHeight()) {
+            resized = original;
+        } else {
+            winrt::com_ptr<IWICImagingFactory> factory;
+            winrt::check_hresult(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                                                  IID_PPV_ARGS(factory.put())));
+            winrt::com_ptr<IWICBitmap> bitmap;
+            auto stride = static_cast<UINT>(original.PixelWidth()) * 4;
+            winrt::check_hresult(factory->CreateBitmapFromMemory(original.PixelWidth(), original.PixelHeight(),
+                GUID_WICPixelFormat32bppPBGRA, stride, original.PixelBuffer().Length(),
+                original.PixelBuffer().data(), bitmap.put()));
+            winrt::com_ptr<IWICBitmapScaler> scaler;
+            winrt::check_hresult(factory->CreateBitmapScaler(scaler.put()));
+            // Fant integrates the contributing source pixels. Sending a 4x
+            // formula straight to Image's sampling loses thin strokes during
+            // minification, even when its source glyphs are antialiased.
+            winrt::check_hresult(scaler->Initialize(bitmap.get(), targetWidth, targetHeight, WICBitmapInterpolationModeFant));
+            resized = imaging::WriteableBitmap(targetWidth, targetHeight);
+            winrt::check_hresult(scaler->CopyPixels(nullptr, targetWidth * 4,
+                resized.PixelBuffer().Length(), resized.PixelBuffer().data()));
+            resized.Invalidate();
+        }
+        resources.Insert(memoryCurrentKey(), resized);
+        image.Source(resized);
+    }
+
+    void unfollowMemoryRoot(controls::Image const &image) {
+        auto resources = image.Resources();
+        if (!resources.HasKey(memoryRootKey())) return;
+        auto root = resources.Lookup(memoryRootKey()).as<xaml::XamlRoot>();
+        root.Changed(winrt::event_token{winrt::unbox_value<int64_t>(resources.Lookup(memoryRootTokenKey()))});
+        resources.Remove(memoryRootKey()); resources.Remove(memoryRootTokenKey());
+    }
+    void followMemoryRoot(controls::Image const &image) {
+        unfollowMemoryRoot(image);
+        auto root = image.XamlRoot();
+        if (!root) return;
+        auto token = root.Changed(guarded("updating memory image raster scale",
+            [weak = winrt::make_weak(image)](auto const &, auto const &) {
+                if (auto image = weak.get()) refreshMemoryPicture(image);
+            }));
+        image.Resources().Insert(memoryRootKey(), root);
+        image.Resources().Insert(memoryRootTokenKey(), winrt::box_value(token.value));
+        refreshMemoryPicture(image);
+    }
+}
+
+void swiftomniui::setMemoryPicture(controls::Image const &image, xaml::Media::ImageSource const &source) {
+    image.UseLayoutRounding(false);
+    auto resources = image.Resources();
+    resources.Insert(memoryOriginalKey(), source);
+    resources.Insert(memoryCurrentKey(), source);
+    image.Source(source);
+    auto hooked = winrt::box_value(L"SwiftOmniUIMemoryEvents");
+    if (!resources.HasKey(hooked)) {
+        resources.Insert(hooked, winrt::box_value(true));
+        image.Loaded(guarded("preparing a memory image's pixel sampling", [](IInspectable const &sender, auto const &) {
+            followMemoryRoot(sender.as<controls::Image>());
+        }));
+        image.Unloaded(guarded("releasing a memory image's raster scale listener", [](IInspectable const &sender, auto const &) {
+            unfollowMemoryRoot(sender.as<controls::Image>());
+        }));
+        image.SizeChanged(guarded("resizing memory image pixels", [](IInspectable const &sender, auto const &) {
+            refreshMemoryPicture(sender.as<controls::Image>());
+        }));
+    }
+    if (image.IsLoaded()) followMemoryRoot(image);
+}
+
 extern "C" bool swiftomniui_winui_image_set_pixels(SwiftOmniUIObjectRef handle, uint8_t const *rgba,
     int32_t width, int32_t height, double logicalWidth, double logicalHeight) {
     try {
@@ -720,8 +820,9 @@ extern "C" bool swiftomniui_winui_image_set_pixels(SwiftOmniUIObjectRef handle, 
         auto source = memoryPicture(rgba, width, height); if (!source) return false;
         auto grid = imageGrid(handle); auto image = imageChild(grid);
         symbolBox(grid).Visibility(xaml::Visibility::Collapsed); image.Visibility(xaml::Visibility::Visible);
-        image.Source(source); image.Stretch(xaml::Media::Stretch::Fill);
+        image.Stretch(xaml::Media::Stretch::Fill);
         image.Width(logicalWidth); image.Height(logicalHeight);
+        setMemoryPicture(image, source);
         auto state = imageState(grid); state->path.clear(); state->svg = false;
         state->size = {static_cast<float>(logicalWidth), static_cast<float>(logicalHeight)};
         return true;

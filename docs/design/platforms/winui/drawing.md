@@ -15,7 +15,19 @@ coverage/gamma correction. Do not simulate font weight with an added stroke.
 The glyph's local Y axis is converted from CoreText to DirectWrite without
 changing surrounding geometry. Transparent formula bitmaps use grayscale text
 antialiasing and premultiplied RGBA throughout; ClearType assumes an opaque
-background. The native font cache shares file faces with live font owners and
+background. Glyph rendering explicitly requests NATURAL_SYMMETRIC with the
+system's gamma and contrast so a supersampled glyph does not switch to
+outline rendering at the large-font threshold.
+
+Before a memory Image is displayed, WIC's Fant scaler integrates the source
+pixels into the target's physical pixel dimensions, using its XamlRoot's
+rasterization scale. Passing a large formula raster directly to display-time
+sampling can lose thin strokes during minification. The original premultiplied
+pixels remain available for subsequent size or DPI changes. Sampling updates
+on load, size change or root scale change; unchanged dimensions reuse the
+current source. No scroll-position callback or per-frame rasterization is used.
+
+The native font cache shares file faces with live font owners and
 retains no unused faces. Cached formula images continue to own only pixels.
 
 ## A box and its brush

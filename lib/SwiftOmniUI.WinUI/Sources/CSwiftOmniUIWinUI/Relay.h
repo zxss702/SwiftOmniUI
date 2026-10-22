@@ -65,8 +65,13 @@ namespace swiftomniui {
 
     /// The text block of the label `handle` names; throws for any other element.
     xaml::Media::ImageSource memoryPicture(uint8_t const *rgba, int32_t width, int32_t height);
+    /// Install a memory image with native area filtering at the displayed DPI.
+    void setMemoryPicture(controls::Image const &image, xaml::Media::ImageSource const &source);
     controls::RichTextBlock richWords(SwiftOmniUIObjectRef handle);
     void syncRichWords(SwiftOmniUIObjectRef handle);
+    /// Resolve additive line spacing using XAML's native measurements before
+    /// the caller measures the label at its final constraint.
+    void measureWords(SwiftOmniUIObjectRef handle, winrt::Windows::Foundation::Size available);
     controls::TextBlock labelWords(SwiftOmniUIObjectRef handle);
 
     /// Font values from the system's current text style, read through a reused

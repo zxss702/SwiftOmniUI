@@ -106,6 +106,10 @@ an expanding input, scroll viewport or spacer shrinks before an intrinsic
 button or label. A spacer keeps its declared minimum, and explicit main-axis
 sizes are never negotiated. Once a child reaches its minimum or maximum, its
 unused share is distributed among the remaining children in that group.
+Intrinsic horizontal siblings share the remaining proposal by width: a short
+label accepts its ideal width and returns its unused share to longer siblings.
+Do not subtract the same deficit from each ideal width, which erases narrow
+list markers before the paragraph beside them has had a chance to wrap.
 Unsatisfied explicit sizes and minima can overflow the stack. A hidden child
 takes no room and no spacing.
 

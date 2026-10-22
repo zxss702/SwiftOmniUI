@@ -470,7 +470,6 @@ void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef element, int32_t s
 void swiftomniui_winui_text_set_selectable(SwiftOmniUIObjectRef element, bool selectable);
 int32_t swiftomniui_winui_text_character_rects(SwiftOmniUIObjectRef element, double *rectangles, int32_t capacity);
 int32_t swiftomniui_winui_text_character_geometry(SwiftOmniUIObjectRef element, double *rectangles, int32_t capacity, int32_t *lineCount);
-bool swiftomniui_winui_text_resolve_spacing(SwiftOmniUIObjectRef element, int32_t nativeLineCount);
 /// The measured first-line baseline, including the label's vertical alignment.
 double swiftomniui_winui_text_baseline(SwiftOmniUIObjectRef element, double height);
 /// Width of an all-whitespace label, whose XAML DesiredSize can be zero.

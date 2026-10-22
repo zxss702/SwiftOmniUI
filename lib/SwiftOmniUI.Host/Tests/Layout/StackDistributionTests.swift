@@ -60,11 +60,25 @@ final class StackDistributionTests: XCTestCase {
         XCTAssertEqual(places([intrinsic, input], length: 300).map { $0?.width }, [100, 200])
     }
 
-    func testIntrinsicCompressionRedistributesAfterAChildReachesZero() {
+    func testIntrinsicRowKeepsSmallMarkersAndGivesTheRemainderToText() {
         let arranged = places([StackChild(width: 10, height: 20), StackChild(width: 100, height: 20)], length: 50)
 
-        XCTAssertEqual(arranged.map { $0?.width }, [0, 50])
-        XCTAssertEqual(arranged[1]?.x, 0)
+        XCTAssertEqual(arranged.map { $0?.width }, [10, 40])
+        XCTAssertEqual(arranged[1]?.x, 10)
+    }
+
+    func testIntrinsicSharingReservesLargeMinimaBeforeAcceptingShortIdealWidths() {
+        let marker = StackChild(width: 10, height: 20)
+        var text = StackChild(width: 100, height: 20)
+        text.values.minimumWidth = 80
+        XCTAssertEqual(places([marker, text], length: 80).map { $0?.width }, [0, 80])
+        XCTAssertEqual(places([marker, text], length: 90).map { $0?.width }, [10, 80])
+    }
+
+    func testIntrinsicRowDistributesSeveralSmallAndLargeChildrenSymmetrically() {
+        let children = [StackChild(width: 10, height: 20), StackChild(width: 100, height: 20),
+                        StackChild(width: 20, height: 20), StackChild(width: 200, height: 20)]
+        XCTAssertEqual(places(children, length: 100).map { $0?.width }, [10, 35, 20, 35])
     }
 
     func testCompressionRedistributesWithinPriorityBeforeTouchingHigherPriority() {
@@ -77,7 +91,7 @@ final class StackDistributionTests: XCTestCase {
 
         let arranged = places([small, large, protected], length: 90)
 
-        XCTAssertEqual(arranged.map { $0?.width }, [15, 35, 40])
+        XCTAssertEqual(arranged.map { $0?.width }, [20, 30, 40])
         XCTAssertEqual(arranged[2]?.x, 50)
     }
 

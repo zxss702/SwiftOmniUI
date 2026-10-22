@@ -102,7 +102,7 @@ class WinUITextView: WinUIView {
     }
 
     func requestTextLayout() {
-        guard onTextLayout != nil || look.lineSpacing != 0 || look.lineHeight != nil else { return }
+        guard onTextLayout != nil else { return }
         guard textLayoutDirty, !textLayoutPending else { return }
         textLayoutPending = true
         Self.pendingTextLayouts.append(self)
@@ -128,21 +128,12 @@ class WinUITextView: WinUIView {
         let text = self.text
         let count = text.utf16.count
         guard count > 0 else {
-            if swiftomniui_winui_text_resolve_spacing(handle, 1) { nativeTextLoaded() }
             textLayoutDirty = false
             onTextLayout?(TextLayoutReport(lines: [])); return
         }
         var rectangles = [Double](repeating: 0, count: count * 4)
-        var nativeLineCount: Int32 = 0
-        guard swiftomniui_winui_text_character_geometry(handle, &rectangles, Int32(count), &nativeLineCount) == count,
+        guard swiftomniui_winui_text_character_geometry(handle, &rectangles, Int32(count), nil) == count,
               stride(from: 3, to: rectangles.count, by: 4).contains(where: { rectangles[$0] > 0 }) else {
-            awaitNativeTextLayout()
-            return
-        }
-        // Character positions belong to the completed native Arrange. Resolve
-        // spacing once from that layout; never reset LineHeight during Measure.
-        if swiftomniui_winui_text_resolve_spacing(handle, nativeLineCount) {
-            nativeTextLoaded()
             awaitNativeTextLayout()
             return
         }
@@ -280,9 +271,9 @@ class WinUITextView: WinUIView {
         prepareMeasure(width: bound.width, height: bound.height)
     }
 
-    /// XAML owns the continuous text and wrapping. The requested baseline
-    /// interval is enabled only after native Arrange reports multiple lines.
-    /// A single-line Text, including a concatenated Text, has no line gap.
+    /// XAML owns continuous text, wrapping and baseline spacing. The native
+    /// measurement adapter resolves the single-line case before returning a
+    /// DesiredSize, independently of selection geometry and scroll callbacks.
     private func writeSpacing() {
         let size = look.size ?? Self.platformFontSize
         let thousandths = Int32((look.letterSpacing(inEmsOf: size) * 1000).rounded())

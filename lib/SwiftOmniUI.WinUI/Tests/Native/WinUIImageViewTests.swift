@@ -9,6 +9,36 @@ import Foundation
 import XCTest
 
 final class WinUIImageViewTests: XCTestCase {
+    func testSupersampledMemoryImagePreservesThinStrokeCoverageWhenDisplayed() throws {
+        try onUIThread {
+            var rgba = [UInt8](repeating: 0, count: 64 * 64 * 4)
+            for y in 0..<64 {
+                for x in stride(from: 0, to: 64, by: 4) {
+                    let at = (y * 64 + x) * 4
+                    rgba[at] = 255; rgba[at + 3] = 255
+                }
+            }
+            let bitmap = try XCTUnwrap(BitmapImage(pixels: PicturePixels(width: 64, height: 64, rgba: rgba),
+                                                  scale: 16, size: Size(4, 4)))
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                Image(ImageSource(bitmap: bitmap)).frame(width: 4, height: 4)
+            }
+            let image = try XCTUnwrap(host.views(WinUIImageView.self).first)
+            host.settle { ((try? Self.decoded(image))?.width ?? 64) < 64 }
+            let result = try Self.decoded(image)
+            XCTAssertLessThan(result.width, 64)
+            let alpha = stride(from: 3, to: result.rgba.count, by: 4).map { Int(result.rgba[$0]) }
+            XCTAssertEqual(Double(alpha.reduce(0, +)) / Double(alpha.count), 255.0 / 4, accuracy: 1,
+                           "Area filtering must preserve the coverage of subpixel strokes")
+            for at in stride(from: 0, to: result.rgba.count, by: 4) {
+                XCTAssertEqual(result.rgba[at], result.rgba[at + 3])
+                XCTAssertEqual(result.rgba[at + 1], 0)
+                XCTAssertEqual(result.rgba[at + 2], 0)
+            }
+            XCTAssertEqual(image.measure(width: nil, height: nil), LayoutSize(width: 4, height: 4))
+        }
+    }
+
     /// Inspect decoded bytes directly, before the UI queue has any chance to
     /// finish a load. Metadata or a later rendered screenshot alone cannot prove this.
     @MainActor

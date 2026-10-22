@@ -59,11 +59,18 @@ WinUI spaces letters in thousandths of an em. SwiftOmniUI converts letter
 spacing from points using the font size. `.lineHeight` multiplies the font's
 native measured line height and `.lineSpacing` adds DIPs between baselines.
 The native font measurement is cached by family, size, weight, slant and stretch.
-Resolve additive spacing from the native paragraph's completed Arrange, including
+Resolve additive spacing before returning the native measurement, including
 after wrapping changes during a resize. A single-line Text has no additive
 spacing; concatenated Text is one paragraph, while sibling Texts are independent.
-Multiline paragraphs use XAML's `BaselineToBaseline`; do not reset their
-`LineHeight` during Measure or create separate views for visual lines.
+Multiline paragraphs use XAML's `LineHeight` and `BaselineToBaseline`.
+XAML retains trailing leading for a single line even with that strategy, so
+the measure adapter compares the paragraph's native DesiredSize with its
+native MaxLines=1 measurement at the same width. It restores MaxLines and
+sets the resulting native line height before the final Measure. It does not
+read character rectangles, call Arrange/UpdateLayout or render visual lines.
+Selection publication never changes typography or measured height; it is
+only a reader of the completed native layout. Scroll position plays no role
+in deciding when spacing is applied.
 Native caret rectangles include the full line advance. The text-layout adapter
 reports natural text alignment boxes for selection, excluding inter-line gaps;
 inline images retain their own native arranged bounds. This geometry adaptation
