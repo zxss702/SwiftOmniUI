@@ -33,6 +33,22 @@ struct GTKLayoutItem: LayoutChild {
         values.sized(view.measure(width: values.offer(width), height: nil), offered: width)
     }
 
+    /// Custom layouts propose both axes, including a Canvas's drawing height.
+    func size(offered proposal: ProposedViewSize) -> LayoutSize {
+        let height = values.height.map { values.boundedHeight($0, available: proposal.height) }
+            ?? [proposal.height, values.maximumHeight].compactMap { $0 }.min()
+        var sized = values.sized(view.measure(width: values.offer(proposal.width), height: height),
+                                 offered: proposal.width)
+        if values.height == nil, let height = proposal.height, height.isFinite {
+            let expands = values.expandingAxes == .vertical || values.expandingAxes == .both
+            let scrolls = values.scrollAxes == .vertical || values.scrollAxes == .both
+            if expands || scrolls || values.minimumHeight != nil || values.maximumHeight != nil {
+                sized.height = values.boundedHeight(height)
+            }
+        }
+        return sized
+    }
+
     func arranges(like other: GTKLayoutItem) -> Bool {
         view === other.view && values == other.values && isShown == other.isShown && departing == other.departing
     }

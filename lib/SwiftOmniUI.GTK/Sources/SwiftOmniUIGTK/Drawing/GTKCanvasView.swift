@@ -120,6 +120,11 @@ final class GTKCanvasView: GTKPanelView {
         0
     }
 
+    override func measure(width: Double?, height: Double?) -> LayoutSize {
+        let size = ProposedViewSize(width: width, height: height).replacingUnspecifiedDimensions()
+        return LayoutSize(width: max(0, size.width), height: max(0, size.height))
+    }
+
     /// The room `text` takes drawn in the font `look` names, measured by a Pango layout of this widget's own -
     /// the same attributes `insert` puts on the words a label wears - wrapped at `maximumWidth` where one is
     /// given, each paragraph one line else. The `measureText` act's answer.

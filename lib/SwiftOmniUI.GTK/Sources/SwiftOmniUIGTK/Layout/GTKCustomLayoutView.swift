@@ -39,11 +39,11 @@ final class GTKCustomLayoutView: GTKTravellingLayout {
                 layoutValues: item.codeId.map { CoreLink().layoutValues(for: $0) } ?? [:],
                 priority: item.values.priority,
                 measureSize: { proposal in
-                    let measured = item.size(offered: proposal.width)
+                    let measured = item.size(offered: proposal)
                     return SwiftOmniUICore.Size(width: measured.width, height: measured.height)
                 },
                 measureDimensions: { proposal in
-                    let measured = item.size(offered: proposal.width)
+                    let measured = item.size(offered: proposal)
                     var guides: [Int32: Double] = [:]
                     if let baseline = item.view.firstTextBaseline(in: measured) { guides[4] = baseline }
                     var explicit: Set<Int32> = []
@@ -61,7 +61,7 @@ final class GTKCustomLayoutView: GTKTravellingLayout {
                 },
                 placeView: { [weak self] position, anchor, proposal in
                     guard let self else { return }
-                    let measured = item.size(offered: proposal.width)
+                    let measured = item.size(offered: proposal)
                     self.place(item, at: Rect(
                         x: position.x - anchor.x * measured.width,
                         y: position.y - anchor.y * measured.height,

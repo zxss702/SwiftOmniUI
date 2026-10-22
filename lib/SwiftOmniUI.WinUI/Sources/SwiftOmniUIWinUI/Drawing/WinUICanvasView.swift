@@ -9,6 +9,11 @@ import CSwiftOmniUIWinUI
 /// Design: docs/design/platforms/winui/drawing.md#a-canvas
 @MainActor
 final class WinUICanvasView: WinUIView {
+    override func measure(width: Double?, height: Double?) -> LayoutSize {
+        let size = ProposedViewSize(width: width, height: height).replacingUnspecifiedDimensions()
+        return LayoutSize(width: max(0, size.width), height: max(0, size.height))
+    }
+
     static func bitmap(size: Size, scale: Double, drawing: [DrawCommand]) -> PicturePixels? {
         let pixelWidth = (size.width * scale).rounded(.up), pixelHeight = (size.height * scale).rounded(.up)
         // Check the floating-point values before converting to Int: malformed

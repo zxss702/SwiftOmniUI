@@ -10,6 +10,21 @@ final class GTKCanvasViewTests: XCTestCase {
     private static let red: UInt32 = 0xFFFF_0000
     private static let blue: UInt32 = 0xFF00_00FF
 
+    /// A width-only scroll proposal still allocates the Canvas's derived
+    /// height through the native custom-layout placement boundary.
+    func testAspectRatioAllocatesTheCanvasHeight() throws {
+        try onUIThread {
+            let host = GTKRenderer.running {
+                Canvas { context, size in
+                    context.fill(Path(Rect(0, 0, size.width, size.height)), with: .color(Color("#0000FF")))
+                }.aspectRatio(2, contentMode: .fit).frame(width: 100)
+            }
+            let canvas = try XCTUnwrap(host.views(GTKCanvasView.self).first)
+            XCTAssertEqual(canvas.drawingSize(), Size(100, 50))
+            XCTAssertEqual(canvas.pixels(at: [(50, 25)]), [Self.blue])
+        }
+    }
+
     /// A canvas draws its records in order: a filled rectangle covers the room it names, and a stroked line under
     /// the pen set for it - its style, cap and join - draws where it runs.
     func testACanvasDrawsItsRecordsAsWritten() throws {
