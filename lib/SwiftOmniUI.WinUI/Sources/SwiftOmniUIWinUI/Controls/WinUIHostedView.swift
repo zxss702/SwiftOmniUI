@@ -19,7 +19,15 @@ final class WinUIHostedView<Control: WinUIControl>: WinUIView {
     }
 
     override func measure(width: Double?, height: Double?) -> LayoutSize {
-        let viewportHeight = height.flatMap { $0.isFinite ? $0 : nil } ?? 0
-        return super.measure(width: width, height: control.sizesToContentHeight ? height : viewportHeight)
+        if !control.sizesToContentHeight, height?.isFinite != true {
+            // A scrolling control has no intrinsic document height. Answer
+            // the layout's size query without measuring its native viewport
+            // at zero: doing so alternates the scroller's constraint with
+            // its real allocation and can cycle its scrollbar layout.
+            // prepareMeasure still measures the actual allocation before
+            // the parent's normal Arrange, including the very first frame.
+            return LayoutSize(width: width.flatMap { $0.isFinite ? max(0, $0) : nil } ?? 0, height: 0)
+        }
+        return super.measure(width: width, height: height)
     }
 }
