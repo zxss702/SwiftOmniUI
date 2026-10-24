@@ -222,7 +222,7 @@ may still choose another class that preserves the same contract.
 | `Slider` | `SeekBar` | `Slider` | `GtkScale` | `<input type=range>` |
 | `Stepper` | custom `NumberPicker`-based view | `NumberBox` | `GtkSpinButton` | `<input type=number>` |
 | `ProgressBar` | horizontal `ProgressBar` | `ProgressBar` | `GtkProgressBar` | `<progress>` |
-| `ActivityIndicator` | indeterminate `ProgressBar` | `ProgressRing` | `GtkSpinner` | indeterminate `<progress>` |
+| `ActivityIndicator` | indeterminate `ProgressBar` | `ProgressRing` (24 × 24 DIP) | `GtkSpinner` | indeterminate `<progress>` |
 | `Canvas` | `View` `onDraw(Canvas)` | Direct2D in a `SurfaceImageSource` | `GtkDrawingArea` | `<canvas>` |
 | `Rectangle` / `Ellipse` | `View` drawing `Path` | `Microsoft.UI.Xaml.Shapes` | `GskPath` in a snapshot | inline SVG |
 | `Line` / `Path` / `Polygon` / `Polyline` | `View` drawing `Path` | `Microsoft.UI.Xaml.Shapes` | `GskPath` in a snapshot | inline SVG |

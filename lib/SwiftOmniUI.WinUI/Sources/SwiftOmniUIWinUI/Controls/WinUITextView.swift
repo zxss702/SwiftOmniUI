@@ -31,6 +31,7 @@ class WinUITextView: WinUIView {
 
     /// Where the view's place is bound while it travels; nil where it stands.
     private var bound: Rect?
+    var refreshesAttachedInlineMeasurements: Bool { false }
     private var loadedMeasurePending = false
     private var attachmentGeneration = 0
     private var measuredAttachmentGeneration = -1
@@ -75,7 +76,7 @@ class WinUITextView: WinUIView {
                       label.sourceElement?.isDeparting != true,
                       label.measuredAttachmentGeneration != label.attachmentGeneration else { continue }
                 label.measuredAttachmentGeneration = label.attachmentGeneration
-                if label.refreshMeasurementsAfterAttachment(),
+                if label.refreshMeasurementsAfterAttachment(includingAttached: label.refreshesAttachedInlineMeasurements),
                    let layout: WinUIView = label.placingLayout ?? label.nativeContentOwner {
                     changedLayouts.append(layout)
                 }
@@ -184,6 +185,7 @@ class WinUITextView: WinUIView {
     /// The words shown.
     func setText(_ text: String) {
         swiftomniui_winui_text_set_text(handle, text)
+        discardMeasurementResults()
         invalidateTextLayout()
     }
 
@@ -222,6 +224,7 @@ class WinUITextView: WinUIView {
         let trims = breaking.truncates || (breaking.wraps && lines != nil)
         swiftomniui_winui_text_set_lines(
             handle, breaking.wraps, Int32(lines ?? 0), trims)
+        discardMeasurementResults()
         invalidateTextLayout()
     }
 
@@ -275,6 +278,7 @@ class WinUITextView: WinUIView {
     /// measurement adapter resolves the single-line case before returning a
     /// DesiredSize, independently of selection geometry and scroll callbacks.
     private func writeSpacing() {
+        discardMeasurementResults()
         let size = look.size ?? Self.platformFontSize
         let thousandths = Int32((look.letterSpacing(inEmsOf: size) * 1000).rounded())
         let natural = look.lineHeight != nil || look.lineSpacing != 0

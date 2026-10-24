@@ -10,10 +10,17 @@ import CSwiftOmniUIWinUI
 /// Design: docs/design/platforms/winui/controls.md#runs-of-words
 @MainActor
 final class WinUILabelView: WinUITextView {
+    override var cachesIntrinsicMeasurements: Bool { true }
     /// The label's own words, and the runs shown in their place; nil while it shows its own.
     private var ownText = ""
     private var runs: [TextRun]?
     private var runsLook: TextLook?
+
+    // A newly installed rich paragraph can attach after its Border is already
+    // loaded. Inline image/baseline metrics still need that paragraph's refresh.
+    override var refreshesAttachedInlineMeasurements: Bool {
+        runs?.contains { $0.image != nil || ($0.look.baselineOffset ?? 0) != 0 } == true
+    }
 
     override func setText(_ text: String) {
         ownText = text

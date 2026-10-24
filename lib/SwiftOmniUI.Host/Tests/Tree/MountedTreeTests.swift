@@ -505,6 +505,55 @@ final class MountedTreeTests: XCTestCase {
         XCTAssertEqual(tree.root?.takeCreatedHandlers(), [])
     }
 
+    @MainActor
+    func testLazyInsertionCollectsOnlyNewCreationHandlersAfterAnEarlierDrain() {
+        let (tree, _) = Self.tree()
+        var row = HostPatch(id: .manual("row"), type: .text)
+        row.events = .replace([.created: 11])
+        var list = HostPatch(id: .manual("list"), type: .lazyVStack)
+        list.children = .arranged([row])
+        var root = HostPatch(id: .manual("root"), type: .vStack)
+        root.children = .arranged([list])
+        tree.apply(root, complete: true)
+        XCTAssertEqual(tree.root?.takeCreatedHandlers(), [11])
+
+        var next = HostPatch(id: .manual("next"), type: .text)
+        next.events = .replace([.created: 12])
+        list.children = .arranged([row, next])
+        root.children = .changed([list])
+        tree.apply(root, complete: false)
+        XCTAssertEqual(tree.root?.takeCreatedHandlers(), [12])
+        XCTAssertEqual(tree.root?.takeCreatedHandlers(), [])
+
+        // A row removed before dispatch must not receive a stale creation.
+        next = HostPatch(id: .manual("discarded"), type: .text)
+        next.events = .replace([.created: 13])
+        list.children = .arranged([row, next])
+        root.children = .changed([list])
+        tree.apply(root, complete: false)
+        list.children = .arranged([row])
+        root.children = .changed([list])
+        tree.apply(root, complete: false)
+        XCTAssertEqual(tree.root?.takeCreatedHandlers(), [])
+    }
+
+    @MainActor
+    func testStaticRowPatchSkipsStandingQueriesButCancelsExistingMotion() throws {
+        let (tree, log) = Self.tree()
+        var row = HostPatch(id: .manual("row"), type: .text)
+        row.properties = [.text: .string("file.swift"), .fontSize: .number(12), .opacity: .number(1)]
+        tree.apply(row, complete: true)
+        XCTAssertEqual(log.standingQueries, 0)
+        let mount = try XCTUnwrap(tree.root?.mount)
+        tree.receiveProperty(mount: mount, property: .opacity, standing: .number(0),
+                             target: .number(1), animation: .eased(200, .linear))
+        XCTAssertTrue(tree.describedMotion.isActive)
+        row.properties = [.opacity: .number(0.75)]
+        tree.apply(row, complete: false)
+        XCTAssertFalse(tree.describedMotion.isActive)
+        XCTAssertEqual(tree.root?.value(.opacity)?.number, 0.75)
+    }
+
     /// A radio button's peers are its group's in the whole tree, or every radio button beside it where it
     /// names none.
     @MainActor
@@ -734,6 +783,7 @@ final class MountedTreeTests: XCTestCase {
 /// What the native halves heard, by element key.
 @MainActor
 private final class NativeLog {
+    var standingQueries = 0
     var applied: [String] = []
     var arranged: [String] = []
     var left: [String] = []
@@ -761,7 +811,7 @@ private final class RecordingNative: NativeElement {
         return "\(id)"
     }
 
-    func standingValue(_ property: Prop) -> HostValue? { nil }
+    func standingValue(_ property: Prop) -> HostValue? { log.standingQueries += 1; return nil }
     func animates(_ property: Prop) -> Bool { false }
     func applied(changed: Set<Prop>, wasDescribed: Bool) { log.applied.append(name) }
     func presentFrame(_ changed: Set<Prop>) {

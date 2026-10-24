@@ -263,8 +263,12 @@ class WinUILayoutView: WinUIView {
         let handles: [SwiftOmniUIObjectRef?] = (boxView.map { [$0.presentationHandle] } ?? []) + views.map(\.presentationHandle)
         let previous = held
         holdNativeChildren(handles)
-        for view in previous where !views.contains(where: { $0 === view }) { view.nativeParentChanged() }
-        for view in views where !previous.contains(where: { $0 === view }) { view.nativeParentChanged() }
+        // A dense lazy window can retain hundreds of seats. Membership checks
+        // must not compare every old seat with every incoming seat per patch.
+        let previousNumbers = Set(previous.map(\.number))
+        let nextNumbers = Set(views.map(\.number))
+        for view in previous where !nextNumbers.contains(view.number) { view.nativeParentChanged() }
+        for view in views where !previousNumbers.contains(view.number) { view.nativeParentChanged() }
         held = views
         heldBox = boxView
         // Native content must be attached before its size is queried again.
@@ -604,8 +608,11 @@ class WinUILayoutView: WinUIView {
             prepareChildren(plan, for: preparation)
             if before == WinUIView.nativeSizeRevision && revision == measurementRevision
                 && plan.dependencies.allSatisfy({ $0.isCurrent }) {
-                keepLayoutPlan(in: bounds, proposals: plan.proposals)
-                return layoutPlans.last!
+                // completedLayoutPlan already cached this exact plan. Preparing
+                // unchanged children does not require recreating every weak
+                // dependency (including native attachment queries) again.
+                // Dense lazy rows reach this path in both Measure and Arrange.
+                return plan
             }
             // Preparation may resolve an attached template or inherited font.
             // Recompute before giving those child rectangles to Arrange.
@@ -769,7 +776,19 @@ class WinUILayoutView: WinUIView {
         let input = SafeAreaInput(bounds: edges(context.bounds), container: edges(context.container),
                                   keyboard: edges(context.keyboard), consumed: context.consumed)
         guard input != lastSafeAreaInput else { return }
+        let initialUnrestrictedProposal = lastSafeAreaInput == nil && isReceivingLayoutContext
+            && rootSafeAreaContext == nil
+            && input.bounds == EdgeInsets(0) && input.container == EdgeInsets(0)
+            && input.keyboard == EdgeInsets(0)
         lastSafeAreaInput = input
+        // Before receiving context, an ordinary child already queries against
+        // an unrestricted local proposal. Already-consumed ancestor strips
+        // remain bookkeeping, not new local insets. Selecting this environment
+        // in its parent's preparation changes no intrinsic input. Invalidating it
+        // here makes every new text/icon row repeat its entire child plan.
+        // External assignment must still request the first native layout;
+        // nonzero insets and root-provided contexts keep normal invalidation.
+        if initialUnrestrictedProposal { return }
         layoutContextChanged()
         // Different native proposals can project the same environment to
         // different insets (a closed SplitView pane is measured at width 0).
@@ -778,6 +797,10 @@ class WinUILayoutView: WinUIView {
         if isReceivingLayoutContext {
             forgetMeasurements()
             measured = nil
+            // The native parent can reuse this exact Arrange rectangle after
+            // the inherited safe region changes. Its cache cannot see Swift's
+            // new child plan, so request placement without changing Measure.
+            if allocatedBounds.width > 0 || allocatedBounds.height > 0 { invalidateArrange() }
             return
         }
         invalidateMeasure()

@@ -10,6 +10,7 @@ import CSwiftOmniUIWinUI
 /// Design: docs/design/platforms/winui/controls.md#pictures
 @MainActor
 final class WinUIImageView: WinUIView {
+    override var cachesIntrinsicMeasurements: Bool { true }
     /// The picture shown, by file name, and whether it was found.
     private(set) var file = ""
     private(set) var found = false
@@ -82,6 +83,7 @@ final class WinUIImageView: WinUIView {
         hasWrittenTint = false
         writeTint(font.color?.argb)
         picturePlace = nil
+        discardMeasurementResults()
         if let committedFrame { draw(in: committedFrame) }
         placingLayout?.invalidateMeasurements()
     }
@@ -106,15 +108,29 @@ final class WinUIImageView: WinUIView {
             swiftomniui_winui_image_size(handle, &size)
             intrinsic = LayoutSize(width: size[0], height: size[1])
         }
-        // Preparing a Viewbox/system glyph at zero clips its native content even
-        // though Swift's intrinsic result is nonzero. Prepare the same box
-        // the arithmetic reports, before its first native arrangement.
-        _ = super.measure(width: intrinsic.width, height: intrinsic.height)
+        // Bitmap/SVG dimensions and a symbol's nominal box are already known.
+        // An arithmetic query must not replace a glyph's prepared native slot
+        // or invalidate its ancestors just to discard XAML's size answer.
+        // Native preparation still selects the real nonzero allocation before
+        // Arrange; direct measurements retain their native Measure contract.
+        if WinUILayoutView.queryingSize == 0 {
+            _ = super.measure(width: intrinsic.width, height: intrinsic.height)
+        }
         return intrinsic
     }
 
     override func commitGeometry(in place: Rect) {
         draw(in: place)
+    }
+
+    override func prepareMeasure(width: Double, height: Double? = nil) {
+        if width.isFinite, let height, height.isFinite {
+            // Supply final-size SVG pixels before native Measure. Replacing
+            // Image.Source during Arrange dirties layout just like writing
+            // a glyph's Width/Height there.
+            draw(in: Rect(0, 0, width, height))
+        }
+        super.prepareMeasure(width: width, height: height)
     }
 
     /// Places the picture and synchronously supplies any additional SVG pixels

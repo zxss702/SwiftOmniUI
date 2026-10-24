@@ -5,10 +5,29 @@
 import XCTest
 
 final class WinUILazyPrefetchTests: XCTestCase {
-    func testBunchedNativeNoticesCannotInventMovementFasterThanTheirDisplayInterval() {
-        XCTAssertEqual(WinUILazyPrefetch.velocity(distance: 20, elapsed: 0.1, refreshInterval: 16), 1.25)
-        XCTAssertEqual(WinUILazyPrefetch.velocity(distance: -40, elapsed: 32, refreshInterval: 16), -1.25)
-        XCTAssertEqual(WinUILazyPrefetch.velocity(distance: 20, elapsed: 0, refreshInterval: 0), 0)
+    func testSeveralNoticesWithinARefreshKeepTheirWholeMovementForTheNextSample() {
+        var samples = WinUILazyPrefetch.MotionSamples()
+        XCTAssertNil(samples.observe(offset: 0, time: 0, refreshInterval: 16))
+        XCTAssertNil(samples.observe(offset: 8, time: 4, refreshInterval: 16))
+        XCTAssertNil(samples.observe(offset: 16, time: 8, refreshInterval: 16))
+        XCTAssertNil(samples.observe(offset: 24, time: 12, refreshInterval: 16))
+        let next = samples.observe(offset: 32, time: 16, refreshInterval: 16)
+        XCTAssertEqual(next?.velocity, 2)
+        XCTAssertEqual(next?.interval, 16)
+        XCTAssertNil(samples.observe(offset: 48, time: 24, refreshInterval: 16))
+        XCTAssertEqual(samples.observe(offset: 64, time: 32, refreshInterval: 16)?.velocity, 2)
+        // A reversal uses the new direction immediately at the next sample,
+        // rather than averaging forward motion into the backward lead.
+        XCTAssertEqual(samples.observe(offset: 32, time: 48, refreshInterval: 16)?.velocity, -2)
+    }
+
+    func testRepeatedAndBackwardsTimestampsCannotReplaceTheLastMovementSample() {
+        var samples = WinUILazyPrefetch.MotionSamples()
+        XCTAssertNil(samples.observe(offset: 0, time: 0, refreshInterval: 0))
+        XCTAssertNil(samples.observe(offset: 20, time: 0, refreshInterval: 0))
+        XCTAssertNil(samples.observe(offset: 30, time: -1, refreshInterval: 0))
+        XCTAssertEqual(samples.observe(offset: 40, time: 32, refreshInterval: 0)?.velocity, 1.25)
+        XCTAssertEqual(samples.observe(offset: 0, time: 64, refreshInterval: 0)?.velocity, -1.25)
     }
 
     func testExistingNeighbourCoversIdleAndSlowMotion() {

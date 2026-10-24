@@ -40,6 +40,7 @@ namespace {
         winrt::event_token templateLayout{};
         std::vector<ViewportRequest> viewportRequests;
         winrt::event_token viewportLayout{};
+        int32_t pendingJump = -1;
     };
     std::unordered_map<void *, std::weak_ptr<ScrollerInsets>> insetStates;
 
@@ -283,9 +284,13 @@ namespace {
     void scrollTo(controls::ScrollView const &scroller, double x, double y, bool animated) {
         // Completion also reports cancellation. The native presenter owns the
         // request's lifetime; never resurrect its target from ScrollCompleted.
-        scroller.ScrollTo(x, y, controls::ScrollingScrollOptions(
+        auto correlation = scroller.ScrollTo(x, y, controls::ScrollingScrollOptions(
             animated ? controls::ScrollingAnimationMode::Enabled : controls::ScrollingAnimationMode::Disabled,
             controls::ScrollingSnapPointsMode::Ignore));
+        auto found = insetStates.find(winrt::get_abi(scroller));
+        if (found != insetStates.end()) {
+            if (auto state = found->second.lock()) state->pendingJump = animated ? -1 : correlation;
+        }
     }
 }
 
@@ -298,6 +303,14 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
             if (at->second.expired()) at = insetStates.erase(at); else ++at;
         }
         insetStates[winrt::get_abi(scroller)] = insets;
+        scroller.ScrollCompleted(guarded("completing a prepared scroll jump",
+            [view, insets](controls::ScrollView const &scroller, controls::ScrollingScrollCompletedEventArgs const &args) {
+            if (insets->pendingJump == -1 || insets->pendingJump != args.CorrelationId()) return;
+            insets->pendingJump = -1;
+            // Completion includes cancellation. Reconcile with the actual
+            // viewport, never replay the old target after a newer input.
+            callbacks.scrolled(view, scroller.HorizontalOffset(), scroller.VerticalOffset());
+        }));
         scroller.Loaded(guarded("preparing scroller margins", [insets](IInspectable const &sender, auto const &) {
             auto scroller = sender.as<controls::ScrollView>();
             queueInsets(scroller, insets);
@@ -394,6 +407,18 @@ extern "C" void swiftomniui_winui_scroller_move(SwiftOmniUIObjectRef handle, dou
         scrollTo(borrow<controls::ScrollView>(handle), x, y, animated);
     } catch (...) {
         report("moving a scroller");
+    }
+}
+
+extern "C" bool swiftomniui_winui_scroller_jump_pending(SwiftOmniUIObjectRef handle) {
+    try {
+        auto found = insetStates.find(winrt::get_abi(borrow<controls::ScrollView>(handle)));
+        if (found == insetStates.end()) return false;
+        auto state = found->second.lock();
+        return state && state->pendingJump != -1;
+    } catch (...) {
+        report("reading a pending scroll jump");
+        return false;
     }
 }
 

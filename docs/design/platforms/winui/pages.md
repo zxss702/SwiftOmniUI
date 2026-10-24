@@ -134,6 +134,14 @@ column. The trailing split stays inline. A detail width of zero removes that
 native column, and `.detailOnly` hides the middle column so detail takes the
 remaining room. Page identities and business navigation state stay in Swift.
 
+The always-open trailing split uses a two-column template with a flexible
+content column and a pane bound directly to `OpenPaneLength`. The default
+`OpenInlineRight` storyboard temporarily restores left-pane column widths
+when that property changes, causing an incorrect intermediate content width.
+The outer sidebar keeps the system template for adaptation and light dismiss.
+Width changes discard Swift proposal caches; the native property change
+already invalidates XAML measurement and must not schedule a duplicate pass.
+
 Both pane boundaries use native `Thumb` drag capture. A transparent template
 keeps the grip invisible in every state. The grip overlays the pane's edge,
 contributes no desired size or column width, and uses the native horizontal

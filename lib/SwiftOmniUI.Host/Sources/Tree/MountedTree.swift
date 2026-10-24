@@ -234,6 +234,7 @@
         retainingTarget: Bool = false,
         landed: (() -> Void)? = nil
     ) -> Bool {
+        let wasActive = describedMotion.isActive
         let started = describedMotion.receive(
             key: DescribedKey(mount: mount, property: property),
             standing: standing,
@@ -243,7 +244,11 @@
             retainingTarget: retainingTarget,
             now: patchTime ?? now(),
             reducesMotion: patchReducesMotion ?? reducesMotion())
-        onAnimation()
+        // A static property write does not change the frame subscription.
+        // Checking the cycle board for every font, frame and image property
+        // makes mounting rows repeatedly scan all carried states in the app.
+        // A running transition can also be cancelled by this write.
+        if started || wasActive { onAnimation() }
         return started
     }
 
@@ -251,6 +256,8 @@
     public func presentedPropertyValue(mount: UInt64, property: Prop) -> HostValue? {
         describedMotion.presentedValue(for: DescribedKey(mount: mount, property: property))
     }
+
+    func hasPropertyMotions(on mount: UInt64) -> Bool { describedMotion.hasProperties(on: mount) }
 
     func presentedValue(for binding: HostStateBinding, from carried: HostStateValue) -> HostStateValue {
         stateChannels.presentedValue(for: binding, from: carried, now: now(), reducesMotion: reducesMotion())

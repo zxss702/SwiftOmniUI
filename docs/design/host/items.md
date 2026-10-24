@@ -178,38 +178,108 @@ GTK requests a bounded viewport window together, then replaces its estimates
 with the mounted rows' measurements. WinUI lazy stacks measure each unknown
 row before expanding the requested range, so tall composite cards do not
 create a screenful of controls based on the provisional 44-point estimate.
-Further expansion resumes through the coalesced post-layout turn instead of
-rendering every unknown row inside one viewport callback. Surviving mounted
+Further expansion runs in the coalesced post-layout turn instead of the native
+viewport callback. The first run is measured alone. Subsequent visible batches
+grow no faster than the measured run count, bounded by the uncovered viewport
+divided by the median of nearby measured runs, rounded up to a whole run. Geometry queries
+fill the window first; the normal XAML Measure prepares the final native child
+allocations once, rather than preparing every nested allocation again for each
+expansion. Explicit jumps still prepare their landing natively. Unseen geometry
+retains its provisional extent, but that estimate does not artificially split a
+measured-density batch into many tiny renders. This fills dense file
+rows without a separate render for each row while tall initial cards still stop
+expansion promptly. Changed document extents are reported upward once per fill.
+Surviving mounted
 rows keep their seats while that range is measured. Look-ahead
 and neighbour policy still bound realization; nothing requests the entire
 source merely because its rows have no measurements yet. The actual window is
 mandatory demand; optional prediction must not synchronously fill a whole ahead
-window. Ordinary scroll notices return after requesting rows. Native measurement,
-arrangement and acknowledgement resume incremental realization. Only explicit
-program jumps prepare their landing synchronously. WinUI predicts the forward
-distance as measured scroll velocity multiplied by the sum of the observed frame
-interval and measured request-to-arrangement latency. The interval is at
-least the reported display refresh period; multiple XAML callbacks inside a
-refresh do not shorten it. Adjacent samples smooth velocity and preparation
+window. Every native ViewChanged notice immediately records the latest viewport
+and enqueues a coalesced turn; it does not wait for the next display callback to
+notify lazy descendants. Row creation still runs after the native callback.
+The coalesced turn measures and fills visible
+demand before composition; visible rows are not rationed one per frame, including
+when a source edit is animated. The ready arrangement then places all affected
+surviving rows under the same animation. Explicit program jumps can also
+prepare their landing synchronously. WinUI predicts the forward
+distance as measured scroll velocity multiplied by the sum of the larger of the
+reported display period and observed scroll-notice interval, and measured
+request-to-arrangement latency. A delayed UI observation widens the target window
+because native composition can keep moving between observations.
+Only requests made while scrolling supply this latency. Cold first-screen
+construction measures an entire viewport and is not an incoming-batch sample.
+A superseding request starts a new sample rather than extending the oldest
+unfinished range across many scrolling updates.
+Multiple XAML callbacks inside a refresh keep their accumulated displacement
+until a complete refresh interval can be sampled. Giving each fragment a full
+refresh interval would underestimate velocity and the necessary lead. Adjacent
+samples smooth velocity and preparation
 latency. The measured distance
 between the latest native scroll offset and XAML's document viewport is added
 in the moving direction. The existing adjacent row's actual coverage, including
 the partially visible edge row and spacing, is
 subtracted from that distance; idle views need no additional prefetch. The
-extension is clipped to the content bounds. Optional work requests at most one
-row (or whole grid run) per owner per frame, even when its geometry is known:
-remembering a size does not make rebuilding a complex subtree or images cheap.
+extension is clipped to the content bounds. Each optional job runs once per
+owner per frame. Its batch covers velocity multiplied by the display period
+(falling back to the observed interval when display cadence is unavailable),
+rounded to whole rows or grid runs, rather than a fixed one-row limit
+or the entire latency-based ahead range. The physical lead and per-frame distance
+are converted to run counts with the median of up to sixteen nearby measured
+runs. The unseen 44-point document estimate does not cut a dense file list's
+requested lead in half or request a screenful of inferred tall rows. A later
+measurement revises the conversion. Idle/manual requests default to one run.
+Remembering a size does not make rebuilding a complex subtree or images cheap.
+Delayed observations widen the target but never widen a batch: otherwise one
+slow batch would increase the next batch's size and amplify the stall.
 WinUI pauses optional work during row animations and native layout phases,
-and waits for the preceding unit's native measurement. Checking readiness never
-forces a native measure or a full-window layout pass. The frame clock
+and waits for the preceding unit's native measurement and first arrangement.
+An intrinsic geometry query alone does not make incoming rows ready. Hidden or
+departing rows do not hold that first-arrangement check. Checking readiness never
+forces a native measure or a full-window layout pass. Visible readiness checks
+only demanded rows, so an unmeasured offscreen batch cannot cancel itself.
+When demand reaches that batch before measurement completes, visible fill
+retains its remaining rows inside the current predicted range; it does not
+evict and reconstruct them. This retention adds no new offscreen rows.
+The frame clock
 deduplicates WinUI's rendering timestamps. Actual native offsets supply
-velocity samples on frames, rather than layout callbacks or animation endpoints.
+velocity samples on ViewChanged notices as well as display frames. Layout
+callbacks and animation endpoints do not supply synthetic displacement.
 Native idle state clears the prediction; a delayed notice
 during a live gesture does not incorrectly turn its velocity into zero.
 New sources, direction changes, jumps and detach cancel or replace
 stale work. There is no fixed millisecond prefetch budget. Native layout and paint
 run normally between units. Images still load synchronously when their row is
 requested; distance prediction cannot make an indivisible expensive row cheap.
+
+WinUI Text caches intrinsic answers across widths separately from restoring the
+native Measure proposal before Arrange. Text/font/spacing/padding changes and
+attachment refresh discard stale answers. An attachment refresh rechecks
+proposals measured before attachment;
+proposals already measured in the live tree keep their answers. A newly attached
+rich paragraph still refreshes inline-image and baseline metrics even if its
+enclosing Border was already loaded. Image creates only its used native
+content (bitmap or Viewbox/FontIcon). PicturePanel stores the child's final slot
+directly instead of setting child Width/Height during Arrange: those dependency
+property writes otherwise restart native layout for each newly visible symbol.
+Its child is measured within the available slot, so a large custom bitmap or
+SVG scales into a smaller frame without retaining its intrinsic native bounds.
+Arrange does not remeasure the child; doing so can keep XAML in a layout loop.
+Final-size SVG rasters are prepared before native Measure whenever the allocation
+is known, so Image.Source changes do not normally occur during Arrange either.
+Child attachment checks use identity sets rather than comparing each retained
+seat with every incoming seat. Geometry writes in a batch stop propagating at
+an unread ancestor that is already queued for layout. Reads and animation lanes
+still resume propagation; queued descendants retain their depth order.
+The composed-view layer also reuses formatted
+type names by metatype identity; this caches immutable metadata only, preserving
+the original qualified identity paths and all per-view state/value comparisons.
+For non-Equatable arrays and dictionaries of plain models, the state walk proves
+the declared member types contain no dynamic state using cached field metadata.
+It retains one collection input rather than eagerly expanding every record into
+paths for a newly created row. Structural value comparison runs only when reuse
+actually compares that input. Views, state wrappers, reference/existential
+members, custom mirrors and unproven enum payloads keep the ordinary walk, so
+dynamic-property discovery never depends on the first value in a collection.
 
 Viewport-only reconciliation names retained source identities before
 materializing content. Those rows reuse their rendered subtrees without

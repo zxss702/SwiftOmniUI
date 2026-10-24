@@ -208,7 +208,9 @@ The user's day or time is reported, the program's is only shown.
 A ProgressBar is WinUI's `ProgressBar` over the range 0 to 1, a fraction past
 either end standing at that end ([a value in a
 range](../../host/runtime.md#a-value-in-a-range)); an ActivityIndicator is its `ProgressRing`,
-turning while its work runs and gone while it does not.
+turning while its work runs and gone while it does not. The ring is 24 by 24
+DIPs, including when used by an indeterminate `ProgressView`; its label keeps
+its own size and spacing.
 
 ## A stepper
 

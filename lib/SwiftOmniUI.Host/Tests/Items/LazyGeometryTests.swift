@@ -7,6 +7,29 @@ import XCTest
 
 final class LazyGeometryTests: XCTestCase {
     @MainActor
+    func testPrefetchConvertsPhysicalLeadUsingNearbyMeasuredRowDensity() throws {
+        func window(rowHeight: Double, lead: Double) throws -> Range<Int> {
+            let runtime = HostRuntime.still()
+            var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+            patch.lazyRows = HostLazySource((0..<1_000).map(String.init))
+            runtime.tree.apply(patch, complete: true)
+            let cells = LazyCells(try XCTUnwrap(runtime.tree.root), in: runtime)
+            cells.takeItems()
+            for index in 0..<8 { cells.extents.measure(String(index), extent: rowHeight) }
+            cells.show(0..<200, realize: 0..<(200 + lead),
+                       prefetch: true, demand: 0..<200)
+            return cells.built
+        }
+        let dense = try window(rowHeight: 20, lead: 200)
+        XCTAssertGreaterThanOrEqual(dense.upperBound, 19,
+            "44-DIP placeholders must not halve the lead for dense file rows")
+        XCTAssertLessThanOrEqual(dense.upperBound, 21)
+        let tall = try window(rowHeight: 200, lead: 1_800)
+        XCTAssertLessThanOrEqual(tall.upperBound, 12,
+            "the same distance should not mount a screenful of inferred tall rows")
+    }
+
+    @MainActor
     func testTrimmingRowsDoesNotUnderestimatePreparationLatency() throws {
         let runtime = HostRuntime.still()
         var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)

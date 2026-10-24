@@ -904,6 +904,8 @@ void swiftomniui_winui_scroller_read_modes(SwiftOmniUIObjectRef scroller, int32_
 /// Moves the scroller's view to `x`, `y` DIPs at once; the scroller keeps it within what it can reach, and says where
 /// it stands through `scrolled` once it has moved.
 void swiftomniui_winui_scroller_move(SwiftOmniUIObjectRef scroller, double x, double y, bool animated);
+/// Whether the latest nonanimated ScrollTo is still queued in the native presenter.
+bool swiftomniui_winui_scroller_jump_pending(SwiftOmniUIObjectRef scroller);
 /// Commits the displayed document offset after its virtualized window has been arranged.
 void swiftomniui_winui_scroller_anchor(SwiftOmniUIObjectRef element, bool enabled);
 
@@ -1032,6 +1034,9 @@ void swiftomniui_winui_title_bar_set_app_menu(SwiftOmniUIObjectRef bar, SwiftOmn
 
 /// A native SplitView; a trailing pane holds an auxiliary detail column. A zero breakpoint keeps it inline.
 SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, double expandsAt, bool trailing);
+
+/// Moves the native divider by a horizontal drag delta, retaining the user's width.
+void swiftomniui_winui_split_resize(SwiftOmniUIObjectRef split, double change);
 /// Selects the initial display mode from a known client allocation before activation.
 void swiftomniui_winui_split_prepare_room(SwiftOmniUIObjectRef split, double width);
 void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef split);

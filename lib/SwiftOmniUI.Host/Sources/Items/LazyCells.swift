@@ -40,13 +40,14 @@
     /// merely because the user scrolled to them.
     private var insertionPredecessor: HostLazySource?
     private var prefetchPlan: (demand: Range<Double>, target: Range<Double>, perRun: Int, grid: Bool)?
-    private var prefetchForward = true
     private var prefetchInvalidated = false
-    private var lastDemand: Range<Double>?
     private var lastPerRun = 1
     /// Native hosts can hold optional work until the requested rows have been
     /// measured. The callback must not keep the native layout alive.
     public var prefetchReady: (() -> Bool)?
+    /// Distance entering the viewport over one observed scroll interval. Hosts
+    /// can request that many rows together instead of imposing one row/frame.
+    public var prefetchStepDistance = 0.0
     /// Starts a host's measurement of the time until newly requested rows are ready.
     /// Capture the native owner weakly; its native preparation completes the sample.
     public var onRowsRequested: (() -> Void)?
@@ -227,7 +228,8 @@
     /// with `prefetch`, the rest of `realize` is optional work for later frames.
     public func show(_ span: Range<Double>, perRun: Int = 1, grid: Bool = false, realize: Range<Double>? = nil,
                      measureBeforeExpanding: Bool = false, keeping: Set<String> = [],
-                     prefetch: Bool = false, demand: Range<Double>? = nil) {
+                     prefetch: Bool = false, demand: Range<Double>? = nil, unknownRuns: Int = 1,
+                     retaining: Range<Double>? = nil) {
         let identities = orderedIdentities
         let perRun = max(1, perRun)
         lastPerRun = perRun
@@ -240,11 +242,6 @@
             || prefetch && prefetchInvalidated else { return }
         let moved = window?.revision == revision && window?.span != span
         prefetchInvalidated = false
-        let nextDemand = demand ?? span
-        if let previous = lastDemand, nextDemand != previous {
-            prefetchForward = nextDemand.lowerBound >= previous.lowerBound
-        }
-        lastDemand = nextDemand
         window = (span, revision, perRun, realize)
         searches += 1
         let runCount = (identities.count + perRun - 1) / perRun
@@ -268,16 +265,26 @@
         guard let element else { return }
         var lower = min(identities.count, max(0, wanted.lowerBound - 1) * perRun)
         var upper = min(identities.count, (wanted.upperBound + 1) * perRun)
+        if measureBeforeExpanding, unknownRuns > 1, lower < built.upperBound, built.lowerBound <= lower {
+            // The host has measured dense rows in this same visible window.
+            // Keep the unseen rows' geometry at 44, but do not force a series
+            // of tiny renders solely because that estimate overstates them.
+            upper = max(upper, min(identities.count, built.upperBound + unknownRuns * perRun))
+        }
         let requestedUpper = upper
         needsMeasurement = false
         if measureBeforeExpanding, !wanted.isEmpty {
             // The estimate describes scroll room, not permission to build an
-            // entire set of potentially tall cards. Include one unknown run,
-            // let its native measurement correct the range, then continue.
+            // entire set of potentially tall cards. Start with one unknown
+            // run; a host with measured density can supply a bounded batch.
+            // Let native measurement correct the range before continuing.
+            var remaining = max(1, unknownRuns)
             for run in (lower / perRun)..<((upper + perRun - 1) / perRun) {
                 let known = grid ? runs.hasMeasurement(for: run)
                     : extents.hasMeasurement(for: identities[run])
                 if !known {
+                    remaining -= 1
+                    if remaining > 0 { continue }
                     let end = min(identities.count, (run + 1) * perRun)
                     needsMeasurement = end < upper
                     upper = end
@@ -294,10 +301,25 @@
                 upper = max(upper, min(requestedUpper, (place / perRun + 1) * perRun))
             }
             needsMeasurement = upper < requestedUpper
+            if let retaining, lower < upper {
+                // A moving viewport can reach a batch before native measurement
+                // finishes. Fill demand without evicting the rest of that batch
+                // and then rebuilding it as prefetch in the following pass.
+                let allowed = prefetchRequestedRange(demand: demand ?? span, target: retaining,
+                                                     perRun: perRun, grid: grid)
+                let start = max(built.lowerBound, allowed.lowerBound)
+                let end = min(built.upperBound, allowed.upperBound)
+                if start < end, start <= upper, lower <= end {
+                    lower = min(lower, start)
+                    upper = max(upper, end)
+                }
+            }
         }
         if prefetch, !measureBeforeExpanding {
             let visible = requestedRange(in: demand ?? span, perRun: perRun, grid: grid)
-            let target = !wanted.isEmpty && lower < upper ? lower..<upper : 0..<0
+            let target = !wanted.isEmpty && lower < upper
+                ? prefetchRequestedRange(demand: demand ?? span, target: realize,
+                                         perRun: perRun, grid: grid) : 0..<0
             var within = visible
             let start = max(built.lowerBound, target.lowerBound)
             let held = start..<max(start, min(built.upperBound, target.upperBound))
@@ -346,6 +368,66 @@
         return lower..<min(identities.count, (places.upperBound + 1) * perRun)
     }
 
+    /// Convert the physical lead to rows using the density already measured
+    /// next to the viewport. Unknown rows still carry the document's 44-DIP
+    /// estimate; using that estimate to count incoming rows makes a dense file
+    /// list consume its entire lead after only half the requested distance.
+    private func prefetchRequestedRange(demand: Range<Double>, target: Range<Double>,
+                                        perRun: Int, grid: Bool) -> Range<Int> {
+        let estimated = requestedRange(in: target, perRun: perRun, grid: grid)
+        let visible = requestedRange(in: demand, perRun: perRun, grid: grid)
+        guard !estimated.isEmpty, !visible.isEmpty else { return estimated }
+        let count = orderedIdentities.count
+        let extent = nearbyMeasuredRunExtent(perRun: perRun, grid: grid,
+                                             forward: target.upperBound > demand.upperBound,
+                                             visible: visible)
+        if target.upperBound > demand.upperBound {
+            let runs = predictedRuns(for: target.upperBound - demand.upperBound,
+                                     extent: extent, perRun: perRun)
+            return visible.lowerBound..<min(count, visible.upperBound + runs * perRun)
+        }
+        if target.lowerBound < demand.lowerBound {
+            let runs = predictedRuns(for: demand.lowerBound - target.lowerBound,
+                                     extent: extent, perRun: perRun)
+            return max(0, visible.lowerBound - runs * perRun)..<visible.upperBound
+        }
+        return estimated
+    }
+
+    private func predictedRuns(for distance: Double, extent: Double, perRun: Int) -> Int {
+        guard distance.isFinite else { return orderedIdentities.count / perRun }
+        return Int(min(Double(orderedIdentities.count / perRun),
+                       max(0, (distance / extent).rounded(.up))))
+    }
+
+    /// The density at the incoming edge, shared by visible fill and optional
+    /// look-ahead so both convert physical distance with the same measurements.
+    public func measuredRunExtent(perRun: Int, grid: Bool, forward: Bool) -> Double {
+        nearbyMeasuredRunExtent(perRun: perRun, grid: grid, forward: forward)
+    }
+
+    private func nearbyMeasuredRunExtent(perRun: Int, grid: Bool, forward: Bool,
+                                         visible: Range<Int>? = nil) -> Double {
+        let range = built.isEmpty ? (visible ?? built) : built
+        let first = range.lowerBound / perRun
+        let last = (range.upperBound + perRun - 1) / perRun
+        let sample = forward ? max(first, last - 16)..<last : first..<min(last, first + 16)
+        var values: [Double] = []
+        for run in sample {
+            let index = run * perRun
+            guard index < orderedIdentities.count else { continue }
+            let measured = grid ? runs.hasMeasurement(for: run)
+                : extents.hasMeasurement(for: orderedIdentities[index])
+            if measured {
+                values.append(grid ? runs.extent(of: run)
+                              : extents.extent(of: orderedIdentities[index]))
+            }
+        }
+        guard !values.isEmpty else { return 44 }
+        values.sort()
+        return max(1, values[values.count / 2])
+    }
+
     /// Stops optional work when the source or the native presentation disappears.
     public func cancelPrefetch(invalidate: Bool = true) {
         prefetchPlan = nil
@@ -356,15 +438,20 @@
     private func prefetchOne() -> Bool {
         guard let plan = prefetchPlan, !built.isEmpty else { return false }
         guard requestedItemsAreCurrent else { return true }
-        let target = requestedRange(in: plan.target, perRun: plan.perRun, grid: plan.grid)
+        let target = prefetchRequestedRange(demand: plan.demand, target: plan.target,
+                                            perRun: plan.perRun, grid: plan.grid)
         guard !target.isEmpty else { prefetchPlan = nil; return false }
         var lower = max(built.lowerBound, target.lowerBound)
         var upper = min(built.upperBound, target.upperBound)
         guard lower < upper else { prefetchPlan = nil; return false }
-        // A remembered size does not make rebuilding the row cheap. Complex
-        // subtrees and images still initialize on demand, one run at a time.
-        let batch = plan.perRun
-        if prefetchForward, upper < target.upperBound || lower == target.lowerBound {
+        // Keep pace with incoming content, not the entire latency-based target.
+        // This is a distance bound, independent of whether geometry is cached.
+        let forward = plan.target.upperBound > plan.demand.upperBound
+        let distance = max(0, prefetchStepDistance)
+        let extent = nearbyMeasuredRunExtent(perRun: plan.perRun, grid: plan.grid, forward: forward)
+        let batch = max(1, predictedRuns(for: distance, extent: extent,
+                                         perRun: plan.perRun)) * plan.perRun
+        if forward {
             upper = min(target.upperBound, upper + batch)
         } else if lower > target.lowerBound {
             lower = max(target.lowerBound, lower - batch)

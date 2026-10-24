@@ -35,6 +35,15 @@ struct WinUILayoutItem: LayoutChild {
     }
 
     func size(offered proposal: ProposedViewSize) -> LayoutSize {
+        // Intrinsic probes cannot change either axis of an explicit frame.
+        // Querying every nested image/text here only throws away its answer
+        // and changes XAML's active Measure constraint. The parent's native
+        // plan still prepares this subtree at its actual allocation.
+        if WinUILayoutView.queryingSize > 0,
+           let width = values.width, width.isFinite,
+           let height = values.height, height.isFinite {
+            return values.sized(.zero, offered: proposal.width)
+        }
         let offer = values.offer(proposal.width)
         let height: Double?
         if let stated = values.height {

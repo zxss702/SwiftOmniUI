@@ -258,7 +258,7 @@ class WinUIView {
     /// Only changed dependencies discard these answers; entering another
     /// native layout pass must not force an intrinsic probe to replace a
     /// descendant's prepared allocation again.
-    private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize)] = []
+    private var measuredSizes: [(width: Double?, height: Double?, size: LayoutSize, attached: Bool)] = []
     private var nativeMeasurePending = false
     /// Changes when properties or a native size change invalidate this view, not on a repeated Measure query.
     var measurementRevision = 0 {
@@ -434,6 +434,9 @@ class WinUIView {
     /// Lays the view out in `direction` where it takes one, else left to right: written either way, as WinUI hands
     /// an element's direction down to what stands in it.
     func setDirection(_ direction: LayoutDirection) {
+        if cachesIntrinsicMeasurements, writtenRightToLeft != (takesDirection && direction == .rightToLeft) {
+            discardMeasurementResults()
+        }
         writtenRightToLeft = takesDirection && direction == .rightToLeft
         swiftomniui_winui_set_flow_direction(handle, writtenRightToLeft)
     }
@@ -525,10 +528,10 @@ class WinUIView {
     /// enclosing layout that its size changed unless a result actually differs.
     /// Other cached proposals must also be refreshed: a later resize may return
     /// to one of them without rebuilding the view.
-    func refreshMeasurementsAfterAttachment() -> Bool {
-        let previous = measuredSizes
+    func refreshMeasurementsAfterAttachment(includingAttached: Bool = false) -> Bool {
+        let previous = measuredSizes.filter { includingAttached || !$0.attached }
         guard !previous.isEmpty else { return false }
-        measuredSizes.removeAll(keepingCapacity: true)
+        measuredSizes.removeAll { includingAttached || !$0.attached }
         // Re-read XAML's answer after attachment. Native resource/property
         // changes already invalidate its measure; forcing invalidation here
         // makes every newly realized label repeat a completed layout pass.
@@ -545,7 +548,7 @@ class WinUIView {
     /// A parent's Arrange may prepare children that have not entered Arrange.
     func prepareMeasure(width: Double, height: Double? = nil) {
         precondition(!isNativeArranging, "an arranging view cannot measure itself")
-        _ = measureNative(width: width, height: height)
+        _ = measureNative(width: width, height: height, preparing: true)
     }
 
     /// XAML arranges native controls and their templates from the completed
@@ -562,14 +565,19 @@ class WinUIView {
         measureNative(width: width, height: height)
     }
 
-    private func measureNative(width: Double?, height: Double?) -> LayoutSize {
+    /// Text and pictures own all intrinsic inputs. Arithmetic can reuse their
+    /// answers across proposals; prepareMeasure still restores XAML's actual
+    /// allocation before Arrange. Stateful native controls keep their own path.
+    var cachesIntrinsicMeasurements: Bool { false }
+
+    private func measureNative(width: Double?, height: Double?, preparing: Bool = false) -> LayoutSize {
         WinUILayoutUpdates.measured(self)
         // Use XAML's single-precision proposal as the cache key. Unknown
         // proposals are measured on this child, never answered from DesiredSize
         // produced by an unrelated width or height.
         let width = width.map { Double(Float($0)) }
         let height = height.map { Double(Float($0)) }
-        if WinUILayoutView.queryingSize > 0,
+        if !preparing, WinUILayoutView.queryingSize > 0 || cachesIntrinsicMeasurements,
            let measured = measuredSizes.first(where: {
                $0.width == width && $0.height == height
            }) {
@@ -582,6 +590,7 @@ class WinUIView {
             invalidateNativeMeasure()
         }
         let contentRevision = measurementRevision
+        let attached = cachesIntrinsicMeasurements && isAttached
         var size = [0.0, 0.0]
         withNativeMeasure {
             swiftomniui_winui_measure(presentationHandle, width ?? .infinity, height ?? .infinity, &size)
@@ -611,7 +620,7 @@ class WinUIView {
         measuredSizes.removeAll { $0.width == width && $0.height == height }
         // Only a few proposals are active at a time. Resizing must not retain every width ever visited.
         if measuredSizes.count == 8 { measuredSizes.removeFirst() }
-        measuredSizes.append((width, height, measured))
+        measuredSizes.append((width, height, measured, attached))
         return measured
     }
 
@@ -710,12 +719,14 @@ class WinUIView {
 
     /// Where the view stands, in DIPs: its frame in its parent, its place in the window, and the frame the
     /// window's content - clear of its chrome - stands in there.
-    func frameReport(safeArea: Rect) -> [Double] {
+    // A placement context already supplies the safe region. Resolve a window
+    // fallback only when needed, and reuse the caller's native frame read.
+    func frameReport(safeArea: @autoclosure () -> Rect, frame actualFrame: Rect? = nil) -> [Double] {
         let corner = origin
         let local = safeAreaContext?.safe
-        let safe = local.map { Rect(corner.x + $0.x, corner.y + $0.y, $0.width, $0.height) } ?? safeArea
+        let safe = local.map { Rect(corner.x + $0.x, corner.y + $0.y, $0.width, $0.height) } ?? safeArea()
         var frame = placedFrame
-        let actual = laidOutFrame
+        let actual = actualFrame ?? laidOutFrame
         frame.width = actual.width
         frame.height = actual.height
         return MountedElement.frameNumbers(place: frame, corner: corner, safeArea: safe)

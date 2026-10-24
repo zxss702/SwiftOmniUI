@@ -23,14 +23,17 @@ extension WinUIElement: FrameReporter {
             element.reportDrawingSize(Size(frame.width, frame.height), in: host.runtime)
             return
         }
-        let named = element.namedSpaceFrames { ancestor in
+        // Text's passive origin report does not read named coordinate spaces.
+        // Walking its ancestors per label makes dense scrolling pay for data
+        // that no handler consumes.
+        let named = element.handler(.namedFramesChanged) == nil ? [] : element.namedSpaceFrames { ancestor in
             guard let ancestorView = (ancestor.native as? WinUIElement)?.view else { return nil }
             let origin = ancestorView.origin
             let frame = ancestorView.laidOutFrame
             return Rect(x: origin.x, y: origin.y, width: frame.width, height: frame.height)
         }
         element.reportFrame(
-            view.frameReport(safeArea: host.safeArea(of: element)), named: named, in: host.runtime,
+            view.frameReport(safeArea: host.safeArea(of: element), frame: frame), named: named, in: host.runtime,
             geometryInsets: view.safeAreaContext?.insets)
     }
 }

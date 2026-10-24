@@ -11,7 +11,8 @@
     private let intake: PatchIntake
 
     /// Handlers waiting for their turn, in the order they came.
-    private var queued: [Queued] = []
+    private var queued: [Queued?] = []
+    private var firstQueued = 0
 
     /// How deep the user's transactions stand.
     private var transactions = 0
@@ -35,7 +36,7 @@
     public var inTransaction: Bool { transactions > 0 }
 
     /// Whether a handler raised during a patch or transaction still awaits dispatch.
-    var hasQueued: Bool { !queued.isEmpty }
+    var hasQueued: Bool { firstQueued < queued.count }
 
     /// Raises `handler` with `payload` now, or queues it while held; whether it ran.
     @discardableResult
@@ -64,10 +65,24 @@
 
     /// Raises what waits, in order, stopping after a phase so it is rendered first; whether any ran.
     func raiseQueued() -> Bool {
-        guard !queued.isEmpty, !isHeld else { return false }
+        guard hasQueued, !isHeld else { return false }
 
-        while !queued.isEmpty {
-            let each = queued.removeFirst()
+        defer {
+            if firstQueued == queued.count {
+                queued.removeAll(keepingCapacity: true)
+                firstQueued = 0
+            } else if firstQueued >= queued.count - firstQueued {
+                queued.removeFirst(firstQueued)
+                firstQueued = 0
+            }
+        }
+        while hasQueued {
+            // A dense scrolling window reports many Text origins together.
+            // Remove each payload without shifting every remaining event;
+            // compact at most once after dispatch, preserving phase barriers.
+            let each = queued[firstQueued]!
+            queued[firstQueued] = nil
+            firstQueued += 1
             _ = core.dispatch(each.handler, payload: each.payload)
             if each.isPhase { break }
         }

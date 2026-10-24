@@ -7,6 +7,26 @@ import XCTest
 
 /// One frame of the display, in the order every runtime keeps.
 final class DisplayCycleTests: XCTestCase {
+    @MainActor
+    func testStaticRowPropertiesDoNotPollTheFrameClock() {
+        let runtime = HostRuntime.still()
+        var notifications = 0
+        runtime.tree.onAnimation = { notifications += 1 }
+        for mount in UInt64(1)...100 {
+            for property: Prop in [.width, .height, .text, .fontSize, .opacity] {
+                runtime.tree.receiveProperty(mount: mount, property: property,
+                    standing: nil, target: .number(20), animation: nil)
+            }
+        }
+        XCTAssertEqual(notifications, 0)
+        runtime.tree.receiveProperty(mount: 1, property: .opacity,
+            standing: .number(0), target: .number(1), animation: .eased(200, .linear))
+        XCTAssertEqual(notifications, 1)
+        runtime.tree.receiveProperty(mount: 1, property: .opacity,
+            standing: .number(0.5), target: .number(1), animation: nil)
+        XCTAssertEqual(notifications, 2, "cancelling the last animation must release its clock hold")
+    }
+
     /// A state channel, a described property and the core's changes are presented in one walk.
     @MainActor
     func testAFramePresentsEverythingItMovedInOneWalk() {

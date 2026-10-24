@@ -12,7 +12,7 @@ public protocol ShapeProperties: ViewProperties {}
 
 extension Shape {
     public var node: Node {
-        Node.composed(self, type: String(reflecting: Self.self)) { SizedShape(shape: self).node }
+        Node.composed(self, type: ElementTypeNames.qualified(Self.self)) { SizedShape(shape: self).node }
     }
 
     @_disfavoredOverload public func fill(_ value: Brush) -> ModifiedContent { revised { $0.write(ShapeContract.fill, value) } }

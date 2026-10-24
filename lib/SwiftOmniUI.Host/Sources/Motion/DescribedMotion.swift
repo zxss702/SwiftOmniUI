@@ -63,6 +63,10 @@
     /// Whether any transition is under way.
     public var isActive: Bool { !transitions.isEmpty }
 
+    /// Includes completed values retained until a mount leaves. Static new
+    /// mounts have no motion state to retarget or cancel.
+    func hasProperties(on mount: UInt64) -> Bool { keysByMount[mount] != nil }
+
     /// The value a transition draws, including a finished removal component
     /// held while the rest of that element's transition still runs.
     public func presentedValue(for key: DescribedKey) -> HostValue? {

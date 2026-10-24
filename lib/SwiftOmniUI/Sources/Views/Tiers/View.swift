@@ -49,7 +49,7 @@ extension View {
     /// runs only for composed views.
     /// Design: docs/design/views/composition.md#a-composed-view-is-a-placeholder
     public var node: Node {
-        Node.composed(self, type: String(reflecting: Self.self)) { body.node }
+        Node.composed(self, type: ElementTypeNames.qualified(Self.self)) { body.node }
     }
 }
 

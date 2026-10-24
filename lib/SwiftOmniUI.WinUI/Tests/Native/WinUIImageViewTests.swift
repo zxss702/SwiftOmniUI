@@ -121,6 +121,65 @@ final class WinUIImageViewTests: XCTestCase {
         }
     }
 
+    func testLargeCustomImagePaintsBothSidesWhenScaledIntoSmallFrame() throws {
+        try onUIThread {
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try """
+                <svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200">
+                  <rect width="200" height="200" fill="red"/>
+                  <rect x="200" width="200" height="200" fill="blue"/>
+                </svg>
+                """.write(to: folder.appendingPathComponent("large.svg"), atomically: true, encoding: .utf8)
+            swiftomniui_winui_set_pictures(folder.path)
+            defer {
+                swiftomniui_winui_set_pictures(WinUITestHost.pictures)
+                try? FileManager.default.removeItem(at: folder)
+            }
+            let host = WinUIRenderer.running {
+                Image("large.svg").resizable().scaledToFit().frame(width: 40, height: 40)
+            }
+            let image = try XCTUnwrap(host.views(WinUIImageView.self).first)
+            host.settle { image.laidOutFrame.width > 0 }
+            host.layOut()
+            let colors = image.pixels(at: [(10, 20), (30, 20)])
+            XCTAssertEqual(colors.map { $0 & 0x00FF_FFFF }, [0x00FF_0000, 0x0000_00FF])
+        }
+    }
+
+    func testLargePNGPaintsBothSidesWhenScaledIntoSmallFrame() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                Image("test_large_halves.png").resizable().scaledToFit().frame(width: 40, height: 40)
+            }
+            let image = try XCTUnwrap(host.views(WinUIImageView.self).first)
+            host.settle { image.laidOutFrame.width > 0 }
+            host.layOut()
+            let colors = image.pixels(at: [(10, 20), (30, 20)])
+            XCTAssertEqual(colors.map { $0 & 0x00FF_FFFF }, [0x00FF_0000, 0x0000_00FF])
+        }
+    }
+
+    func testMemoryBitmapUsesLogicalSizeAndScalesWithinFrame() throws {
+        try onUIThread {
+            let rgba = (0..<(40 * 20)).flatMap { index -> [UInt8] in
+                index % 40 < 20 ? [255, 0, 0, 255] : [0, 0, 255, 255]
+            }
+            let pixels = PicturePixels(width: 40, height: 20, rgba: rgba)
+            let bitmap = try XCTUnwrap(BitmapImage(pixels: pixels,
+                                                   size: Size(width: 400, height: 200)))
+            let host = WinUIRenderer.running {
+                Image(ImageSource(bitmap: bitmap)).resizable().scaledToFit()
+                    .frame(width: 40, height: 40)
+            }
+            let image = try XCTUnwrap(host.views(WinUIImageView.self).first)
+            host.settle { image.laidOutFrame.width > 0 }
+            host.layOut()
+            let colors = image.pixels(at: [(10, 20), (30, 20)])
+            XCTAssertEqual(colors.map { $0 & 0x00FF_FFFF }, [0x00FF_0000, 0x0000_00FF])
+        }
+    }
+
     func testChangingFoldersAndSourcesBeforeTheFirstFrameShowsOnlyTheNewPixels() throws {
         try onUIThread {
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -205,25 +264,30 @@ final class WinUIImageViewTests: XCTestCase {
                 }
                 .frame(width: 180, height: 64)
             }
-            @MainActor func visible(_ id: String, width: Int, height: Int) throws {
-                let image = try XCTUnwrap(host.view(id: .manual(id)) as? WinUIImageView)
+            @MainActor func glyph(_ symbol: String) -> WinUIImageView? {
+                host.views(WinUIImageView.self).first {
+                    $0.sourceElement?.value(ImageContract.source.token) == .name(symbol)
+                }
+            }
+            @MainActor func visible(_ symbol: String, width: Int, height: Int) throws {
+                let image = try XCTUnwrap(glyph(symbol))
                 let points = (0..<height).flatMap { y in
                     (0..<width).map { x in (Double(x) + 0.5, Double(y) + 0.5) }
                 }
                 XCTAssertTrue(image.pixels(at: points).contains { ($0 >> 24) != 0 },
                               "the native glyph must paint pixels in the allocated image")
             }
-            host.settle { (host.view(id: .manual("attachment"))?.laidOutFrame.width ?? 0) > 0 }
+            host.settle { (glyph("\u{E723}")?.laidOutFrame.width ?? 0) > 0 }
             host.layOut()
-            try visible("disclosure", width: 8, height: 8)
-            try visible("attachment", width: 40, height: 40)
+            try visible("\u{E70D}", width: 8, height: 8)
+            try visible("\u{E723}", width: 40, height: 40)
             alternate.wrappedValue = true
-            host.settle { host.view(id: .manual("attachment")) == nil }
+            host.settle { glyph("\u{E723}") == nil }
             alternate.wrappedValue = false
-            host.settle { (host.view(id: .manual("attachment"))?.laidOutFrame.width ?? 0) > 0 }
+            host.settle { (glyph("\u{E723}")?.laidOutFrame.width ?? 0) > 0 }
             host.layOut()
-            try visible("disclosure", width: 8, height: 8)
-            try visible("attachment", width: 40, height: 40)
+            try visible("\u{E70D}", width: 8, height: 8)
+            try visible("\u{E723}", width: 40, height: 40)
         }
     }
 

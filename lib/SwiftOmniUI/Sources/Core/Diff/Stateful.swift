@@ -6,6 +6,8 @@
 // storage before it builds the body.
 // Design: docs/design/core/identity-and-diffing.md#state-survives-a-rebuild
 
+@_spi(Reflection) import Swift
+
 /// What the differ needs of any state box without knowing its value's type.
 protocol StateBox: AnyObject {
     /// Takes over `other`'s storage when it is a box of the same value type.
@@ -42,6 +44,10 @@ protocol LazyRowStateBoundary {}
 enum Input {
     /// A value that says whether it equals another.
     case value(any Equatable)
+
+    /// A proven state-free collection. New rows retain its value without
+    /// expanding every model into paths; equality is needed only on reuse.
+    case plainCollection(Any)
 
     /// An object, by identity.
     case reference(ObjectIdentifier)
@@ -103,6 +109,8 @@ enum Input {
         switch (now, then) {
         case let (.value(a), .value(b)):
             return equal(a, b)
+        case let (.plainCollection(a), .plainCollection(b)):
+            return plainEqual(a, b)
         case let (.reference(a), .reference(b)):
             return a == b
         case let (.borrowed(a, partA), .borrowed(b, partB)):
@@ -116,6 +124,19 @@ enum Input {
         default:
             return false
         }
+    }
+
+    private static func plainEqual(_ a: Any, _ b: Any) -> Bool {
+        guard ObjectIdentifier(type(of: a)) == ObjectIdentifier(type(of: b)) else { return false }
+        if let a = a as? any Equatable, let b = b as? any Equatable { return equal(a, b) }
+        let first = Mirror(reflecting: a), second = Mirror(reflecting: b)
+        guard first.displayStyle == second.displayStyle,
+              first.children.count == second.children.count else { return false }
+        if first.children.isEmpty { return first.displayStyle != nil }
+        for (left, right) in zip(first.children, second.children) {
+            guard left.label == right.label, plainEqual(left.value, right.value) else { return false }
+        }
+        return true
     }
 
     /// Equality across the existential, opened on the first value's type.
@@ -153,6 +174,16 @@ enum Input {
     slots: inout [EnvironmentSlot],
     inputs: inout [(path: String, input: Input)]
 ) {
+    // Prove plain collections before probing for class-bound wrappers. Large
+    // value collections need neither object conversion nor per-entry paths
+    // merely to discover that none of their records owns dynamic properties.
+    if let collection = value as? any PlainStateCollection,
+       type(of: collection).hasPlainStateMembers {
+        let input: Input = (value as? any Equatable).map { .value($0) } ?? .plainCollection(value)
+        inputs.append((path: path, input: input))
+        return
+    }
+
     // An aim the view was handed is compared by its box and never adopted; one it
     // declares is `@Aim`'s underscored backing property, adopted like any state.
     if let aim = value as? Aiming, !(path.split(separator: ".").last?.hasPrefix("_") ?? false) {
@@ -257,10 +288,87 @@ enum Input {
     }
 }
 
+/// Collection element types are checked once from declared field metadata,
+/// never inferred from a sample value: an existential, custom mirror or unknown
+/// enum can conceal a different State/Environment payload in the next row.
+@MainActor private protocol PlainStateCollection {
+    static var hasPlainStateMembers: Bool { get }
+}
+
+extension Array: PlainStateCollection {
+    fileprivate static var hasPlainStateMembers: Bool { PlainStateTypes.contains(Element.self) }
+}
+
+extension Dictionary: PlainStateCollection {
+    fileprivate static var hasPlainStateMembers: Bool {
+        PlainStateTypes.contains(Key.self) && PlainStateTypes.contains(Value.self)
+    }
+}
+
+@MainActor private enum PlainStateTypes {
+    private struct Probe<Member> { let member: Member }
+    private static var known: [ObjectIdentifier: Bool] = [:]
+
+    static func contains(_ type: Any.Type) -> Bool {
+        let identity = ObjectIdentifier(type)
+        if let kept = known[identity] { return kept }
+        // A recursive/unknown metadata path always takes the ordinary walk.
+        known[identity] = false
+        func inspect<Member>(_ type: Member.Type) -> Bool {
+            var result = false
+            _forEachField(of: Probe<Member>.self) { _, _, declared, kind in
+                switch kind {
+                case .struct, .tuple, .enum, .optional:
+                    break
+                default:
+                    return false
+                }
+                if declared is any View.Type || declared is any StateBox.Type
+                    || declared is any BorrowedState.Type || declared is any EnvironmentSlot.Type
+                    || declared is any Aiming.Type || declared == Keyed.self
+                    || declared is any LazyRowStateBoundary.Type { return false }
+                if declared is any Equatable.Type { result = true; return true }
+                if let collection = declared as? any PlainStateCollection.Type {
+                    result = collection.hasPlainStateMembers
+                    return result
+                }
+                guard kind == .struct || kind == .tuple,
+                      !(declared is any CustomReflectable.Type) else { return false }
+                result = _forEachField(of: declared) { _, _, field, _ in contains(field) }
+                return result
+            }
+            return result
+        }
+        let result = _openExistential(type, do: inspect)
+        known[identity] = result
+        return result
+    }
+}
+
 /// The type of a stored view, in brackets after the property holding it, so one
 /// property holding different views gives different paths. Module-qualified.
-private func storedViewType(of value: Any) -> String {
-    value is Element ? "(\(String(reflecting: type(of: value))))" : ""
+@MainActor private func storedViewType(of value: Any) -> String {
+    value is Element ? ElementTypeNames.stored(type(of: value)) : ""
+}
+
+/// Type metadata is process-lifetime data. Repeated file rows share their
+/// generic view types; do not repeatedly format/demangle the same large names
+/// while scanning each row's stored properties. Cache names, never view values
+/// or their state, so identity paths remain exactly the same strings.
+@MainActor enum ElementTypeNames {
+    private static var names: [ObjectIdentifier: (qualified: String, stored: String)] = [:]
+
+    private static func entry(_ type: Any.Type) -> (qualified: String, stored: String) {
+        let key = ObjectIdentifier(type)
+        if let cached = names[key] { return cached }
+        let name = String(reflecting: type)
+        let entry = (qualified: name, stored: "(\(name))")
+        names[key] = entry
+        return entry
+    }
+
+    static func qualified(_ type: Any.Type) -> String { entry(type).qualified }
+    static func stored(_ type: Any.Type) -> String { entry(type).stored }
 }
 
 extension Node {

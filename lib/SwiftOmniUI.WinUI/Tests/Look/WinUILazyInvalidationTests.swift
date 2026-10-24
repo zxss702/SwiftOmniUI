@@ -7,6 +7,15 @@
 import SwiftOmniUIConformance
 import XCTest
 
+@MainActor private final class LazyRowPreparationProbe: WinUISingleChildView {
+    var nativeProposals: [ProposedViewSize] = []
+
+    override func prepareMeasure(width: Double, height: Double? = nil) {
+        nativeProposals.append(ProposedViewSize(width: width, height: height))
+        super.prepareMeasure(width: width, height: height)
+    }
+}
+
 @MainActor private final class RowBuilds {
     var calls: [Int: Int] = [:]
 }
@@ -34,6 +43,51 @@ private struct HoverWorkRow: View {
 }
 
 final class WinUILazyInvalidationTests: XCTestCase {
+    func testNewWrappedRowPreparesOnlyItsFinalNativeAllocation() throws {
+        try onUIThread {
+            for grid in [false, true] {
+                let host = WinUIRenderer.running(reducesMotion: true) {
+                    ScrollView {
+                        if grid {
+                            LazyVGrid(columns: [GridItem(.fixed(120))], spacing: 0) { Text("row") }
+                        } else { LazyVStack(spacing: 0) { Text("row") } }
+                    }.frame(width: 120, height: 240)
+                }
+                for _ in 0..<16 { host.step() }
+                let original = try XCTUnwrap(host.views(WinUILazyView.self).first)
+                let identity = try XCTUnwrap(original.mounted.keys.first)
+                let element = try XCTUnwrap(original.sourceElement)
+                let cells = LazyCells(element, in: host.runtime)
+                cells.takeItems()
+                let lazy: WinUILazyView
+                if grid {
+                    let layout = WinUILazyGridView(axis: .vertical, cells: cells)
+                    layout.tracks = [GridItem(.fixed(120))]
+                    lazy = layout
+                } else { lazy = WinUILazyStackView(axis: .vertical, cells: cells) }
+                let words = WinUILabelView()
+                words.setText("A file name with enough words to wrap across several lines")
+                words.setLines(breaking: .wordWrap, maximum: nil)
+                let row = LazyRowPreparationProbe()
+                row.setItems([WinUILayoutItem(view: words)])
+                lazy.setItems([(identity, WinUILayoutItem(view: row))])
+
+                // This is the native Measure path used by a newly mounted
+                // window, before its final row heights have been selected.
+                lazy.prepareLayoutContent(in: Rect(0, 0, 120, 240), measuringNative: true)
+                XCTAssertTrue(row.nativeProposals.isEmpty,
+                              "learning row height must not prepare a provisional native subtree")
+                lazy.prepareMeasure(width: 120, height: 240)
+                lazy.arrange(width: 120, height: 240)
+                XCTAssertFalse(row.nativeProposals.isEmpty)
+                XCTAssertTrue(row.nativeProposals.allSatisfy { $0.height != nil && $0.height!.isFinite })
+                XCTAssertGreaterThan(words.desiredSize.height, 20)
+                XCTAssertEqual(row.laidOutFrame.height, lazy.measured[identity]?.size.height ?? 0, accuracy: 1)
+                XCTAssertGreaterThan(words.laidOutFrame.height, 20)
+            }
+        }
+    }
+
     func testArrangeMeasuresRowsBeforeConsumingPendingAnimation() throws {
         try onUIThread {
             for grid in [false, true] {
@@ -88,7 +142,7 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
                 XCTAssertLessThan(lazy.mounted.count, 80)
                 XCTAssertLessThan(builds.calls.count, 80, "offscreen bodies stay unevaluated")
-                let row = try XCTUnwrap(host.view(id: .manual("hover-0")))
+                let row = try XCTUnwrap(lazy.mounted[lazy.cells.orderedIdentities[0]]?.view)
                 let elements = host.views(WinUIView.self).compactMap { $0.sourceElement?.winUI }
                 // Resolve once before measuring reuse, including window-owned ancestors.
                 for element in elements { _ = element.resolvedLayoutValues }
@@ -262,6 +316,43 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 for _ in 0..<4 { host.frame(); host.step() }
                 XCTAssertEqual(row.placedFrame.y, before + 28, accuracy: 1)
             }
+        }
+    }
+
+    func testInsertedLazyRowsMoveSurvivingFollowersThroughIntermediatePositions() throws {
+        try onUIThread {
+            let rows = State(wrappedValue: Array(0..<40))
+            let clock = TestClock()
+            let law = Animation.eased(200, .linear)
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { index in
+                            Text("row \(index)").frame(height: 28).id("entry-\(index)")
+                        }
+                    }
+                }.frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let follower = try XCTUnwrap(host.view(id: .manual("entry-1")))
+            let before = follower.placedFrame.y
+            withAnimation(law) { rows.wrappedValue.insert(contentsOf: [-3, -2, -1], at: 1) }
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertTrue(host.view(id: .manual("entry-1")) === follower)
+            clock.now = 100
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(follower.placedFrame.y, before + 42, accuracy: 1)
+            clock.now = 200
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(follower.placedFrame.y, before + 84, accuracy: 1)
+            withAnimation(law) { rows.wrappedValue.removeSubrange(1..<4) }
+            for _ in 0..<12 { host.step(); host.frame() }
+            clock.now = 300
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(follower.placedFrame.y, before + 42, accuracy: 1)
+            clock.now = 400
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(follower.placedFrame.y, before, accuracy: 1)
         }
     }
 }

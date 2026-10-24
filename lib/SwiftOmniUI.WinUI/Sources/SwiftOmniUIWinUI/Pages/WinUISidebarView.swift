@@ -35,11 +35,16 @@ final class WinUISidebarView: WinUIView {
     func remove(_ view: WinUIView) { swiftomniui_winui_split_remove(handle, view.presentationHandle) }
     var minimumRoom: Double { swiftomniui_winui_split_minimum_width(handle) }
 
-    /// Native column resizing also invalidates Swift's cached split proposal.
-    /// XAML still owns measuring and arranging the pages at their new widths.
+    /// OpenPaneLength already dirties native layout. Forget Swift's cached
+    /// proposals without scheduling another native pass through the same pages.
+    /// Include native owners because the trailing split has no placingLayout.
     func paneWidthChanged() {
-        invalidateMeasure()
-        (placingLayout ?? nativeLayoutOwner)?.invalidateMeasurements()
+        discardMeasurementResults()
+        var owner = placingLayout ?? nativeLayoutOwner
+        while let layout = owner {
+            layout.discardMeasurementResults()
+            owner = layout.placingLayout ?? layout.nativeLayoutOwner
+        }
     }
 
     override func presented(_ open: Bool) {

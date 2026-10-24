@@ -69,11 +69,22 @@ final class WinUIElement: NativeElement {
             (view as? WinUITravellingLayout)?.followsPresentationFrame(lanes: presentedLanes, sample: followingPresentation)
         }
         var owners: [WinUIElement] = []
+        var queuedAncestorDepth = 0
+        let coalesces = ProgramWrite.isWriting && !followingPresentation && presentedLanes.isEmpty
         // Only the branch whose intrinsic extent depends on this property
         // gives up its geometry lanes. A sibling can reorder on the same axis.
         var branch = view != nil ? element.mount : layoutItem?.mount
         var owner = parent
         while let each = owner {
+            // This branch's previous write already dirtied every ancestor.
+            // Stop at an unread queued owner instead of walking the same path
+            // for every Text/Image in a newly mounted compound row. A value
+            // read during the batch, or an animation lane, still walks through.
+            if coalesces, each.layoutItemsDirty, each.cachedLayoutValues == nil,
+               let queued = Self.pendingLayouts[ObjectIdentifier(each)] {
+                queuedAncestorDepth = queued.depth
+                break
+            }
             each.layoutItemsDirty = true
             each.cachedLayoutValues = nil
             if followingPresentation || !presentedLanes.isEmpty {
@@ -87,7 +98,7 @@ final class WinUIElement: NativeElement {
         guard ProgramWrite.isWriting, !owners.isEmpty else { return }
         for (index, each) in owners.enumerated() {
             Self.pendingLayouts[ObjectIdentifier(each)] = PendingLayout(
-                element: each.element, depth: owners.count - index)
+                element: each.element, depth: queuedAncestorDepth + owners.count - index)
         }
         guard !Self.layoutCommitScheduled else { return }
         Self.layoutCommitScheduled = true

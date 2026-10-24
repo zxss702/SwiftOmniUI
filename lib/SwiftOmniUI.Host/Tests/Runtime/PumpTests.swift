@@ -102,6 +102,35 @@ final class PumpTests: XCTestCase {
         XCTAssertEqual(runtime.shown, ["count 0", "count 1", "count 2"])
     }
 
+    @MainActor
+    func testDenseReportsKeepThePhaseBarrierAndHandlersAppendedDuringItsRender() {
+        let runtime = TurnRuntime()
+        runtime.pump.turn()
+        // Finish the initial app-state render before observing queue phases.
+        runtime.pump.turn()
+        XCTAssertFalse(runtime.core.needsRender)
+        let initialRenders = runtime.shown.count
+        runtime.onApply = {
+            runtime.onApply = nil
+            // A native layout callback can add a report while the phase's
+            // render is being applied, behind reports already waiting.
+            runtime.pump.dispatch(runtime.add)
+        }
+        runtime.pump.performUserTransaction {
+            for _ in 0..<100 { runtime.pump.dispatch(runtime.add) }
+            runtime.pump.handlers.enqueuePhase(runtime.add)
+            for _ in 0..<100 { runtime.pump.dispatch(runtime.add) }
+        }
+        XCTAssertEqual(Array(runtime.shown.dropFirst(initialRenders)), ["count 101", "count 202"])
+        XCTAssertFalse(runtime.pump.handlers.hasQueued)
+
+        runtime.pump.performUserTransaction {
+            for _ in 0..<100 { runtime.pump.dispatch(runtime.add) }
+        }
+        XCTAssertEqual(runtime.shown.last, "count 302")
+        XCTAssertFalse(runtime.pump.handlers.hasQueued)
+    }
+
     /// An act lands on the interface its handler changed: the turn renders first, then performs it.
     @MainActor
     func testAnActLandsOnTheInterfaceItsHandlerChanged() {

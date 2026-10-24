@@ -425,22 +425,32 @@ namespace {
         bool svg = false;
         int32_t aspect = -1;
         winrt::Windows::Foundation::Size size{};
+        controls::Image image{nullptr};
+        controls::Viewbox box{nullptr};
+        winrt::Windows::Foundation::Size placement{};
 
-        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size) {
+        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size available) {
             // Swift owns the image's intrinsic size and its frame. A native
             // desired size would enlarge or clip an unresizable image whose
             // frame is smaller than its glyph (for example a disclosure arrow).
-            for (auto const &child : Children()) child.Measure({INFINITY, INFINITY});
+            auto size = placement.Width > 0 && placement.Height > 0 ? placement : available;
+            if (std::isfinite(available.Width)) size.Width = std::min(size.Width, available.Width);
+            if (std::isfinite(available.Height)) size.Height = std::min(size.Height, available.Height);
+            for (auto const &child : Children())
+                if (child.Visibility() == xaml::Visibility::Visible) child.Measure(size);
             return {0, 0};
         }
 
         winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) {
             if (callbacks.arrange) callbacks.arrange(view, final.Width, final.Height);
             for (auto const &child : Children()) {
+                if (child.Visibility() != xaml::Visibility::Visible) continue;
                 auto element = child.as<xaml::FrameworkElement>();
                 auto desired = child.DesiredSize();
-                auto width = std::isfinite(element.Width()) ? static_cast<float>(element.Width()) : desired.Width;
-                auto height = std::isfinite(element.Height()) ? static_cast<float>(element.Height()) : desired.Height;
+                auto width = placement.Width > 0 ? placement.Width
+                    : std::isfinite(element.Width()) ? static_cast<float>(element.Width()) : desired.Width;
+                auto height = placement.Height > 0 ? placement.Height
+                    : std::isfinite(element.Height()) ? static_cast<float>(element.Height()) : desired.Height;
                 child.Arrange({(final.Width - width) / 2, (final.Height - height) / 2, width, height});
             }
             return final;
@@ -448,8 +458,8 @@ namespace {
     };
 
     /// The element `handle` made by `swiftomniui_winui_image_make` holds: a panel
-    /// with the picture at [0] and a Viewbox with a system glyph at [1], one
-    /// visible at a time.
+    /// with only the native content it has used. Symbol-heavy lazy rows must
+    /// not create an unused Image for every glyph (or a FontIcon for a bitmap).
     controls::Panel imageGrid(SwiftOmniUIObjectRef handle) {
         return borrow<controls::Panel>(handle);
     }
@@ -459,29 +469,31 @@ namespace {
     }
 
     controls::Image imageChild(controls::Panel const &grid) {
-        return grid.Children().GetAt(0).as<controls::Image>();
+        auto state = imageState(grid);
+        if (!state->image) {
+            state->image = controls::Image();
+            grid.Children().Append(state->image);
+        }
+        return state->image;
     }
 
     controls::Viewbox symbolBox(controls::Panel const &grid) {
-        return grid.Children().GetAt(1).as<controls::Viewbox>();
+        auto state = imageState(grid);
+        if (!state->box) {
+            state->box = controls::Viewbox();
+            controls::FontIcon glyph;
+            glyph.FontSize(16);
+            state->box.Child(glyph);
+            state->box.Stretch(xaml::Media::Stretch::None);
+            grid.Children().Append(state->box);
+        }
+        return state->box;
     }
 }
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_image_make(int64_t view) {
     try {
-        auto grid = winrt::make<PicturePanel>(view).as<controls::Panel>();
-        grid.Children().Append(controls::Image());
-        controls::Viewbox box;
-        // FontIcon uses WinUI's current SymbolThemeFontFamily and its native
-        // glyph renderer. A TextBlock with a font-family list can render blank
-        // when that list is treated as one unresolved family name.
-        controls::FontIcon glyph;
-        glyph.FontSize(16);
-        box.Child(glyph);
-        box.Stretch(xaml::Media::Stretch::None);
-        box.Visibility(xaml::Visibility::Collapsed);
-        grid.Children().Append(box);
-        return detach(grid);
+        return detach(winrt::make<PicturePanel>(view).as<controls::Panel>());
     } catch (...) {
         report("making an image");
         return nullptr;
@@ -500,10 +512,11 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
         state->path.clear();
         state->svg = false;
         state->aspect = -1;
-        auto image = imageChild(grid);
         auto box = symbolBox(grid);
-        image.Source(nullptr);
-        image.Visibility(xaml::Visibility::Collapsed);
+        if (state->image) {
+            state->image.Source(nullptr);
+            state->image.Visibility(xaml::Visibility::Collapsed);
+        }
         auto symbol = box.Child().as<controls::FontIcon>();
         // Fluent glyphs are selected by code point, not by text weight. Keep
         // the platform's icon font/weight and use text styles only for size.
@@ -532,7 +545,9 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
 
 extern "C" void swiftomniui_winui_image_set_tint(SwiftOmniUIObjectRef handle, bool has, uint32_t argb) {
     try {
-        auto glyph = symbolBox(imageGrid(handle)).Child().as<controls::FontIcon>();
+        auto state = imageState(imageGrid(handle));
+        if (!state->box) return;
+        auto glyph = state->box.Child().as<controls::FontIcon>();
         if (has) glyph.Foreground(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{
             static_cast<uint8_t>(argb >> 24), static_cast<uint8_t>(argb >> 16),
             static_cast<uint8_t>(argb >> 8), static_cast<uint8_t>(argb)}));
@@ -548,7 +563,7 @@ extern "C" bool swiftomniui_winui_image_set(
     size[0] = size[1] = 0;
     try {
         auto grid = imageGrid(handle);
-        symbolBox(grid).Visibility(xaml::Visibility::Collapsed);
+        if (auto box = imageState(grid)->box) box.Visibility(xaml::Visibility::Collapsed);
         auto image = imageChild(grid);
         image.Visibility(xaml::Visibility::Visible);
         // SwiftOmniUI's Aspect: fit, fill, stretch, centre - at the picture's own size, in the middle of the room.
@@ -626,7 +641,8 @@ extern "C" void swiftomniui_winui_image_size(SwiftOmniUIObjectRef handle, double
             size[1] = state->size.Height;
             return;
         }
-        auto bitmap = imageChild(grid).Source().try_as<imaging::BitmapSource>();
+        if (!state->image) return;
+        auto bitmap = state->image.Source().try_as<imaging::BitmapSource>();
         if (!bitmap) return;
         size[0] = bitmap.PixelWidth();
         size[1] = bitmap.PixelHeight();
@@ -637,14 +653,11 @@ extern "C" void swiftomniui_winui_image_size(SwiftOmniUIObjectRef handle, double
 
 extern "C" void swiftomniui_winui_image_place(SwiftOmniUIObjectRef handle, double width, double height) {
     try {
-        auto grid = imageGrid(handle);
-        auto box = symbolBox(grid);
-        auto child = box.Visibility() == xaml::Visibility::Visible
-            ? box.as<xaml::FrameworkElement>() : imageChild(grid).as<xaml::FrameworkElement>();
-        child.Width(width);
-        child.Height(height);
-        child.HorizontalAlignment(xaml::HorizontalAlignment::Center);
-        child.VerticalAlignment(xaml::VerticalAlignment::Center);
+        // Called while the panel is arranging. Dependency-property writes on
+        // its child would dirty the parent and restart XAML layout once per
+        // newly visible icon. A dense lazy window can exhaust that countdown.
+        // The custom panel owns the slot already; no Width/Height DP is needed.
+        imageState(imageGrid(handle))->placement = {static_cast<float>(width), static_cast<float>(height)};
     } catch (...) {
         report("placing a picture");
     }
@@ -819,9 +832,11 @@ extern "C" bool swiftomniui_winui_image_set_pixels(SwiftOmniUIObjectRef handle, 
         if (!std::isfinite(logicalWidth) || !std::isfinite(logicalHeight) || logicalWidth <= 0 || logicalHeight <= 0) return false;
         auto source = memoryPicture(rgba, width, height); if (!source) return false;
         auto grid = imageGrid(handle); auto image = imageChild(grid);
-        symbolBox(grid).Visibility(xaml::Visibility::Collapsed); image.Visibility(xaml::Visibility::Visible);
+        if (auto box = imageState(grid)->box) box.Visibility(xaml::Visibility::Collapsed);
+        image.Visibility(xaml::Visibility::Visible);
         image.Stretch(xaml::Media::Stretch::Fill);
-        image.Width(logicalWidth); image.Height(logicalHeight);
+        image.ClearValue(xaml::FrameworkElement::WidthProperty());
+        image.ClearValue(xaml::FrameworkElement::HeightProperty());
         setMemoryPicture(image, source);
         auto state = imageState(grid); state->path.clear(); state->svg = false;
         state->size = {static_cast<float>(logicalWidth), static_cast<float>(logicalHeight)};

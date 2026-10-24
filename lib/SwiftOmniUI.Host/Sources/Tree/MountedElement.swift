@@ -114,6 +114,7 @@ import CRT
     private var wornStates: [Int32] = []
     private var drivenValues: [Prop: HostStateValue] = [:]
     private var created = false
+    private var pendingCreation = true
     private var described = false
 
     init(_ patch: HostPatch, tree: MountedTree, parent: MountedElement?) {
@@ -122,6 +123,11 @@ import CRT
         self.tree = tree
         self.parent = parent
         mount = tree.allocateMount()
+        var ancestor = parent
+        while let each = ancestor, !each.pendingCreation {
+            each.pendingCreation = true
+            ancestor = each.parent
+        }
         // The native half is made knowing what describes the element - a host picks its control by the
         // properties - so they stand while it is made; `apply` describes the element itself.
         properties = patch.properties
@@ -162,8 +168,9 @@ import CRT
             changed.formUnion(replacement.keys)
         }
 
-        let standing = Dictionary(uniqueKeysWithValues: changed.compactMap { property in
-            standingValue(property, target: patch.properties[property]).map { (property, $0) }
+        let standing = Dictionary(uniqueKeysWithValues: changed.compactMap { property -> (Prop, HostValue)? in
+            guard patch.transitions[property] != nil else { return nil }
+            return standingValue(property, target: patch.properties[property]).map { (property, $0) }
         })
 
         for property in patch.clearedProperties {
@@ -264,7 +271,11 @@ import CRT
             }
         }
 
-        for property in changed.sorted() {
+        // Most newly realized Text/Image properties are static. Only a patch
+        // carrying transitions or an existing mount's motion needs this walk.
+        let motionProperties = patch.transitions.isEmpty && !tree.hasPropertyMotions(on: mount)
+            ? [] : changed.sorted()
+        for property in motionProperties {
             let hasDrivenPresentation = driven[property].map { $0.mode != .in } ?? false
             tree.receiveProperty(
                 mount: mount,
@@ -482,6 +493,8 @@ import CRT
 
     /// The handlers of `created` raised by no render yet, in tree order; a window raises its own.
     public func takeCreatedHandlers() -> [Int32] {
+        guard pendingCreation else { return [] }
+        pendingCreation = false
         var handlers: [Int32] = []
 
         if !created {

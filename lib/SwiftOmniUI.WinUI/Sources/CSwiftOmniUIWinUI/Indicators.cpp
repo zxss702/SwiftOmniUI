@@ -31,6 +31,10 @@ extern "C" void swiftomniui_winui_progress_bar_set(SwiftOmniUIObjectRef handle, 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_progress_ring_make(void) {
     try {
         controls::ProgressRing ring;
+        ring.MinWidth(0);
+        ring.MinHeight(0);
+        ring.Width(24);
+        ring.Height(24);
         ring.IsActive(false);
         return detach(ring);
     } catch (...) {

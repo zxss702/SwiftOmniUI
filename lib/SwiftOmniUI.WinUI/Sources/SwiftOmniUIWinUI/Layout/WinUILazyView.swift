@@ -85,7 +85,6 @@ class WinUILazyView: WinUITravellingLayout {
     private var measurementRows: Set<String> = []
     private var measuredEmptyGeneration = -1
     var isPreparingRows = false
-    private var measuringRowsNatively = false
 
     override var hasNativeProposals: Bool { true }
 
@@ -121,9 +120,10 @@ class WinUILazyView: WinUITravellingLayout {
            measuredContexts[identity] == item.view.layoutContextRevision {
             return kept.size
         }
-        let size = measuringRowsNatively
-            ? item.size(offered: proposedWidth)
-            : Self.querySize { item.size(offered: proposedWidth) }
+        // Row geometry selects the final native proposal; it must not prepare
+        // the same subtree first at an unspecified height. prepareChildren
+        // measures the completed plan and retries it if native sizes change.
+        let size = Self.querySize { item.size(offered: proposedWidth) }
         cells.measurements += 1
         measured[identity] = (proposedWidth, size)
         measuredRevisions[identity] = item.view.measurementRevision
@@ -142,14 +142,11 @@ class WinUILazyView: WinUITravellingLayout {
         }
         let previousQuery = Self.queryingSize
         let previousPreparation = isPreparingRows
-        let previousNative = measuringRowsNatively
         Self.queryingSize = 0
         isPreparingRows = true
-        measuringRowsNatively = measuringNative
         defer {
             Self.queryingSize = previousQuery
             isPreparingRows = previousPreparation
-            measuringRowsNatively = previousNative
         }
         _ = contentSize(width: axis == .vertical ? bounds.width : nil)
     }
@@ -196,20 +193,26 @@ class WinUILazyView: WinUITravellingLayout {
     /// WinUI's effective viewport is the compositor's window in this panel's coordinates.
     private var effectiveViewport: Rect?
     private var lastTargetViewport: Rect?
-    private var scrollSample: (offset: Double, time: Double)?
-    private var precedingScrollSample: (offset: Double, time: Double)?
+    private var scrollSamples = WinUILazyPrefetch.MotionSamples()
     private var previousPreparationDuration = 0.0
     private(set) var scrollVelocity = 0.0
     private(set) var scrollInterval = 0.0
     private(set) var preparationDuration = 0.0
     private(set) var scrollObservationLead = 0.0
     private var preparationStarted: Double?
+    private var displayInterval: Double {
+        let refresh = WinUIFrameClock.current?.refreshInterval ?? 0
+        return refresh > 0 ? refresh : scrollInterval
+    }
 
     /// The viewport the scroller's own notices last named - newer than the
     /// effective viewport while a move stands between them.
     private var announcedRect: Rect?
     /// A program jump deferred by native layout still owes its requested window.
     private var preparedViewport: Rect?
+    /// ScrollTo without animation is still asynchronous. Keep its prepared
+    /// window until that native operation completes or is cancelled.
+    private var jumpViewport: Rect?
     private var pendingScrollTarget: Point?
     private(set) var isWaitingForViewport = false
     /// The ear the run hears its scroller's moves by, ahead of the effective viewport's notice.
@@ -218,6 +221,9 @@ class WinUILazyView: WinUITravellingLayout {
     /// after it, its viewport already taken.
     private var inViewportChange = false
     private var pendingViewport = false
+    private var fillingWindow = false
+    private var pendingContentExtent = false
+    private(set) var expansionRuns = 1
 
     /// The mounted rows still on their way: a change's own rows while the change stands, and
     /// afterwards the mounts the motion itself says are moving.
@@ -240,8 +246,14 @@ class WinUILazyView: WinUITravellingLayout {
         self.cells = cells
         super.init()
         cells.onRowsRequested = { [weak self] in
-            guard let self else { return }
-            if self.preparationStarted == nil { self.preparationStarted = WinUIFrameClock.monotonic() }
+            // Opening a page measures the whole first viewport, often with cold
+            // templates/fonts. It is not the latency of one incoming scroll
+            // batch and must not inflate the first fling's prediction.
+            guard let self, self.watching?.held == true else { return }
+            // A newer request supersedes the previous range. Timing from the
+            // oldest unfinished range folds many batches into one latency,
+            // making prediction grow as scrolling keeps replacing that range.
+            self.preparationStarted = WinUIFrameClock.monotonic()
         }
         cells.prefetchReady = { [weak self] in
             guard let self else { return false }
@@ -250,7 +262,7 @@ class WinUILazyView: WinUITravellingLayout {
                   self.placed != nil else { return false }
             // Native layout completes the previous request. Do not synchronously
             // measure image-heavy rows to permit another prefetch in this turn.
-            return !self.needsRowMeasurements
+            return !self.needsRowMeasurements && !self.hasUnplacedRows()
         }
         swiftomniui_winui_panel_watch_viewport(handle, true)
     }
@@ -275,6 +287,9 @@ class WinUILazyView: WinUITravellingLayout {
         // revision is the layout signal; an unchanged revision needs no native pass.
         // Structural changes still need a pass to place their new window.
         let rowSizeChanged = contentChanged && !measurementRows.isEmpty
+        // A retained row may grow without changing the source identities.
+        // Its later siblings still need the patch's placement law.
+        if rowSizeChanged { cells.animatesChanges = true }
         if sourceChanged || rowSizeChanged {
             invalidateMeasure()
             invalidateArrange()
@@ -359,6 +374,7 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     func commitChangedContentExtent() {
+        if fillingWindow { pendingContentExtent = true; return }
         // Internal row invalidation is not a changed document size. Parents
         // observe this revision only when this layout reports a new extent.
         contentExtentRevision &+= 1
@@ -405,7 +421,13 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     func viewportReported(_ rect: Rect) {
-        viewportChanged(rect)
+        // EffectiveViewportChanged can arrive inside XAML's own layout. Fill
+        // visible demand from the coalesced turn, never mutate children there.
+        watchClip()
+        guard let current = currentNativeViewport() else { return }
+        effectiveViewport = current
+        announcedRect = current
+        retell()
     }
 
     private func currentNativeViewport() -> Rect? {
@@ -433,7 +455,7 @@ class WinUILazyView: WinUITravellingLayout {
     /// rectangle can already precede another allocation or compositor offset.
     /// Program jumps supply their explicit target separately.
     func viewportChanged(_ reported: Rect, effective: Bool = true, target override: Rect? = nil,
-                         completingJump: Bool = false) {
+                         completingJump: Bool = false, fillingVisible: Bool = false) {
         guard clip != nil else { return }
         watchClip()
         let rect: Rect
@@ -467,7 +489,13 @@ class WinUILazyView: WinUITravellingLayout {
                 }
             }
         }
-        guard let target = override ?? preparedViewport ?? announcedRect ?? viewport else { return }
+        if override == nil, jumpViewport != nil {
+            if watching.map({ swiftomniui_winui_scroller_jump_pending($0.scroller.handle) }) == true {
+                return
+            }
+            jumpViewport = nil
+        }
+        guard let target = override ?? preparedViewport ?? jumpViewport ?? announcedRect ?? viewport else { return }
         let grid = self is WinUILazyGridView
         let revision = grid ? cells.runs.revision : cells.extents.revision
         let keeping = travellingIdentities
@@ -511,18 +539,49 @@ class WinUILazyView: WinUITravellingLayout {
             }
         }
         var needsArrangement = false
+        fillingWindow = completingJump || fillingVisible
         defer {
+            fillingWindow = false
+            expansionRuns = 1
+            if pendingContentExtent {
+                pendingContentExtent = false
+                commitChangedContentExtent()
+            }
             // XAML must measure the changed extent before placing the new rows.
             if needsArrangement { invalidateArrange() }
         }
         var measuredWindows: Set<Range<Int>> = []
         while true {
             let built = cells.built
+            if fillingVisible, let incoming, cells.requestedItemsAreCurrent, !needsRowMeasurements,
+               !built.isEmpty {
+                let perRun = cells.window?.perRun ?? 1
+                let count = (cells.orderedIdentities.count + perRun - 1) / perRun
+                let first = built.lowerBound / perRun, last = (built.upperBound - 1) / perRun
+                var known = 0
+                for run in first...last {
+                    let measured = grid ? cells.runs.hasMeasurement(for: run)
+                        : cells.extents.hasMeasurement(for: cells.orderedIdentities[run])
+                    if measured { known += 1 }
+                }
+                let head = grid ? cells.runs.offset(of: first, count: count) : cells.offset(of: first)
+                let tail = grid ? cells.runs.offset(of: last + 1, count: count) : cells.offset(of: last + 1)
+                let missingBefore = max(0, head - incoming.lowerBound)
+                let missingAfter = max(0, incoming.upperBound - tail)
+                let remaining = missingBefore + missingAfter
+                let observed = cells.measuredRunExtent(perRun: perRun, grid: grid,
+                                                       forward: missingAfter >= missingBefore)
+                // Start with one measured run, then grow only as far as both
+                // nearby measured density and the still-unfilled viewport justify.
+                // This avoids one render/patch per tiny file row without
+                // constructing a provisional screenful of tall unknown cards.
+                expansionRuns = max(1, min(known, Int((remaining / observed).rounded(.up))))
+            }
             tellWindow(span ?? 0..<0, realize: realize ?? 0..<0, demand: incoming)
-            // Scroll input must return to WinUI. Native measure/arrange and the
-            // request acknowledgement resume this window outside the callback.
-            // Only an explicit program jump prepares its landing synchronously.
-            if !completingJump { return }
+            // The coalesced turn completes visible demand before the next
+            // composition. Optional ahead work never enters this loop. Native
+            // callbacks only enqueue the turn, so scroll input can return first.
+            if !completingJump && !fillingVisible { return }
             // Complete only this viewport. Shorter-than-estimated rows can expose
             // further rows; those are visible work, not next-frame prefetch.
             guard WinUIView.arranging == 0, WinUIView.measuring == 0,
@@ -531,7 +590,11 @@ class WinUILazyView: WinUITravellingLayout {
             if cells.built != built || measuredRevision != measurementRevision
                 || needsRowMeasurements || cells.anchorShift != 0 {
                 let actual = laidOutFrame
-                prepareLayoutContent(in: Rect(0, 0, actual.width, actual.height), measuringNative: true)
+                // Query geometry while filling. Preparing every nested native
+                // allocation here and again in XAML Measure repeats the whole
+                // incoming subtree's work. The normal native pass prepares the
+                // completed visible window once before Arrange.
+                prepareLayoutContent(in: Rect(0, 0, actual.width, actual.height), measuringNative: completingJump)
                 needsArrangement = true
             }
             let after = grid ? cells.runs.revision : cells.extents.revision
@@ -594,7 +657,10 @@ class WinUILazyView: WinUITravellingLayout {
         let extent = grid ? cells.runs.extent(of: neighbour)
             : cells.extents.extent(of: cells.orderedIdentities[neighbour])
         let spare = max(0, scrollVelocity > 0 ? origin + extent - span.upperBound : span.lowerBound - origin)
-        let extra = WinUILazyPrefetch.distance(velocity: scrollVelocity, interval: scrollInterval,
+        // Native composition can advance between UI observations. A missed
+        // callback widens the interval the ahead window must cover.
+        let leadInterval = max(displayInterval, scrollInterval)
+        let extra = WinUILazyPrefetch.distance(velocity: scrollVelocity, interval: leadInterval,
                                               readiness: preparationDuration, neighbour: spare,
                                               observationLead: scrollObservationLead)
         var expanded = rect
@@ -650,7 +716,7 @@ class WinUILazyView: WinUITravellingLayout {
                 || self.cells.window?.revision != revision
                 || self.measuredRevision != self.measurementRevision || self.needsRowMeasurements
                 || self.cells.retained != self.travellingIdentities {
-                if let viewport = self.viewport { self.viewportChanged(viewport, effective: false) }
+                if let viewport = self.viewport { self.viewportChanged(viewport, effective: false, fillingVisible: true) }
             }
         }
     }
@@ -675,8 +741,8 @@ class WinUILazyView: WinUITravellingLayout {
         announcedRect = nil
         preparedViewport = nil
         pendingScrollTarget = nil
-        scrollSample = nil
-        precedingScrollSample = nil
+        jumpViewport = nil
+        scrollSamples = .init()
         scrollVelocity = 0
         scrollInterval = 0
         scrollObservationLead = 0
@@ -704,25 +770,10 @@ class WinUILazyView: WinUITravellingLayout {
         let offset = scroll.scroller.standing.offset
         let along = axis == .vertical ? offset.y : offset.x
         let refresh = WinUIFrameClock.current?.refreshInterval ?? 0
-        if let previous = scrollSample, now > previous.time, along != previous.offset {
-            let delta = along - previous.offset
-            let elapsed = max(now - previous.time, refresh)
-            // Smooth adjacent native samples without waiting an extra display
-            // frame to learn about movement that ViewChanged already reported.
-            if let preceding = precedingScrollSample,
-               delta * (previous.offset - preceding.offset) > 0 {
-                scrollVelocity = WinUILazyPrefetch.velocity(distance: along - preceding.offset,
-                    elapsed: now - preceding.time, refreshInterval: refresh)
-                scrollInterval = max(elapsed, previous.time - preceding.time)
-            } else {
-                scrollVelocity = WinUILazyPrefetch.velocity(distance: delta, elapsed: elapsed, refreshInterval: refresh)
-                scrollInterval = elapsed
-            }
-            scrollInterval = max(scrollInterval, WinUIFrameClock.current?.refreshInterval ?? 0)
-            precedingScrollSample = previous
-            scrollSample = (along, now)
+        if let sample = scrollSamples.observe(offset: along, time: now, refreshInterval: refresh) {
+            scrollVelocity = sample.velocity
+            scrollInterval = sample.interval
         }
-        if scrollSample == nil { scrollSample = (along, now) }
     }
 
     private func scrollerMoved(onFrame: Bool = false) {
@@ -731,15 +782,18 @@ class WinUILazyView: WinUITravellingLayout {
             if !scroll.held {
                 scrollVelocity = 0
                 scrollObservationLead = 0
-                scrollSample = nil
-                precedingScrollSample = nil
+                scrollSamples = .init()
             } else if onFrame {
                 observeScroll()
                 scrollObservationLead = scroll.observationLead(on: axis)
-            } else if scrollSample == nil {
+            } else {
                 observeScroll()
             }
         }
+        // A busy UI thread can receive scroll frames less often than the
+        // display refreshes. Producing only one refresh's travel per callback
+        // cannot catch up with the distance consumed between callbacks.
+        cells.prefetchStepDistance = abs(scrollVelocity) * max(displayInterval, scrollInterval)
         // A native scroll notification records position only. Coalesce row
         // realization outside the ScrollPresenter's callback/layout stack.
         announcedRect = rect
@@ -750,17 +804,49 @@ class WinUILazyView: WinUITravellingLayout {
         retell()
     }
 
+    private func hasUnplacedRows(in range: Range<Int>? = nil) -> Bool {
+        for number in pendingAnchors {
+            guard let identity = identitiesByView[number], let item = mounted[identity],
+                  item.isShown, !item.departing else { continue }
+            if let range {
+                guard let position = cells.position(of: identity), range.contains(position) else { continue }
+            }
+            return true
+        }
+        return false
+    }
+
     func hasMountedWindow(in span: Range<Double>) -> Bool {
-        guard cells.requestedItemsAreCurrent, !cells.needsMeasurement,
-              let window = cells.window else { return false }
+        guard cells.requestedItemsAreCurrent, let window = cells.window else { return false }
         let perRun = window.perRun
         let wanted = self is WinUILazyGridView
             ? cells.runs.places(in: span, overscan: 0,
                                 count: (cells.orderedIdentities.count + perRun - 1) / perRun)
             : cells.places(in: span, overscan: 0)
         guard !wanted.isEmpty else { return false }
-        return cells.built.lowerBound <= wanted.lowerBound * perRun
-            && cells.built.upperBound >= min(cells.orderedIdentities.count, wanted.upperBound * perRun)
+        let lower = wanted.lowerBound * perRun
+        let upper = min(cells.orderedIdentities.count, wanted.upperBound * perRun)
+        guard cells.built.lowerBound <= lower, cells.built.upperBound >= upper else { return false }
+        // Querying row geometry does not mean that XAML has arranged the
+        // incoming native subtree. Do not cancel/follow up a batch while its
+        // demanded rows still have no first native placement.
+        guard !hasUnplacedRows(in: lower..<upper) else { return false }
+        if !needsRowMeasurements, !cells.needsMeasurement { return true }
+        // Readiness belongs to the demanded viewport. An incoming offscreen
+        // batch can still need measurement without making the visible rows
+        // unready; otherwise the next viewport pass cancels that batch and
+        // removes it before XAML ever measures or paints it.
+        for place in lower..<upper {
+            let identity = cells.orderedIdentities[place]
+            guard let item = mounted[identity] else {
+                guard measuredEmptyGeneration == cells.element?.lazyRequestGeneration else { return false }
+                continue
+            }
+            guard measured[identity] != nil,
+                  measuredRevisions[identity] == item.view.measurementRevision,
+                  measuredContexts[identity] == item.view.layoutContextRevision else { return false }
+        }
+        return true
     }
 
     /// A jump the program makes: realize the window it lands in before the
@@ -776,6 +862,7 @@ class WinUILazyView: WinUITravellingLayout {
         let standing = scroll.scroller.standing.offset
         if axis == .vertical { rect.y += target.y - standing.y }
         else { rect.x += target.x - standing.x }
+        jumpViewport = rect
         viewportChanged(rect, effective: false, target: rect, completingJump: true)
     }
 
@@ -822,7 +909,12 @@ class WinUILazyView: WinUITravellingLayout {
         places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges && ready,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
                                          axis == .vertical ? cells.anchorShift : 0), refining: true,
-                     consumingPatch: ready, height: axis == .vertical ? bounds.height : bounds.width,
+                     // The scroll-axis extent changes when rows grow, arrive or
+                     // leave. It is a result of the edit, not an external resize;
+                     // treating it as one suppresses every surviving row's
+                     // displacement animation. Only the cross-axis proposal
+                     // determines whether the layout was resized.
+                     consumingPatch: ready,
                      followingPresentation: ready ? takePresentationFrame() : false,
                      presentedLanes: ready ? takePresentedLanes() : [],
                      presentedItems: ready ? takePresentedItems() : [:])
@@ -860,13 +952,14 @@ class WinUILazyView: WinUITravellingLayout {
 
     override func arrange(width: Double, height: Double) {
         super.arrange(width: width, height: height)
-        if let started = preparationStarted, cells.requestedItemsAreCurrent, !needsRowMeasurements {
-            recordPreparationDuration(WinUIFrameClock.monotonic() - started)
-            preparationStarted = nil
-        }
         readyAnchors.formUnion(placedAnchors)
         pendingAnchors.subtract(placedAnchors)
         placedAnchors.removeAll(keepingCapacity: true)
+        if let started = preparationStarted, cells.requestedItemsAreCurrent,
+           !needsRowMeasurements, !hasUnplacedRows() {
+            recordPreparationDuration(WinUIFrameClock.monotonic() - started)
+            preparationStarted = nil
+        }
     }
 
     override func detach() {
@@ -880,6 +973,7 @@ class WinUILazyView: WinUITravellingLayout {
         measurementRows.removeAll()
         measuredEmptyGeneration = -1
         cells.cancelPrefetch()
+        preparationStarted = nil
         super.detach()
         swiftomniui_winui_panel_watch_viewport(handle, false)
         effectiveViewport = nil
@@ -887,6 +981,7 @@ class WinUILazyView: WinUITravellingLayout {
         announcedRect = nil
         preparedViewport = nil
         pendingScrollTarget = nil
+        jumpViewport = nil
         isWaitingForViewport = false
         watching = nil
         scrollEar = nil
@@ -1031,7 +1126,8 @@ final class WinUILazyStackView: WinUILazyView {
     override func tellWindow(_ span: Range<Double>, realize: Range<Double>, demand: Range<Double>?) {
         let prefetch = hasMountedWindow(in: demand ?? span)
         cells.show(span, realize: prefetch ? realize : (demand ?? span), measureBeforeExpanding: !prefetch,
-                   keeping: travellingIdentities, prefetch: prefetch, demand: demand)
+                   keeping: travellingIdentities, prefetch: prefetch, demand: demand, unknownRuns: expansionRuns,
+                   retaining: realize)
     }
 }
 
@@ -1257,7 +1353,7 @@ final class WinUILazyGridView: WinUILazyView {
         let prefetch = hasMountedWindow(in: demand ?? span)
         cells.show(span, perRun: perRun, grid: true, realize: prefetch ? realize : (demand ?? span),
                    measureBeforeExpanding: !prefetch, keeping: travellingIdentities,
-                   prefetch: prefetch, demand: demand)
+                   prefetch: prefetch, demand: demand, unknownRuns: expansionRuns, retaining: realize)
     }
 }
 

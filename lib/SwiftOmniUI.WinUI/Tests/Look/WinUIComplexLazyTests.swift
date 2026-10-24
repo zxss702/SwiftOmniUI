@@ -28,22 +28,22 @@ private struct ComplexLazyCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 8) {
-                Image(systemName: "folder.fill").frame(width: 24, height: 24)
+                Image(systemName: "\u{E8B7}").frame(width: 24, height: 24)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Card \(number)").font(.system(size: 16))
                     Text("Nested content and metadata").font(.system(size: 11))
                 }
                 Spacer()
-                Image(systemName: "ellipsis").frame(width: 18, height: 18)
+                Image(systemName: "\u{E712}").frame(width: 18, height: 18)
             }
             Text(paragraph).font(.system(size: 13))
             ForEach(0..<(1 + number % 3)) { section in
                 HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "doc.text").frame(width: 18, height: 18)
+                    Image(systemName: "\u{E8A5}").frame(width: 18, height: 18)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Section \(section)").font(.system(size: 12))
                         HStack(spacing: 5) {
-                            Image(systemName: "clock").frame(width: 14, height: 14)
+                            Image(systemName: "\u{E823}").frame(width: 14, height: 14)
                             Text("Updated recently").font(.system(size: 11))
                         }
                     }
@@ -51,7 +51,7 @@ private struct ComplexLazyCard: View {
             }
             HStack(spacing: 7) {
                 ForEach(0..<8) { badge in
-                    Image(systemName: badge.isMultiple(of: 2) ? "star.fill" : "checkmark.circle")
+                    Image(systemName: badge.isMultiple(of: 2) ? "\u{E735}" : "\u{E73E}")
                         .frame(width: 14, height: 14)
                 }
             }
@@ -95,6 +95,39 @@ private struct ComplexLazyPage: View {
 }
 
 final class WinUIComplexLazyTests: XCTestCase {
+    func testLeafCreationAndRepeatedProposalCosts() throws {
+        try onUIThread {
+            var start = WinUIFrameClock.monotonic()
+            let labels = (0..<60).map { number in
+                let label = WinUILabelView()
+                label.setText(String(repeating: "Different length text 自动换行 text. ", count: 1 + number % 5))
+                label.setTextFont(size: 13, attributes: nil, family: nil)
+                return label
+            }
+            let textCreation = WinUIFrameClock.monotonic() - start
+            start = WinUIFrameClock.monotonic()
+            var checksum = 0.0
+            for _ in 0..<12 {
+                for label in labels {
+                    for width: Double? in [nil, 80, 210, 420] {
+                        checksum += label.measure(width: width, height: nil).height
+                    }
+                }
+            }
+            let proposals = WinUIFrameClock.monotonic() - start
+            start = WinUIFrameClock.monotonic()
+            let symbols = (0..<60).map { _ in
+                let image = WinUIImageView()
+                var size = [0.0, 0.0]
+                XCTAssertTrue(swiftomniui_winui_image_set_symbol(image.handle, "\u{E8D5}", 3, 16, 0, -1, &size))
+                return image
+            }
+            XCTAssertGreaterThan(checksum, 0)
+            XCTAssertEqual(symbols.count, 60)
+            print("Leaf costs: text creation=\(textCreation)ms; repeated proposals=\(proposals)ms; symbol creation=\(WinUIFrameClock.monotonic() - start)ms")
+        }
+    }
+
     func testNestedVStackSymbolsAndWrappedTextDuringScrollAndEdits() throws { try exercise(kind: 0) }
     func testNestedHStackSymbolsAndWrappedTextDuringScrollAndEdits() throws { try exercise(kind: 1) }
     func testNestedVGridSymbolsAndWrappedTextDuringScrollAndEdits() throws { try exercise(kind: 2) }

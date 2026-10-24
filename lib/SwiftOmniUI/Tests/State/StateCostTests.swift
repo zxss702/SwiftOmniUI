@@ -202,4 +202,50 @@ import XCTest
         XCTAssertEqual(borrowed.wrappedValue, 4, "and reads what was written")
         XCTAssertEqual(Self.made, 1)
     }
+    func testLargePlainIconTablesDoNotExpandEveryEntryIntoStatePaths() {
+        struct Icon { let name: String; let system: Bool; let color: Color? }
+        let table = Dictionary(uniqueKeysWithValues: (0..<330).map {
+            ("extension-\($0)", Icon(name: "icon-\($0)", system: $0.isMultiple(of: 2), color: .red))
+        })
+        let captured = stateParts(in: table)
+        XCTAssertTrue(captured.boxes.isEmpty)
+        XCTAssertEqual(captured.inputs.count, 1)
+        // A custom mirror retains the ordinary recursive walk as a reference.
+        // Measure snapshot construction, separately from later equality checks.
+        struct ReflectedTable: CustomReflectable {
+            let table: [String: Icon]
+            var customMirror: Mirror { Mirror(reflecting: table) }
+        }
+        let reference = ReflectedTable(table: table)
+        XCTAssertGreaterThan(stateParts(in: reference).inputs.count, 1_000)
+        var fastRecords = 0, recursiveRecords = 0
+        let fastBegan = ContinuousClock.now
+        for _ in 0..<80 { fastRecords += stateParts(in: table).inputs.count }
+        let fastTime = Inspection.micros(since: fastBegan) / 1_000
+        let recursiveBegan = ContinuousClock.now
+        for _ in 0..<80 { recursiveRecords += stateParts(in: reference).inputs.count }
+        let recursiveTime = Inspection.micros(since: recursiveBegan) / 1_000
+        print("80 icon-table snapshots: deferred=\(fastTime)ms/\(fastRecords) records, recursive=\(recursiveTime)ms/\(recursiveRecords) records")
+        XCTAssertTrue(Input.same(captured.inputs, stateParts(in: table).inputs))
+        var changed = table
+        changed["extension-42"] = Icon(name: "updated", system: false, color: .blue)
+        XCTAssertFalse(Input.same(captured.inputs, stateParts(in: changed).inputs))
+    }
+
+    func testCollectionTypeProofDoesNotHideStateInExistentialsOrEnums() {
+        struct Plain { let number: Int }
+        struct Owning { let box = State(7) }
+        enum Payload { case plain(Plain); case owning(Owning) }
+        let existential: [Any] = [Plain(number: 1), Owning()]
+        let variants: [Payload] = [.plain(Plain(number: 1)), .owning(Owning())]
+        XCTAssertEqual(stateParts(in: existential).boxes.count, 1)
+        XCTAssertEqual(stateParts(in: variants).boxes.count, 1)
+        XCTAssertEqual(stateParts(in: ["row": Owning()]).boxes.count, 1)
+        struct Mirrored: CustomReflectable {
+            let box = State(7)
+            var customMirror: Mirror { Mirror(self, children: ["box": box]) }
+        }
+        XCTAssertEqual(stateParts(in: [Mirrored()]).boxes.count, 1)
+    }
+
 }

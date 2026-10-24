@@ -8,6 +8,7 @@
 #include "Relay.h"
 
 #include <algorithm>
+#include <unordered_set>
 #include <memory>
 #include <vector>
 
@@ -105,8 +106,14 @@ namespace {
 
     void removeUnused(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
                       std::vector<xaml::UIElement> const &held) {
+        // Canonical COM identity avoids O(old * new) projected comparisons
+        // when a lazy jump replaces an entire viewport. Both lists keep the
+        // objects alive throughout this local membership check.
+        std::unordered_set<::IUnknown *> retained;
+        retained.reserve(held.size());
+        for (auto const &child : held) retained.insert(child.as<::IUnknown>().get());
         for (uint32_t index = items.Size(); index > 0; --index) {
-            if (std::find(held.begin(), held.end(), items.GetAt(index - 1)) == held.end()) items.RemoveAt(index - 1);
+            if (!retained.contains(items.GetAt(index - 1).as<::IUnknown>().get())) items.RemoveAt(index - 1);
         }
     }
 
@@ -114,7 +121,12 @@ namespace {
                        std::vector<xaml::UIElement> const &held) {
         if (sameChildren(items, held)) return;
         for (uint32_t index = 0; index < held.size(); ++index) {
-            if (index < items.Size() && items.GetAt(index) == held[index]) continue;
+            // A new tail need not search the prefix already put in order.
+            if (index == items.Size()) {
+                items.Append(held[index]);
+                continue;
+            }
+            if (items.GetAt(index) == held[index]) continue;
             uint32_t previous;
             if (items.IndexOf(held[index], previous)) items.RemoveAt(previous);
             items.InsertAt(index, held[index]);

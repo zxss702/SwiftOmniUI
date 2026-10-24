@@ -188,6 +188,17 @@ namespace {
 
     void sizeSplit(controls::SplitView const &split) { sizeSplit(split, split.ActualWidth()); }
 
+    void resizeSplit(controls::SplitView const &split, double change) {
+        auto widths = split.Tag().as<SplitWidths>();
+        auto available = std::max(0.0, split.ActualWidth());
+        auto least = std::max(widths.GetAt(0), available - widths.GetAt(6));
+        auto most = std::max(least, std::min(widths.GetAt(2), available - widths.GetAt(5)));
+        bool trailing = split.PanePlacement() == controls::SplitViewPanePlacement::Right;
+        auto length = split.OpenPaneLength() + (trailing ? -change : change);
+        widths.SetAt(3, std::clamp(length, least, most));
+        sizeSplit(split);
+    }
+
 }
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view) {
@@ -483,6 +494,23 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
         split.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
         split.CompactPaneLength(0);
         split.PanePlacement(trailing ? controls::SplitViewPanePlacement::Right : controls::SplitViewPanePlacement::Left);
+        if (trailing) {
+            // The auxiliary split is always inline and open. WinUI's default
+            // OpenInlineRight storyboard temporarily restores the left-pane
+            // column widths whenever OpenPaneLength changes, measuring the
+            // conversation at the auxiliary width before correcting next frame.
+            // Bind these two columns directly; the outer split retains WinUI's
+            // adaptive/overlay template and its presentation transitions.
+            split.Template(xaml::Markup::XamlReader::Load(
+                LR"(<ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="SplitView">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <ContentPresenter Content="{TemplateBinding Content}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+                        <ContentPresenter Grid.Column="1" Content="{TemplateBinding Pane}" Width="{TemplateBinding OpenPaneLength}"
+                                          HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+                    </Grid>
+                </ControlTemplate>)").as<controls::ControlTemplate>());
+        }
         split.Tag(winrt::single_threaded_vector<double>({0, 256, INFINITY, 256, expandsAt, 0, INFINITY}));
         split.RegisterPropertyChangedCallback(controls::SplitView::OpenPaneLengthProperty(),
             guarded("changing a split column's width", [view](xaml::DependencyObject const &sender, xaml::DependencyProperty const &) {
@@ -516,17 +544,8 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
         split.Pane(pane);
         auto weak = winrt::make_weak(split);
         grip.DragDelta(guarded("resizing a split column",
-            [weak, trailing](IInspectable const &, controls::Primitives::DragDeltaEventArgs const &args) {
-                if (auto split = weak.get()) {
-                    auto widths = split.Tag().as<SplitWidths>();
-                    auto least = widths.GetAt(0);
-                    auto available = std::max(0.0, split.ActualWidth());
-                    least = std::max(least, available - widths.GetAt(6));
-                    auto most = std::max(least, std::min(widths.GetAt(2), available - widths.GetAt(5)));
-                    auto length = split.OpenPaneLength() + (trailing ? -1 : 1) * args.HorizontalChange();
-                    widths.SetAt(3, std::clamp(length, least, most));
-                    sizeSplit(split);
-                }
+            [weak](IInspectable const &, controls::Primitives::DragDeltaEventArgs const &args) {
+                if (auto split = weak.get()) resizeSplit(split, args.HorizontalChange());
             }));
         split.SizeChanged(guarded("sizing a split view", [](IInspectable const &sender, xaml::SizeChangedEventArgs const &) {
             sizeSplit(sender.as<controls::SplitView>());
@@ -550,6 +569,12 @@ extern "C" void swiftomniui_winui_split_prepare_room(SwiftOmniUIObjectRef handle
     try {
         if (std::isfinite(width) && width > 0) sizeSplit(borrow<controls::SplitView>(handle), width);
     } catch (...) { report("preparing a split view's initial room"); }
+}
+
+extern "C" void swiftomniui_winui_split_resize(SwiftOmniUIObjectRef handle, double change) {
+    try {
+        if (std::isfinite(change)) resizeSplit(borrow<controls::SplitView>(handle), change);
+    } catch (...) { report("resizing a split column"); }
 }
 
 extern "C" void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef handle) {

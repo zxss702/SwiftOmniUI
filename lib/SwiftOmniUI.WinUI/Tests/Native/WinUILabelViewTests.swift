@@ -23,7 +23,42 @@ private struct SpannedPage: View {
     }
 }
 
+@MainActor private final class AttachmentMeasuredText: WinUITextView {
+    var queries = 0
+    override var cachesIntrinsicMeasurements: Bool { true }
+    override func measure(width: Double?, height: Double?) -> LayoutSize {
+        queries += 1
+        return super.measure(width: width, height: height)
+    }
+}
+
 final class WinUILabelViewTests: XCTestCase {
+    func testAttachmentRefreshKeepsProposalsAlreadyMeasuredInTheLiveTree() throws {
+        onUIThread {
+            let host = WinUIRenderer.bare(reducesMotion: true)
+            let text = AttachmentMeasuredText()
+            text.setTextFont(size: 14, attributes: nil, family: nil)
+            text.setText("A filename with enough words to wrap differently at each width")
+            let detached = text.measure(width: 80, height: nil)
+            WinUITestHost.window.show(text)
+            for _ in 0..<4 { host.step() }
+            XCTAssertTrue(text.isAttached)
+            let wide = text.measure(width: 240, height: nil)
+            let narrow = text.measure(width: 60, height: nil)
+            XCTAssertGreaterThan(narrow.height, wide.height)
+            let before = text.queries
+            XCTAssertFalse(text.refreshMeasurementsAfterAttachment())
+            XCTAssertEqual(text.queries, before,
+                           "Loaded must not repeat proposals already measured after attachment")
+            // Explicit revalidation remains available to newly attached inline
+            // paragraphs, even while their enclosing Border stays loaded.
+            XCTAssertFalse(text.refreshMeasurementsAfterAttachment(includingAttached: true))
+            XCTAssertGreaterThan(text.queries, before)
+            XCTAssertEqual(text.measure(width: 80, height: nil), detached)
+            WinUITestHost.window.show(nil)
+        }
+    }
+
     func testAnActuallyNarrowLabelStillUsesNativeEllipsis() throws {
         try onUIThread {
             let host = WinUIRenderer.running(reducesMotion: true) {

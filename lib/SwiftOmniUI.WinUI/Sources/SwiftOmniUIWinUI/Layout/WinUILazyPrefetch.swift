@@ -6,9 +6,35 @@
 /// observation can lag its latest offset. Existing neighbours
 /// already cover part of that distance; only the remainder needs prefetch.
 enum WinUILazyPrefetch {
-    static func velocity(distance: Double, elapsed: Double, refreshInterval: Double) -> Double {
-        let interval = max(elapsed, refreshInterval)
-        return interval > 0 ? distance / interval : 0
+    /// ViewChanged and Rendering can report the same physical frame in several
+    /// callbacks. Keep their distance together instead of giving each fragment
+    /// a whole refresh period, which underestimates velocity during a fling.
+    struct MotionSamples {
+        private var latest: (offset: Double, time: Double)?
+        private var preceding: (offset: Double, time: Double)?
+
+        mutating func observe(offset: Double, time: Double, refreshInterval: Double)
+            -> (velocity: Double, interval: Double)? {
+            guard let latest else {
+                latest = (offset, time)
+                return nil
+            }
+            let elapsed = time - latest.time
+            guard offset != latest.offset, elapsed > 0, elapsed >= refreshInterval else { return nil }
+            let delta = offset - latest.offset
+            let velocity: Double
+            let interval: Double
+            if let preceding, delta * (latest.offset - preceding.offset) > 0 {
+                velocity = (offset - preceding.offset) / (time - preceding.time)
+                interval = max(elapsed, latest.time - preceding.time)
+            } else {
+                velocity = delta / elapsed
+                interval = elapsed
+            }
+            self.preceding = latest
+            self.latest = (offset, time)
+            return (velocity, interval)
+        }
     }
 
     static func distance(velocity: Double, interval: Double, readiness: Double,

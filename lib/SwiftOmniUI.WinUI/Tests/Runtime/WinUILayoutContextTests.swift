@@ -180,7 +180,11 @@ final class WinUILayoutContextTests: XCTestCase {
                     host.frame()
                     // Wait for the native pane transition and requested row
                     // patch, never for an offset or a user's scroll event.
-                    host.settle { lazy.span != nil && !lazy.mounted.isEmpty }
+                    host.settle {
+                        guard let span = lazy.span, !lazy.mounted.isEmpty else { return false }
+                        return lazy.hasMountedWindow(in: span)
+                            && lazy.mounted.values.filter { !$0.departing }.allSatisfy { $0.view.isAttached }
+                    }
                     host.frame()
                     XCTAssertEqual([lazy.handle, scroll.handle, items.handle], identities)
                     XCTAssertTrue(items.isAttached)
