@@ -143,6 +143,13 @@ enum WinUICallbacks {
                     WinUIRenderer.shared?.runtime.frames.laidOut()
                 }
             },
+            scrollPreparing: { view, x, y, correlation in
+                MainActor.assumeIsolated {
+                    guard let scroller = WinUIView.find(view) as? WinUIScrollerView else { return }
+                    scroller.ears.removeAll { $0.owner == nil }
+                    scroller.prepareControllerJump(to: Point(x: x, y: y), correlation: correlation)
+                }
+            },
             scrolled: { view, x, y in
                 MainActor.assumeIsolated {
                     guard let scroller = WinUIView.find(view) as? WinUIScrollerView else { return }

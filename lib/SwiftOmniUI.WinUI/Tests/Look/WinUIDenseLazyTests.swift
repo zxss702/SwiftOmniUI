@@ -72,7 +72,9 @@ final class WinUIDenseLazyTests: XCTestCase {
     func testDenseFileGridFillsAndScrollsWithManySimultaneousRows() throws { try exercise(grid: true) }
     func testDenseFileGridFillsDuringContinuousFastScroll() throws { try exercise(grid: true, continuous: true) }
 
-    private func exercise(grid: Bool, continuous: Bool = false) throws {
+    func testDenseFileGridHandlesNativeControllerJumps() throws { try exercise(grid: true, controller: true) }
+
+    private func exercise(grid: Bool, continuous: Bool = false, controller: Bool = false) throws {
         try onUIThread {
             let rows = State(wrappedValue: Array(0..<3_000))
             let longNames = State(wrappedValue: false)
@@ -150,7 +152,13 @@ final class WinUIDenseLazyTests: XCTestCase {
             let targets = continuous ? stride(from: 100.0, through: 1_200.0, by: 100.0).map { $0 }
                 : [600.0, 1_800, 3_200, 1_200, 0]
             for target in targets {
-                swiftomniui_winui_scroller_move(scroll.scroller.handle, 0, target, true)
+                let requestsBeforeJump = lazy.cells.requests
+                if controller {
+                    XCTAssertTrue(swiftomniui_winui_scroller_request_from_controller(
+                        scroll.scroller.handle, false, target, false, false))
+                } else {
+                    swiftomniui_winui_scroller_move(scroll.scroller.handle, 0, target, true)
+                }
                 for _ in 0..<(continuous ? 2 : 24) {
                     let start = WinUIFrameClock.monotonic()
                     host.step()
@@ -161,8 +169,28 @@ final class WinUIDenseLazyTests: XCTestCase {
                         let end = grid ? lazy.cells.runs.offset(of: last, count: (rows.wrappedValue.count + 1) / 2)
                             + lazy.cells.runs.extent(of: last)
                             : lazy.cells.offset(of: last) + lazy.cells.extents.extent(of: lazy.cells.orderedIdentities[last])
-                        maxGap = max(maxGap, span.upperBound - end)
+                        if controller {
+                            // A queued jump temporarily retains the previously
+                            // displayed viewport outside cells.built. Verify the
+                            // union of actual row allocations, including holes.
+                            let intervals = lazy.mounted.values.compactMap { item -> Range<Double>? in
+                                guard let frame = item.view.placed, frame.height > 0 else { return nil }
+                                return frame.y..<(frame.y + frame.height)
+                            }.sorted { $0.lowerBound < $1.lowerBound }
+                            var covered = span.lowerBound
+                            for interval in intervals where interval.upperBound > covered {
+                                if interval.lowerBound > covered + 1 { break }
+                                covered = max(covered, interval.upperBound)
+                            }
+                            maxGap = max(maxGap, span.upperBound - covered)
+                        } else {
+                            maxGap = max(maxGap, span.upperBound - end)
+                        }
                     }
+                }
+                if controller {
+                    XCTAssertLessThan(lazy.cells.requests - requestsBeforeJump, 32,
+                                      "dense destination fill must batch from measured row density, not render once per row")
                 }
             }
             host.settle(until: ready)
@@ -177,7 +205,7 @@ final class WinUIDenseLazyTests: XCTestCase {
 
             let report = "Dense file \(grid ? "grid" : "sidebar"): initial=\(initial)ms, mounted=\(mounted), peak=\(peak), slowest frame callback=\(longestFrame)ms [\(slowestFrameDetail)], longest message pump=\(longest)ms, largest uncovered geometry=\(maxGap)dip"
             print(report)
-            if continuous { return }
+            if continuous || controller { return }
 
             let existing = lazy.mounted.mapValues(\.view)
             let measurements = lazy.cells.measurements

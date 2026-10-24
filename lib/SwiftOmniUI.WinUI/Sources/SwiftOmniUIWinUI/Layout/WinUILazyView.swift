@@ -213,6 +213,10 @@ class WinUILazyView: WinUITravellingLayout {
     /// ScrollTo without animation is still asynchronous. Keep its prepared
     /// window until that native operation completes or is cancelled.
     private var jumpViewport: Rect?
+    /// ScrollTo is asynchronous. Keep already placed rows covering the old
+    /// viewport until the native request completes; never build the gap between
+    /// that viewport and a distant destination.
+    private var jumpRetained: Set<String> = []
     private var pendingScrollTarget: Point?
     private(set) var isWaitingForViewport = false
     /// The ear the run hears its scroller's moves by, ahead of the effective viewport's notice.
@@ -238,7 +242,23 @@ class WinUILazyView: WinUITravellingLayout {
             : Set(mounted.compactMap { identity, item in
                 places.layoutMotion?.isTravelling(mount: item.mount) == true ? identity : nil
             })
-        return Set(moving.filter { cells.position(of: $0) != nil })
+        var kept = jumpRetained
+        if let destination = jumpViewport.flatMap({ windowSpan(in: $0) }) {
+            let perRun = cells.window?.perRun ?? 1
+            let count = cells.orderedIdentities.count
+            let places = self is WinUILazyGridView
+                ? cells.runs.places(in: destination, overscan: 0, count: (count + perRun - 1) / perRun)
+                : cells.places(in: destination, overscan: 0)
+            let lower = min(count, max(0, places.lowerBound - 1) * perRun)
+            let upper = min(count, (places.upperBound + 1) * perRun)
+            // Rows already selected by the destination need no extra retention
+            // request. Tiny moves within one mounted window must remain no-ops.
+            kept = Set(kept.filter { identity in
+                guard let position = cells.position(of: identity) else { return false }
+                return !(lower..<upper).contains(position)
+            })
+        }
+        return Set(moving.union(kept).filter { cells.position(of: $0) != nil })
     }
 
     init(axis: StackArithmetic.Axis, cells: LazyCells) {
@@ -494,6 +514,7 @@ class WinUILazyView: WinUITravellingLayout {
                 return
             }
             jumpViewport = nil
+            jumpRetained.removeAll(keepingCapacity: true)
         }
         guard let target = override ?? preparedViewport ?? jumpViewport ?? announcedRect ?? viewport else { return }
         let grid = self is WinUILazyGridView
@@ -553,7 +574,7 @@ class WinUILazyView: WinUITravellingLayout {
         var measuredWindows: Set<Range<Int>> = []
         while true {
             let built = cells.built
-            if fillingVisible, let incoming, cells.requestedItemsAreCurrent, !needsRowMeasurements,
+            if fillingWindow, let incoming, cells.requestedItemsAreCurrent, !needsRowMeasurements,
                !built.isEmpty {
                 let perRun = cells.window?.perRun ?? 1
                 let count = (cells.orderedIdentities.count + perRun - 1) / perRun
@@ -742,6 +763,7 @@ class WinUILazyView: WinUITravellingLayout {
         preparedViewport = nil
         pendingScrollTarget = nil
         jumpViewport = nil
+        jumpRetained.removeAll()
         scrollSamples = .init()
         scrollVelocity = 0
         scrollInterval = 0
@@ -859,6 +881,16 @@ class WinUILazyView: WinUITravellingLayout {
             return
         }
         pendingScrollTarget = nil
+        // Use actual placed frames, not estimated source offsets: learning a
+        // short destination row can already have shifted the extent index.
+        let leading = axis == .vertical ? rect.y : rect.x
+        let trailing = leading + (axis == .vertical ? rect.height : rect.width)
+        jumpRetained = Set(mounted.compactMap { identity, item in
+            guard item.isShown, !item.departing, let frame = item.view.placed else { return nil }
+            let start = axis == .vertical ? frame.y : frame.x
+            let end = start + (axis == .vertical ? frame.height : frame.width)
+            return start < trailing && end > leading ? identity : nil
+        })
         let standing = scroll.scroller.standing.offset
         if axis == .vertical { rect.y += target.y - standing.y }
         else { rect.x += target.x - standing.x }
@@ -982,6 +1014,7 @@ class WinUILazyView: WinUITravellingLayout {
         preparedViewport = nil
         pendingScrollTarget = nil
         jumpViewport = nil
+        jumpRetained.removeAll()
         isWaitingForViewport = false
         watching = nil
         scrollEar = nil

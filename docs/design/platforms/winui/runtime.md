@@ -27,6 +27,11 @@ executor's queue, which rings the doorbell. The WinUI element goes with it.
 
 ## Starting
 
+Unhandled XAML exceptions report their HRESULT and message to standard error
+before WinUI terminates the process. They are not marked handled. Setting
+`SWIFTOMNIUI_LAYOUT_TRACE=1` enables WinUI's high-detail layout-cycle debug
+output for both application and embedded-test startup.
+
 The host pins Windows App SDK **2.5.1** (stable) in
 `.scripts/WinUI/tools.ps1`. Component versions are independent: WinUI **2.3.9**,
 Foundation **2.3.12**, InteractiveExperiences **2.1.9**, and Base **2.0.4** are

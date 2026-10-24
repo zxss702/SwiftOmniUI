@@ -72,6 +72,7 @@ namespace swiftomniui {
     /// Resolve additive line spacing using XAML's native measurements before
     /// the caller measures the label at its final constraint.
     void measureWords(SwiftOmniUIObjectRef handle, winrt::Windows::Foundation::Size available);
+    void invalidateWordsMeasurement(SwiftOmniUIObjectRef handle);
     controls::TextBlock labelWords(SwiftOmniUIObjectRef handle);
 
     /// Font values from the system's current text style, read through a reused

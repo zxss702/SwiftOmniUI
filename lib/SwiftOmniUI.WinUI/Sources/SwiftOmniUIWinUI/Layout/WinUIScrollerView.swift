@@ -31,6 +31,27 @@ final class WinUIScrollerView: WinUIView {
     /// run whose window it is. Weakly held: a dead ear hears nothing and is
     /// dropped.
     var ears: [WinUIScrollEar] = []
+    private var controllerJump: (target: Point, correlation: Int32)?
+    private var controllerJumpQueued = false
+
+    /// Controller requests can arrive several times before the presenter moves.
+    /// Prepare only the last destination after the native input callback returns.
+    /// The native correlation rejects work cancelled or replaced by a program move.
+    func prepareControllerJump(to target: Point, correlation: Int32) {
+        controllerJump = (target, correlation)
+        guard !controllerJumpQueued else { return }
+        controllerJumpQueued = true
+        WinUIDoorbell.afterPass { [weak self] in
+            guard let self else { return }
+            self.controllerJumpQueued = false
+            let jump = self.controllerJump
+            self.controllerJump = nil
+            guard !self.isDetached, let jump,
+                  swiftomniui_winui_scroller_pending_jump_id(self.handle) == jump.correlation else { return }
+            self.ears.removeAll { $0.owner == nil }
+            for ear in self.ears { ear.announce?(jump.target) }
+        }
+    }
 
     init() {
         super.init { number in swiftomniui_winui_scroller_make(number) }
@@ -114,6 +135,7 @@ final class WinUIScrollerView: WinUIView {
         onScrolled = nil
         onHeld = nil
         ears = []
+        controllerJump = nil
     }
 }
 

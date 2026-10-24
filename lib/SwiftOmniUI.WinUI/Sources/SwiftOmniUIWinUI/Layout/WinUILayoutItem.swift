@@ -47,7 +47,7 @@ struct WinUILayoutItem: LayoutChild {
         let offer = values.offer(proposal.width)
         let height: Double?
         if let stated = values.height {
-            height = values.boundedHeight(stated, available: proposal.height)
+            height = values.boundedHeight(stated, available: values.isFrameContent ? nil : proposal.height)
         } else {
             height = [proposal.height, values.maximumHeight].compactMap { $0 }.min()
         }
@@ -59,7 +59,8 @@ struct WinUILayoutItem: LayoutChild {
                 let expands = values.flex != nil || values.expandingAxes == .horizontal || values.expandingAxes == .both
                 let allocated = Extent.of(option: expands ? 3 : values.horizontal, stated: values.width,
                                           natural: measured.width, available: proposal.width ?? measured.width,
-                                          minimum: values.minimumWidth, maximum: values.maximumWidth)
+                                          minimum: values.minimumWidth, maximum: values.maximumWidth,
+                                          allowsOverflow: values.isFrameContent)
                 layout.prepareMeasure(width: allocated, height: height)
                 measured = height == nil ? layout.naturalSize(width: offer) : layout.naturalSize(proposal: offered)
             }

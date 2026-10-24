@@ -137,6 +137,9 @@ typedef struct {
     /// ViewChanged notification.
     void (*scrolling)(int64_t view, double x, double y, double fx, double fy);
 
+    /// A nonanimated native controller request, before its queued offset is displayed.
+    void (*scrollPreparing)(int64_t view, double x, double y, int32_t correlation);
+
     /// A scroller's view changed: where it stands now, in DIPs.
     void (*scrolled)(int64_t view, double x, double y);
 
@@ -458,6 +461,8 @@ void swiftomniui_winui_set_font(SwiftOmniUIObjectRef element, double size, bool 
 
 /// Native text-style readers created; repeated rows reuse these rather than making temporary controls.
 uint64_t swiftomniui_winui_font_probes(void);
+/// Number of native full-paragraph/first-line spacing comparisons (UI thread).
+uint64_t swiftomniui_winui_text_spacing_probes(void);
 void swiftomniui_winui_set_foreground(SwiftOmniUIObjectRef element, bool has, uint32_t argb);
 void swiftomniui_winui_set_padding(SwiftOmniUIObjectRef element, double left, double top, double right, double bottom);
 
@@ -721,6 +726,7 @@ SwiftOmniUIObjectRef swiftomniui_winui_progress_bar_make(void);
 void swiftomniui_winui_progress_bar_set(SwiftOmniUIObjectRef bar, double progress);
 double swiftomniui_winui_progress_bar_value(SwiftOmniUIObjectRef bar);
 SwiftOmniUIObjectRef swiftomniui_winui_progress_ring_make(void);
+void swiftomniui_winui_progress_ring_set_size(SwiftOmniUIObjectRef ring, double diameter);
 void swiftomniui_winui_progress_ring_set_running(SwiftOmniUIObjectRef ring, bool running);
 bool swiftomniui_winui_progress_ring_running(SwiftOmniUIObjectRef ring);
 
@@ -906,6 +912,11 @@ void swiftomniui_winui_scroller_read_modes(SwiftOmniUIObjectRef scroller, int32_
 void swiftomniui_winui_scroller_move(SwiftOmniUIObjectRef scroller, double x, double y, bool animated);
 /// Whether the latest nonanimated ScrollTo is still queued in the native presenter.
 bool swiftomniui_winui_scroller_jump_pending(SwiftOmniUIObjectRef scroller);
+/// The pending native request identity, or -1 after completion/cancellation.
+int32_t swiftomniui_winui_scroller_pending_jump_id(SwiftOmniUIObjectRef scroller);
+/// Exercises ScrollPresenter through IScrollController events, with native correlation/completion (tests).
+bool swiftomniui_winui_scroller_request_from_controller(
+    SwiftOmniUIObjectRef scroller, bool horizontal, double value, bool relative, bool animated);
 /// Commits the displayed document offset after its virtualized window has been arranged.
 void swiftomniui_winui_scroller_anchor(SwiftOmniUIObjectRef element, bool enabled);
 

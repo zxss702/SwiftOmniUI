@@ -70,6 +70,7 @@ extern "C" void swiftomniui_winui_arrange(SwiftOmniUIObjectRef handle, double x,
 
 extern "C" void swiftomniui_winui_invalidate_measure(SwiftOmniUIObjectRef handle) {
     try {
+        invalidateWordsMeasurement(handle);
         as<xaml::UIElement>(handle).InvalidateMeasure();
     } catch (...) {
         report("invalidating a measure");

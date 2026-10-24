@@ -158,6 +158,7 @@ extern "C" void swiftomniui_winui_text_on_loaded(
 
 extern "C" void swiftomniui_winui_text_set_text(SwiftOmniUIObjectRef handle, char const *utf8) {
     try {
+        invalidateWordsMeasurement(handle);
         auto block = labelWords(handle);
         if (richWords(handle)) {
             auto border = borrow<controls::Border>(handle); border.Child(block); border.Tag(nullptr);

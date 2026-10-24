@@ -5,17 +5,23 @@ import PackageDescription
 // build is for. SourceKit understands only code a SwiftPM package holds, so the
 // editor completes the application through this manifest as well.
 
-// The host a build is for: SWIFTOMNIUI_HOST - android, winui, gtk or web -
-// which its script or the editor sets, or none for plain Swift. The
-// application's Swift for that host alone stands under its condition -
-// `#if GTK` - and the root package brings the host itself to the head.
-let host = ["Android", "WinUI", "GTK", "Web"]
-    .first { $0.lowercased() == Context.environment["SWIFTOMNIUI_HOST"] }
+// The operating system selects its native host. No environment override or
+// additional Swift compilation condition participates in backend selection.
+#if os(Windows)
+let host: String? = "WinUI"
+#elseif os(Linux)
+let host: String? = "GTK"
+#elseif os(Android)
+let host: String? = "Android"
+#elseif os(WASI)
+let host: String? = "Web"
+#else
+let host: String? = nil
+#endif
 
 // NonisolatedNonsendingByDefault is the one setting an application must not
 // leave out; see the note in ../../Package.swift.
 let settings: [SwiftSetting] = [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
-    + (host.map { [.define($0.uppercased())] } ?? [])
 
 var products: [Product] = [
     // The application module; a platform head depends on its target.

@@ -51,6 +51,18 @@ extern "C" void swiftomniui_winui_progress_ring_set_running(SwiftOmniUIObjectRef
     }
 }
 
+extern "C" void swiftomniui_winui_progress_ring_set_size(SwiftOmniUIObjectRef handle, double diameter) {
+    try {
+        auto ring = borrow<controls::ProgressRing>(handle);
+        ring.MinWidth(0);
+        ring.MinHeight(0);
+        ring.Width(diameter);
+        ring.Height(diameter);
+    } catch (...) {
+        report("sizing a spinner");
+    }
+}
+
 extern "C" double swiftomniui_winui_progress_bar_value(SwiftOmniUIObjectRef handle) {
     try {
         return borrow<controls::ProgressBar>(handle).Value();

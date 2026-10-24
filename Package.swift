@@ -4,8 +4,17 @@ import PackageDescription
 // One package owns every SwiftOmniUI module. Internal dependencies are targets;
 // ordinary library products expose those modules to applications.
 let settings: [SwiftSetting] = [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
-let host = ["Android", "WinUI", "GTK", "Web"]
-    .first { $0.lowercased() == Context.environment["SWIFTOMNIUI_HOST"] }
+#if os(Windows)
+let host: String? = "WinUI"
+#elseif os(Linux)
+let host: String? = "GTK"
+#elseif os(Android)
+let host: String? = "Android"
+#elseif os(WASI)
+let host: String? = "Web"
+#else
+let host: String? = nil
+#endif
 let selectedHost = host
 var products: [Product] = [
     .library(name: "SwiftOmniUI", targets: ["SwiftOmniUI"]),
@@ -78,8 +87,7 @@ var targets: [Target] = [
             name: "SwiftOmniUIHead",
             dependencies: host.map { [.target(name: "SwiftOmniUI\($0)")] } ?? [],
             path: "lib/SwiftOmniUI.Head/Sources",
-            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
-                + (host.map { [.define($0.uppercased())] } ?? []),
+            swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
             // A WinUI head is a windowed application: started by itself it opens no console, and started from one it
             // writes there. A Web head's module exports its function table, through which the page calls the host
             // back, and its stack is the main thread's on macOS and Linux, 8 MB, below its data, so running out of
@@ -165,7 +173,7 @@ case "GTK"?:
                 "SwiftOmniUIGTK",
                 "SwiftOmniUICore",
             ],
-            path: "lib/Backends/WebView.GTK/Sources/SwiftOmniUIWebViewGTK", swiftSettings: settings + [.define("GTK")]),
+            path: "lib/Backends/WebView.GTK/Sources/SwiftOmniUIWebViewGTK", swiftSettings: settings),
     ]
 case "WinUI"?:
     products += [
@@ -199,6 +207,8 @@ case "WinUI"?:
                 "SwiftOmniUIWebViewWinUI",
                 "SwiftOmniUIHost",
                 "SwiftOmniUIConformance",
+                "SwiftOmniUIJsonData",
+                .product(name: "JsonData", package: "JsonData"),
             ],
             path: "lib/SwiftOmniUI.WinUI/Tests",
             // The pictures a test shows, read from where they stand rather than bundled.
@@ -219,7 +229,7 @@ case "WinUI"?:
                 "SwiftOmniUIWinUI",
                 "SwiftOmniUICore",
             ],
-            path: "lib/Backends/WebView.WinUI/Sources/SwiftOmniUIWebViewWinUI", swiftSettings: settings + [.define("WINUI")]),
+            path: "lib/Backends/WebView.WinUI/Sources/SwiftOmniUIWebViewWinUI", swiftSettings: settings),
     ]
 case "Android"?:
     products += [

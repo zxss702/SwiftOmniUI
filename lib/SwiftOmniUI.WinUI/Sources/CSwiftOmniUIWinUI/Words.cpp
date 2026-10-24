@@ -82,6 +82,36 @@ extern "C" void swiftomniui_winui_text_set_selectable(SwiftOmniUIObjectRef handl
 
 namespace {
     uint64_t fontProbes = 0;
+    uint64_t spacingProbes = 0;
+
+    using SpacingDecisions = winrt::Windows::Foundation::Collections::IMap<double, double>;
+    constexpr wchar_t spacingDecisionsKey[] = L"SwiftOmniUITextSpacingDecisions";
+
+    SpacingDecisions spacingDecisions(controls::Border const &border, controls::TextBlock const &block) {
+        auto resources = border.Resources();
+        auto key = winrt::box_value(spacingDecisionsKey);
+        if (resources.HasKey(key)) return resources.Lookup(key).as<SpacingDecisions>();
+        auto decisions = winrt::single_threaded_map<double, double>();
+        resources.Insert(key, decisions);
+        // Observe inherited typography too. These handlers retain only the
+        // small map, never the label. MaxLines/LineHeight are deliberately not
+        // observed: our first-line probe temporarily changes them. Their
+        // public setters explicitly discard these decisions instead.
+        for (auto const &property : {
+            controls::TextBlock::TextProperty(), controls::TextBlock::FontFamilyProperty(),
+            controls::TextBlock::FontSizeProperty(), controls::TextBlock::FontWeightProperty(),
+            controls::TextBlock::FontStyleProperty(), controls::TextBlock::FontStretchProperty(),
+            controls::TextBlock::CharacterSpacingProperty(), controls::TextBlock::TextWrappingProperty(),
+            controls::TextBlock::TextTrimmingProperty(), controls::TextBlock::TextLineBoundsProperty(),
+            controls::TextBlock::TextAlignmentProperty(), controls::TextBlock::OpticalMarginAlignmentProperty(),
+            controls::TextBlock::TextReadingOrderProperty(), controls::TextBlock::PaddingProperty(),
+            controls::TextBlock::IsTextScaleFactorEnabledProperty(),
+            xaml::FrameworkElement::LanguageProperty(), xaml::FrameworkElement::FlowDirectionProperty()}) {
+            block.RegisterPropertyChangedCallback(property, [decisions](auto const &, auto const &) { decisions.Clear(); });
+        }
+        border.Loaded([decisions](auto const &, auto const &) { decisions.Clear(); });
+        return decisions;
+    }
 
     // WinUI takes an Image/Panel's bottom edge as its inline baseline; only a
     // TextBlock/RichTextBlock can report a separate baseline and descent. Keep
@@ -276,6 +306,7 @@ swiftomniui::TextFontDefaults swiftomniui::textFontDefaults(int32_t textStyle) {
 }
 
 extern "C" uint64_t swiftomniui_winui_font_probes(void) { return fontProbes; }
+extern "C" uint64_t swiftomniui_winui_text_spacing_probes(void) { return spacingProbes; }
 
 extern "C" void swiftomniui_winui_set_font(SwiftOmniUIObjectRef handle, double size, bool bold, bool italic,
                                          char const *family, int32_t textStyle, double requestedWeight) {
@@ -377,6 +408,7 @@ extern "C" void swiftomniui_winui_set_padding(SwiftOmniUIObjectRef handle, doubl
 
 extern "C" void swiftomniui_winui_text_set_lines(SwiftOmniUIObjectRef handle, bool wraps, int32_t lines, bool trims) {
     try {
+        invalidateWordsMeasurement(handle);
         auto block = labelWords(handle);
         block.TextWrapping(wraps ? xaml::TextWrapping::Wrap : xaml::TextWrapping::NoWrap);
         block.TextTrimming(trims ? xaml::TextTrimming::CharacterEllipsis : xaml::TextTrimming::None);
@@ -434,6 +466,7 @@ extern "C" double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRe
 
 extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, int32_t characterSpacing, double baselineAdvance, double singleLineHeight) {
     try {
+        invalidateWordsMeasurement(handle);
         auto block = labelWords(handle);
         block.CharacterSpacing(characterSpacing);
         auto resources = borrow<controls::Border>(handle).Resources();
@@ -448,6 +481,14 @@ extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, 
     } catch (...) { report("spacing a label's words"); }
 }
 
+void swiftomniui::invalidateWordsMeasurement(SwiftOmniUIObjectRef handle) {
+    auto border = as<IInspectable>(handle).try_as<controls::Border>();
+    if (!border) return;
+    auto key = winrt::box_value(spacingDecisionsKey);
+    auto resources = border.Resources();
+    if (resources.HasKey(key)) resources.Lookup(key).as<SpacingDecisions>().Clear();
+}
+
 void swiftomniui::measureWords(SwiftOmniUIObjectRef handle, winrt::Windows::Foundation::Size available) {
     auto border = as<IInspectable>(handle).try_as<controls::Border>();
     if (!border) return;
@@ -460,14 +501,19 @@ void swiftomniui::measureWords(SwiftOmniUIObjectRef handle, winrt::Windows::Foun
     auto single = resources.HasKey(singleKey) ? winrt::unbox_value<double>(resources.Lookup(singleKey)) : 0;
     auto maximum = block.MaxLines();
     auto height = requested;
-    if (requested != single && maximum != 1) {
+    SpacingDecisions decisions{nullptr};
+    if (requested != single && maximum != 1) decisions = spacingDecisions(border, block);
+    if (decisions && decisions.HasKey(available.Width)) {
+        height = decisions.Lookup(available.Width);
+    } else if (decisions) {
+        ++spacingProbes;
         // Use the same native paragraph and the same width for both probes.
         // MaxLines is WinUI's own first-line measurement, including styled
         // runs and inline images. No glyph scanning, guessed font heights,
         // Arrange/UpdateLayout calls or replacement visual lines are used.
         auto probe = available;
         probe.Height = INFINITY;
-        block.LineHeight(requested);
+        if (block.LineHeight() != requested) block.LineHeight(requested);
         syncRichWords(handle);
         border.Measure(probe);
         auto full = border.DesiredSize().Height;
@@ -482,19 +528,31 @@ void swiftomniui::measureWords(SwiftOmniUIObjectRef handle, winrt::Windows::Foun
             throw;
         }
         block.MaxLines(maximum);
+        // Cache the line-height decision, not DesiredSize: the final native
+        // Measure still consumes the caller's actual height constraint. Keep
+        // only a few proposals per paragraph, independent of document length.
+        if (decisions.Size() >= 4) decisions.Remove(decisions.First().Current().Key());
+        decisions.Insert(available.Width, height);
     } else if (maximum == 1) {
         height = single;
     }
     // BaselineToBaseline already trims the outer leading for multiple
     // lines. WinUI leaves trailing leading on a single line, so only that
     // case removes the additive value, before the final native Measure.
-    block.LineHeight(height);
-    syncRichWords(handle);
+    // Text can be prepared at its animation destination while an ancestor
+    // is arranging. Even an equal LineHeight write invalidates TextBlock's
+    // layout, restarting that ancestor's Arrange indefinitely.
+    if (block.LineHeight() != height) block.LineHeight(height);
+    // A rich paragraph may still need MaxLines restored after the first-line
+    // probe, even when its final line height did not change.
+    if (auto rich = richWords(handle); rich && (rich.LineHeight() != height || rich.MaxLines() != maximum))
+        syncRichWords(handle);
 }
 
 extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, SwiftOmniUIWordsRun const *runs, int32_t count) {
     try {
         if (count < 0 || (count > 0 && !runs)) return;
+        invalidateWordsMeasurement(handle);
         namespace documents = winrt::Microsoft::UI::Xaml::Documents;
         using winrt::Windows::UI::Text::TextDecorations;
         auto block = labelWords(handle);
@@ -516,7 +574,12 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
                 auto ready = reinterpret_cast<void (*)(int64_t)>(static_cast<uintptr_t>(
                     winrt::unbox_value<uint64_t>(border.Resources().Lookup(callbackKey))));
                 rich.Loaded(guarded("completing an attached rich label's measurement",
-                    [view, ready](IInspectable const &sender, xaml::RoutedEventArgs const &) {
+                    [view, ready, weak = winrt::make_weak(border)](IInspectable const &sender, xaml::RoutedEventArgs const &) {
+                        if (auto border = weak.get()) {
+                            auto key = winrt::box_value(spacingDecisionsKey);
+                            if (border.Resources().HasKey(key))
+                                border.Resources().Lookup(key).as<SpacingDecisions>().Clear();
+                        }
                         sender.as<xaml::UIElement>().InvalidateMeasure();
                         if (ready) ready(view);
                     }));

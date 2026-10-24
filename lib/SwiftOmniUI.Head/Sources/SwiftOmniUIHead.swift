@@ -3,12 +3,12 @@
 
 // The host this build is for, to the head that depends on SwiftOmniUIHead.
 
-#if ANDROID
+#if os(Android)
 @_exported import SwiftOmniUIAndroid
-#elseif WINUI
+#elseif os(Windows)
 @_exported import SwiftOmniUIWinUI
-#elseif GTK
+#elseif os(Linux)
 @_exported import SwiftOmniUIGTK
-#elseif WEB
+#elseif os(WASI)
 @_exported import SwiftOmniUIWeb
 #endif

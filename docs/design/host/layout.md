@@ -79,6 +79,15 @@ in the room. Most toolkits show the words cut; WinUI, which measures until
 its layout settles, finds the words' size changing at every pass and ends
 the application (`0xc000027b`, a layout cycle).
 
+A frame's sole child is an exception to the available-room cap. An explicit
+inner frame keeps its stated size during both measurement and placement,
+bounded only by its own minimum and maximum. The outer frame aligns that
+content even when alignment requires a negative offset. For example, a
+1024-by-640 view scaled to one half inside a 512-by-320 frame must still lay
+out at 1024 by 640; the render transform alone makes it fit the outer frame.
+`isFrameContent` identifies this relationship. Ordinary grid cells keep their
+available-room cap.
+
 ## A control and its face
 
 A control that wears content of its own - a button, a menu button - is laid out

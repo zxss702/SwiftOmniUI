@@ -306,6 +306,21 @@ viewport notifications trigger a fresh complete read instead of mixing an
 old event's size with a new origin. Failed queries report an explicit native
 error and do not register a pending retry.
 
+Nonanimated native scrollbar requests announce their destination through
+`IScrollController.ScrollToRequested` / `ScrollByRequested`, after ScrollPresenter
+assigns the request correlation and before it commits the queued offset.
+The host coalesces these announcements after the input callback and prepares
+only the latest target viewport. Already placed rows covering the previous
+viewport remain attached until completion, without constructing intermediate
+rows. Unknown destination heights use the same density-based batches as a
+visible fill, rather than one render per incoming row. Completion, cancellation, and replacement by
+a program move invalidate the announcement through its native correlation.
+Controller subscriptions follow the loaded template; weak handlers and explicit
+revocation keep replaced template parts from retaining a scroller. Animated
+requests keep following the current viewport, not their eventual endpoint.
+This addresses controller jumps; it does not establish that continuous animated
+scrolling is free of blank frames.
+
 Native `UIElement.Clip`, composition clips and alpha masks control drawing;
 they do not alter the layout viewport or destroy its mounted rows. In
 particular, a SplitView's temporarily empty animated clip must not clear a

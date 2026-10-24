@@ -68,6 +68,16 @@ the measure adapter compares the paragraph's native DesiredSize with its
 native MaxLines=1 measurement at the same width. It restores MaxLines and
 sets the resulting native line height before the final Measure. It does not
 read character rectangles, call Arrange/UpdateLayout or render visual lines.
+The single-line decision is retained for at most four widths per paragraph;
+different height constraints still go through the final native Measure. Text,
+run, spacing and line-limit changes, inherited typography, attachment and
+explicit native measure invalidation discard those decisions. Repeated
+preparation at an unchanged width must not toggle MaxLines again: doing so
+invalidates native text measurement even when its resulting size is unchanged.
+The final line-height write is conditional on its value changing. Text can
+be prepared at an animation's destination during an ancestor's Arrange;
+writing an unchanged `LineHeight` still dirties XAML text layout and would
+restart that Arrange until WinUI reports a layout cycle.
 Selection publication never changes typography or measured height; it is
 only a reader of the completed native layout. Scroll position plays no role
 in deciding when spacing is applied.
@@ -208,9 +218,12 @@ The user's day or time is reported, the program's is only shown.
 A ProgressBar is WinUI's `ProgressBar` over the range 0 to 1, a fraction past
 either end standing at that end ([a value in a
 range](../../host/runtime.md#a-value-in-a-range)); an ActivityIndicator is its `ProgressRing`,
-turning while its work runs and gone while it does not. The ring is 24 by 24
-DIPs, including when used by an indeterminate `ProgressView`; its label keeps
-its own size and spacing.
+turning while its work runs and gone while it does not. The regular ring is
+24 by 24 DIPs, including when used by an indeterminate `ProgressView`.
+Inherited `controlSize` sizes the native ring to 12, 16, 24, 32 or 48 DIPs
+for mini, small, regular, large or extra large. A small ring therefore fits
+a 16-DIP task icon without clipping a larger native template. Its label
+keeps its own size and spacing.
 
 ## A stepper
 

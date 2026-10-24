@@ -6,6 +6,34 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 final class WinUITextSpacingTests: XCTestCase {
+    func testRepeatedPreparationDoesNotReprobeSpacedParagraph() {
+        onUIThread {
+            let label = WinUITextView()
+            label.setTextFont(size: 18, attributes: nil, family: nil)
+            label.setText("alpha beta gamma delta 中文内容自动换行")
+            label.setLineSpacing(12)
+            let before = swiftomniui_winui_text_spacing_probes()
+            label.prepareMeasure(width: 90)
+            let narrow = label.desiredSize
+            label.prepareMeasure(width: 900)
+            let wide = label.desiredSize
+            XCTAssertGreaterThan(narrow.height, wide.height)
+            let prepared = swiftomniui_winui_text_spacing_probes()
+            XCTAssertEqual(prepared - before, 2)
+            // Parent measurement and destination preparation revisit both
+            // widths, with different height constraints, during scrolling.
+            for _ in 0..<30 {
+                label.prepareMeasure(width: 90)
+                XCTAssertEqual(label.desiredSize, narrow)
+                label.prepareMeasure(width: 90, height: narrow.height)
+                label.prepareMeasure(width: 900)
+                XCTAssertEqual(label.desiredSize, wide)
+            }
+            XCTAssertEqual(swiftomniui_winui_text_spacing_probes(), prepared,
+                           "unchanged paragraphs must not toggle MaxLines during every preparation")
+        }
+    }
+
     func testFirstMeasureResolvesSpacingWithoutAttachmentSelectionOrScroll() throws {
         onUIThread {
             let label = WinUITextView()
@@ -27,6 +55,45 @@ final class WinUITextSpacingTests: XCTestCase {
             XCTAssertGreaterThan(Self.lineHeight(label), 24)
             XCTAssertEqual(label.measure(width: 600, height: nil).height, natural, accuracy: 1)
             XCTAssertEqual(Self.lineHeight(label), 0)
+        }
+    }
+
+    func testSpacingDecisionsFollowTypographyRunsAndLineLimits() {
+        onUIThread {
+            let label = WinUILabelView()
+            label.setTextFont(size: 18, attributes: nil, family: nil)
+            label.setText("alpha beta gamma delta")
+            label.setLineSpacing(12)
+            label.prepareMeasure(width: 90)
+            let wrapped = label.desiredSize.height
+            label.setLines(breaking: .wordWrap, maximum: 1)
+            label.prepareMeasure(width: 90)
+            XCTAssertEqual(Self.lineHeight(label), 0)
+            XCTAssertLessThan(label.desiredSize.height, wrapped)
+            label.setLines(breaking: .wordWrap, maximum: nil)
+            label.prepareMeasure(width: 90)
+            XCTAssertEqual(label.desiredSize.height, wrapped)
+
+            label.setRuns([TextRun(text: "one", look: TextLook())])
+            label.prepareMeasure(width: 90)
+            XCTAssertEqual(Self.lineHeight(label), 0)
+            var large = TextLook()
+            large.size = 60
+            label.setRuns([TextRun(text: "one two three", look: large)])
+            label.prepareMeasure(width: 90)
+            XCTAssertGreaterThan(Self.lineHeight(label), 0)
+            XCTAssertGreaterThan(label.desiredSize.height, wrapped)
+
+            label.setRuns(nil)
+            label.setTextFont(size: 24, attributes: nil, family: nil)
+            label.setLineSpacing(20)
+            label.prepareMeasure(width: 90)
+            let natural = swiftomniui_winui_text_natural_line_height(label.handle)
+            XCTAssertEqual(Self.lineHeight(label), natural + 20, accuracy: 1)
+            let before = swiftomniui_winui_text_spacing_probes()
+            label.invalidateNativeMeasure()
+            label.prepareMeasure(width: 90)
+            XCTAssertEqual(swiftomniui_winui_text_spacing_probes(), before + 1)
         }
     }
 

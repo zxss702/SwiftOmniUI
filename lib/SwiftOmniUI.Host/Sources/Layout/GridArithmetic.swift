@@ -120,20 +120,26 @@
             let natural = item.size(offered: availableWidth)
             let expandsAcross = values.flex != nil || values.expandingAxes == .horizontal || values.expandingAxes == .both
             let expandsDown = values.flex != nil || values.expandingAxes == .vertical || values.expandingAxes == .both
+            // A frame aligns its preceding view; it does not shrink a fixed
+            // inner frame before a render transform such as scaleEffect.
             let width = Extent.of(
                 option: expandsAcross ? 3 : values.horizontal, stated: values.width, natural: natural.width,
-                available: availableWidth, minimum: values.minimumWidth, maximum: values.maximumWidth)
+                available: availableWidth, minimum: values.minimumWidth, maximum: values.maximumWidth,
+                allowsOverflow: values.isFrameContent)
             let height = Extent.of(
                 option: expandsDown ? 3 : values.vertical, stated: values.height, natural: natural.height,
-                available: availableHeight, minimum: values.minimumHeight, maximum: values.maximumHeight)
+                available: availableHeight, minimum: values.minimumHeight, maximum: values.maximumHeight,
+                allowsOverflow: values.isFrameContent)
 
             return Rect(
                 x: Extent.start(
                     option: values.horizontal, extent: width,
-                    start: columnOrigins[column] + margin.left, available: availableWidth),
+                    start: columnOrigins[column] + margin.left, available: availableWidth,
+                    allowsOverflow: values.isFrameContent),
                 y: Extent.start(
                     option: values.vertical, extent: height,
-                    start: rowOrigins[row] + margin.top, available: availableHeight),
+                    start: rowOrigins[row] + margin.top, available: availableHeight,
+                    allowsOverflow: values.isFrameContent),
                 width: width,
                 height: height)
         }

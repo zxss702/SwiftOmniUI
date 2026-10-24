@@ -11,13 +11,21 @@ import PackageDescription
 // `swift test` compiles no line of any host's half. The application's Swift for that host alone stands under its
 // condition - `#if GTK` - and the root package brings the host itself
 // to the head.
-let host = ["Android", "WinUI", "GTK", "Web"]
-    .first { $0.lowercased() == Context.environment["SWIFTOMNIUI_HOST"] }
+#if os(Windows)
+let host: String? = "WinUI"
+#elseif os(Linux)
+let host: String? = "GTK"
+#elseif os(Android)
+let host: String? = "Android"
+#elseif os(WASI)
+let host: String? = "Web"
+#else
+let host: String? = nil
+#endif
 
 // NonisolatedNonsendingByDefault is the one setting an application must not
 // leave out; see the note in ../../Package.swift.
 let settings: [SwiftSetting] = [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
-    + (host.map { [.define($0.uppercased())] } ?? [])
 
 var products: [Product] = [
     // The application module; a platform head depends on its target.

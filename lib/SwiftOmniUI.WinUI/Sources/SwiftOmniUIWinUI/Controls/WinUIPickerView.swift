@@ -60,6 +60,10 @@ final class WinUIPickerView: WinUIView {
         }
         swiftomniui_winui_picker_set(handle, Int32(clamping: write.chosen ?? -1), write.writesChoice, title)
         if write.choices != nil || write.writesChoice {
+            // ItemsSource/SelectedIndex invalidate XAML, but parents also keep
+            // Swift intrinsic answers and placement plans. A removed selection
+            // must not leave the old caption's size in those caches.
+            invalidateChoiceMeasurements()
         }
     }
 

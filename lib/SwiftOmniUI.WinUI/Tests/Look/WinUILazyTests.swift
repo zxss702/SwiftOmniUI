@@ -10,6 +10,47 @@ import SwiftOmniUIConformance
 import CSwiftOmniUIWinUI
 import WinSDK
 
+@MainActor private final class MarkdownLazyReports {
+    var lines = 0
+    var rows: Set<Int> = []
+}
+
+/// Markdown's spaced, styled, selectable paragraphs exercise native line
+/// measurement and geometry publication together, without depending on LUI.
+private struct MarkdownLazyParagraph: View {
+    let number: Int
+    let reports: MarkdownLazyReports
+
+    var body: some View {
+        let _ = reports.rows.insert(number)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "\u{E8A5}").frame(width: 16, height: 16)
+                Text("Section \(number)").font(.system(size: 15, weight: .bold))
+            }
+            (Text("A styled paragraph. ").bold()
+                + Text(String(repeating: "自动换行文字 mixed with English, different lengths and punctuation. ",
+                              count: 1 + number % 5)))
+            HStack(alignment: .top, spacing: 6) {
+                Text("•")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Nested list item with wrapped content \(number)")
+                    Text("`code` and a second line").font(.system(size: 11))
+                }
+            }
+        }
+        .font(.system(size: 12))
+        .lineSpacing(8)
+        .backgroundPreferenceValue(Text.LayoutKey.self) { layouts in
+            let _ = reports.lines += layouts.reduce(0) { $0 + $1.count }
+            Color.clear
+        }
+        .padding(12)
+        .frame(width: 320, alignment: .leading)
+        .background(Color("#D03020"))
+    }
+}
+
 /// The modified source mirrors a file tree beside an ordinary settings card.
 @MainActor private final class ModifiedLazyBuilds {
     var calls = 0
@@ -81,6 +122,92 @@ private struct ModifiedLazyPage: View {
 /// A `LazyVStack` on WinUI answers the same window questions as everywhere:
 /// the rows the scroller's reach holds are mounted, and no more.
 final class WinUILazyTests: XCTestCase {
+    func testNativeControllerPreparesDestinationBeforeOffsetChanges() throws {
+        try onUIThread {
+            for kind in 0..<4 {
+                let horizontal = kind % 2 == 1
+                let host = WinUIRenderer.running(reducesMotion: true) { ExactLazyPage(kind: kind) }
+                for _ in 0..<24 { host.step() }
+                let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+                let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+                let extent = horizontal ? 80.0 : 40.0, perRun = kind < 2 ? 1 : 4
+                giveExactGeometry(lazy, extent: extent, perRun: perRun)
+                for _ in 0..<12 { host.step() }
+                let old = scroll.scroller.standing.offset
+                let initialCount = lazy.mounted.count
+                XCTAssertTrue(swiftomniui_winui_scroller_request_from_controller(
+                    scroll.scroller.handle, horizontal, 2_000, false, false))
+                XCTAssertEqual(scroll.scroller.standing.offset, old,
+                               "the controller request is still queued in native ScrollPresenter")
+                XCTAssertTrue(swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle))
+                WinUIDoorbell.commitPending()
+                XCTAssertEqual(scroll.scroller.standing.offset, old)
+                let targetIndex = Int(2_000 / extent) * perRun
+                XCTAssertNotNil(lazy.mounted[lazy.cells.orderedIdentities[targetIndex]],
+                                "realize the destination before native composition moves")
+                XCTAssertLessThanOrEqual(lazy.cells.built.count, initialCount + perRun * 2,
+                                         "a jump must not construct intermediate rows")
+                XCTAssertLessThanOrEqual(lazy.mounted.count, initialCount * 2 + perRun * 2,
+                                         "only the old viewport and the destination may be held")
+                let requests = lazy.cells.requests
+                let prepared = lazy.mounted.mapValues(\.view)
+                for _ in 0..<3 {
+                    lazy.viewportReported(Rect(0, 0, 480, 240))
+                    WinUIDoorbell.commitPending()
+                }
+                XCTAssertEqual(lazy.cells.requests, requests)
+                for (id, view) in prepared { XCTAssertTrue(lazy.mounted[id]?.view === view) }
+                // A burst replaces queued targets without building each one.
+                for target in [4_000.0, 6_000, 8_000] {
+                    XCTAssertTrue(swiftomniui_winui_scroller_request_from_controller(
+                        scroll.scroller.handle, horizontal, target, false, false))
+                }
+                XCTAssertEqual(lazy.cells.requests, requests)
+                // A later controller request replaces the pending destination.
+                XCTAssertTrue(swiftomniui_winui_scroller_request_from_controller(
+                    scroll.scroller.handle, horizontal, 400, false, false))
+                host.settle {
+                    !swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle)
+                        && lazy.span.map { lazy.hasMountedWindow(in: $0) } == true
+                        && abs((horizontal ? scroll.scroller.standing.offset.x : scroll.scroller.standing.offset.y) - 400) < 1
+                }
+                XCTAssertFalse(swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle))
+                XCTAssertEqual(horizontal ? scroll.scroller.standing.offset.x : scroll.scroller.standing.offset.y,
+                               400, accuracy: 1)
+                XCTAssertTrue(lazy.hasMountedWindow(in: try XCTUnwrap(lazy.span)))
+                // ScrollBy shares the same pre-announcement, relative to the native offset.
+                XCTAssertTrue(swiftomniui_winui_scroller_request_from_controller(
+                    scroll.scroller.handle, horizontal, 800, true, false))
+                WinUIDoorbell.commitPending()
+                let nextIndex = Int(1_200 / extent) * perRun
+                XCTAssertNotNil(lazy.mounted[lazy.cells.orderedIdentities[nextIndex]])
+                host.settle { !swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle) }
+                XCTAssertEqual(horizontal ? scroll.scroller.standing.offset.x : scroll.scroller.standing.offset.y,
+                               1_200, accuracy: 1)
+                // A program move cancels an uncommitted controller announcement.
+                let beforeReplacement = lazy.cells.requests
+                XCTAssertTrue(swiftomniui_winui_scroller_request_from_controller(
+                    scroll.scroller.handle, horizontal, 6_000, false, false))
+                swiftomniui_winui_scroller_move(scroll.scroller.handle,
+                                              horizontal ? 400 : 0, horizontal ? 0 : 400, false)
+                WinUIDoorbell.commitPending()
+                XCTAssertEqual(lazy.cells.requests, beforeReplacement)
+                host.settle {
+                    !swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle)
+                        && lazy.span.map { lazy.hasMountedWindow(in: $0) } == true
+                }
+                XCTAssertEqual(horizontal ? scroll.scroller.standing.offset.x : scroll.scroller.standing.offset.y,
+                               400, accuracy: 1)
+                // Animated endpoints are metadata; they must not evict current rows.
+                let built = lazy.cells.built
+                XCTAssertTrue(swiftomniui_winui_scroller_request_from_controller(
+                    scroll.scroller.handle, horizontal, 8_000, false, true))
+                XCTAssertEqual(lazy.cells.built, built)
+                XCTAssertFalse(swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle))
+            }
+        }
+    }
+
     func testQueuedProgramJumpKeepsPreparedRowsUntilCompletionAndAcceptsReplacement() throws {
         try onUIThread {
             let host = WinUIRenderer.running(reducesMotion: true) { ExactLazyPage(kind: 0) }
@@ -167,11 +294,50 @@ final class WinUILazyTests: XCTestCase {
     func testNativeAnimatedVGridPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 2) }
     func testNativeAnimatedHGridPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 3) }
     func testNativeAnimatedStaticContentPaintsBothViewportEdges() throws { try checkPaintedScroll(kind: 2, staticContent: true) }
+    func testNativeAnimatedMarkdownParagraphsPaintBothViewportEdges() throws {
+        try checkPaintedScroll(kind: 0, markdown: true)
+    }
+    func testNativeAnimatedNestedMarkdownPaintsBothViewportEdges() throws {
+        try checkPaintedScroll(kind: 0, markdown: true, nested: true)
+    }
 
-    private func checkPaintedScroll(kind: Int, staticContent: Bool = false) throws {
+    func testNativeControllerVStackPaintsBothViewportEdges() throws {
+        try checkPaintedScroll(kind: 0, controller: true)
+    }
+    func testNativeControllerHStackPaintsBothViewportEdges() throws {
+        try checkPaintedScroll(kind: 1, controller: true)
+    }
+    func testNativeControllerHGridPaintsBothViewportEdges() throws {
+        try checkPaintedScroll(kind: 3, controller: true)
+    }
+
+    func testNativeControllerVGridPaintsBothViewportEdges() throws {
+        try checkPaintedScroll(kind: 2, controller: true)
+    }
+
+    private func checkPaintedScroll(kind: Int, staticContent: Bool = false, controller: Bool = false,
+                                   markdown: Bool = false, nested: Bool = false) throws {
         try onUIThread {
+            let reports = MarkdownLazyReports()
+            let opened = WinUIFrameClock.monotonic()
             let host = WinUIRenderer.running(reducesMotion: true) {
-                if staticContent {
+                if markdown {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(0..<1_000) { number in
+                                if nested {
+                                    LazyVStack(spacing: 0) {
+                                        ForEach(0..<12) { block in
+                                            MarkdownLazyParagraph(number: number * 12 + block, reports: reports)
+                                        }
+                                    }.frame(width: 320)
+                                } else {
+                                    MarkdownLazyParagraph(number: number, reports: reports)
+                                }
+                            }
+                        }
+                    }.frame(width: 480, height: 240)
+                } else if staticContent {
                     ScrollView {
                         VStack(spacing: 0) {
                             ForEach(0..<250) { _ in
@@ -181,11 +347,12 @@ final class WinUILazyTests: XCTestCase {
                     }.frame(width: 480, height: 240)
                 } else { SolidLazyPage(kind: kind) }
             }
+            let openingTime = WinUIFrameClock.monotonic() - opened
             for _ in 0..<24 { host.step() }
             let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             let lazy = host.views(WinUILazyView.self).first
             let horizontal = kind % 2 == 1
-            if let lazy { giveExactGeometry(lazy, extent: horizontal ? 80 : 40, perRun: kind < 2 ? 1 : 4) }
+            if let lazy, !markdown { giveExactGeometry(lazy, extent: horizontal ? 80 : 40, perRun: kind < 2 ? 1 : 4) }
             for _ in 0..<16 { host.step() }
             let window = try XCTUnwrap(host.window)
             let title = "SOUISolidScroll-\(kind)"
@@ -199,7 +366,7 @@ final class WinUILazyTests: XCTestCase {
             let row = try XCTUnwrap(lazy.flatMap { $0.mounted[$0.cells.orderedIdentities[0]]?.view }
                                     ?? host.view(id: .manual("solid-static")))
             let frame = scroll.scroller.laidOutFrame, origin = scroll.scroller.origin
-            let across = horizontal ? row.origin.y + 20 : row.origin.x + 40
+            let across = horizontal ? row.origin.y + 20 : row.origin.x + (markdown ? 4 : 40)
             let scale = Double(GetDpiForWindow(hwnd)) / 96
             let points = [8.0, (horizontal ? frame.width : frame.height) - 8].map { along in
                 var point = POINT(x: LONG((horizontal ? origin.x + along : across) * scale),
@@ -231,10 +398,20 @@ final class WinUILazyTests: XCTestCase {
                 _ = WaitForSingleObject(thread, 2_000)
                 _ = CloseHandle(thread)
             }
+            var slowestStep = 0.0
             for target in [1_000.0, 4_000.0, 0] {
-                swiftomniui_winui_scroller_move(scroll.scroller.handle, horizontal ? target : 0,
-                                              horizontal ? 0 : target, true)
-                for _ in 0..<48 { host.step() }
+                if controller {
+                    XCTAssertTrue(swiftomniui_winui_scroller_request_from_controller(
+                        scroll.scroller.handle, horizontal, target, false, false))
+                } else {
+                    swiftomniui_winui_scroller_move(scroll.scroller.handle, horizontal ? target : 0,
+                                                  horizontal ? 0 : target, true)
+                }
+                for _ in 0..<48 {
+                    let start = WinUIFrameClock.monotonic()
+                    host.step()
+                    slowestStep = max(slowestStep, WinUIFrameClock.monotonic() - start)
+                }
             }
             probe.lock.lock(); probe.stopped = true; probe.lock.unlock()
             XCTAssertEqual(WaitForSingleObject(thread, 2_000), 0)
@@ -245,6 +422,12 @@ final class WinUILazyTests: XCTestCase {
             // Fractional row boundaries can blend red with the backdrop.
             // Count exposed background, rather than a subpixel red seam.
             let gaps = samples.filter { $0.pixel & 255 <= 160 || ($0.pixel >> 8) & 255 >= 220 }
+            if markdown {
+                XCTAssertGreaterThan(reports.lines, 0, "selection must consume actual native text geometry")
+                XCTAssertLessThan(reports.rows.count, 100, "opening/scrolling must not build the entire document")
+                XCTAssertLessThan(slowestStep, 1_000, "a UI turn must not block for seconds")
+                print("Markdown lazy (nested=\(nested)): opening=\(openingTime)ms, slowest step=\(slowestStep)ms, rows=\(reports.rows.count), unpainted=\(gaps.count)/\(samples.count)")
+            }
             XCTAssertTrue(gaps.isEmpty, "kind \(kind): \(gaps.count)/\(samples.count) unpainted edge samples; first=\(String(describing: gaps.first))")
         }
     }

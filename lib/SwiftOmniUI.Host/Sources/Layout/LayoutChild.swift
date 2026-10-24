@@ -100,9 +100,10 @@
 
     /// The width a child is measured at for the width its layout offers: its stated width, within its bounds and the
     /// offer - the width it is placed at, so its words wrap to it - else the smaller of the offer and its most width.
+    /// A frame's content keeps an explicit width even when it exceeds the outer frame.
     /// Design: docs/design/host/layout.md#a-child-measured
     public func offer(_ width: Double?) -> Double? {
-        if let stated = self.width { return boundedWidth(stated, available: width) }
+        if let stated = self.width { return boundedWidth(stated, available: isFrameContent ? nil : width) }
         return [width, maximumWidth].compactMap { $0 }.min()
     }
 
@@ -212,10 +213,12 @@ extension LayoutChild {
         natural: Double,
         available: Double,
         minimum: Double? = nil,
-        maximum: Double? = nil
+        maximum: Double? = nil,
+        allowsOverflow: Bool = false
     ) -> Double {
         if let stated {
-            return bounded(stated, minimum: minimum, maximum: maximum, available: available)
+            return bounded(stated, minimum: minimum, maximum: maximum,
+                           available: allowsOverflow ? nil : available)
         }
 
         if (minimum != nil || maximum != nil) && available.isFinite {
@@ -226,10 +229,13 @@ extension LayoutChild {
     }
 
     /// Where a child of `extent` starts in its slot; a filling child that stops short stands in the middle.
-    public static func start(option: Int32, extent: Double, start: Double, available: Double) -> Double {
+    public static func start(
+        option: Int32, extent: Double, start: Double, available: Double, allowsOverflow: Bool = false
+    ) -> Double {
+        let remaining = allowsOverflow ? available - extent : max(0, available - extent)
         switch option {
-        case 1, 3: return start + max(0, available - extent) / 2
-        case 2: return start + max(0, available - extent)
+        case 1, 3: return start + remaining / 2
+        case 2: return start + remaining
         default: return start
         }
     }
