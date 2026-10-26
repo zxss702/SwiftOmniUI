@@ -11,6 +11,20 @@ import Synchronization
     /// representation; native lazy layouts use the shared sequence directly.
     private let identitiesCache: Mutex<[String]?>
     private let insertedCache: Mutex<Set<String>?>
+    private let scrollPrefixes = Mutex<[String]>([])
+
+    /// Structural row scopes, independent of the number of data items. A
+    /// reader's public ID must not be confused with its internal reuse token.
+    @_spi(Host) public func setScrollPrefixes(_ prefixes: [String]) {
+        scrollPrefixes.withLock { $0 = prefixes }
+    }
+
+    @_spi(Host) public func identity(forScrollID id: String) -> String? {
+        if position(of: id) != nil { return id }
+        return scrollPrefixes.withLock { prefixes in
+            prefixes.lazy.map { $0 + id }.first { position(of: $0) != nil }
+        }
+    }
     public var identities: [String] {
         identitiesCache.withLock { stored in
             if let stored { return stored }

@@ -289,10 +289,33 @@ final class WinUILazyTests: XCTestCase {
         }
     }
 
+    func testIncomingPrefetchAndOldEdgeRetirementShareOneNativeWindowPatch() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) { SolidLazyPage(kind: 0) }
+            for _ in 0..<24 { host.step() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            giveExactGeometry(lazy, extent: 40, perRun: 1)
+            for _ in 0..<12 { host.step() }
+            lazy.cells.show(0..<240, realize: 0..<480, prefetch: true)
+            host.renderIfNeeded()
+            host.layOut()
+            XCTAssertEqual(lazy.cells.built, 0..<13)
+            let requests = lazy.cells.requests
+            lazy.cells.prefetchStepDistance = 120
+            lazy.cells.show(120..<360, realize: 120..<600, prefetch: true, demand: 120..<360)
+            XCTAssertEqual(lazy.cells.requests, requests,
+                           "retiring the old edge cannot force a separate render before the incoming batch")
+            host.runtime.lazyPrefetch.drain { host.renderIfNeeded() }
+            XCTAssertEqual(lazy.cells.requests, requests + 1)
+            XCTAssertEqual(lazy.cells.built, 2..<16)
+        }
+    }
+
     func testNativeAnimatedVStackPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 0) }
     func testNativeAnimatedHStackPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 1) }
     func testNativeAnimatedVGridPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 2) }
     func testNativeAnimatedHGridPaintsSolidRowsAtBothViewportEdges() throws { try checkPaintedScroll(kind: 3) }
+    func testNativeAnimatedDenseFileGridPaintsBothViewportEdges() throws { try checkPaintedScroll(kind: 2, files: true) }
     func testNativeAnimatedStaticContentPaintsBothViewportEdges() throws { try checkPaintedScroll(kind: 2, staticContent: true) }
     func testNativeAnimatedMarkdownParagraphsPaintBothViewportEdges() throws {
         try checkPaintedScroll(kind: 0, markdown: true)
@@ -316,12 +339,25 @@ final class WinUILazyTests: XCTestCase {
     }
 
     private func checkPaintedScroll(kind: Int, staticContent: Bool = false, controller: Bool = false,
-                                   markdown: Bool = false, nested: Bool = false) throws {
+                                   markdown: Bool = false, nested: Bool = false, files: Bool = false) throws {
         try onUIThread {
             let reports = MarkdownLazyReports()
             let opened = WinUIFrameClock.monotonic()
-            let host = WinUIRenderer.running(reducesMotion: true) {
-                if markdown {
+            let fileHeight = min(1_000, Double(GetSystemMetrics(SM_CYSCREEN)) * 96 / Double(GetDpiForSystem()) - 140)
+            let host = WinUIRenderer.running(reducesMotion: true,
+                room: files ? LayoutSize(width: 620, height: fileHeight + 80) : WinUITestHost.room) {
+                if files {
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.fixed(180)), GridItem(.fixed(180))], spacing: 0) {
+                            ForEach(0..<3_000) { number in
+                                DenseFileRow(index: number, names: Binding(get: { false }, set: { _ in }))
+                                    .padding(.horizontal, 8)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .background(Color("#D03020"))
+                            }
+                        }.frame(width: 360)
+                    }.frame(width: 480, height: fileHeight)
+                } else if markdown {
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             ForEach(0..<1_000) { number in
@@ -352,7 +388,7 @@ final class WinUILazyTests: XCTestCase {
             let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             let lazy = host.views(WinUILazyView.self).first
             let horizontal = kind % 2 == 1
-            if let lazy, !markdown { giveExactGeometry(lazy, extent: horizontal ? 80 : 40, perRun: kind < 2 ? 1 : 4) }
+            if let lazy, !markdown, !files { giveExactGeometry(lazy, extent: horizontal ? 80 : 40, perRun: kind < 2 ? 1 : 4) }
             for _ in 0..<16 { host.step() }
             let window = try XCTUnwrap(host.window)
             let title = "SOUISolidScroll-\(kind)"
@@ -360,13 +396,14 @@ final class WinUILazyTests: XCTestCase {
             let name = Array(title.utf16) + [0]
             let hwnd = try XCTUnwrap(name.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
             _ = SetForegroundWindow(hwnd)
-            XCTAssertTrue(SetWindowPos(hwnd, HWND(bitPattern: -1), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE)))
+            XCTAssertTrue(SetWindowPos(hwnd, HWND(bitPattern: -1), files ? 40 : 0, files ? 40 : 0,
+                                      0, 0, UINT(SWP_NOSIZE | (files ? 0 : SWP_NOMOVE))))
             defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 0, 0, 0, 0, UINT(SWP_NOMOVE | SWP_NOSIZE)) }
             for _ in 0..<8 { host.step() }
             let row = try XCTUnwrap(lazy.flatMap { $0.mounted[$0.cells.orderedIdentities[0]]?.view }
                                     ?? host.view(id: .manual("solid-static")))
             let frame = scroll.scroller.laidOutFrame, origin = scroll.scroller.origin
-            let across = horizontal ? row.origin.y + 20 : row.origin.x + (markdown ? 4 : 40)
+            let across = horizontal ? row.origin.y + 20 : row.origin.x + (markdown || files ? 4 : 40)
             let scale = Double(GetDpiForWindow(hwnd)) / 96
             let points = [8.0, (horizontal ? frame.width : frame.height) - 8].map { along in
                 var point = POINT(x: LONG((horizontal ? origin.x + along : across) * scale),
@@ -388,6 +425,17 @@ final class WinUILazyTests: XCTestCase {
             let colored = initial.allSatisfy { $0 & 255 > 160 && ($0 >> 8) & 255 < 100 }
             XCTAssertTrue(colored, "kind \(kind): initial solid rows must be visible; pixels=\(initial), origin=\(origin), frame=\(frame), row=\(row.origin), points=\(points)")
             guard colored else { return }
+            if files {
+                XCTAssertGreaterThanOrEqual(lazy?.mounted.count ?? 0, 80,
+                                           "the pixel test must display a dense page of real file rows")
+                XCTAssertGreaterThan(host.views(WinUIImageView.self).count, 200)
+                let labels = host.views(WinUILabelView.self)
+                let wrapped = try XCTUnwrap(labels.first { $0.text.hasPrefix("Source_") })
+                let single = try XCTUnwrap(labels.first { $0.text.hasPrefix("File_") })
+                XCTAssertGreaterThan(wrapped.desiredSize.height, single.desiredSize.height)
+            }
+            WinUIScrollWork.install()
+            defer { WinUIScrollWork.finish() }
             let probe = WinUILazyScreenProbe(window: hwnd, points: points)
             let raw = Unmanaged.passRetained(probe).toOpaque()
             let created = CreateThread(nil, 0, WinUILazyScreenProbe.entry, raw, 0, nil)
@@ -399,6 +447,18 @@ final class WinUILazyTests: XCTestCase {
                 _ = CloseHandle(thread)
             }
             var slowestStep = 0.0
+            var preparedNestedEdge = false
+            let tracing = ProcessInfo.processInfo.environment["SOUI_NESTED_TRACE"] == "1"
+            var trace: [String] = []
+            let oldFrame = host.frameClock.onFrame
+            if tracing {
+                host.frameClock.onFrame = { now in
+                    oldFrame?(now)
+                    guard let lazy else { return }
+                    trace.append("\(WinUIFrameClock.monotonic()) frame offset=\(scroll.scroller.standing.offset) span=\(String(describing: lazy.span)) built=\(lazy.cells.built) realize=\(String(describing: lazy.cells.window?.realize)) v=\(lazy.scrollVelocity) interval=\(lazy.scrollInterval) prep=\(lazy.preparationDuration) lead=\(lazy.scrollObservationLead) measure=\(lazy.needsRowMeasurements)")
+                }
+            }
+            defer { host.frameClock.onFrame = oldFrame }
             for target in [1_000.0, 4_000.0, 0] {
                 if controller {
                     XCTAssertTrue(swiftomniui_winui_scroller_request_from_controller(
@@ -411,6 +471,26 @@ final class WinUILazyTests: XCTestCase {
                     let start = WinUIFrameClock.monotonic()
                     host.step()
                     slowestStep = max(slowestStep, WinUIFrameClock.monotonic() - start)
+                    if nested {
+                        let panels = host.views(WinUILazyView.self)
+                        preparedNestedEdge = preparedNestedEdge || panels.contains {
+                            guard $0 !== lazy, $0.span == nil, !$0.cells.built.isEmpty else { return false }
+                            let at = $0.origin.y
+                            return $0.scrollVelocity > 0 ? at >= origin.y + frame.height
+                                : $0.scrollVelocity < 0 && at + $0.laidOutFrame.height <= origin.y
+                        }
+                        if tracing {
+                            trace.append("\(WinUIFrameClock.monotonic()) target=\(target) offset=\(scroll.scroller.standing.offset.y) " + panels.map {
+                                "[\($0.number) span=\(String(describing: $0.span)) built=\($0.cells.built) total=\($0.cells.total) v=\($0.scrollVelocity) prep=\($0.preparationDuration)]"
+                            }.joined(separator: " "))
+                        }
+                    }
+                }
+                if markdown {
+                    host.settle { !scroll.held && !host.runtime.lazyPrefetch.isPending }
+                    XCTAssertFalse(scroll.held, "the native animation must finish")
+                    XCTAssertEqual(scroll.scroller.standing.offset.y, target, accuracy: 1,
+                                   "the sampled scroll must actually reach its requested destination")
                 }
             }
             probe.lock.lock(); probe.stopped = true; probe.lock.unlock()
@@ -422,7 +502,16 @@ final class WinUILazyTests: XCTestCase {
             // Fractional row boundaries can blend red with the backdrop.
             // Count exposed background, rather than a subpixel red seam.
             let gaps = samples.filter { $0.pixel & 255 <= 160 || ($0.pixel >> 8) & 255 >= 220 }
+            if tracing {
+                for sample in gaps { print("NESTED gap \(sample)") }
+                for sample in samples { print("NESTED pixel \(sample)") }
+                for entry in trace { print("NESTED \(entry)") }
+            }
             if markdown {
+                if nested {
+                    XCTAssertTrue(preparedNestedEdge,
+                                  "nested lazy paragraphs must prepare the predicted incoming edge before it is visible")
+                }
                 XCTAssertGreaterThan(reports.lines, 0, "selection must consume actual native text geometry")
                 XCTAssertLessThan(reports.rows.count, 100, "opening/scrolling must not build the entire document")
                 XCTAssertLessThan(slowestStep, 1_000, "a UI turn must not block for seconds")
@@ -445,24 +534,51 @@ final class WinUILazyTests: XCTestCase {
                 let extent = horizontal ? 80.0 : 40.0
                 giveExactGeometry(lazy, extent: extent, perRun: perRun)
                 for _ in 0..<16 { host.step() }
+                let renderedBeforeScroll = swiftomniui_winui_last_rendered_time()
                 swiftomniui_winui_scroller_move(scroll.scroller.handle, horizontal ? 1_000 : 0,
                                               horizontal ? 0 : 1_000, true)
                 var observedAhead = 0.0
                 var calculatedMaximum = 0.0
+                var previousPreparedEnd = lazy.cells.built.upperBound
                 for _ in 0..<60 {
                     host.step()
                     guard let window = lazy.cells.window else { continue }
+                    if scroll.held, lazy.scrollVelocity > 0 {
+                        XCTAssertGreaterThanOrEqual(lazy.cells.built.upperBound, previousPreparedEnd,
+                            "a shorter speed prediction must not destroy prepared incoming rows")
+                    }
+                    previousPreparedEnd = lazy.cells.built.upperBound
                     let ahead = window.realize.upperBound - window.span.upperBound
                     observedAhead = max(observedAhead, ahead)
+                    let displayPeriod = host.frameClock.refreshInterval > 0
+                        ? host.frameClock.refreshInterval : lazy.scrollInterval
                     calculatedMaximum = max(calculatedMaximum,
                         abs(WinUILazyPrefetch.distance(velocity: lazy.scrollVelocity,
-                            interval: lazy.scrollInterval, readiness: lazy.preparationDuration,
-                            neighbour: 0, observationLead: lazy.scrollObservationLead)))
+                            interval: displayPeriod,
+                            readiness: lazy.preparationDuration + displayPeriod,
+                            neighbour: 0, observationLead: lazy.scrollObservationLead, acceleration: lazy.scrollAcceleration)))
                     XCTAssertGreaterThanOrEqual(window.realize.lowerBound, window.span.lowerBound - 1,
                                                 "kind \(kind): no extra screen behind forward motion")
+                    if lazy.scrollVelocity > 0, let span = lazy.span {
+                        let room = span.upperBound - span.lowerBound
+                        let rect = horizontal ? Rect(span.lowerBound, 0, room, 240)
+                            : Rect(0, span.lowerBound, 480, room)
+                        let predicted = try XCTUnwrap(lazy.realizationSpan(in: rect))
+                        let end = min(1_000 / perRun,
+                            Int((predicted.upperBound / extent).rounded(.up)) + 1)
+                        let distance = WinUILazyPrefetch.distance(velocity: lazy.scrollVelocity,
+                            interval: displayPeriod,
+                            readiness: lazy.preparationDuration + displayPeriod, neighbour: 0,
+                            observationLead: lazy.scrollObservationLead, acceleration: lazy.scrollAcceleration)
+                        XCTAssertGreaterThanOrEqual(Double(end) * extent + 0.02,
+                            min(Double(1_000 / perRun) * extent, span.upperBound + distance),
+                            "row rounding must not shorten the predicted physical coverage")
+                    }
                 }
-                XCTAssertLessThanOrEqual(observedAhead, calculatedMaximum + 1,
-                                         "prefetch cannot exceed the measured necessary distance")
+                XCTAssertLessThanOrEqual(observedAhead, calculatedMaximum + extent,
+                    "retaining an already prepared whole edge row adds less than one run to the prediction")
+                XCTAssertGreaterThan(swiftomniui_winui_last_rendered_time(), renderedBeforeScroll,
+                                     "preparation latency must observe actual native frame completion")
                 host.settle { !scroll.held && !host.runtime.lazyPrefetch.isPending }
                 for _ in 0..<8 { host.step() }
                 let span = try XCTUnwrap(lazy.span)
@@ -1027,8 +1143,8 @@ final class WinUILazyTests: XCTestCase {
                 XCTAssertEqual(lazy.mounted.count, 2)
                 XCTAssertEqual(host.views(WinUIPickerView.self).count, 18)
                 XCTAssertFalse(lazy.cells.needsMeasurement)
-                XCTAssertEqual(lazy.cells.total, 2 * 360 + 98 * 44, accuracy: 1,
-                               "only the two requested cards replace their provisional extents")
+                XCTAssertEqual(lazy.cells.total, 100 * 360, accuracy: 1,
+                               "two measured cards estimate the document without constructing unseen cards")
             }
         }
     }
@@ -1727,7 +1843,8 @@ final class WinUILazyTests: XCTestCase {
             let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
             let measured = lazy.cells.identities.filter { lazy.cells.extents.hasMeasurement(for: $0) }.count
-            let total = Double(measured) * 140 + Double(200 - measured) * 44 + 199 * 12
+            XCTAssertLessThan(measured, 200)
+            let total = Double(200 * 140 + 199 * 12)
             XCTAssertEqual(lazy.cells.total, total, accuracy: 1)
             XCTAssertEqual(scroll.scroller.standing.reach.x + scroll.scroller.laidOutFrame.width,
                            total, accuracy: 1, "the native document must replace each measured tile's estimate")
@@ -1812,9 +1929,9 @@ final class WinUILazyTests: XCTestCase {
                                 let row = try XCTUnwrap(host.views(WinUILazyStackView.self).first {
                                     ($0.placingLayout as? WinUIScrollDocument)?.scrollView === scroll
                                 })
-                                let measured = row.cells.identities.filter { row.cells.extents.hasMeasurement(for: $0) }.count
+                                XCTAssertLessThan(row.mounted.count, 40)
                                 XCTAssertEqual(scroll.scroller.standing.reach.x + scroll.scroller.laidOutFrame.width,
-                                               Double(measured) * 96 + Double(40 - measured) * 44 + 39 * 8, accuracy: 1)
+                                               Double(40 * 96 + 39 * 8), accuracy: 1)
                             }
                         }
                         XCTAssertGreaterThan(scrolls.count, 2)
@@ -2393,11 +2510,11 @@ final class WinUILazyTests: XCTestCase {
                     && abs(lazy.laidOutFrame.height - lazy.cells.total) < 1
             }
 
-            // The document combines known forty-point rows and provisional
-            // forty-four-point rows without building the whole source.
+            // The measured forty-point rows estimate the whole document
+            // without building the rest of the source.
             let measured = lazy.cells.identities.filter { lazy.cells.extents.hasMeasurement(for: $0) }.count
             XCTAssertLessThan(measured, lazy.cells.identities.count)
-            XCTAssertEqual(lazy.laidOutFrame.height, Double(measured) * 40 + Double(1_000 - measured) * 44, accuracy: 1)
+            XCTAssertEqual(lazy.laidOutFrame.height, 1_000 * 40, accuracy: 1)
         }
     }
 
@@ -2490,8 +2607,10 @@ private struct SolidLazyPage: View {
 
     var body: some View {
         ScrollView(kind % 2 == 1 ? .horizontal : .vertical) {
-            let rows = ForEach(0..<1_000) { _ in
-                Rectangle().fill(Color("#D03020")).frame(width: 80, height: 40)
+            let traced = ProcessInfo.processInfo.environment["SOUI_NESTED_TRACE"] == "1"
+            let rows = ForEach(0..<1_000) { number in
+                Rectangle().fill(traced ? Color(red: 208, green: 48 + number / 256, blue: number % 256)
+                                 : Color("#D03020")).frame(width: 80, height: 40)
             }
             if kind == 0 { LazyVStack(spacing: 0) { rows } }
             else if kind == 1 { LazyHStack(spacing: 0) { rows } }

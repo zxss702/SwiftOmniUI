@@ -55,6 +55,9 @@ namespace {
         winrt::event_token templateLayout{};
         std::vector<ViewportRequest> viewportRequests;
         winrt::event_token viewportLayout{};
+        winrt::event_token readerLayout{};
+        winrt::event_token readerExtent{};
+        winrt::event_token readerCompleted{};
         int32_t pendingJump = -1;
         double pendingX = 0, pendingY = 0;
         std::array<ControllerRequests, 2> controllers;
@@ -606,7 +609,21 @@ extern "C" void swiftomniui_winui_scroller_place_for(
         auto scroller = borrow<controls::ScrollView>(handle);
         auto element = as<xaml::FrameworkElement>(descendant);
         auto content = scroller.Content().try_as<xaml::UIElement>();
-        if (!element || !content) { *found = 0; return; }
+        double viewport[6]{};
+        if (!element || !content || readViewport(scroller, element, viewport) != SwiftOmniUIViewportReady) {
+            *found = 0; return;
+        }
+        // Arrange can publish the new row bounds before ScrollPresenter has
+        // committed its new range. Clamping against that old range would
+        // incorrectly complete a reader request at yesterday's document end.
+        auto document = content.try_as<xaml::FrameworkElement>();
+        auto sameExtent = [](double extent, double actual, double room) {
+            return std::abs(std::max(extent, room) - std::max(actual, room)) <= 0.5;
+        };
+        if (document && (!sameExtent(scroller.ExtentWidth(), document.ActualWidth(), scroller.ViewportWidth())
+            || !sameExtent(scroller.ExtentHeight(), document.ActualHeight(), scroller.ViewportHeight()))) {
+            *found = 0; return;
+        }
 
         auto bounds = element.TransformToVisual(content).TransformBounds(
             winrt::Windows::Foundation::Rect(
@@ -616,8 +633,12 @@ extern "C" void swiftomniui_winui_scroller_place_for(
         if (auto found = insetStates.find(winrt::get_abi(scroller)); found != insetStates.end())
             if (auto state = found->second.lock()) insets = state->region;
         auto nearest = [](double start, double length, double room, double now) {
+            // Oversized content cannot fit between both safe edges. Keep the
+            // trailing alignment stable: after reaching it, choosing `start`
+            // on the next observation would alternate between the two edges.
+            if (length > room) return start + length - room;
             if (start >= now && start + length <= now + room) return now;
-            return start < now ? start : start + length - room;
+            return start + length > now + room ? start + length - room : start;
         };
 
         double x = scroller.HorizontalOffset();
@@ -655,6 +676,28 @@ extern "C" void swiftomniui_winui_scroller_offset(SwiftOmniUIObjectRef handle, d
     } catch (...) {
         report("reading a scroller");
     }
+}
+
+extern "C" void swiftomniui_winui_scroller_watch_layout(
+    SwiftOmniUIObjectRef handle, int64_t view, void (*callback)(int64_t)) {
+    try {
+        auto scroller = borrow<controls::ScrollView>(handle);
+        auto found = insetStates.find(winrt::get_abi(scroller));
+        if (found == insetStates.end()) return;
+        auto state = found->second.lock();
+        if (!state) return;
+        if (state->readerLayout.value) scroller.LayoutUpdated(std::exchange(state->readerLayout, {}));
+        if (state->readerExtent.value) scroller.ExtentChanged(std::exchange(state->readerExtent, {}));
+        if (state->readerCompleted.value) scroller.ScrollCompleted(std::exchange(state->readerCompleted, {}));
+        if (callback) {
+            state->readerLayout = scroller.LayoutUpdated(guarded("resolving a reader destination",
+                [view, callback](auto const &, auto const &) { callback(view); }));
+            state->readerExtent = scroller.ExtentChanged(guarded("resolving a changed reader extent",
+                [view, callback](auto const &, auto const &) { callback(view); }));
+            state->readerCompleted = scroller.ScrollCompleted(guarded("completing a reader destination",
+                [view, callback](auto const &, auto const &) { callback(view); }));
+        }
+    } catch (...) { report("observing a reader destination's layout"); }
 }
 
 extern "C" void swiftomniui_winui_scroller_insets(

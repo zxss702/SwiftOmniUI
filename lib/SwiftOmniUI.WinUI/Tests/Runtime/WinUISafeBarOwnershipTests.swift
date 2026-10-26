@@ -39,13 +39,13 @@ final class WinUISafeBarOwnershipTests: XCTestCase {
             let native = WinUISafeAreaBarHost(bar: bar)
             let originalHandle = bar.handle
             defer {
-                swiftomniui_winui_window_set_safe_area_bars(window.handle, nil, 0, false, 0)
+                swiftomniui_winui_window_set_safe_area_bars(window.handle, nil, 0)
                 native.releaseBar()
                 window.close()
             }
             window.show(page, present: false)
             let handles: [SwiftOmniUIObjectRef?] = [native.presentationHandle]
-            swiftomniui_winui_window_set_safe_area_bars(window.handle, handles, 1, false, 0)
+            swiftomniui_winui_window_set_safe_area_bars(window.handle, handles, 1)
             swiftomniui_winui_window_set_safe_area_bar_frame(window.handle, 0, 0, 0)
             window.presentContent()
             WinUITestHost.pump()

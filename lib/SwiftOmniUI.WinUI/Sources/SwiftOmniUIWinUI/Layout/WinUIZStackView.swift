@@ -3,11 +3,33 @@
 
 @_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
+import CSwiftOmniUIWinUI
 
 /// A ZStack: its children one over another, each in its area, or where an engine's placement run puts it.
 /// Design: docs/design/platforms/winui/drawing.md#a-placed-child
 @MainActor
 class WinUIZStackView: WinUITravellingLayout {
+    /// Local insets on every edge own a material behind the bar, above the
+    /// scrolling base. Promoted top bars draw their backing in native hosts.
+    private var safeAreaBackground: WinUIView?
+
+    override func heldViews() -> [WinUIView] {
+        var views = super.heldViews()
+        guard sourceElement?.safeAreaInsetEdge != nil else { return views }
+        let current = items.filter { !$0.departing }
+        guard current.count == 2,
+              current[1].view.nativeSafeBarOwner == nil,
+              current[1].element?.safeBarBackgroundHidden != true,
+              let index = views.firstIndex(where: { $0 === current[1].view }) else { return views }
+        if safeAreaBackground == nil {
+            let background = WinUIView { _ in swiftomniui_winui_safe_area_background_make() }
+            background.placingLayout = self
+            safeAreaBackground = background
+        }
+        views.insert(safeAreaBackground!, at: index)
+        return views
+    }
+
     override func firstTextBaseline(in size: LayoutSize) -> Double? {
         let places = childPlaces(in: Rect(0, 0, size.width, size.height))
         return zip(items, places).compactMap { item, place -> Double? in
@@ -45,12 +67,19 @@ class WinUIZStackView: WinUITravellingLayout {
 
     @discardableResult
     override func setItems(_ items: [WinUILayoutItem]) -> Bool {
-        defer { holdInDrawingOrder() }
+        defer { holdChildren(); holdInDrawingOrder() }
         return super.setItems(items)
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        Self.querySize { ZStackArithmetic.size(of: items, padding: padding, width: width) }
+        Self.querySize {
+            let current = items.filter { !$0.departing }
+            if let edge = sourceElement?.safeAreaInsetEdge, current.count == 2 {
+                return SafeAreaArithmetic.size(base: current[0], bar: current[1], edge: edge,
+                                               spacing: sourceElement?.number(.spacing) ?? 0, width: width)
+            }
+            return ZStackArithmetic.size(of: items, padding: padding, width: width)
+        }
     }
 
     override var hasNativeProposals: Bool { true }
@@ -59,14 +88,18 @@ class WinUIZStackView: WinUITravellingLayout {
             insetContext = nil
             insetBase = nil
             _ = resolveInset(in: Rect(0, 0, width ?? size.width, size.height), items: items.filter { !$0.departing })
-            return zip(items, placements).map { item, placement in
+            var proposals = zip(items, placements).map { item, placement in
                 NativeProposal(view: item.view, place: placement.place)
             }
+            appendSafeAreaBackground(to: &proposals, in: Rect(0, 0, width ?? size.width, size.height))
+            return proposals
         }
         let places = childPlaces(in: Rect(0, 0, width ?? size.width, size.height))
-        return zip(items, places).compactMap { item, place in
+        var proposals = zip(items, places).compactMap { item, place in
             place.map { NativeProposal(view: item.view, place: $0) }
         }
+        appendSafeAreaBackground(to: &proposals, in: Rect(0, 0, width ?? size.width, size.height))
+        return proposals
     }
 
     override func arrange(in bounds: Rect) {
@@ -78,6 +111,11 @@ class WinUIZStackView: WinUITravellingLayout {
         for item in items where item.view.nativeSafeBarOwner == nil { item.view.setPlacedDrawing(nil, opacity: 1) }
         let byView = Dictionary(uniqueKeysWithValues: items.map { ($0.view.number, $0) })
         for proposal in preparedLayoutPlan(in: bounds) {
+            if let background = safeAreaBackground, proposal.view === background {
+                background.setPlacedDrawing(nil, opacity: 1)
+                background.layout(proposal.place)
+                continue
+            }
             guard let view = proposal.view, let item = byView[view.number] else { continue }
             let place = proposal.place
             if item.view.nativeSafeBarOwner != nil, item.view !== insetBase,
@@ -151,9 +189,46 @@ class WinUIZStackView: WinUITravellingLayout {
     /// reaches them in too, with nothing moved and nothing laid out again.
     private func holdInDrawingOrder() {
         let ordered = ZStackArithmetic.drawingOrder(of: items.count, placedBy: placement?.placements ?? [])
+        let barIndex = sourceElement?.safeAreaInsetEdge != nil ? items.lastIndex(where: { !$0.departing }) : nil
         for (rank, index) in ordered.enumerated() {
             items[index].view.setZIndex(ordered == Array(items.indices) ? 0 : Int32(rank))
+            if index == barIndex {
+                safeAreaBackground?.setZIndex(ordered == Array(items.indices) ? 0 : Int32(rank))
+            }
         }
+    }
+
+    /// The backdrop paints the complete reserved strip, including margins and
+    /// positive spacing. It never contributes to intrinsic size or safe insets.
+    private func appendSafeAreaBackground(to proposals: inout [NativeProposal], in bounds: Rect) {
+        guard let background = safeAreaBackground, let edge = sourceElement?.safeAreaInsetEdge else { return }
+        let current = items.filter { !$0.departing }
+        guard current.count == 2, current[1].view.nativeSafeBarOwner == nil,
+              current[1].element?.safeBarBackgroundHidden != true else { return }
+        let bar = current[1]
+        guard bar.isShown, let place = proposals.first(where: { $0.view === bar.view })?.place else {
+            proposals.append(NativeProposal(view: background, place: Rect(0, 0, 0, 0)))
+            return
+        }
+        let room = layoutSafeArea(in: bounds).safe
+        let margin = bar.values.margin
+        let spacing = max(0, sourceElement?.number(.spacing) ?? 0)
+        let frame: Rect
+        switch SafeAreaArithmetic.physicalEdge(edge, direction: direction) {
+        case .top:
+            frame = Rect(room.x, place.y - margin.top, room.width,
+                         max(0, place.height + margin.top + margin.bottom + spacing))
+        case .bottom:
+            frame = Rect(room.x, place.y - margin.top - spacing, room.width,
+                         max(0, place.height + margin.top + margin.bottom + spacing))
+        case .leading:
+            frame = Rect(place.x - margin.left, room.y,
+                         max(0, place.width + margin.left + margin.right + spacing), room.height)
+        case .trailing:
+            frame = Rect(place.x - margin.left - spacing, room.y,
+                         max(0, place.width + margin.left + margin.right + spacing), room.height)
+        }
+        proposals.append(NativeProposal(view: background, place: frame))
     }
 
     /// Stands each child where the run says, drawn as it says: at once inside a pass, and between passes in the
@@ -165,6 +240,18 @@ class WinUIZStackView: WinUITravellingLayout {
             Self.querySize { _ = resolveInset(in: bounds, items: items.filter { !$0.departing }) }
         }
         let count = min(items.count, placements.count)
+        if let background = safeAreaBackground, sourceElement?.safeAreaInsetEdge != nil {
+            var proposals = zip(items.prefix(count), placements.prefix(count)).map { item, placement in
+                NativeProposal(view: item.view, place: placement.place)
+            }
+            appendSafeAreaBackground(to: &proposals, in: bounds)
+            if let proposal = proposals.last, proposal.view === background {
+                background.layout(proposal.place)
+                if let index = items.firstIndex(where: { $0.view !== insetBase && !$0.departing }), index < count {
+                    background.setPlacedDrawing(placements[index].drawing, opacity: placements[index].drawnOpacity)
+                }
+            }
+        }
         for index in 0..<count {
             let placement = placements[index]
             let view = items[index].view
@@ -190,6 +277,12 @@ class WinUIZStackView: WinUITravellingLayout {
             return SafeAreaContext(bounds: Rect(0, 0, place.width, place.height))
         }
         return super.context(for: child, at: place)
+    }
+
+    override func detach() {
+        safeAreaBackground?.detach()
+        safeAreaBackground = nil
+        super.detach()
     }
 
 }

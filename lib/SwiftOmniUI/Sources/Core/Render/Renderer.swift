@@ -27,7 +27,7 @@ public final class Renderer: @unchecked Sendable {
     /// Whether a render was asked for without naming a state, which makes the next
     /// render build the whole tree.
     private var untracked = true
-    private var textPreferencesChanged = false
+    private var textPreferencesChanged: Set<ObjectIdentifier> = []
 
     /// The transaction the next render runs under - what a `withAnimation` or
     /// `withTransaction` write left behind.
@@ -190,10 +190,10 @@ public final class Renderer: @unchecked Sendable {
 
     /// Native text reports change preference values, not authored view inputs.
     /// Refold the retained tree without rebuilding the application or reparsing text.
-    func setNeedsTextPreferenceRender() {
+    func setNeedsTextPreferenceRender(for box: TextLayoutBox) {
         guarded.withLock {
             dirty = true
-            textPreferencesChanged = true
+            textPreferencesChanged.insert(box.preferenceIdentity)
         }
         UIThreadExecutor.shared.poke()
     }
@@ -326,6 +326,7 @@ public final class Renderer: @unchecked Sendable {
 
     /// What the next render will act on - for tests driving a differ of their own.
     var pendingChanges: Set<ObjectIdentifier> { guarded.withLock { changed } }
+    var pendingTextPreferences: Set<ObjectIdentifier> { guarded.withLock { textPreferencesChanged } }
 
     /// What those changes are called, for the same tests.
     var pendingNames: [ObjectIdentifier: String] { guarded.withLock { names } }
@@ -340,7 +341,7 @@ public final class Renderer: @unchecked Sendable {
             changed.removeAll()
             names.removeAll()
             untracked = false
-            textPreferencesChanged = false
+            textPreferencesChanged = []
             pendingTransaction = nil
         }
     }
@@ -360,12 +361,12 @@ public final class Renderer: @unchecked Sendable {
         // asks for the next one.
         // Design: docs/design/core/render.md#taking-the-changes
         let (changedNow, untrackedNow, namesNow, transactionNow, textPreferencesNow):
-            (Set<ObjectIdentifier>, Bool, [ObjectIdentifier: String], Transaction?, Bool) = guarded.withLock {
+            (Set<ObjectIdentifier>, Bool, [ObjectIdentifier: String], Transaction?, Set<ObjectIdentifier>) = guarded.withLock {
             let taken = (changed, untracked, names, pendingTransaction, textPreferencesChanged)
             changed.removeAll()
             names.removeAll()
             untracked = false
-            textPreferencesChanged = false
+            textPreferencesChanged = []
             dirty = false
             pendingTransaction = nil
             rendering = true
@@ -467,19 +468,19 @@ public final class Renderer: @unchecked Sendable {
             }
 
             let (wrote, wroteUntracked, wroteNames, wroteTextPreferences):
-                (Set<ObjectIdentifier>, Bool, [ObjectIdentifier: String], Bool) = guarded.withLock {
+                (Set<ObjectIdentifier>, Bool, [ObjectIdentifier: String], Set<ObjectIdentifier>) = guarded.withLock {
                 let taken = (changed, untracked, names, textPreferencesChanged)
                 changed.removeAll()
                 names.removeAll()
                 untracked = false
-                textPreferencesChanged = false
+                textPreferencesChanged = []
                 dirty = false
                 rendering = true
                 return taken
             }
 
             // Nothing they wrote is read anywhere.
-            if wrote.isEmpty && !wroteUntracked && !wroteTextPreferences {
+            if wrote.isEmpty && !wroteUntracked && wroteTextPreferences.isEmpty {
                 guarded.withLock { rendering = false }
                 break
             }

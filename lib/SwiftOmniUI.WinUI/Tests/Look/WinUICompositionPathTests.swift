@@ -12,33 +12,40 @@ final class WinUICompositionPathTests: XCTestCase {
     func testRoundedVectorKeepsItsAlphaAndGeometryWhileChangingWidth() throws {
         try onUIThread {
             let width = State(wrappedValue: 100.0)
+            let alpha = State(wrappedValue: 0.0)
             let host = WinUIRenderer.running(reducesMotion: true) {
                 ZStack {
                     Color.white
-                    RoundedRectangle(cornerRadius: 20).fill(.black.opacity(0.2)).id("vector")
+                    RoundedRectangle(cornerRadius: 20).fill(.black.opacity(alpha.wrappedValue)).id("vector")
                 }.frame(width: width.wrappedValue, height: 60)
+                    .frame(width: 200, height: 100)
             }
-            let shape = try XCTUnwrap(host.views(WinUIPathView.self).first)
+            // Color.white also owns a Rectangle. Inspect the foreground vector.
+            let shape = try XCTUnwrap(host.views(WinUIPathView.self).last)
             let window = try XCTUnwrap(host.window)
-            for value in [100.0, 148, 100] {
+            for (value, opacity) in [(100.0, 0.0), (100, 0.2), (148, 0.2), (148, 0), (100, 0), (100, 0.2)] {
                 width.wrappedValue = value
+                alpha.wrappedValue = opacity
                 host.step()
+                XCTAssertEqual(shape.drawsInk, opacity > 0)
+                let expected = Int((255 * (1 - opacity)).rounded())
                 let points = [(value / 2, 30.0), (1.0, 1.0), (value - 2, 30.0)]
                 host.settle {
+                    guard abs(shape.laidOutFrame.width - value) < 0.001 else { return false }
                     let pixels = shape.presentedPixels(at: points, in: window)
-                    return pixels.count == 3 && abs(Int(pixels[0] & 255) - 204) <= 1
-                        && pixels[1] == 0xFFFF_FFFF && abs(Int(pixels[2] & 255) - 204) <= 1
+                    return pixels.count == 3 && abs(Int(pixels[0] & 255) - expected) <= 1
+                        && pixels[1] == 0xFFFF_FFFF && abs(Int(pixels[2] & 255) - expected) <= 1
                 }
                 let pixels = shape.presentedPixels(at: points, in: window)
                 XCTAssertEqual(pixels.count, 3)
                 guard pixels.count == 3 else { return }
                 for index in [0, 2] {
                     for shift in [0, 8, 16] {
-                        XCTAssertEqual(Double((pixels[index] >> shift) & 255), 204, accuracy: 1)
+                        XCTAssertEqual(Double((pixels[index] >> shift) & 255), Double(expected), accuracy: 1)
                     }
                 }
                 XCTAssertEqual(pixels[1], 0xFFFF_FFFF)
-                XCTAssertTrue(host.views(WinUIPathView.self).first === shape)
+                XCTAssertTrue(host.views(WinUIPathView.self).last === shape)
                 XCTAssertEqual(shape.laidOutFrame.width, value, accuracy: 0.001)
             }
         }

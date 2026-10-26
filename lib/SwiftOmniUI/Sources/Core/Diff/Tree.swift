@@ -161,7 +161,13 @@ final class RenderedNode {
 
     /// A text's layout box as this element last held it, so a rebuilt text
     /// under it takes the last report over (`TextLayoutBox.inherit`).
-    var textLayoutBox: TextLayoutBox?
+    var textLayoutBox: TextLayoutBox? {
+        didSet {
+            let before = oldValue.map { Set([$0.preferenceIdentity]) } ?? []
+            let after = textLayoutBox.map { Set([$0.preferenceIdentity]) } ?? []
+            Renderer.shared.index(self, adding: after.subtracting(before), removing: before.subtracting(after))
+        }
+    }
 
     /// Whether this element or one under it watches `key` - what a pushed
     /// report checks before it asks for a render.
@@ -269,6 +275,7 @@ final class RenderedNode {
     }
 
     deinit {
+        if let textLayoutBox { Renderer.shared.unindex(self, reading: [textLayoutBox.preferenceIdentity]) }
         if !reads.isEmpty {
             Renderer.shared.unreading(reads)
             Renderer.shared.unindex(self, reading: reads)

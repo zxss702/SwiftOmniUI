@@ -143,6 +143,20 @@ extern "C" void swiftomniui_winui_origin(SwiftOmniUIObjectRef handle, double *or
     }
 }
 
+extern "C" bool swiftomniui_winui_translation_to_root(SwiftOmniUIObjectRef handle, double *origin) {
+    try {
+        auto element = as<xaml::UIElement>(handle);
+        if (!element.XamlRoot()) return false;
+        auto transform = element.TransformToVisual(nullptr).try_as<xaml::Media::MatrixTransform>();
+        if (!transform) return false;
+        auto matrix = transform.Matrix();
+        if (matrix.M11 != 1 || matrix.M12 != 0 || matrix.M21 != 0 || matrix.M22 != 1) return false;
+        origin[0] = matrix.OffsetX;
+        origin[1] = matrix.OffsetY;
+        return true;
+    } catch (...) { return false; }
+}
+
 extern "C" bool swiftomniui_winui_layout_offset(
     SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef ancestor, double *offset
 ) {

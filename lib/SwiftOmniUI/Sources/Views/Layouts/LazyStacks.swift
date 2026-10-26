@@ -455,6 +455,12 @@ struct LazyHStackElement: StackBase {
             leadingRowCount = newLeadingCount == leadingRows?.lazyRowCount ? newLeadingCount : nil
         }
         guard let source else { return }
+        if !same {
+            source.setScrollPrefixes(segments.compactMap {
+                if case .rows(let rows) = $0 { return rows.lazyScrollIdentity("") }
+                return nil
+            })
+        }
         node.lazyRows = source
         // Segment boundaries are small, structural metadata. A row finds its
         // current builder by index; no second per-row ownership table is needed.

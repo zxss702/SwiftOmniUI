@@ -50,7 +50,12 @@ class GTKZStackView: GTKTravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        ZStackArithmetic.size(of: items, padding: padding, width: width)
+        let current = items.filter { !$0.departing }
+        if let edge = sourceElement?.safeAreaInsetEdge, current.count == 2 {
+            return SafeAreaArithmetic.size(base: current[0], bar: current[1], edge: edge,
+                                           spacing: sourceElement?.number(.spacing) ?? 0, width: width)
+        }
+        return ZStackArithmetic.size(of: items, padding: padding, width: width)
     }
 
     override func arrange(in bounds: Rect) {

@@ -251,6 +251,13 @@ public struct GeometryReader: View {
 /// One measurement as the host sends it: place, corner and safe area in ten
 /// numbers, and the named spaces enclosing the view.
 struct FrameReport: Equatable, Sendable {
+    /// Optional layout coordinates in a shared scroll document. Resolving two anchors in this
+    /// space avoids subtracting independently rounded, moving native window coordinates.
+    struct Document: Equatable, Sendable {
+        let identity: Double
+        let frame: Rect
+    }
+    var document: Document?
     /// The frame in the parent's coordinates.
     let frame: Rect
 
@@ -290,12 +297,15 @@ struct FrameReport: Equatable, Sendable {
     }
 
     /// Reads the ten numbers of one report - x, y, width, height, windowX,
-    /// windowY, safeX, safeY, safeWidth, safeHeight; any other count is nil.
+    /// windowY, safeX, safeY, safeWidth, safeHeight; optionally followed by a document identity, x, y.
     init?(_ numbers: [Double]) {
-        guard numbers.count == 10 else { return nil }
+        guard numbers.count == 10 || numbers.count == 13 else { return nil }
         frame = Rect(numbers[0], numbers[1], numbers[2], numbers[3])
         global = Rect(numbers[4], numbers[5], numbers[2], numbers[3])
         safeAreaRect = Rect(numbers[6], numbers[7], numbers[8], numbers[9])
+        if numbers.count == 13 {
+            document = Document(identity: numbers[10], frame: Rect(numbers[11], numbers[12], numbers[2], numbers[3]))
+        }
     }
 
     /// Assembles a report from its parts - tests and the empty state.

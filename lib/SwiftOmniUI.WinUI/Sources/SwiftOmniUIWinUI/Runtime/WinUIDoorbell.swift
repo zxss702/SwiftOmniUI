@@ -47,9 +47,19 @@ enum WinUIDoorbell {
 extension WinUIDoorbell {
     /// Runs `work` in the next turn posted, once the layout pass under way is over: what a pass decides - a split
     /// view's first room - is said once WinUI has finished laying out.
-    @MainActor static func afterPass(_ work: @escaping @MainActor () -> Void) {
+    @MainActor static var workObserver: ((String, Double) -> Void)?
+
+    @MainActor static func afterPass(_ work: @escaping @MainActor () -> Void, caller: StaticString = #function) {
         let needsTurn = pending.isEmpty
-        pending.append(work)
+        if workObserver != nil {
+            pending.append {
+                let start = WinUIFrameClock.monotonic()
+                work()
+                workObserver?(String(describing: caller), WinUIFrameClock.monotonic() - start)
+            }
+        } else {
+            pending.append(work)
+        }
         if needsTurn { swiftomniui_winui_post_turn() }
         WinUIRenderer.shared?.runtime.displayCycle.hold()
     }

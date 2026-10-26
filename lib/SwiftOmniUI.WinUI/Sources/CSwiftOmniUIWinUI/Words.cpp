@@ -16,6 +16,8 @@
 #include <iterator>
 #include <memory>
 #include <map>
+#include <limits>
+#include <optional>
 #include <tuple>
 #include <string>
 #include <vector>
@@ -951,15 +953,24 @@ extern "C" double swiftomniui_winui_text_whitespace_width(SwiftOmniUIObjectRef h
     } catch (...) { report("measuring whitespace in a text flow"); return 0; }
 }
 
+static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity,
+                                     int32_t *lineCount, bool reuseLeadingCarets);
+
 extern "C" int32_t swiftomniui_winui_text_character_rects(
     SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity
 ) {
-    return swiftomniui_winui_text_character_geometry(handle, rectangles, capacity, nullptr);
+    // Keep the compatibility reader's two-affinity path as a geometry reference.
+    return readCharacterGeometry(handle, rectangles, capacity, nullptr, false);
 }
 
 extern "C" int32_t swiftomniui_winui_text_character_geometry(
     SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity, int32_t *lineCount
 ) {
+    return readCharacterGeometry(handle, rectangles, capacity, lineCount, true);
+}
+
+static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity,
+                                     int32_t *lineCount, bool reuseLeadingCarets) {
     if (lineCount) *lineCount = 0;
     try {
         auto block = labelWords(handle);
@@ -968,6 +979,16 @@ extern "C" int32_t swiftomniui_winui_text_character_geometry(
         auto rich = richWords(handle);
         auto visual = rich ? rich.as<xaml::UIElement>() : block.as<xaml::UIElement>();
         auto transform = visual.TransformToVisual(coordinates);
+        // The text normally sits in its Border with only a vertical alignment
+        // offset. Snapshot that translation once instead of invoking XAML's
+        // GeneralTransform for every glyph. Other transforms retain the native path.
+        std::optional<winrt::Windows::Foundation::Point> translation;
+        if (reuseLeadingCarets) if (auto matrix = transform.try_as<xaml::Media::MatrixTransform>()) {
+            auto value = matrix.Matrix();
+            if (value.M11 == 1 && value.M12 == 0 && value.M21 == 0 && value.M22 == 1)
+                translation = winrt::Windows::Foundation::Point{
+                    static_cast<float>(value.OffsetX), static_cast<float>(value.OffsetY)};
+        }
         auto advance = rich ? rich.LineHeight() : block.LineHeight();
         struct Row {
             double ascent = 0, descent = 0;
@@ -980,6 +1001,25 @@ extern "C" int32_t swiftomniui_winui_text_character_geometry(
         struct Glyph { winrt::Windows::Foundation::Rect rect; float row; bool ownBounds; };
         std::map<float, Row> rows;
         std::vector<Glyph> glyphs;
+        glyphs.reserve(std::max(0, capacity));
+        // For a unidirectional LTR document, the next leading caret is the
+        // current trailing caret except at a line/run boundary. Read it once
+        // and reuse it for the following character. Mixed bidi documents keep
+        // both native affinities; guessing at their run boundaries is unsafe.
+        auto plain = block.Text();
+        bool leadingCarets = reuseLeadingCarets && block.FlowDirection() == xaml::FlowDirection::LeftToRight && !plain.empty();
+        if (leadingCarets) {
+            std::vector<WORD> directions(plain.size());
+            std::vector<WORD> clusters(plain.size());
+            leadingCarets = GetStringTypeW(CT_CTYPE2, plain.c_str(), static_cast<int>(plain.size()), directions.data());
+            leadingCarets = leadingCarets && GetStringTypeW(CT_CTYPE3, plain.c_str(), static_cast<int>(plain.size()), clusters.data());
+            for (size_t i = 0; leadingCarets && i < plain.size(); ++i) {
+                auto ch = plain[i];
+                if (directions[i] == C2_RIGHTTOLEFT || directions[i] == C2_ARABICNUMBER
+                    || (clusters[i] & (C3_NONSPACING | C3_DIACRITIC | C3_VOWELMARK | C3_HIGHSURROGATE | C3_LOWSURROGATE))
+                    || (ch >= 0x202a && ch <= 0x202e) || (ch >= 0x2066 && ch <= 0x2069)) leadingCarets = false;
+            }
+        }
         bool valid = true;
         auto rowAt = [&](winrt::Windows::Foundation::Rect const &rect, NaturalWordsMetrics metrics) {
             if (rect.Height <= 0) return rect.Y; // A trimmed character has no visible bounds.
@@ -993,16 +1033,28 @@ extern "C" int32_t swiftomniui_winui_text_character_geometry(
                           xaml::UIElement const &owner = nullptr, documents::TextPointer const &parent = nullptr) {
             auto position = start;
             auto local = owner ? owner.TransformToVisual(visual) : nullptr;
+            auto parentRect = parent ? parent.GetCharacterRect(documents::LogicalDirection::Forward)
+                                     : winrt::Windows::Foundation::Rect{};
+            std::optional<winrt::Windows::Foundation::Rect> nextLeading;
+            float lastRowY = std::numeric_limits<float>::quiet_NaN(), lastRow = 0;
             for (int32_t i = 0; i < static_cast<int32_t>(string.size()) && at < capacity; ++i, ++at) {
                 if (!position) { valid = false; return; }
-                auto rect = position.GetCharacterRect(documents::LogicalDirection::Forward);
-                auto rowRect = parent ? parent.GetCharacterRect(documents::LogicalDirection::Forward) : rect;
-                auto row = rowAt(rowRect, metrics);
+                auto rect = nextLeading ? *nextLeading : position.GetCharacterRect(documents::LogicalDirection::Forward);
+                nextLeading.reset();
+                auto rowRect = parent ? parentRect : rect;
+                if (rowRect.Height <= 0 || rowRect.Y != lastRowY) {
+                    lastRow = rowAt(rowRect, metrics);
+                    lastRowY = rowRect.Height > 0 ? rowRect.Y : std::numeric_limits<float>::quiet_NaN();
+                }
+                auto row = lastRow;
                 auto next = position.GetPositionAtOffset(1, documents::LogicalDirection::Forward);
                 // X comes from native caret affinities, including bidi and soft
                 // wraps. No second typesetter is used to choose line breaks.
                 if (next) {
-                    auto end = next.GetCharacterRect(documents::LogicalDirection::Backward);
+                    if (leadingCarets && i + 1 < static_cast<int32_t>(string.size()))
+                        nextLeading = next.GetCharacterRect(documents::LogicalDirection::Forward);
+                    auto end = nextLeading && nextLeading->Height > 0 && std::abs(rect.Y - nextLeading->Y) < 0.5f
+                        ? *nextLeading : next.GetCharacterRect(documents::LogicalDirection::Backward);
                     if (rect.Height > 0 && end.Height > 0 && std::abs(rect.Y - end.Y) < 0.5f) {
                         auto left = std::min(rect.X, end.X);
                         rect.Width = std::abs(end.X - rect.X); rect.X = left;
@@ -1089,7 +1141,11 @@ extern "C" int32_t swiftomniui_winui_text_character_geometry(
                     rect.Height = static_cast<float>(height);
                 }
             }
-            rect = transform.TransformBounds(rect);
+            if (translation) {
+                rect.X += translation->X; rect.Y += translation->Y;
+            } else {
+                rect = transform.TransformBounds(rect);
+            }
             rectangles[i * 4] = rect.X; rectangles[i * 4 + 1] = rect.Y;
             rectangles[i * 4 + 2] = rect.Width; rectangles[i * 4 + 3] = rect.Height;
         }

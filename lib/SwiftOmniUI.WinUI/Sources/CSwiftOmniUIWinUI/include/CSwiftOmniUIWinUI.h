@@ -259,6 +259,9 @@ void swiftomniui_winui_keep_scene_alive(bool alive);
 
 /// Subscribes to CompositionTarget.Rendering, or lets go of it.
 void swiftomniui_winui_hold_frames(bool hold);
+/// The most recent CompositionTarget.Rendered completion, in performance-counter milliseconds.
+/// Read on the UI thread; updated only while frames are held.
+double swiftomniui_winui_last_rendered_time(void);
 /// Whether WinUI's frames are subscribed to now. What a test reads.
 bool swiftomniui_winui_holds_frames(void);
 
@@ -277,9 +280,11 @@ void swiftomniui_winui_window_set_background(SwiftOmniUIObjectRef window, bool h
 bool swiftomniui_winui_window_background(SwiftOmniUIObjectRef window, uint32_t *background);
 void swiftomniui_winui_window_set_content(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef content);
 /// A native overlay in the existing content row, below TitleBar and above its
-/// ScrollView. It never creates another auto row or reduces the viewport.
+/// ScrollView, with its own Mica surface. It never creates another auto row or reduces the viewport.
 void swiftomniui_winui_window_set_safe_area_bars(SwiftOmniUIObjectRef window,
-    SwiftOmniUIObjectRef const *bars, int32_t count, bool hasBackground, uint32_t background);
+    SwiftOmniUIObjectRef const *bars, int32_t count);
+/// A noninteractive SystemBackdropElement with Mica, for a local inset on any edge.
+SwiftOmniUIObjectRef swiftomniui_winui_safe_area_background_make(void);
 /// Place the merged surface in its owning page's coordinates within the existing content row.
 void swiftomniui_winui_window_set_safe_area_bar_frame(SwiftOmniUIObjectRef window, double x, double y, double width);
 
@@ -351,6 +356,8 @@ void swiftomniui_winui_set_tooltip(SwiftOmniUIObjectRef element, char const *utf
 
 /// Where `element`'s top left corner stands in its window's content, in DIPs, into `origin` (x, y).
 void swiftomniui_winui_origin(SwiftOmniUIObjectRef element, double *origin);
+// The root transform is translation only; false requires the general transform path.
+bool swiftomniui_winui_translation_to_root(SwiftOmniUIObjectRef element, double *origin);
 
 /// Arrange offsets relative to an actual visual ancestor, excluding presentation transforms.
 /// Returns false if the element has not been attached beneath that ancestor.
@@ -928,6 +935,10 @@ void swiftomniui_winui_scroller_place_for(SwiftOmniUIObjectRef scroller, SwiftOm
 
 /// Where the scroller's view stands, then the farthest it reaches across and down, in DIPs: four values.
 void swiftomniui_winui_scroller_offset(SwiftOmniUIObjectRef scroller, double *offset);
+/// Observe completed native layouts while a reader's destination is pending.
+/// A null callback removes the observation; this never requests a layout pass.
+void swiftomniui_winui_scroller_watch_layout(SwiftOmniUIObjectRef scroller, int64_t view,
+    void (*callback)(int64_t));
 
 /// Six DIPs: the visible viewport x, y, width, height in the descendant's coordinates, intersected with
 /// ancestor scroll presenters and clipping bounds, then its displayed x, y relative to the native presenter.

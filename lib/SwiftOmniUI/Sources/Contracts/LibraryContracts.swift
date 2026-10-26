@@ -72,6 +72,13 @@
         return byType
     }()
 
+    /// Library contracts are immutable. Attribute inheritance visits every
+    /// newly realized descendant; it must not rebuild the same tier graph for
+    /// each font, foreground, and shape lookup in every incoming lazy row.
+    static let wornByType: [NodeType: Set<ObjectIdentifier>] = byType.mapValues {
+        Set($0.worn.map(ObjectIdentifier.init))
+    }
+
     /// Every property's facts, by the name it crosses under - what the differ
     /// asks of a property it holds only a token for. The first member met
     /// answers for every member of its name.

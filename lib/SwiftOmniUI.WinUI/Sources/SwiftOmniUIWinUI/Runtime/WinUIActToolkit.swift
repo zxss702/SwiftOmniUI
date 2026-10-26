@@ -156,16 +156,14 @@ final class WinUIActToolkit: ActToolkit {
                     return true
                 }
                 let name = call.arguments.value(1)?.string ?? ""
-                guard let target = element.first(id: .manual(name)),
-                      let descendant = (target.native as? WinUIElement)?.view else {
+                guard scroller.scroll(
+                    to: name, in: element,
+                    anchorX: call.arguments.value(2)?.number,
+                    anchorY: call.arguments.value(3)?.number) else {
                     core.fail(call, "there is no view '\(name)' inside the scroll view",
                               log: { WinUIRenderer.log.error($0) })
                     return true
                 }
-                scroller.scroll(
-                    toDescendant: descendant,
-                    anchorX: call.arguments.value(2)?.number,
-                    anchorY: call.arguments.value(3)?.number)
                 core.reply(call, [])
                 return true
             }

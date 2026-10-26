@@ -6,6 +6,34 @@ import CSwiftOmniUIWinUI
 import XCTest
 
 final class WinUITextSpacingTests: XCTestCase {
+    func testLeadingCaretReuseMatchesNativeAffinitiesAcrossWrapsAndDirections() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                VStack {
+                    Text("office affine AV fi ffi e\u{301} 中文换行测试 repeated words repeated words\nsecond line")
+                    Text("office affine AV fi ffi 中文换行测试 repeated words repeated words\nsecond line")
+                    Text("中文 English العربية עברית 123 mixed directions\nnext line")
+                    Text("emoji 👩‍💻 👨‍👩‍👧‍👦 🇨🇳 हिन्दी 中文 repeated words\nnew line")
+                    (Text("bold 中文 ").bold() + Text("regular office affine words words words")
+                        + Text(Image(systemName: "\u{E8A5}")) + Text(" inline symbol"))
+                }.font(.system(size: 16)).lineSpacing(8).frame(width: 180)
+            }
+            for _ in 0..<12 { host.step() }
+            let labels = host.views(WinUILabelView.self)
+            XCTAssertEqual(labels.count, 5)
+            for label in labels {
+                let count = label.text.utf16.count
+                var optimized = [Double](repeating: 0, count: count * 4)
+                var reference = optimized
+                XCTAssertEqual(swiftomniui_winui_text_character_geometry(label.handle, &optimized, Int32(count), nil), Int32(count))
+                XCTAssertEqual(swiftomniui_winui_text_character_rects(label.handle, &reference, Int32(count)), Int32(count))
+                for index in optimized.indices {
+                    XCTAssertEqual(optimized[index], reference[index], accuracy: 0.0001,
+                                   "native affinity changed at UTF16 \(index / 4), component \(index % 4): \(label.text)")
+                }
+            }
+        }
+    }
     func testRepeatedPreparationDoesNotReprobeSpacedParagraph() {
         onUIThread {
             let label = WinUITextView()

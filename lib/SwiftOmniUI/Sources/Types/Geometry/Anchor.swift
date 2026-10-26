@@ -60,6 +60,7 @@ extension AnchorSource where Value == Rect {
 final class AnchorBox: @unchecked Sendable {
     private final class Storage {
         var frame: Rect?
+        var document: FrameReport.Document?
     }
     private var storage = Storage()
 
@@ -68,7 +69,19 @@ final class AnchorBox: @unchecked Sendable {
     /// The last frame the host reported, in window coordinates.
     var frame: Rect? {
         get { storage.frame }
-        set { storage.frame = newValue }
+        set { storage.frame = newValue; storage.document = nil }
+    }
+
+    func update(_ report: FrameReport) {
+        storage.frame = report.global
+        storage.document = report.document
+    }
+
+    func resolve<Value>(against report: FrameReport, read: (Rect, Rect) -> Value) -> Value {
+        if let source = storage.document, let target = report.document, source.identity == target.identity {
+            return read(source.frame, target.frame)
+        }
+        return read(storage.frame ?? Rect(0, 0, 0, 0), report.global)
     }
 
     /// Rebuilding a value does not recreate its mounted element. Both old
@@ -80,6 +93,6 @@ extension GeometryProxy {
     /// The anchored view's frame in this proxy's coordinate space, or zero
     /// where the host has reported none yet.
     public subscript<Value>(anchor: Anchor<Value>) -> Value {
-        anchor.read(anchor.box.frame ?? Rect(0, 0, 0, 0), report.global)
+        anchor.box.resolve(against: report, read: anchor.read)
     }
 }

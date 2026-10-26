@@ -6,6 +6,45 @@
 import XCTest
 
 final class LazyGeometryTests: XCTestCase {
+    func testMeasuredDocumentEstimateTracksTallRowsWithoutRealizingTheSource() {
+        let identities = (0..<10_000).map(String.init)
+        var extents = LazyExtents()
+        extents.spacing = 0
+        extents.usesMeasuredEstimate = true
+        extents.adopt(positions: Dictionary(uniqueKeysWithValues: identities.enumerated().map { ($1, $0) }))
+        extents.measure("0", extent: 300)
+        extents.measure("1", extent: 500)
+        XCTAssertEqual(extents.estimate, 400)
+        XCTAssertEqual(extents.total(in: identities), 4_000_000)
+        XCTAssertEqual(extents.offset(of: 2, in: identities), 800)
+        XCTAssertLessThan(extents.storageNodes, 10)
+        let revision = extents.revision
+        extents.measure("1", extent: 700)
+        XCTAssertGreaterThan(extents.revision, revision)
+        XCTAssertEqual(extents.estimate, 500)
+        XCTAssertEqual(extents.total(in: identities), 5_000_000)
+        extents.keep(identities: Set(identities.dropFirst()))
+        let remaining = Array(identities.dropFirst())
+        extents.adopt(positions: Dictionary(uniqueKeysWithValues: remaining.enumerated().map { ($1, $0) }))
+        XCTAssertEqual(extents.estimate, 700, "removed rows cannot bias the remaining document")
+        extents.reset()
+        XCTAssertEqual(extents.estimate, 44)
+    }
+
+    func testGridEstimateUsesMeasuredRunsAndPreservesZeroSizedRows() {
+        var extents = LazyRunExtents()
+        extents.usesMeasuredEstimate = true
+        extents.measure(0, extent: 240)
+        extents.measure(1, extent: 360)
+        XCTAssertEqual(extents.estimate, 300)
+        XCTAssertEqual(extents.total(count: 100), 30_000)
+        extents.measure(0, extent: 0)
+        XCTAssertEqual(extents.extent(of: 0), 0)
+        XCTAssertEqual(extents.estimate, 180)
+        extents.reset()
+        XCTAssertEqual(extents.estimate, 44)
+    }
+
     @MainActor
     func testPrefetchConvertsPhysicalLeadUsingNearbyMeasuredRowDensity() throws {
         func window(rowHeight: Double, lead: Double) throws -> Range<Int> {
@@ -27,6 +66,35 @@ final class LazyGeometryTests: XCTestCase {
         let tall = try window(rowHeight: 200, lead: 1_800)
         XCTAssertLessThanOrEqual(tall.upperBound, 12,
             "the same distance should not mount a screenful of inferred tall rows")
+    }
+
+    @MainActor
+    func testLearnedPrefetchStopsAtTallMeasuredRowsInBothDirections() throws {
+        for perRun in [1, 3] {
+            let runtime = HostRuntime.still()
+            var patch = HostPatch(id: .manual("lazy"), type: .lazyVStack)
+            patch.lazyRows = HostLazySource((0..<(100 * perRun)).map(String.init))
+            runtime.tree.apply(patch, complete: true)
+            let cells = LazyCells(try XCTUnwrap(runtime.tree.root), in: runtime)
+            cells.takeItems()
+            cells.extents.spacing = 0
+            cells.extents.usesMeasuredEstimate = true
+            cells.runs.usesMeasuredEstimate = true
+            cells.show(0..<0, perRun: perRun, grid: perRun > 1)
+            // A tall table between otherwise thin rows must be counted by
+            // its real height, including when revisited while scrolling up.
+            for row in 0..<100 {
+                let height = row == 8 ? 4_000.0 : 20
+                if perRun == 1 { cells.extents.measure(String(row), extent: height) }
+                else { cells.runs.measure(row, extent: height) }
+            }
+            cells.show(0..<100, perRun: perRun, grid: perRun > 1, realize: 0..<500,
+                       prefetch: true, demand: 0..<100)
+            XCTAssertEqual(cells.built, 0..<(10 * perRun))
+            cells.show(4_400..<4_500, perRun: perRun, grid: perRun > 1, realize: 4_000..<4_500,
+                       prefetch: true, demand: 4_400..<4_500)
+            XCTAssertEqual(cells.built, (7 * perRun)..<(27 * perRun))
+        }
     }
 
     @MainActor

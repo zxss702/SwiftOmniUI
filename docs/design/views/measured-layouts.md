@@ -19,13 +19,11 @@ on the host's frames, so a run of views can follow a finger with no view built.
 because a frame is where a view sits in its parent's coordinates; bounds would
 say the view's own.
 
-One report carries every space. The host sends eight numbers - `x, y, width,
-height, windowX, windowY, safeX, safeY`: the frame in the parent, the same
-origin converted to the window, and the origin measured from where content can
-safely sit - and each handler takes the four its space means. No property says
-which space was asked for: the host computes all of them in one walk. A report
-of any other length is a version mismatch, not an event, and reaches no
-handler.
+One report carries every space. The host sends ten numbers - `x, y, width,
+height, windowX, windowY, safeX, safeY, safeWidth, safeHeight`: the frame in the
+parent, the origin converted to the window, and the safe rectangle. Each handler
+takes the coordinates its space means. WinUI may append three document-local
+fields described below; other report lengths are rejected.
 
 Nothing is measured unless something asks. A view without a handler is not
 subscribed at all, the rule every reported property follows: a frame moves at
@@ -68,6 +66,19 @@ Safe allocation alone does not consume a reader's environment. An ordinary
 content boundary or scroll document that consumed it reports zero for that
 contribution. `onGeometryChange` combines the same context with the matching
 physical report; the existing ten-number wire format remains compatible.
+WinUI may append a scroll-document identity and the element's layout x/y within
+that document. Anchors and their resolving reader use these coordinates when
+both belong to the same document. This avoids subtracting two independently
+rounded, moving window positions during scrolling. Anchors across documents,
+and hosts sending ten numbers, continue to resolve in window coordinates.
+Within one completed-layout report transaction, WinUI reuses shared ancestor
+layout offsets and each document's root translation. An idle nested scroller's
+translation is composed through its enclosing document, keeping table-cell
+window coordinates stable relative to an outer reader while that reader scrolls.
+Moving inner scrollers and nontranslation root transforms use the native path.
+These caches are discarded for the next report transaction.
+An intervening drawing transform also uses window coordinates so stabilizing
+scroll translation does not discard a child's own offset, scale or rotation.
 Before first allocation the reader accepts space without mounting its closure,
 so a fabricated zero size cannot produce a visible initial placement.
 

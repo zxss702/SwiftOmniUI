@@ -47,7 +47,8 @@ public enum ViewContract: Contract {
         "coordinateSpaceName", layer: .stateUI, travels: false)
 
     /// The view settled on a frame: ten numbers - x, y, width, height, the
-    /// window's x and y, and the safe area's frame in the window.
+    /// window's x and y, and the safe area's frame in the window. Hosts may append
+    /// three numbers for stable anchor resolution: scroll-document identity, x, y.
     public static let frameChanged = ElementEvent<Self, [Double]>("frameChanged", layer: .native)
 
     /// Internal drawing feedback: width and height, independent of scroll position.

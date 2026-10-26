@@ -92,13 +92,21 @@ class WinUITextView: WinUIView {
     private var lastTextLayoutSize: LayoutSize?
     private var textLayoutDirty = true
     private var textLayoutAwaitingNative = false
+    private var textLayoutRevision: UInt64 = 0
 
-    func invalidateTextLayout() { textLayoutDirty = true; requestTextLayout() }
+    func invalidateTextLayout() {
+        textLayoutRevision &+= 1
+        textLayoutDirty = true
+        requestTextLayout()
+    }
 
     override func commitGeometry(in bounds: Rect) {
         super.commitGeometry(in: bounds)
         let size = LayoutSize(width: bounds.width, height: bounds.height)
-        if size != lastTextLayoutSize { textLayoutDirty = true }
+        if size != lastTextLayoutSize {
+            textLayoutRevision &+= 1
+            textLayoutDirty = true
+        }
         requestTextLayout()
     }
 
@@ -111,11 +119,43 @@ class WinUITextView: WinUIView {
         WinUIDoorbell.afterPass {
             let labels = Self.pendingTextLayouts
             Self.pendingTextLayouts = []
-            let publish = {
-                for label in labels {
-                    label.textLayoutPending = false
-                    label.publishTextLayout()
+            TextLayoutBatch(labels).advance()
+        }
+    }
+
+    /// Glyph bounds are selection metadata; XAML has already laid out and can
+    /// paint the whole table. Do not turn its ninety-six labels into one long
+    /// UI callback. Read one native label per turn, then publish the completed
+    /// snapshot in one transaction so preference readers do not rebuild once
+    /// per cell. This does not defer or progressively construct visible rows.
+    @MainActor private final class TextLayoutBatch {
+        let labels: [WinUITextView]
+        var index = 0
+        var reports: [(WinUITextView, UInt64, TextLayoutReport)] = []
+
+        init(_ labels: [WinUITextView]) { self.labels = labels }
+
+        func advance() {
+            if index < labels.count {
+                let label = labels[index]
+                index += 1
+                label.textLayoutPending = false
+                if let report = label.readTextLayout() {
+                    reports.append((label, label.textLayoutRevision, report))
                 }
+            }
+            if index < labels.count {
+                WinUIDoorbell.afterPass { self.advance() }
+                return
+            }
+            let publish = {
+                let start = WinUITextView.textWorkObserver == nil ? 0 : WinUIFrameClock.monotonic()
+                for (label, revision, report) in self.reports {
+                    guard !label.isDetached, label.isAttached,
+                          revision == label.textLayoutRevision else { continue }
+                    label.onTextLayout?(report)
+                }
+                WinUITextView.textWorkObserver?("batch-publish", WinUIFrameClock.monotonic() - start)
             }
             if let runtime = WinUIRenderer.shared?.runtime { runtime.performUserTransaction(publish) }
             else { publish() }
@@ -123,24 +163,28 @@ class WinUITextView: WinUIView {
     }
 
     private static var pendingTextLayouts: [WinUITextView] = []
+    static var textWorkObserver: ((String, Double) -> Void)?
 
-    private func publishTextLayout() {
-        guard textLayoutDirty, isAttached else { return }
+    private func readTextLayout() -> TextLayoutReport? {
+        guard textLayoutDirty, !isDetached, isAttached, onTextLayout != nil else { return nil }
         let text = self.text
         let count = text.utf16.count
         guard count > 0 else {
             textLayoutDirty = false
-            onTextLayout?(TextLayoutReport(lines: [])); return
+            lastTextLayoutSize = LayoutSize(width: laidOutFrame.width, height: laidOutFrame.height)
+            return TextLayoutReport(lines: [])
         }
         var rectangles = [Double](repeating: 0, count: count * 4)
+        let nativeStart = Self.textWorkObserver == nil ? 0 : WinUIFrameClock.monotonic()
         guard swiftomniui_winui_text_character_geometry(handle, &rectangles, Int32(count), nil) == count,
               stride(from: 3, to: rectangles.count, by: 4).contains(where: { rectangles[$0] > 0 }) else {
             awaitNativeTextLayout()
-            return
+            return nil
         }
+        Self.textWorkObserver?("native-geometry", WinUIFrameClock.monotonic() - nativeStart)
+        let swiftStart = Self.textWorkObserver == nil ? 0 : WinUIFrameClock.monotonic()
         textLayoutDirty = false
         lastTextLayoutSize = LayoutSize(width: laidOutFrame.width, height: laidOutFrame.height)
-        guard let report = onTextLayout else { return }
         var offset = 0, line = 0
         var last: Rect?
         var glyphs: [NativeTextLayout.Glyph] = []
@@ -162,7 +206,9 @@ class WinUITextView: WinUIView {
             glyphs.append(.init(text: string, rect: rect, line: line))
             last = rect
         }
-        report(NativeTextLayout.report(glyphs))
+        let report = NativeTextLayout.report(glyphs)
+        Self.textWorkObserver?("swift-geometry", WinUIFrameClock.monotonic() - swiftStart)
+        return report
     }
 
     private func awaitNativeTextLayout() {

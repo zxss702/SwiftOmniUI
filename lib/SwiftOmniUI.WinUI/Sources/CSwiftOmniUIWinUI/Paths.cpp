@@ -23,6 +23,19 @@ namespace {
         int64_t view;
         composition::ShapeVisual drawing{nullptr};
 
+        composition::CompositionSpriteShape prepareDrawing() {
+            if (!drawing) {
+                IInspectable self = *this;
+                auto element = self.as<controls::Panel>();
+                auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(element).Compositor();
+                drawing = compositor.CreateShapeVisual();
+                drawing.Shapes().Append(compositor.CreateSpriteShape(compositor.CreatePathGeometry()));
+                drawing.Size(element.ActualSize());
+                xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(element, drawing);
+            }
+            return drawing.Shapes().GetAt(0).as<composition::CompositionSpriteShape>();
+        }
+
         peers::AutomationPeer OnCreateAutomationPeer() {
             IInspectable self = *this;
             return figurePeer(self.as<xaml::FrameworkElement>(), view);
@@ -31,7 +44,7 @@ namespace {
         Size MeasureOverride(Size) { return {0, 0}; }
         Size ArrangeOverride(Size final) {
             if (callbacks.arrange) callbacks.arrange(view, final.Width, final.Height);
-            drawing.Size({final.Width, final.Height});
+            if (drawing) drawing.Size({final.Width, final.Height});
             return final;
         }
     };
@@ -111,11 +124,8 @@ namespace swiftomniui {
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_path_make(int64_t view) {
     try {
         auto held = winrt::make<PathPanel>(view).as<controls::Panel>();
-        auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(held).Compositor();
-        auto drawing = compositor.CreateShapeVisual();
-        drawing.Shapes().Append(compositor.CreateSpriteShape(compositor.CreatePathGeometry()));
-        winrt::get_self<PathPanel>(held.as<xaml::IFrameworkElementOverrides>())->drawing = drawing;
-        xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(held, drawing);
+        // Spacer is a clear rectangle. Keep its layout/event identity, but
+        // allocate no compositor resources until it has something to paint.
         // Gesture registration owns the hit area, as for other SOUI panels.
         // A decorative vector must not acquire a rectangular input surface.
         return detach(held);
@@ -127,7 +137,8 @@ extern "C" void swiftomniui_winui_path_paint(
     int32_t dashCount, double dashOffset, int32_t cap, int32_t join, double miter
 ) {
     try {
-        auto shape = pathSprite(as<IInspectable>(handle));
+        auto panel = as<controls::Panel>(handle);
+        auto shape = winrt::get_self<PathPanel>(panel.as<xaml::IFrameworkElementOverrides>())->prepareDrawing();
         auto compositor = shape.Compositor();
         shape.FillBrush(paint(compositor, fill));
         shape.StrokeBrush(paint(compositor, stroke));
@@ -184,7 +195,8 @@ extern "C" void swiftomniui_winui_path_draw(
             winrt::check_hresult(pathFactory()->CreateTransformedGeometry(geometry.get(), &matrix, transformed.put()));
             geometry = transformed.as<ID2D1Geometry>();
         }
-        auto shape = pathSprite(as<IInspectable>(handle));
+        auto panel = as<controls::Panel>(handle);
+        auto shape = winrt::get_self<PathPanel>(panel.as<xaml::IFrameworkElementOverrides>())->prepareDrawing();
         shape.Geometry().as<composition::CompositionPathGeometry>().Path(compositionPath(geometry, evenOdd));
     } catch (...) { report("drawing a shape"); }
 }

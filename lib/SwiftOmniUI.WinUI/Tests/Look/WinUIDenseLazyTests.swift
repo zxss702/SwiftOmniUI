@@ -13,7 +13,7 @@ import XCTest
     var total: Int { rows.values.reduce(0, +) }
 }
 
-private struct DenseFileRow: View {
+struct DenseFileRow: View {
     let index: Int
     let names: Binding<Bool>
 

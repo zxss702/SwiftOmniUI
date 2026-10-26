@@ -359,7 +359,8 @@ same measurement requirement.
 Changing the cross-axis proposal invalidates row measurements through their
 proposal keys, not by replacing the entire extent index with 44-point rows.
 Previously measured offscreen extents remain estimates until those rows are
-realized at the new width; only never-measured rows begin at 44. Grid runs
+realized at the new width; never-measured rows use the measured average, or 44
+before any row has a measurement. Grid runs
 retain estimates while their cell grouping stays the same. A changed track
 count invalidates that grouping and resets the run index.
 

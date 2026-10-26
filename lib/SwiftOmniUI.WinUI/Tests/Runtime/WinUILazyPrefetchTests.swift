@@ -5,6 +5,36 @@
 import XCTest
 
 final class WinUILazyPrefetchTests: XCTestCase {
+    func testIncreasingSpeedPredictsTravelFromTheCurrentFrameInBothDirections() {
+        for direction in [-1.0, 1.0] {
+            var samples = WinUILazyPrefetch.MotionSamples()
+            // x(t) = 0.125 * t squared. At t=32 velocity is 8 DIP/ms;
+            // the next 16ms travel 160 DIP, not the preceding interval's 96.
+            _ = samples.observe(offset: 0, time: 0, refreshInterval: 0)
+            _ = samples.observe(offset: direction * 32, time: 16, refreshInterval: 0)
+            let motion = samples.observe(offset: direction * 128, time: 32, refreshInterval: 0)!
+            XCTAssertEqual(motion.velocity, direction * 8, accuracy: 0.001)
+            XCTAssertEqual(motion.acceleration, direction * 0.25, accuracy: 0.001)
+            XCTAssertEqual(WinUILazyPrefetch.distance(velocity: motion.velocity, interval: 16,
+                readiness: 0, neighbour: 0, acceleration: motion.acceleration), direction * 160, accuracy: 0.001)
+            let reversed = samples.observe(offset: 0, time: 48, refreshInterval: 0)!
+            XCTAssertEqual(reversed.velocity, -direction * 8, accuracy: 0.001)
+            XCTAssertEqual(reversed.acceleration, 0)
+        }
+    }
+
+    func testBrakingDoesNotPredictAReversalOrRetainAcceleration() {
+        var samples = WinUILazyPrefetch.MotionSamples()
+        _ = samples.observe(offset: 0, time: 0, refreshInterval: 0)
+        _ = samples.observe(offset: 160, time: 16, refreshInterval: 0)
+        let motion = samples.observe(offset: 176, time: 32, refreshInterval: 0)!
+        XCTAssertEqual(motion.velocity, 1)
+        XCTAssertEqual(motion.acceleration, 0)
+        XCTAssertEqual(WinUILazyPrefetch.distance(velocity: 8, interval: 16,
+            readiness: 160, neighbour: 0, acceleration: 0.25), 1_440,
+            "a short acceleration must not grow quadratically with a slow row's preparation time")
+    }
+
     func testSeveralNoticesWithinARefreshKeepTheirWholeMovementForTheNextSample() {
         var samples = WinUILazyPrefetch.MotionSamples()
         XCTAssertNil(samples.observe(offset: 0, time: 0, refreshInterval: 16))

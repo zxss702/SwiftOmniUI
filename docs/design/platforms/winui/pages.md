@@ -11,8 +11,9 @@ navigation model to reconcile with them.
 
 Top inset surfaces occupy a native Grid/StackPanel overlay in the existing
 content row, directly beneath TitleBar, menus and tabs. They do not create an
-auto row or shrink the ScrollView viewport. The common surface takes the
-TitleBar background and uses a native theme brush for the lower scroll edge;
+auto row or shrink the ScrollView viewport. Each bar owns an optional
+`SystemBackdropElement` with `MicaBackdrop`, independent of `TitleBar.Background`.
+The common surface uses a native theme brush for the lower scroll edge;
 sheets and authored window overlays remain above it. Explicit bar backgrounds
 stay on their original views.
 
@@ -23,12 +24,34 @@ window width would both cover the sidebar and alternate layout proposals.
 Source placement queues a coalesced geometry update; unchanged geometry
 does not write XAML layout properties again.
 
-Only the uninterrupted page-root modifier chain is promoted. Local layouts,
+Only a navigation stack or split view's uninterrupted page-root modifier chain
+is promoted. Outside navigation, top bars use the same local inset path as
+bottom and horizontal bars, including inside popovers. Local layouts,
 finite frames, clipping, side boundaries and negative spacing retain ordinary
 local hosting. The mounted source keeps geometry, animation and coordinate
 ancestry while native ownership changes are coalesced after layout. Old hosts
 release their children before new ones attach them; weak queued callbacks do
 nothing after release or window teardown.
+
+Local safe-area insets on top, bottom, leading and trailing edges also own a
+noninteractive `SystemBackdropElement` with `MicaBackdrop`. It is drawn immediately
+behind the bar and above the base content, filling the reserved strip including
+margins and positive spacing. It does not participate in intrinsic sizing or
+change the safe-area contribution. Promoted top bars draw their material in the
+window's merged stack. Explicit backgrounds remain above the material. Mica follows the system
+theme, wallpaper and fallback policy; it does not blur the application's text.
+
+`hiddenSafeBarBackground(_:)`, available on Windows and Linux, hides only the
+native SafeBar backing. Apply it after `safeAreaInset` or on a containing subtree;
+the nearest explicit value wins. Windows omits each local/promoted bar's Mica
+surface. GTK keeps hidden-background bars local rather than adding them to the
+painted native toolbar. Content, explicit authored backgrounds and safe-area
+contributions remain intact.
+
+Inset sizing observes modifier order. A bar outside a fixed frame adds to the
+frame's reported extent; an outer frame constrains the combined base and bar.
+Both native hosts measure that combined extent before arranging the remaining
+safe region. The material itself remains a drawing decoration.
 
 ## The window's chrome
 

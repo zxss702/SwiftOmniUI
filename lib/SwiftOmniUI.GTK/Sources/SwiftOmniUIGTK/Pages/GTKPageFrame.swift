@@ -136,7 +136,13 @@ final class GTKPageFrame {
     }
 
     private func refreshSafeBars() {
-        let bars = page.sourceElement?.pageTopSafeAreaBars.compactMap { $0.gtk.view } ?? []
+        let element = page.sourceElement
+        let navigation = element?.enclosing(type: .navigationStack) != nil
+            || element?.enclosing(type: .navigationSplitView) != nil
+        // Transparent bars and bars outside navigation stay in their local
+        // inset layout, away from AdwToolbarView's shared painted top surface.
+        let elements = navigation ? element?.pageTopSafeAreaBars ?? [] : []
+        let bars = elements.filter { !$0.safeBarBackgroundHidden }.compactMap { $0.gtk.view }
         guard bars.count != safeBars.count || !zip(bars, safeBars).allSatisfy({ $0 === $1.bar }) else {
             refreshScrollEdges()
             return

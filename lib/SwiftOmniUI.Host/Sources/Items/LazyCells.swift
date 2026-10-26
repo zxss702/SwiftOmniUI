@@ -348,7 +348,15 @@
             if !needsMeasurement { insertionPredecessor = nil }
         }
         if !needsMeasurement { inserting.formIntersection(identities[within]) }
-        request(within, keeping: keeping)
+        // When the incoming batch is already queued and visible rows remain
+        // covered, retire the old edge together with that batch. A separate
+        // shrink request would diff and patch the same window twice, and would
+        // make the ready batch wait for acknowledgement of an eviction alone.
+        let onlyRetires = !within.isEmpty && built.lowerBound <= within.lowerBound
+            && built.upperBound >= within.upperBound
+        if prefetchPlan == nil || !onlyRetires || retained != keeping {
+            request(within, keeping: keeping)
+        }
         // The visible request is always dispatched before optional neighbours.
         if prefetchPlan != nil {
             runtime?.lazyPrefetch.schedule(owner: self, ready: { [weak self] in
@@ -375,6 +383,12 @@
     private func prefetchRequestedRange(demand: Range<Double>, target: Range<Double>,
                                         perRun: Int, grid: Bool) -> Range<Int> {
         let estimated = requestedRange(in: target, perRun: perRun, grid: grid)
+        // A learned extent index already converts the physical prediction to
+        // rows. Replacing those measured extents with a median row count can
+        // cross an entire tall Markdown table and build several more tables
+        // beyond the predicted window. Keep the density fallback only for
+        // hosts whose unseen rows still use the fixed provisional estimate.
+        if grid ? runs.usesMeasuredEstimate : extents.usesMeasuredEstimate { return estimated }
         let visible = requestedRange(in: demand, perRun: perRun, grid: grid)
         guard !estimated.isEmpty, !visible.isEmpty else { return estimated }
         let count = orderedIdentities.count
@@ -555,8 +569,15 @@
     public var padding: (head: Double, tail: Double) = (0, 0) {
         didSet { if padding != oldValue { revision += 1 } }
     }
-    /// The provisional extent of each unseen child, independent of measured neighbours.
-    public let estimate: Double = 44
+    /// Hosts can learn document length from actual measurements without
+    /// constructing unseen children. The sequence keeps measured sums/counts,
+    /// so updating this estimate never scans the source or mounted views.
+    public var usesMeasuredEstimate = false {
+        didSet { if usesMeasuredEstimate != oldValue { revision += 1 } }
+    }
+    public var estimate: Double {
+        usesMeasuredEstimate ? max(1, sums.measuredAverage ?? 44) : 44
+    }
     /// Geometry version used to reuse viewport searches.
     public private(set) var revision = 0
     private var measured: [String: Double] = [:]
@@ -703,8 +724,13 @@
     public var padding: (head: Double, tail: Double) = (0, 0) {
         didSet { if padding != oldValue { revision += 1 } }
     }
-    /// The provisional extent of each unseen run, independent of measured neighbours.
-    public let estimate: Double = 44
+    public var usesMeasuredEstimate = false {
+        didSet { if usesMeasuredEstimate != oldValue { revision += 1 } }
+    }
+    /// Estimate rows/columns, not individual cells of a grid run.
+    public var estimate: Double {
+        usesMeasuredEstimate ? max(1, sums.measuredAverage ?? 44) : 44
+    }
     /// Geometry version used to reuse viewport searches.
     public private(set) var revision = 0
     private var sums = LazyExtentTree()

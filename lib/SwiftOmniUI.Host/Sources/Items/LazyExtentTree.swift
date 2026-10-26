@@ -35,6 +35,10 @@ struct LazyExtentTree: Sendable {
 
     private var root: Node?
     var count: Int { root?.count ?? 0 }
+    var measuredAverage: Double? {
+        guard let root, root.known > 0 else { return nil }
+        return root.sum / Double(root.known)
+    }
     var height: Int { root?.height ?? 0 }
     var storageNodes: Int {
         func nodes(_ node: Node?) -> Int {

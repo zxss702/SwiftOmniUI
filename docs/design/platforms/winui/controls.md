@@ -40,9 +40,13 @@ When XAML has not produced geometry yet, a one-shot `LayoutUpdated` handler
 reschedules the dirty report after arrangement.
 Reports are invalidated by text, typography, wrapping, alignment and size changes.
 Each native run's pointer advances sequentially, with transforms shared across
-its character queries. Dirty labels publish together in one transaction; clean
-labels schedule no geometry work. Reports refold retained preferences rather
-than rebuilding authored view bodies.
+its character queries. Character geometry is selection metadata, independent
+of XAML painting the completed paragraph. A dirty batch reads one label per UI
+turn and publishes its completed reports together in one transaction. Changed
+or detached labels cannot publish an older snapshot. A table therefore does not
+hold one callback while reading every cell, nor rebuild preference layers for
+every individual cell. Clean labels schedule no geometry work. Reports refold
+retained preferences rather than rebuilding authored view bodies.
 
 Custom layouts read a label's measured `BaselineOffset` through
 `LayoutSubview.dimensions(in:)`. A background/overlay ZStack forwards its

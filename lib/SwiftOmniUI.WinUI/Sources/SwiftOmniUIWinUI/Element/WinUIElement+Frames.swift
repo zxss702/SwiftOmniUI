@@ -33,7 +33,9 @@ extension WinUIElement: FrameReporter {
             return Rect(x: origin.x, y: origin.y, width: frame.width, height: frame.height)
         }
         element.reportFrame(
-            view.frameReport(safeArea: host.safeArea(of: element), frame: frame), named: named, in: host.runtime,
+            view.frameReport(safeArea: host.safeArea(of: element), frame: frame,
+                             cache: host.frameReportCache, generation: host.runtime.frames.reportGeneration),
+            named: named, in: host.runtime,
             geometryInsets: view.safeAreaContext?.insets)
     }
 }

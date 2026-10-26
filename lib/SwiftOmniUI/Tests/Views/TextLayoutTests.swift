@@ -70,6 +70,56 @@ private func findEvent(_ patch: HostPatch, _ event: String) -> Int? {
 }
 
 @MainActor final class TextLayoutTests: XCTestCase {
+    func testNativeLayoutPublicationRebuildsThePreferenceLayerWithoutRebuildingItsBase() throws {
+        struct Base: View {
+            let builds: Received<Int>
+            let make: () -> Text
+            var body: some View {
+                builds.values.append(1)
+                return make()
+            }
+        }
+        let renders = Renders()
+        let builds = Received<Int>()
+        let heard = Received<Int>()
+        let patch = renders.settled(stack([
+            Base(builds: builds, make: { Text("body") })
+                .backgroundPreferenceValue(Text.LayoutKey.self) { layouts in
+                    heard.values.append(layouts.first?.count ?? 0)
+                    return Color.clear
+                }.node,
+        ], id: "root"))
+        let before = builds.values.count
+        let handler = try XCTUnwrap(findEvent(patch, "textLayoutChanged"))
+        XCTAssertTrue(renders.fire(handler, with: [report().propValue]))
+        for _ in 0..<3 { _ = renders.revisit(changed: Renderer.shared.pendingChanges) }
+        XCTAssertEqual(heard.values.last, 1, "the dependent layer must receive the native layout")
+        XCTAssertEqual(builds.values.count, before,
+                       "selection geometry must not rebuild the Markdown view producing that geometry")
+    }
+    func testTextReportsRefoldOnlyTheChangedBranch() throws {
+        let renders = Renders()
+        let heard = Received<[Text.Layout]>()
+        let unrelated = Received<Int>()
+        let patch = renders.settled(stack([
+            LayoutEar(heard: heard) { Text("changed") }.node,
+            VStack {
+                ForEach(0..<500) { index in
+                    Text("unrelated \(index)").transformPreference(Text.LayoutKey.self) { layouts in
+                        unrelated.values.append(index)
+                        return layouts
+                    }
+                }
+            }.node,
+        ], id: "root"))
+        let previous = unrelated.values.count
+        let handler = try XCTUnwrap(findEvent(patch, "textLayoutChanged"))
+        XCTAssertTrue(renders.fire(handler, with: [report().propValue]))
+        _ = renders.revisit(changed: [])
+        XCTAssertEqual(heard.values.count, 2)
+        XCTAssertEqual(unrelated.values.count, previous,
+                       "one native text report must not refold every other mounted text")
+    }
     func testTextOriginReportsDoNotBecomeBusinessGeometryReads() throws {
         let renders = Renders()
         let heard = Received<[Text.Layout]>()
@@ -215,8 +265,8 @@ private func findEvent(_ patch: HostPatch, _ event: String) -> Int? {
         else { return XCTFail("the text heard no layout event") }
 
         XCTAssertTrue(renders.fire(id, with: [report().propValue]))
-        XCTAssertTrue(Renderer.shared.hasUntrackedCause,
-                      "a host-pushed report asks for a render")
+        XCTAssertFalse(Renderer.shared.pendingTextPreferences.isEmpty,
+                       "a host-pushed report identifies the preference branch to refresh")
 
         _ = renders.revisit(changed: [])
         XCTAssertEqual(heard.values.count, 2,

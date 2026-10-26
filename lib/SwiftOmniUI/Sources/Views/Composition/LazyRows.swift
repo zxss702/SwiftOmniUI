@@ -21,6 +21,9 @@ protocol LazyRows: Element {
     /// Hashable identity, kept as a value until a new host token is needed.
     func lazyRowID(at index: Int) -> AnyHashable?
 
+    /// Preserve structural scope when a reader supplies a public ForEach ID.
+    func lazyScrollIdentity(_ id: String) -> String
+
     /// Whether a fresh source can reuse the previous source's identity index.
     /// Row builders are always refreshed, even when this answers true.
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool
@@ -35,6 +38,7 @@ protocol LazyRows: Element {
 }
 
 extension LazyRows {
+    func lazyScrollIdentity(_ id: String) -> String { id }
     func lazyRowID(at index: Int) -> AnyHashable? { lazyRowIdentity(at: index).map(AnyHashable.init) }
     func changedLazyIdentityRanges(comparedTo other: any LazyRows)
         -> (before: Range<Int>, after: Range<Int>)? { nil }
@@ -139,6 +143,7 @@ private struct LayoutModifiedRows: LazyRows {
     var lazyRowCount: Int { rows.lazyRowCount }
     func lazyRowIdentity(at index: Int) -> String? { rows.lazyRowIdentity(at: index) }
     func lazyRowID(at index: Int) -> AnyHashable? { rows.lazyRowID(at: index) }
+    func lazyScrollIdentity(_ id: String) -> String { rows.lazyScrollIdentity(id) }
 
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
         guard let other = other as? Self else { return false }
@@ -174,6 +179,7 @@ private struct ModifiedLazyRows: LazyRows {
 
     func lazyRowIdentity(at index: Int) -> String? { rows.lazyRowIdentity(at: index) }
     func lazyRowID(at index: Int) -> AnyHashable? { rows.lazyRowID(at: index) }
+    func lazyScrollIdentity(_ id: String) -> String { rows.lazyScrollIdentity(id) }
 
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
         guard let other = other as? Self else { return false }
@@ -226,6 +232,8 @@ struct LazyKeyed: LazyRows {
     func lazyRowID(at index: Int) -> AnyHashable? {
         rows.lazyRowID(at: index).map { AnyHashable(ScopedLazyID(segment: segment, value: $0)) }
     }
+
+    func lazyScrollIdentity(_ id: String) -> String { "\(segment).\(rows.lazyScrollIdentity(id))" }
 
     func hasSameLazyIdentities(as other: any LazyRows) -> Bool {
         guard let other = other as? Self, segment == other.segment else { return false }

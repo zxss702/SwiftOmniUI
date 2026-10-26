@@ -27,6 +27,9 @@
     private var scrollers: [Int64: HeldScroller] = [:]
     private var reporters: [Int64: HeldReporter] = [:]
     private var moved = false
+    /// A completed-layout reporting batch. Native adapters may share ancestor
+    /// reads within this transaction, but never across a later layout or scroll.
+    public private(set) var reportGeneration: UInt64 = 0
 
     private struct HeldScroller {
         weak var scroller: (any FramedScroller)?
@@ -69,6 +72,7 @@
     private func reportFrames() {
         guard moved else { return }
         moved = false
+        reportGeneration &+= 1
         for order in reporters.keys.sorted() {
             guard let reporter = reporters[order]?.reporter else {
                 reporters[order] = nil

@@ -38,6 +38,7 @@ final class WinUIScrollerView: WinUIView {
     /// Prepare only the last destination after the native input callback returns.
     /// The native correlation rejects work cancelled or replaced by a program move.
     func prepareControllerJump(to target: Point, correlation: Int32) {
+        (placingLayout as? WinUIScrollView)?.cancelReaderDestination()
         controllerJump = (target, correlation)
         guard !controllerJumpQueued else { return }
         controllerJumpQueued = true

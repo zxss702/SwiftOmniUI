@@ -83,9 +83,7 @@ extension Node {
     ) {
         modifyContent(for: Owner.self) { node in
             let owner = ObjectIdentifier(Owner.self)
-            if LibraryContracts.byType[node.type]?.worn.contains(where: {
-                ObjectIdentifier($0) == owner
-            }) == true {
+            if LibraryContracts.wornByType[node.type]?.contains(owner) == true {
                 node.props.write(property, value)
             } else {
                 node.writeInherited(property, value)
@@ -131,9 +129,8 @@ extension Node {
         }
         guard inheritedMembers[property] == nil || (mergesAttributes && inheritedMembers[property] != member) else { return }
         inheritedMembers[property] = member
-        if !member.isDefault, LibraryContracts.byType[type]?.worn.contains(where: {
-            ObjectIdentifier($0) == member.owner
-        }) == true, props[property] == nil || mergesAttributes {
+        if !member.isDefault, LibraryContracts.wornByType[type]?.contains(member.owner) == true,
+           props[property] == nil || mergesAttributes {
             props[property] = member.value
         }
         for index in children.indices {
@@ -152,9 +149,7 @@ extension Node {
     }
 
     mutating func resolveShapeFill() {
-        guard LibraryContracts.byType[type]?.worn.contains(where: {
-            ObjectIdentifier($0) == ObjectIdentifier(ShapeContract.self)
-        }) == true else { return }
+        guard LibraryContracts.wornByType[type]?.contains(ObjectIdentifier(ShapeContract.self)) == true else { return }
         let paint: [Prop] = [.fill, .stroke, .strokeBorder]
         guard paint.allSatisfy({ props[$0] == nil && driven[$0] == nil }) else { return }
         props[.fill] = inheritedMembers[.fill]?.value ?? Brush.solidColor(.primary).propValue

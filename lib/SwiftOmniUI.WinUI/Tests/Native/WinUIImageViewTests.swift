@@ -9,6 +9,47 @@ import Foundation
 import XCTest
 
 final class WinUIImageViewTests: XCTestCase {
+    private func checkSymbolCanStartUnscaledThenScaleAndSwitchToPixels() throws {
+        try onUIThread {
+            let mode = State(wrappedValue: 0)
+            let pixels = PicturePixels(width: 2, height: 2,
+                                       rgba: Array(repeating: [UInt8(255), 0, 0, 255], count: 4).flatMap { $0 })
+            let bitmap = try XCTUnwrap(BitmapImage(pixels: pixels, size: Size(2, 2)))
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                Image(mode.wrappedValue == 2 ? ImageSource(bitmap: bitmap) : .symbol("\u{E8B7}"))
+                    .setValue(ImageContract.isResizable, mode.wrappedValue != 0)
+                    .scaledToFit().font(.system(size: 16)).foregroundStyle(.black)
+                    .horizontalAlignment(.fill).verticalAlignment(.fill)
+                    .frame(width: 64, height: 64)
+            }
+            let image = try XCTUnwrap(host.views(WinUIImageView.self).first)
+            let points = (0..<64).flatMap { y in
+                (0..<64).map { x in (Double(x) + 0.5, Double(y) + 0.5) }
+            }
+            @MainActor func inkWidth() -> Int {
+                let ink = image.pixels(at: points).enumerated().compactMap { index, pixel in
+                    pixel >> 24 > 32 ? index % 64 : nil
+                }
+                return ink.isEmpty ? 0 : ink.max()! - ink.min()! + 1
+            }
+            for value in [0, 1, 0, 1, 2, 0] {
+                mode.wrappedValue = value
+                host.step()
+                host.layOut()
+                XCTAssertTrue(host.views(WinUIImageView.self).first === image)
+                XCTAssertEqual(image.laidOutFrame.width, 64, accuracy: 0.001)
+                XCTAssertEqual(image.laidOutFrame.height, 64, accuracy: 0.001)
+                let width = inkWidth()
+                XCTAssertGreaterThan(width, value != 0 ? 32 : 4)
+                if value == 0 { XCTAssertLessThanOrEqual(width, 18) }
+                if value == 2 {
+                    XCTAssertTrue(image.pixels(at: points).allSatisfy { $0 == 0xffff0000 },
+                                  "switching a symbol to pixels must hide the previous glyph")
+                }
+            }
+        }
+    }
+
     func testSupersampledMemoryImagePreservesThinStrokeCoverageWhenDisplayed() throws {
         try onUIThread {
             var rgba = [UInt8](repeating: 0, count: 64 * 64 * 4)
@@ -337,6 +378,7 @@ final class WinUIImageViewTests: XCTestCase {
     }
 
     func testRawFluentGlyphsSurviveRepeatedNativeUpdates() throws {
+        try checkSymbolCanStartUnscaledThenScaleAndSwitchToPixels()
         try onUIThread {
             let image = WinUIImageView()
             var size = [0.0, 0.0]

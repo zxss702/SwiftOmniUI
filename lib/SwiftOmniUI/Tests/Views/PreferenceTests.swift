@@ -172,6 +172,28 @@ private struct Ear: View {
 
     // MARK: - Anchors
 
+    func testAnchorsInTheSameScrollDocumentIgnoreWindowRoundingButRetainLayoutChanges() throws {
+        let box = AnchorBox()
+        let anchor = Anchor<Rect>(box: box) { source, reader in
+            Rect(source.x - reader.x, source.y - reader.y, source.width, source.height)
+        }
+        func frame(globalY: Double, document: Double, y: Double) throws -> FrameReport {
+            try XCTUnwrap(FrameReport([0, 0, 10, 20, 100, globalY, 0, 0, 500, 600, document, 12, y]))
+        }
+        for offset in [0.0, 0.13, 80.41, 100_000.7] {
+            box.update(try frame(globalY: Double(Float(200.25 - offset)), document: 7, y: 200.25))
+            let proxy = GeometryProxy(report: try frame(globalY: Double(Float(20.1 - offset)), document: 7, y: 20.1))
+            XCTAssertEqual(proxy[anchor], Rect(0, 200.25 - 20.1, 10, 20))
+        }
+        box.update(try frame(globalY: 100, document: 7, y: 201.25))
+        let same = GeometryProxy(report: try frame(globalY: 30, document: 7, y: 20.1))
+        XCTAssertEqual(same[anchor].y, 201.25 - 20.1, "a real one-DIP layout change must be preserved")
+        let other = GeometryProxy(report: try frame(globalY: 30, document: 8, y: 20.1))
+        XCTAssertEqual(other[anchor].y, 70, "different scroll documents still resolve through window coordinates")
+        box.update(try XCTUnwrap(FrameReport([0, 0, 10, 20, 100, 120, 0, 0, 500, 600])))
+        XCTAssertEqual(same[anchor].y, 90, "a legacy report must clear the old document context")
+    }
+
     func testAnAnchorResolvesAgainstAProxy() {
         let renders = Renders()
         let heard = Received<[BlocksKey.Layout]>()

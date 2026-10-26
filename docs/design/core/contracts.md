@@ -5,6 +5,11 @@ node type and every member it has, each with the type of its value. Swift
 writes through the members, so a property and its value meet in the compiler,
 and a host realizes the contract member by member.
 
+Library element contracts have an immutable set of inherited tiers. The node
+builder indexes those tier identities once by node type, so inheriting fonts and
+foregrounds into each newly realized lazy row does not traverse and allocate the
+same contract graph again for every descendant.
+
 ```text
   enum TrafficLightContract: ElementContract
     nodeType   "Gallery.TrafficLight"

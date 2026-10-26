@@ -8,6 +8,21 @@
 /// alone - out to the window's edge.
 /// Design: docs/design/host/layout.md#the-safe-area
 @_spi(Host) public enum SafeAreaArithmetic {
+    /// An inset outside a frame adds its bar to the frame's reported size.
+    /// A frame outside the inset constrains this combined size as usual.
+    @MainActor
+    public static func size<Child: LayoutChild>(base: Child, bar: Child, edge: Edge,
+                                               spacing: Double, width: Double?) -> LayoutSize {
+        let vertical = edge == .top || edge == .bottom
+        let barSize = SingleChildArithmetic.size(of: bar, padding: EdgeInsets(0), width: vertical ? width : nil)
+        let gap = bar.isShown ? spacing : 0
+        let baseWidth = vertical ? width : width.map { max(0, $0 - barSize.width - gap) }
+        let baseSize = SingleChildArithmetic.size(of: base, padding: EdgeInsets(0), width: baseWidth)
+        return vertical
+            ? LayoutSize(width: max(baseSize.width, barSize.width), height: max(0, baseSize.height + barSize.height + gap))
+            : LayoutSize(width: max(0, baseSize.width + barSize.width + gap), height: max(baseSize.height, barSize.height))
+    }
+
     /// The room a page's content stands in: `safe` - the window's room clear of its bars and notch - reaching out to
     /// `whole` on each edge `edges` lets the content under the bars; `safe` where the content says nothing.
     public static func room(safe: Rect, whole: Rect, edges: SafeAreaEdges?) -> Rect {

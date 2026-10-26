@@ -7,6 +7,20 @@ import CSwiftOmniUIWinUI
 
 /// Children placed: the layout item each child gives its parent.
 extension WinUIElement {
+    /// An explicit visibility change refreshes only already-mounted insets in
+    /// this scope. This is not part of scrolling or per-frame geometry work.
+    func refreshSafeBarBackgrounds() {
+        let key = Prop("hiddenSafeBarBackground")
+        func refresh(_ node: MountedElement) {
+            if node.safeAreaInsetEdge != nil, let inset = node.winUI.view as? WinUIZStackView {
+                inset.holdChildren()
+                inset.invalidateMeasurements()
+            }
+            for child in node.currentChildren where child.value(key) == nil { refresh(child) }
+        }
+        refresh(element)
+    }
+
     /// The view lays out, and its control writes, in the element's direction.
     func directionChanged() {
         view?.setDirection(element.layoutDirection)

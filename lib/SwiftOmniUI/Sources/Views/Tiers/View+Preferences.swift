@@ -82,7 +82,7 @@ extension View {
                     EventBuffer.current, by: "frameChanged", as: [Double].self),
                     let report = FrameReport(numbers)
                 else { return }
-                box.frame = report.global
+                box.update(report)
             }
             node.preferenceSeeds.append(PreferenceSeed(
                 box: PreferenceKeyBox(K.self), value: transform(anchor)))
@@ -185,10 +185,20 @@ private struct PreferenceBacked<K: PreferenceKey, Base: View, Content: View>: Vi
         }.onPreferenceChange(K.self) { value = $0 }
         return Group {
             if over {
-                heard.overlay { transform(value) }
+                heard.overlay { PreferenceLayer<K, Content>(value: $value, transform: transform) }
             } else {
-                heard.background { transform(value) }
+                heard.background { PreferenceLayer<K, Content>(value: $value, transform: transform) }
             }
         }
     }
+}
+
+/// A preference change invalidates the dependent layer, not the base that produced it.
+/// In particular, publishing a newly visible Text.Layout must not rebuild a lazy document's
+/// row source (and its Markdown bodies) just to update a selection overlay.
+private struct PreferenceLayer<K: PreferenceKey, Content: View>: View {
+    let value: Binding<K.Value>
+    let transform: (K.Value) -> Content
+
+    var body: some View { transform(value.wrappedValue) }
 }

@@ -16,6 +16,7 @@ final class WinUIRenderer {
     static var log = HostLog(host: "WinUI")
 
     let frameClock: WinUIFrameClock
+    let frameReportCache = WinUIFrameReportCache()
 
     /// Whether the user asked for less animation: every animation arrives at once.
     private let reducesMotion: () -> Bool

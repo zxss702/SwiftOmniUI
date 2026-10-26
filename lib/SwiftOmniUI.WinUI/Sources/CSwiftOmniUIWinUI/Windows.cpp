@@ -28,6 +28,13 @@ using winrt::Windows::System::VirtualKeyModifiers;
 namespace windowing = winrt::Microsoft::UI::Windowing;
 
 namespace {
+    controls::SystemBackdropElement safeAreaBackground() {
+        controls::SystemBackdropElement surface;
+        surface.SystemBackdrop(xaml::Media::MicaBackdrop());
+        surface.IsHitTestVisible(false);
+        return surface;
+    }
+
     controls::Grid root(xaml::Window const &window) {
         return window.Content().as<controls::Grid>();
     }
@@ -186,9 +193,14 @@ extern "C" void swiftomniui_winui_window_set_overlay(SwiftOmniUIObjectRef handle
     }
 }
 
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_safe_area_background_make(void) {
+    try {
+        return detach(safeAreaBackground());
+    } catch (...) { report("making a safe area Mica background"); return nullptr; }
+}
+
 extern "C" void swiftomniui_winui_window_set_safe_area_bars(
-    SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef const *bars, int32_t count,
-    bool hasBackground, uint32_t background
+    SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef const *bars, int32_t count
 ) {
     try {
         auto children = root(borrow<xaml::Window>(handle)).Children();
@@ -221,20 +233,9 @@ extern "C" void swiftomniui_winui_window_set_safe_area_bars(
             if (resources.HasKey(key)) edge.Background(resources.Lookup(key).try_as<xaml::Media::Brush>());
             else edge.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{48, 128, 128, 128}));
             layer.Children().Append(edge);
+            // Each hosted bar supplies its own optional Mica background, so
+            // transparent and material-backed bars can share this stack.
             children.Append(layer);
-        }
-        // Share the TitleBar's effective background, including the native
-        // default; authored backgrounds stay on each original bar view.
-        if (hasBackground) {
-            winrt::Windows::UI::Color color{static_cast<uint8_t>(background >> 24),
-                static_cast<uint8_t>(background >> 16), static_cast<uint8_t>(background >> 8),
-                static_cast<uint8_t>(background)};
-            layer.Background(xaml::Media::SolidColorBrush(color));
-        } else {
-            xaml::Media::Brush background{nullptr};
-            for (auto const &child : children)
-                if (auto title = child.try_as<controls::TitleBar>()) { background = title.Background(); break; }
-            layer.Background(background);
         }
         auto held = layer.Children().GetAt(0).as<controls::StackPanel>().Children();
         bool same = held.Size() == static_cast<uint32_t>(count);

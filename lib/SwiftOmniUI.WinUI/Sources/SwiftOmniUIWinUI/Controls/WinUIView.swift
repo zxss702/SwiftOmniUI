@@ -721,15 +721,38 @@ class WinUIView {
     /// window's content - clear of its chrome - stands in there.
     // A placement context already supplies the safe region. Resolve a window
     // fallback only when needed, and reuse the caller's native frame read.
-    func frameReport(safeArea: @autoclosure () -> Rect, frame actualFrame: Rect? = nil) -> [Double] {
-        let corner = origin
+    func frameReport(safeArea: @autoclosure () -> Rect, frame actualFrame: Rect? = nil,
+                     cache: WinUIFrameReportCache? = nil, generation: UInt64 = 0) -> [Double] {
+        let document = cache?.documentCoordinates(of: self, generation: generation)
+        let corner = document.flatMap { cache?.rootOrigin(of: $0) } ?? origin
         let local = safeAreaContext?.safe
         let safe = local.map { Rect(corner.x + $0.x, corner.y + $0.y, $0.width, $0.height) } ?? safeArea()
         var frame = placedFrame
         let actual = actualFrame ?? laidOutFrame
         frame.width = actual.width
         frame.height = actual.height
-        return MountedElement.frameNumbers(place: frame, corner: corner, safeArea: safe)
+        var numbers = MountedElement.frameNumbers(place: frame, corner: corner, safeArea: safe)
+        if cache != nil {
+            if let document {
+                numbers += [Double(document.document.number), document.offset.x, document.offset.y]
+            }
+            return numbers
+        }
+        // Document coordinates remove the shared scroll translation only. A
+        // child's own drawing transform still belongs in its anchor's frame.
+        guard drawing.isIdentity else { return numbers }
+        var ancestor = placingLayout
+        while let layout = ancestor {
+            if layout is WinUIScrollDocument {
+                if let offset = layoutOffset(relativeTo: layout) {
+                    numbers += [Double(layout.number), offset.x, offset.y]
+                }
+                break
+            }
+            guard layout.drawing.isIdentity else { break }
+            ancestor = layout.placingLayout
+        }
+        return numbers
     }
 
     /// Where WinUI laid the element out in its parent, in DIPs.
@@ -923,6 +946,81 @@ class WinUIView {
         setFocusChanged(nil)
         menuActions = []
         paintsBySize = [:]
+    }
+}
+
+/// Native parent walks shared only within one geometry reporting transaction.
+/// A dense text tree otherwise repeats the same VisualTreeHelper/ActualOffset
+/// queries for every label, all the way to its scroll document, every frame.
+@MainActor
+final class WinUIFrameReportCache {
+    struct Coordinates {
+        let document: WinUIScrollDocument
+        let offset: Point
+    }
+    private var generation: UInt64?
+    private var coordinates: [Int64: Coordinates] = [:]
+    private var unsupported: Set<Int64> = []
+    private var documentOrigins: [Int64: Point] = [:]
+    private var transformedDocuments: Set<Int64> = []
+
+    func documentCoordinates(of view: WinUIView, generation: UInt64) -> Coordinates? {
+        if self.generation != generation {
+            coordinates.removeAll(keepingCapacity: true)
+            unsupported.removeAll(keepingCapacity: true)
+            documentOrigins.removeAll(keepingCapacity: true)
+            transformedDocuments.removeAll(keepingCapacity: true)
+            self.generation = generation
+        }
+        return read(view)
+    }
+
+    func rootOrigin(of coordinates: Coordinates) -> Point? {
+        let document = coordinates.document
+        if transformedDocuments.contains(document.number) { return nil }
+        let corner: Point
+        if let held = documentOrigins[document.number] { corner = held }
+        else if let scroll = document.scrollView, !scroll.held, scroll.direction == .leftToRight,
+                let parent = read(scroll), let base = rootOrigin(of: parent),
+                let local = document.layoutOffset(relativeTo: scroll) {
+            // An idle horizontal table moves with its outer vertical document.
+            // Reading its root transform independently rounds that common scroll
+            // translation again, changing cell anchors on every outer frame.
+            // Compose the idle inner offset in the shared document coordinates.
+            // A moving inner scroller keeps the native composition transform.
+            let offset = scroll.scroller.standing.offset
+            corner = Point(base.x + local.x - offset.x, base.y + local.y - offset.y)
+            documentOrigins[document.number] = corner
+        }
+        else {
+            var position = [0.0, 0.0]
+            guard swiftomniui_winui_translation_to_root(document.handle, &position) else {
+                transformedDocuments.insert(document.number)
+                return nil
+            }
+            corner = Point(position[0], position[1])
+            documentOrigins[document.number] = corner
+        }
+        return Point(corner.x + coordinates.offset.x, corner.y + coordinates.offset.y)
+    }
+
+    private func read(_ view: WinUIView) -> Coordinates? {
+        if let held = coordinates[view.number] { return held }
+        if unsupported.contains(view.number) { return nil }
+        if let document = view as? WinUIScrollDocument {
+            let result = Coordinates(document: document, offset: Point(0, 0))
+            coordinates[view.number] = result
+            return result
+        }
+        guard view.drawing.isIdentity, let parent = view.placingLayout,
+              let above = read(parent), let local = view.layoutOffset(relativeTo: parent) else {
+            unsupported.insert(view.number)
+            return nil
+        }
+        let result = Coordinates(document: above.document,
+                                 offset: Point(above.offset.x + local.x, above.offset.y + local.y))
+        coordinates[view.number] = result
+        return result
     }
 }
 

@@ -88,7 +88,7 @@ public struct Text: VisualElement, TextElement, FontElement, TextAlignmentElemen
                 EventBuffer.current, by: "textFrameChanged", as: [Double].self),
                 let report = FrameReport(numbers)
             else { return }
-            anchorBox.frame = report.global
+            anchorBox.update(report)
         }
         // The offer is asked at fold: a text the walk carries answers for the
         // report the host last handed in, not the one its render saw.
@@ -104,7 +104,7 @@ public struct Text: VisualElement, TextElement, FontElement, TextAlignmentElemen
             box.fill(report)
             // Native geometry changes the retained preference's answer.
             // Refold those answers without rebuilding authored view bodies.
-            Renderer.shared.setNeedsTextPreferenceRender()
+            Renderer.shared.setNeedsTextPreferenceRender(for: box)
         }
         return node
     }

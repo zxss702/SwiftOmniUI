@@ -41,6 +41,7 @@ namespace {
         uint32_t pointer = 0;
         bool dragging = false;
         bool capturing = false;
+        bool captured = false;
 
         winrt::event_token tapped, doubleTapped, entered, exited, movedToken, pressed, released, lost, canceled,
             started, delta, completed;
@@ -93,6 +94,7 @@ namespace {
         entry.pointer = 0;
         entry.dragging = false;
         entry.capturing = false;
+        entry.captured = false;
         tell(view, SwiftOmniUIHeardPress, phase, {});
     }
 
@@ -132,6 +134,19 @@ namespace {
             entry->pointer = args.Pointer().PointerId();
             entry->dragging = false;
             entry->capturing = false;
+            entry->captured = false;
+            // A narrow resize grip can be left before the recognition
+            // threshold is crossed. Capture mouse presses immediately, before
+            // Swift callbacks can resize/move the grip. Touch still waits for
+            // drag recognition so the surrounding scroller keeps its gesture.
+            if (args.Pointer().PointerDeviceType() == winrt::Microsoft::UI::Input::PointerDeviceType::Mouse) {
+                auto captured = sender.as<xaml::UIElement>().CapturePointer(args.Pointer());
+                entry = listener(view, SwiftOmniUIHearingDrags);
+                if (!entry || entry->pointer != args.Pointer().PointerId()) return;
+                if (!captured) { letGo(view, 3); return; }
+                entry->captured = true;
+                args.Handled(true);
+            }
             tell(view, SwiftOmniUIHeardPress, 0, onContent(args));
         }));
         entry.movedToken = element.PointerMoved(guarded("handling PointerMoved",
@@ -139,28 +154,50 @@ namespace {
             pointer(view, SwiftOmniUIHeardPointerMoved, sender, args);
             auto *entry = listener(view, SwiftOmniUIHearingDrags);
             if (!entry || entry->pointer != args.Pointer().PointerId()) return;
+            if (args.Pointer().PointerDeviceType() == winrt::Microsoft::UI::Input::PointerDeviceType::Mouse
+                && !args.GetCurrentPoint(sender.as<xaml::UIElement>()).Properties().IsLeftButtonPressed()) {
+                // Recover a missed release without reporting another resize
+                // from hover coordinates. letGo clears state before callbacks.
+                letGo(view, 2);
+                sender.as<xaml::UIElement>().ReleasePointerCapture(args.Pointer());
+                return;
+            }
             tell(view, SwiftOmniUIHeardPress, 1, onContent(args));
             // The host said, as it heard the move, whether the press is a drag: the view holds the pointer from there.
             entry = listener(view, SwiftOmniUIHearingDrags);
             if (!entry || !entry->dragging) return;
             if (entry->capturing) {
                 entry->capturing = false;
-                sender.as<xaml::UIElement>().CapturePointer(args.Pointer());
+                if (!entry->captured && !sender.as<xaml::UIElement>().CapturePointer(args.Pointer())) {
+                    letGo(view, 3);
+                    return;
+                }
+                entry = listener(view, SwiftOmniUIHearingDrags);
+                if (!entry || entry->pointer != args.Pointer().PointerId()) return;
+                entry->captured = true;
             }
             args.Handled(true);
         }));
         entry.released = element.PointerReleased(guarded("handling PointerReleased",
             [view](IInspectable const &sender, input::PointerRoutedEventArgs const &args) {
             pointer(view, SwiftOmniUIHeardPointerReleased, sender, args);
+            auto *entry = listener(view, SwiftOmniUIHearingDrags);
+            if (!entry || entry->pointer != args.Pointer().PointerId()) return;
             letGo(view, 2);
+            sender.as<xaml::UIElement>().ReleasePointerCapture(args.Pointer());
         }));
         entry.lost = element.PointerCaptureLost(guarded("handling PointerCaptureLost",
-            [view](IInspectable const &, input::PointerRoutedEventArgs const &) {
+            [view](IInspectable const &, input::PointerRoutedEventArgs const &args) {
+            auto *entry = listener(view, SwiftOmniUIHearingDrags);
+            if (!entry || entry->pointer != args.Pointer().PointerId()) return;
             letGo(view, 3);
         }));
         entry.canceled = element.PointerCanceled(guarded("handling PointerCanceled",
-            [view](IInspectable const &, input::PointerRoutedEventArgs const &) {
+            [view](IInspectable const &sender, input::PointerRoutedEventArgs const &args) {
+            auto *entry = listener(view, SwiftOmniUIHearingDrags);
+            if (!entry || entry->pointer != args.Pointer().PointerId()) return;
             letGo(view, 3);
+            sender.as<xaml::UIElement>().ReleasePointerCapture(args.Pointer());
         }));
         entry.started = element.ManipulationStarted(
             guarded("handling ManipulationStarted",

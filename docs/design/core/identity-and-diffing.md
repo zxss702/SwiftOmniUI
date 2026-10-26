@@ -337,6 +337,11 @@ reconciling one and the clean one - fold bottom-up the same way and queue an
 observer only when the key's answer actually moved. `backgroundPreferenceValue`
 and `overlayPreferenceValue` are observers whose action writes a state the
 layer reads; the settling passes build the layer again with the fresh answer.
+The layer owns the preference-state read through a binding; the base does not
+read that state. Publishing selection geometry therefore does not rebuild the
+document producing it. Native text layout reports identify their retained text
+box in the renderer's weak dependency index. Only that text and the ownership
+path to its observers refold; unrelated branches retain their previous answers.
 
 Preference seeds, observers and transforms written on a composed view follow
 its body's root during expansion, including a body that splices several roots.

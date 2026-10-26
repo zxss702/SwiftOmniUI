@@ -36,6 +36,7 @@ final class WinUIPathView: WinUIView {
     private var painting: (fill: WinUIBrush, stroke: WinUIBrush, dashes: [Double], dashOffset: Double,
                            cap: LineCap, join: LineJoin, miter: Double)?
     private var figure = LayoutSize(width: 0, height: 0)
+    private(set) var drawsInk = false
 
     init() {
         super.init { number in swiftomniui_winui_path_make(number) }
@@ -47,10 +48,19 @@ final class WinUIPathView: WinUIView {
         fill: WinUIBrush, stroke: WinUIBrush, width: Double, outline: Double, dashes: [Double], dashOffset: Double,
         cap: LineCap, join: LineJoin, miter: Double
     ) {
+        func visible(_ brush: WinUIBrush) -> Bool {
+            brush.kind != 0 && brush.colors.contains { $0 >> 24 != 0 }
+        }
+        let wasDrawing = drawsInk
         strokeWidth = ShapeArithmetic.strokeWidth(width)
         outlineWidth = ShapeArithmetic.strokeWidth(outline)
         painting = (fill, stroke, dashes, dashOffset, cap, join, miter)
-        sendPainting()
+        drawsInk = visible(fill) || (strokeWidth > 0 && visible(stroke))
+        // Empty spacers still participate in layout, input and accessibility.
+        // They need neither composition brushes nor a path geometry. A later
+        // visible fill must draw the current bounds even if those did not move.
+        if drawsInk != wasDrawing { drawn = nil }
+        if drawsInk || wasDrawing { sendPainting() }
         if let committedFrame { draw(in: committedFrame) }
     }
 
@@ -104,6 +114,7 @@ final class WinUIPathView: WinUIView {
 
     /// Hands WinUI the geometry for `room`, again only where the room or the geometry changed.
     private func draw(in room: Rect) {
+        guard drawsInk else { return }
         let inset: Double
         if case .authored = geometry { inset = 0 }
         else { inset = outlineWidth / 2 }

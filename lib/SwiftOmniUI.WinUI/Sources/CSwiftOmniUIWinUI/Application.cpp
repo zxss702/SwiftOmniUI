@@ -39,6 +39,8 @@ namespace swiftomniui {
     namespace {
         winrt::Microsoft::UI::Dispatching::DispatcherQueue queue{nullptr};
         winrt::event_token rendering{};
+        winrt::event_token rendered{};
+        double lastRenderedTime = 0;
         std::atomic<bool> turnQueued{false};
         bool holding = false;
         bool ownsMessageLoop = false;
@@ -503,6 +505,13 @@ extern "C" void swiftomniui_winui_hold_frames(bool hold) {
     if (hold == holding) return;
     try {
         if (hold) {
+            rendered = xaml::Media::CompositionTarget::Rendered(
+                [](winrt::Windows::Foundation::IInspectable const &, xaml::Media::RenderedEventArgs const &) {
+                    LARGE_INTEGER count{}, frequency{};
+                    QueryPerformanceCounter(&count);
+                    QueryPerformanceFrequency(&frequency);
+                    lastRenderedTime = static_cast<double>(count.QuadPart) * 1000.0 / frequency.QuadPart;
+                });
             rendering = xaml::Media::CompositionTarget::Rendering(
                 [](winrt::Windows::Foundation::IInspectable const &, winrt::Windows::Foundation::IInspectable const &args) {
                     auto time = args.as<xaml::Media::RenderingEventArgs>().RenderingTime();
@@ -510,12 +519,18 @@ extern "C" void swiftomniui_winui_hold_frames(bool hold) {
                 });
         } else {
             xaml::Media::CompositionTarget::Rendering(rendering);
+            xaml::Media::CompositionTarget::Rendered(rendered);
         }
         // Held only once WinUI took it: a subscription that failed is asked for again at the next hold.
         holding = hold;
     } catch (...) {
+        if (hold) xaml::Media::CompositionTarget::Rendered(rendered);
         report("holding the frames");
     }
+}
+
+extern "C" double swiftomniui_winui_last_rendered_time(void) {
+    return lastRenderedTime;
 }
 
 extern "C" bool swiftomniui_winui_holds_frames(void) {

@@ -72,7 +72,7 @@ extension MountedElement {
                             contentInsets: EdgeInsets = EdgeInsets(0), geometryInsets: EdgeInsets? = nil) {
         guard readsOwnFrame else { return }
         var numbers = numbers
-        if contentInsets != EdgeInsets(0), numbers.count == 10 {
+        if contentInsets != EdgeInsets(0), numbers.count >= 10 {
             let top = max(0, numbers[7] - numbers[5]) + contentInsets.top
             let left = max(0, numbers[6] - numbers[4]) + contentInsets.left
             let bottom = max(0, numbers[5] + numbers[3] - numbers[7] - numbers[9]) + contentInsets.bottom

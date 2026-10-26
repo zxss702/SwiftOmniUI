@@ -90,8 +90,15 @@ A press of the primary button, or a finger or a pen down, becomes a drag by
 the host layer's rule ([a press dragged](../../host/runtime.md#a-press-dragged))
 once it has moved past the system's drag distance along either axis
 (`SM_CXDRAG`, `SM_CYDRAG` at 96 DPI, so in DIPs as the press is measured).
-The relay tells the press alone - down, moved, let go, taken away - and holds
-the pointer for the view as the rule says it is a drag: from there the view holds the
+The relay tells the press alone - down, moved, let go, taken away. Mouse
+presses capture the pointer immediately, before callbacks can move a narrow
+resize grip and before the recognition threshold is crossed. Touch and pen
+capture when the rule recognizes a drag, preserving native scroll arbitration.
+Failed capture cancels the pending press. Release/cancel/lost-capture events
+must match the active pointer; state clears before callbacks and release of
+capture. A mouse move with the primary button up ends a stale press without
+reporting another drag movement, so hover cannot resize after a missed release.
+From recognition the view holds the
 pointer, so the drag goes on outside it, and the drag is handled, so a view
 dragged inside another drags alone. It is measured on the window's content,
 where the view it moves does not move the measure. A drag says its phases -

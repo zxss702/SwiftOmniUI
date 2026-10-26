@@ -200,6 +200,7 @@ fileprivate final class TextLayoutIdentity {}
 final class TextLayoutBox: @unchecked Sendable {
     /// Stable across a Text value rebuilding, distinct between sibling labels.
     fileprivate var identity = TextLayoutIdentity()
+    var preferenceIdentity: ObjectIdentifier { ObjectIdentifier(identity) }
     /// The lines the host last said the text stands on.
     var lines: [Text.Layout.Line] = []
 

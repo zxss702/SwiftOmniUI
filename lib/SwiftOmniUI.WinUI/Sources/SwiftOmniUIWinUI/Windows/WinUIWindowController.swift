@@ -39,7 +39,10 @@ final class WinUIWindowController {
         if let overlay = changes.overlay { window.showOverlay(overlay?.winUI.view) }
         if runtime.tree.chromeMayChange || changes.arrangement != nil || changes.traits != nil { refreshChrome(in: runtime) }
         let page = presentation.arrangement?.visiblePage
-        window.showTopSafeAreaBars(page?.pageTopSafeAreaBars ?? [], in: page)
+        let navigation = presentation.arrangement?.visibleNavigationStack != nil
+            || presentation.arrangement?.visibleSplitView != nil
+        // Standalone content (including popovers) retains local inset hosting.
+        window.showTopSafeAreaBars(navigation ? page?.pageTopSafeAreaBars ?? [] : [], in: navigation ? page : nil)
         boundContent(element, requested: changes.frame,
                      quiet: changes.arrangement == nil && changes.traits == nil && changes.bounds == nil,
                      keepingSizing: keepingSizing)

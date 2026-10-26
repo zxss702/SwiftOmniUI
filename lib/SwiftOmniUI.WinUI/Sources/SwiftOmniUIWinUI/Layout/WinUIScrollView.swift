@@ -25,6 +25,31 @@ final class WinUIScrollView: WinUILayoutView {
 
     /// The user's movement, and its rest.
     private let movement = ScrollMovement()
+    private var horizontalSamples = WinUILazyPrefetch.MotionSamples()
+    private var verticalSamples = WinUILazyPrefetch.MotionSamples()
+    private var lazyVelocity = Point(0, 0)
+    private var lazyAcceleration = Point(0, 0)
+    private var lazyInterval = Point(0, 0)
+    private var lazyObservationLead = Point(0, 0)
+    private var lazyPreparation = Point(0, 0)
+    private var precedingLazyPreparation = Point(0, 0)
+
+    /// An incoming nested lazy panel has no timing sample of its own yet.
+    /// Reuse the last neighbouring batches in this scroller until it has one;
+    /// zero would incorrectly predict that its first subtree is ready instantly.
+    func recordLazyPreparation(_ duration: Double, on axis: StackArithmetic.Axis) {
+        if axis == .vertical {
+            lazyPreparation.y = max(duration, precedingLazyPreparation.y)
+            precedingLazyPreparation.y = duration
+        } else {
+            lazyPreparation.x = max(duration, precedingLazyPreparation.x)
+            precedingLazyPreparation.x = duration
+        }
+    }
+
+    func preparationTime(on axis: StackArithmetic.Axis) -> Double {
+        axis == .vertical ? lazyPreparation.y : lazyPreparation.x
+    }
 
     let scroller = WinUIScrollerView()
     private let document = WinUIScrollDocument()
@@ -36,6 +61,12 @@ final class WinUIScrollView: WinUILayoutView {
     /// Where the program moved the scroller, until the scroller says it stands there.
     /// Design: docs/design/platforms/winui/layout.md#the-programs-move
     private var programTarget: Point?
+    private weak var readerRoot: MountedElement?
+    private weak var readerLazy: WinUILazyView?
+    private var readerIdentity: String?
+    private var readerDestination: (name: String, x: Double?, y: Double?)?
+    private var readerMove: Point?
+    private var resolvingReader = false
 
     /// The offset the tree writes, kept for the first layout where it comes before it.
     private var writtenOffset = WrittenScrollOffset()
@@ -136,6 +167,7 @@ final class WinUIScrollView: WinUILayoutView {
         if let defaultAnchor { self.defaultAnchor = (defaultAnchor.x, defaultAnchor.y) }
 
         if let target = writtenOffset.written(offset, standing: self.offset, orientation: orientation) {
+            finishReaderDestination()
             move(to: target)
         }
     }
@@ -242,7 +274,14 @@ final class WinUIScrollView: WinUILayoutView {
 
     /// The user took hold of the scroller, or let go of it and left it to throw on.
     private func scrollerHeld(_ holding: Bool) {
+        horizontalSamples = .init()
+        verticalSamples = .init()
+        lazyVelocity = Point(0, 0)
+        lazyAcceleration = Point(0, 0)
+        lazyInterval = Point(0, 0)
+        lazyObservationLead = Point(0, 0)
         if holding {
+            finishReaderDestination()
             programTarget = nil
             movement.holdBegan()
         } else {
@@ -258,16 +297,47 @@ final class WinUIScrollView: WinUILayoutView {
     /// under its own power, ahead of this thread's notices.
     var held: Bool { movement.holding }
 
+    /// Every lazy descendant follows one physical movement. A newly created
+    /// nested panel can use its scroller's existing samples immediately.
+    func lazyMotion(on axis: StackArithmetic.Axis) -> (velocity: Double, interval: Double, acceleration: Double) {
+        axis == .vertical ? (lazyVelocity.y, lazyInterval.y, lazyAcceleration.y)
+            : (lazyVelocity.x, lazyInterval.x, lazyAcceleration.x)
+    }
+
+    private func observeLazyMotion(at offset: Point, now: Double) {
+        let refresh = WinUIFrameClock.current?.refreshInterval ?? 0
+        guard held else { return }
+        // Sample once per display frame. Mixing ViewChanged and Rendering
+        // timestamps gives fragments of one movement different time origins,
+        // causing the predicted lead to alternately grow and collapse.
+        if let sample = horizontalSamples.observe(offset: offset.x, time: now, refreshInterval: refresh) {
+            lazyVelocity.x = sample.velocity; lazyInterval.x = sample.interval
+            lazyAcceleration.x = sample.acceleration
+        }
+        if let sample = verticalSamples.observe(offset: offset.y, time: now, refreshInterval: refresh) {
+            lazyVelocity.y = sample.velocity; lazyInterval.y = sample.interval
+            lazyAcceleration.y = sample.acceleration
+        }
+    }
+
     /// Native ViewChanged offsets can lead the transform exposed by XAML.
     /// Compare in document coordinates so nested lazy panels share the same lag.
     func observationLead(on axis: StackArithmetic.Axis) -> Double {
-        guard case .ready(let rect) = scroller.viewport(of: document) else { return 0 }
-        let offset = scroller.standing.offset
-        return axis == .vertical ? offset.y - rect.y : offset.x - rect.x
+        axis == .vertical ? lazyObservationLead.y : lazyObservationLead.x
     }
 
     /// One frame of the display: what the scroller has to say, said here and nowhere else.
     func frame(now: Double) {
+        if held {
+            let offset = scroller.standing.offset
+            // RenderingTime identifies the physical frame. Dispatcher arrival
+            // time compresses queued callbacks after a slow layout into an
+            // artificial acceleration, requesting still more expensive rows.
+            observeLazyMotion(at: offset, now: WinUIFrameClock.current?.renderingTime ?? now)
+            if case .ready(let rect) = scroller.viewport(of: document) {
+                lazyObservationLead = Point(offset.x - rect.x, offset.y - rect.y)
+            } else { lazyObservationLead = Point(0, 0) }
+        }
         // Keep the visible window current through inertia, independently of
         // how many native ViewChanged notifications arrived between frames.
         scroller.ears.removeAll { $0.owner == nil }
@@ -284,6 +354,7 @@ final class WinUIScrollView: WinUILayoutView {
     }
 
     override func detach() {
+        finishReaderDestination()
         detached = true
         pendingInsets = nil
         super.detach()
@@ -294,6 +365,93 @@ final class WinUIScrollView: WinUILayoutView {
     }
 
     // MARK: - WinUI's scroller
+
+    /// A reader names logical content, including rows not yet materialized.
+    /// Observe completed native layouts rather than consuming an initial zero
+    /// allocation or scheduling a second layout to make the request work.
+    @discardableResult
+    func scroll(to name: String, in root: MountedElement, anchorX: Double?, anchorY: Double?) -> Bool {
+        finishReaderDestination()
+        func lazyTarget(in element: MountedElement) -> (WinUILazyView, String)? {
+            if let view = (element.native as? WinUIElement)?.view as? WinUILazyView,
+               let identity = element.lazyRows?.identity(forScrollID: name)
+                    ?? (view.cells.position(of: name) != nil ? name : nil) { return (view, identity) }
+            for child in element.children {
+                if child !== root, (child.native as? WinUIElement)?.view is WinUIScrollView { continue }
+                if let found = lazyTarget(in: child) { return found }
+            }
+            return nil
+        }
+        let lazy = lazyTarget(in: root)
+        guard lazy != nil || root.first(id: .manual(name)) != nil else { return false }
+        readerRoot = root
+        readerLazy = lazy?.0
+        readerIdentity = lazy?.1
+        readerDestination = (name, anchorX, anchorY)
+        swiftomniui_winui_scroller_watch_layout(scroller.handle, number) { number in
+            MainActor.assumeIsolated {
+                (WinUIView.find(number) as? WinUIScrollView)?.resolveReaderDestination()
+            }
+        }
+        if let (view, identity) = lazy {
+            view.requestReaderTarget(identity, anchor: view.axis == .vertical ? anchorY : anchorX)
+        }
+        resolveReaderDestination()
+        return true
+    }
+
+    private func finishReaderDestination() {
+        guard readerDestination != nil else { return }
+        readerLazy?.readerTarget = nil
+        readerLazy = nil
+        readerIdentity = nil
+        readerRoot = nil
+        readerDestination = nil
+        readerMove = nil
+        swiftomniui_winui_scroller_watch_layout(scroller.handle, number, nil)
+    }
+
+    /// An explicit native scrollbar request supersedes an unfinished reader jump.
+    func cancelReaderDestination() { finishReaderDestination() }
+
+    private func resolveReaderDestination() {
+        guard !resolvingReader, let request = readerDestination, let root = readerRoot else { return }
+        resolvingReader = true
+        defer { resolvingReader = false }
+        func nativeView(_ element: MountedElement) -> WinUIView? {
+            if let view = (element.native as? WinUIElement)?.view { return view }
+            let children = request.y == 1 ? Array(element.children.reversed()) : element.children
+            for child in children { if let view = nativeView(child) { return view } }
+            return nil
+        }
+        let descendant: WinUIView?
+        if let identity = readerIdentity, let lazy = readerLazy {
+            guard lazy.cells.position(of: identity) != nil else { finishReaderDestination(); return }
+            // One logical ForEach row can contain several sibling views.
+            // Its native row container supplies their complete bounds.
+            descendant = lazy.mounted[identity]?.view
+        } else {
+            guard let target = root.first(id: .manual(request.name)) else { finishReaderDestination(); return }
+            descendant = nativeView(target)
+        }
+        guard let descendant, descendant.placed != nil else { return }
+        let rowsReady = readerLazy.map { $0.cells.requestedItemsAreCurrent && !$0.needsRowMeasurements
+            && !$0.cells.needsMeasurement } ?? true
+        guard rowsReady else { return }
+        var place = [0.0, 0.0]
+        var found: Int32 = 0
+        swiftomniui_winui_scroller_place_for(
+            scroller.handle, descendant.handle, request.x ?? .nan, request.y ?? .nan, &found, &place)
+        guard found != 0 else { return }
+        let standing = scroller.standing
+        let destination = ScrollArithmetic.kept(Point(x: place[0], y: place[1]), reach: standing.reach)
+        if !ScrollArithmetic.differs(destination, standing.offset) {
+            finishReaderDestination()
+        } else if readerMove.map({ ScrollArithmetic.differs($0, destination) }) ?? true {
+            readerMove = destination
+            move(to: destination)
+        }
+    }
 
     private func configure() {
         scroller.set(

@@ -149,13 +149,13 @@ final class Differ {
     func revisit(
         _ rendered: RenderedNode,
         changed: Set<ObjectIdentifier>,
-        refreshPreferences: Bool = false
+        refreshPreferences: Set<ObjectIdentifier> = []
     ) -> (node: RenderedNode, patch: HostPatch) {
         customLayoutOwners.removeAll(keepingCapacity: true)
         customLayoutsWithChangedValues.removeAll(keepingCapacity: true)
         describeAll = false
         self.changed = changed
-        affected = refreshPreferences ? nil : Renderer.shared.affectedNodes(reading: changed)
+        affected = Renderer.shared.affectedNodes(reading: changed.union(refreshPreferences))
         stylesMoved = false
         walkStamp += 1
         seedScope()

@@ -78,6 +78,12 @@ final class WinUIGridView: WinUITravellingLayout {
 
     override func arrange(in bounds: Rect) {
         beginArrangement(in: bounds)
+        if items.count == 1, let item = items.first {
+            for proposal in preparedLayoutPlan(in: bounds) where proposal.view === item.view {
+                place(item, at: proposal.place)
+            }
+            return
+        }
         let byView = Dictionary(uniqueKeysWithValues: items.map { ($0.view.number, $0) })
         for proposal in preparedLayoutPlan(in: bounds) {
             guard let view = proposal.view, let item = byView[view.number] else { continue }
@@ -101,10 +107,46 @@ final class WinUIGridView: WinUITravellingLayout {
                 $0.element?.preservesSafeAreaProposal == true
             }
         }
+        // A frame's single implicit proportional cell is exactly its padded
+        // bounds. Dense lazy file rows contain several such wrappers per row;
+        // allocating track definitions, sizes and origins adds no information.
+        if !contentSizedTracks, rows.isEmpty, columns.isEmpty, flowColumns.isEmpty,
+           items.count == 1, let item = items.first, item.values.isFrameContent,
+           item.values.row == 0, item.values.column == 0,
+           item.values.rowSpan == 1, item.values.columnSpan == 1 {
+            return [item.isShown ? framePlace(item, in: bounds) : nil]
+        }
         return GridArithmetic.places(
             of: items, rows: implicitRows, columns: implicitColumns,
             rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, in: bounds,
             direction: direction, flow: flowColumns)
+    }
+
+    /// The one-cell case of GridArithmetic, including a fixed inner frame
+    /// overflowing its outer frame. Ordinary grids retain track arithmetic.
+    private func framePlace(_ item: WinUILayoutItem, in bounds: Rect) -> Rect {
+        let content = Rect(bounds.x + padding.left, bounds.y + padding.top,
+                           max(0, bounds.width - padding.left - padding.right),
+                           max(0, bounds.height - padding.top - padding.bottom))
+        let values = item.values
+        let margin = values.margin
+        let across = max(0, content.width - margin.left - margin.right)
+        let down = max(0, content.height - margin.top - margin.bottom)
+        let natural = item.size(offered: across)
+        let fillsAcross = values.flex != nil || values.expandingAxes == .horizontal || values.expandingAxes == .both
+        let fillsDown = values.flex != nil || values.expandingAxes == .vertical || values.expandingAxes == .both
+        let width = Extent.of(option: fillsAcross ? 3 : values.horizontal, stated: values.width,
+                              natural: natural.width, available: across,
+                              minimum: values.minimumWidth, maximum: values.maximumWidth, allowsOverflow: true)
+        let height = Extent.of(option: fillsDown ? 3 : values.vertical, stated: values.height,
+                               natural: natural.height, available: down,
+                               minimum: values.minimumHeight, maximum: values.maximumHeight, allowsOverflow: true)
+        return direction.places(Rect(
+            x: Extent.start(option: values.horizontal, extent: width,
+                            start: content.x + margin.left, available: across, allowsOverflow: true),
+            y: Extent.start(option: values.vertical, extent: height,
+                            start: content.y + margin.top, available: down, allowsOverflow: true),
+            width: width, height: height), in: bounds)
     }
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
         let context = layoutSafeArea(in: contextBounds)

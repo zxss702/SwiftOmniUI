@@ -223,6 +223,17 @@ extension MountedElement {
         return true
     }
 
+    /// The nearest explicit choice wins, so one local bar can retain its
+    /// material inside a subtree whose other bars are transparent.
+    public var safeBarBackgroundHidden: Bool {
+        var next: MountedElement? = self
+        while let element = next {
+            if let hidden = element.value(Prop("hiddenSafeBarBackground"))?.bool { return hidden }
+            next = element.parent
+        }
+        return false
+    }
+
     /// Only the page's uninterrupted root modifier chain joins native chrome.
     /// GeometryReader, scrolling, stacks and sized/padded local frames end it.
     public var pageTopSafeAreaBars: [MountedElement] {

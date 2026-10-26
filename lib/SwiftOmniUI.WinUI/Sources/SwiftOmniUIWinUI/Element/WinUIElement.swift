@@ -8,6 +8,8 @@
 /// Design: docs/design/host/tree.md#the-native-half
 @MainActor
 final class WinUIElement: NativeElement {
+    /// Optional focused-test instrumentation; ordinary mounting reads no clock.
+    static var workObserver: ((String, NodeType, Double) -> Void)?
     /// The element of the mounted tree this is the WinUI half of; it owns this half.
     unowned let element: MountedElement
 
@@ -125,6 +127,8 @@ final class WinUIElement: NativeElement {
     }
 
     init(_ element: MountedElement, host: WinUIRenderer) {
+        let started = Self.workObserver == nil ? 0 : WinUIFrameClock.monotonic()
+        defer { Self.workObserver?("make", element.type, WinUIFrameClock.monotonic() - started) }
         self.element = element
         self.host = host
         view = makeView()
@@ -175,6 +179,7 @@ final class WinUIElement: NativeElement {
     }
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {
+        var started = Self.workObserver == nil ? 0 : WinUIFrameClock.monotonic()
         if !wasDescribed || element.childOrderChanged || !changed.isDisjoint(with: Self.layoutInputs) {
             // A described height owns dependent vertical geometry, not every
             // sibling's animation. Width may also reflow height; other layout
@@ -191,7 +196,17 @@ final class WinUIElement: NativeElement {
             layoutItemChanged(presentedLanes: Self.geometryLanes(affectedBy: presented))
         }
         if wasDescribed, changed.contains(.isVisible) { crossVisibility() }
+        if let observe = Self.workObserver {
+            observe("derive", type, WinUIFrameClock.monotonic() - started)
+            started = WinUIFrameClock.monotonic()
+        }
         applyProperties(changed: changed)
+        if let observe = Self.workObserver {
+            observe("properties", type, WinUIFrameClock.monotonic() - started)
+            started = WinUIFrameClock.monotonic()
+        }
+        defer { Self.workObserver?("applied", type, WinUIFrameClock.monotonic() - started) }
+        if changed.contains(Prop("hiddenSafeBarBackground")) { refreshSafeBarBackgrounds() }
         if let view, let host { element.applyDrawnChildren(to: view, through: WinUIRegistrations.registry, in: host.runtime) }
         configureGestures()
         if let label = view as? WinUITextView {

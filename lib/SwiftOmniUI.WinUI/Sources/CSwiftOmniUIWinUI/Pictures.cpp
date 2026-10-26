@@ -426,6 +426,7 @@ namespace {
         int32_t aspect = -1;
         winrt::Windows::Foundation::Size size{};
         controls::Image image{nullptr};
+        controls::FontIcon symbol{nullptr};
         controls::Viewbox box{nullptr};
         winrt::Windows::Foundation::Size placement{};
 
@@ -477,17 +478,23 @@ namespace {
         return state->image;
     }
 
-    controls::Viewbox symbolBox(controls::Panel const &grid) {
+    controls::FontIcon symbolChild(controls::Panel const &grid, bool scales) {
         auto state = imageState(grid);
-        if (!state->box) {
+        if (!state->symbol) state->symbol = controls::FontIcon();
+        // A file row's ordinary symbol uses its font's own size. A Viewbox
+        // adds another native element and layout pass without scaling anything.
+        // Keep the same glyph when a later modifier actually requests scaling.
+        if (scales && !state->box) {
+            uint32_t index;
+            if (grid.Children().IndexOf(state->symbol, index)) grid.Children().RemoveAt(index);
             state->box = controls::Viewbox();
-            controls::FontIcon glyph;
-            glyph.FontSize(16);
-            state->box.Child(glyph);
-            state->box.Stretch(xaml::Media::Stretch::None);
+            state->box.Child(state->symbol);
             grid.Children().Append(state->box);
+        } else if (!state->box) {
+            uint32_t index;
+            if (!grid.Children().IndexOf(state->symbol, index)) grid.Children().Append(state->symbol);
         }
-        return state->box;
+        return state->symbol;
     }
 }
 
@@ -512,12 +519,12 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
         state->path.clear();
         state->svg = false;
         state->aspect = -1;
-        auto box = symbolBox(grid);
+        auto centred = aspect == 3;
+        auto symbol = symbolChild(grid, !centred);
         if (state->image) {
             state->image.Source(nullptr);
             state->image.Visibility(xaml::Visibility::Collapsed);
         }
-        auto symbol = box.Child().as<controls::FontIcon>();
         // Fluent glyphs are selected by code point, not by text weight. Keep
         // the platform's icon font/weight and use text styles only for size.
         (void)fontWeight;
@@ -528,14 +535,14 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
         symbol.FontSize(resolvedSize);
         symbol.Glyph(winrt::to_hstring(glyph));
         size[0] = size[1] = symbol.FontSize();
-        auto centred = aspect == 3;
-        box.Stretch(aspect == 2 ? xaml::Media::Stretch::Fill
-                    : centred ? xaml::Media::Stretch::None : xaml::Media::Stretch::Uniform);
-        box.HorizontalAlignment(centred ? xaml::HorizontalAlignment::Center : xaml::HorizontalAlignment::Stretch);
-        box.VerticalAlignment(centred ? xaml::VerticalAlignment::Center : xaml::VerticalAlignment::Stretch);
-        box.ClearValue(xaml::FrameworkElement::WidthProperty());
-        box.ClearValue(xaml::FrameworkElement::HeightProperty());
-        box.Visibility(xaml::Visibility::Visible);
+        if (auto box = state->box) {
+            box.Stretch(aspect == 2 ? xaml::Media::Stretch::Fill
+                        : centred ? xaml::Media::Stretch::None : xaml::Media::Stretch::Uniform);
+            box.HorizontalAlignment(centred ? xaml::HorizontalAlignment::Center : xaml::HorizontalAlignment::Stretch);
+            box.VerticalAlignment(centred ? xaml::VerticalAlignment::Center : xaml::VerticalAlignment::Stretch);
+            box.Visibility(xaml::Visibility::Visible);
+        }
+        symbol.Visibility(xaml::Visibility::Visible);
         return true;
     } catch (...) {
         report("showing a symbol");
@@ -546,8 +553,8 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
 extern "C" void swiftomniui_winui_image_set_tint(SwiftOmniUIObjectRef handle, bool has, uint32_t argb) {
     try {
         auto state = imageState(imageGrid(handle));
-        if (!state->box) return;
-        auto glyph = state->box.Child().as<controls::FontIcon>();
+        auto glyph = state->symbol;
+        if (!glyph) return;
         if (has) glyph.Foreground(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{
             static_cast<uint8_t>(argb >> 24), static_cast<uint8_t>(argb >> 16),
             static_cast<uint8_t>(argb >> 8), static_cast<uint8_t>(argb)}));
@@ -564,6 +571,7 @@ extern "C" bool swiftomniui_winui_image_set(
     try {
         auto grid = imageGrid(handle);
         if (auto box = imageState(grid)->box) box.Visibility(xaml::Visibility::Collapsed);
+        if (auto symbol = imageState(grid)->symbol) symbol.Visibility(xaml::Visibility::Collapsed);
         auto image = imageChild(grid);
         image.Visibility(xaml::Visibility::Visible);
         // SwiftOmniUI's Aspect: fit, fill, stretch, centre - at the picture's own size, in the middle of the room.
@@ -833,6 +841,7 @@ extern "C" bool swiftomniui_winui_image_set_pixels(SwiftOmniUIObjectRef handle, 
         auto source = memoryPicture(rgba, width, height); if (!source) return false;
         auto grid = imageGrid(handle); auto image = imageChild(grid);
         if (auto box = imageState(grid)->box) box.Visibility(xaml::Visibility::Collapsed);
+        if (auto symbol = imageState(grid)->symbol) symbol.Visibility(xaml::Visibility::Collapsed);
         image.Visibility(xaml::Visibility::Visible);
         image.Stretch(xaml::Media::Stretch::Fill);
         image.ClearValue(xaml::FrameworkElement::WidthProperty());

@@ -25,7 +25,6 @@ final class WinUIWindow {
     private var safeBars: [WinUISafeAreaBarHost] = []
     private var requestedSafeBars: [MountedElement] = []
     private var safeBarCommitPending = false
-    private var safeBarBackground: UInt32??
     private weak var safeBarPage: MountedElement?
     private var safeBarFrame: Rect?
     private var safeBarFramePending = false
@@ -67,7 +66,7 @@ final class WinUIWindow {
     }
 
     isolated deinit {
-        if !isClosed { swiftomniui_winui_window_set_safe_area_bars(handle, nil, 0, false, 0) }
+        if !isClosed { swiftomniui_winui_window_set_safe_area_bars(handle, nil, 0) }
         for host in safeBars { host.releaseBar() }
         swiftomniui_winui_release(handle)
     }
@@ -83,9 +82,9 @@ final class WinUIWindow {
         requestSafeBarFrame()
         requestedSafeBars = bars
         let views = bars.compactMap { $0.winUI.view }
-        let background = titleBar.chrome.background?.argb
         let sameBars = views.count == safeBars.count && zip(views, safeBars).allSatisfy { $0 === $1.bar }
-        if sameBars, safeBarBackground == .some(background), !safeBarCommitPending { return }
+        if sameBars { for host in safeBars { host.updateBackground() } }
+        if sameBars, !safeBarCommitPending { return }
         guard !safeBarCommitPending else { return }
         safeBarCommitPending = true
         WinUIDoorbell.afterPass { [weak self] in
@@ -107,7 +106,7 @@ final class WinUIWindow {
         guard !isClosed else { return }
         let views = requestedSafeBars.compactMap { $0.winUI.view }
         if views.count != safeBars.count || !zip(views, safeBars).allSatisfy({ $0 === $1.bar }) {
-            swiftomniui_winui_window_set_safe_area_bars(handle, nil, 0, false, 0)
+            swiftomniui_winui_window_set_safe_area_bars(handle, nil, 0)
             for host in safeBars { host.releaseBar() }
             safeBars = views.map { WinUISafeAreaBarHost(bar: $0) }
             for host in safeBars {
@@ -116,10 +115,7 @@ final class WinUIWindow {
             safeBarFrame = nil
         }
         let handles: [SwiftOmniUIObjectRef?] = safeBars.map(\.presentationHandle)
-        let background = titleBar.chrome.background?.argb
-        safeBarBackground = .some(background)
-        swiftomniui_winui_window_set_safe_area_bars(
-            handle, handles, Int32(handles.count), background != nil, background ?? 0)
+        swiftomniui_winui_window_set_safe_area_bars(handle, handles, Int32(handles.count))
         if safeBarFrame == nil, !safeBars.isEmpty {
             swiftomniui_winui_window_set_safe_area_bar_frame(handle, 0, 0, 0)
         }

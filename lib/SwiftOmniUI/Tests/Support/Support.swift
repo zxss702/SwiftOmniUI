@@ -180,7 +180,8 @@ final class Renders {
     @discardableResult
     func revisit(changed: Set<ObjectIdentifier>) -> HostPatch {
         differ.named = Renderer.shared.pendingNames
-        let result = differ.revisit(rendered!, changed: changed)
+        let result = differ.revisit(rendered!, changed: changed,
+                                    refreshPreferences: Renderer.shared.pendingTextPreferences)
         rendered = result.node
         runFired()
         return result.patch

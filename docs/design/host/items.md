@@ -164,9 +164,12 @@ The latest collection and closures always provide requested rows, including
 content changes at an unchanged identity.
 
 `LazyCells` keeps scroll geometry for a lazy stack or grid. Each unmeasured
-row stays at an extent of 44; a native measurement replaces only that row's
-estimate and updates the document extent. Measured rows never change the
-estimates of unseen rows. An immutable AVL sequence compresses uniform runs
+row initially has an extent of 44. Hosts can opt into a measured estimate:
+WinUI uses the mean of known row extents (known run extents for a grid) for
+unseen entries, so tall Markdown does not advertise a document of short rows
+and hit a false bottom during scrolling. Other hosts retain the fixed estimate.
+The tree's cached measured sum/count answers this mean in constant time;
+changing it neither builds unseen views nor scans their identities. An immutable AVL sequence compresses uniform runs
 and caches subtree counts and measured sums. Range edits change boundary paths
 and inserted runs, without re-summing the complete measurement history. Aligned
 grid edits retain unaffected runs; regrouping invalidates the affected suffix.
@@ -202,35 +205,54 @@ demand before composition; visible rows are not rationed one per frame, includin
 when a source edit is animated. The ready arrangement then places all affected
 surviving rows under the same animation. Explicit program jumps can also
 prepare their landing synchronously. WinUI predicts the forward
-distance as measured scroll velocity multiplied by the sum of the larger of the
-reported display period and observed scroll-notice interval, and measured
-request-to-arrangement latency. A delayed UI observation widens the target window
-because native composition can keep moving between observations.
+distance as measured scroll velocity multiplied by measured request-to-render-
+completion latency plus two reported display periods: one until the next
+observation and one for the rendered surface to reach presentation. The latter
+is a refresh-dependent estimate; `Rendered` is not a GPU presentation fence.
+The observed interval is a fallback only when display cadence is unavailable.
+Preparation already includes dispatcher delay; counting a blocked observation
+interval again makes a slow batch widen the next batch and prolong the stall.
 Only requests made while scrolling supply this latency. Cold first-screen
 construction measures an entire viewport and is not an incoming-batch sample.
-A superseding request starts a new sample rather than extending the oldest
-unfinished range across many scrolling updates.
-Multiple XAML callbacks inside a refresh keep their accumulated displacement
-until a complete refresh interval can be sampled. Giving each fragment a full
-refresh interval would underestimate velocity and the necessary lead. Adjacent
-samples smooth velocity and preparation
-latency. The measured distance
+A disjoint replacement starts a new sample; expansion of the same unfinished
+batch preserves its start. The sample ends at `CompositionTarget.Rendered` after
+native arrangement. `Rendering` announces a frame; it does not confirm that
+arranged rows have been rendered. This measures XAML completion, not a GPU fence.
+Idle cancels unfinished samples so a pause cannot inflate the next gesture's lead.
+Velocity is sampled no more than once per display period, using the native offset and WinUI's
+`RenderingTime`, not the wall-clock arrival time of a queued callback. Mixing
+ViewChanged and Rendering arrivals splits one physical movement across different
+timestamps and makes the lead alternately grow and collapse. The last two moving
+intervals estimate current speed and increasing acceleration. Acceleration extends
+only the next observation interval, not the entire preparation latency of a slow
+row; braking and reversal discard that acceleration. Preparation latency retains
+adjacent samples. The measured distance
 between the latest native scroll offset and XAML's document viewport is added
-in the moving direction. The existing adjacent row's actual coverage, including
-the partially visible edge row and spacing, is
-subtracted from that distance; idle views need no additional prefetch. The
+in the moving direction. The extent index first finds the rows covering that
+physical distance, then removes the edge run which the ordinary one-run neighbour
+will add back. Subtracting the current neighbour's distance before rounding can
+lose a run, especially when the current and predicted neighbours have different
+heights. When that prediction shortens, a continuously moving window retains
+only the already mounted incoming edge instead of destroying and rebuilding it
+on alternating velocity samples. This does not allocate more offscreen rows;
+the trailing edge, reversal, idle and disjoint jumps still retire obsolete rows.
+Idle views need no additional prefetch. The
 extension is clipped to the content bounds. Each optional job runs once per
 owner per frame. Its batch covers velocity multiplied by the display period
-(falling back to the observed interval when display cadence is unavailable),
+(the observed interval is a fallback when display cadence is unavailable),
 rounded to whole rows or grid runs, rather than a fixed one-row limit
-or the entire latency-based ahead range. The physical lead and per-frame distance
-are converted to run counts with the median of up to sixteen nearby measured
-runs. The unseen 44-point document estimate does not cut a dense file list's
+or the entire latency-based ahead range. The physical lead
+uses the learned extent index to stop at the actual measured rows. The optional
+unit's row count uses the median of up to sixteen nearby measured runs; hosts
+with a fixed provisional estimate also use that density for the target. A tall
+measured table must not be replaced by a count of short paragraphs. The
+provisional document estimate does not cut a dense file list's
 requested lead in half or request a screenful of inferred tall rows. A later
 measurement revises the conversion. Idle/manual requests default to one run.
 Remembering a size does not make rebuilding a complex subtree or images cheap.
-Delayed observations widen the target but never widen a batch: otherwise one
-slow batch would increase the next batch's size and amplify the stall.
+The lead accounts for native readiness, but the unit must not amplify a missed
+callback or a slow row into a larger synchronous burst. It does not drain the
+whole predicted target. Visible demand still has priority over optional work.
 WinUI pauses optional work during row animations and native layout phases,
 and waits for the preceding unit's native measurement and first arrangement.
 An intrinsic geometry query alone does not make incoming rows ready. Hidden or
@@ -240,9 +262,25 @@ only demanded rows, so an unmeasured offscreen batch cannot cancel itself.
 When demand reaches that batch before measurement completes, visible fill
 retains its remaining rows inside the current predicted range; it does not
 evict and reconstruct them. This retention adds no new offscreen rows.
+When a queued incoming batch can also retire the previous edge, the old rows
+remain attached until that single patch. An eviction-only patch must not make
+the ready incoming batch wait for an unrelated realization acknowledgement.
+An expansion that still contains unarranged requested rows keeps its original
+preparation start; only a disjoint replacement starts another timing sample.
+The preparation-cost maximum of currently mounted batches also survives two
+cheap neighbouring batches. It leaves with those rows, so a table is not
+predicted as cheap while still present, and old slow rows do not permanently
+inflate the lead. The indexed maximum is read without a per-frame row scan.
+Nested lazy panels share their scroller's motion samples. A new panel borrows
+recent preparation latency until its own first batch has been arranged. Its
+predicted incoming intersection can be prepared before any of it is visible.
+Once prepared, a contraction in the velocity prediction keeps those existing
+rows while approaching; idle/reversed motion or the outer window releases them.
+It does not repeatedly destroy and rebuild the same incoming Markdown batch.
 The frame clock
 deduplicates WinUI's rendering timestamps. Actual native offsets supply
-velocity samples on ViewChanged notices as well as display frames. Layout
+velocity samples on display frames; ViewChanged still queues visible work
+immediately through the existing after-pass handoff. Layout
 callbacks and animation endpoints do not supply synthetic displacement.
 Native idle state clears the prediction; a delayed notice
 during a live gesture does not incorrectly turn its velocity into zero.
