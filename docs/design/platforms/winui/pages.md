@@ -127,6 +127,18 @@ The layout panel holds a native `Frame`. Its `Navigate` call creates a stock
 `Page` shell whose content is the retained Swift view: forward navigation uses
 `SlideNavigationTransitionInfo` with `FromRight`, return uses `FromLeft`.
 The first presentation and reduced-motion navigation suppress transitions.
+Every Page shell explicitly installs `NavigationThemeTransition` in its own
+`Transitions` collection, so XAML has both load and unload storyboards for the
+selected navigation transition. The departing page remains under native
+transition ownership; SOUI does not add a separate animation clock or snapshot.
+
+The Frame stands in a stable Grid viewport with a rectangular XAML clip. Its
+rectangle follows the navigation column's final native allocation and changes
+only when those bounds change. Both incoming content and unloading transition
+visuals are confined to that viewport, so horizontal movement cannot paint over
+the neighboring sidebar. The viewport contributes no second Swift placement or
+safe-area inset; native Grid/Frame/Page still own the page's allocation.
+
 `IsNavigationStackEnabled` is false and page caching is disabled; Swift's path
 remains the only navigation history. A view still held by an old page during a
 rapid return is released from that page before attachment to the new one.

@@ -291,20 +291,28 @@ namespace {
             if (alphaMask) alphaMask->measure(available);
             double size[2] = {0, 0};
             callbacks.measure(view, available.Width, available.Height, size);
-            if (navigation) navigation.Measure(available);
+            if (navigationViewport) navigationViewport.Measure(available);
             return Size(static_cast<float>(size[0]), static_cast<float>(size[1]));
         }
 
         Size ArrangeOverride(Size final) {
             if (alphaMask) alphaMask->arrange(final);
             callbacks.arrange(view, final.Width, final.Height);
-            if (navigation) navigation.Arrange(Rect(0, 0, final.Width, final.Height));
+            if (navigationViewport) {
+                auto bounds = Rect(0, 0, final.Width, final.Height);
+                if (navigationClip.Rect() != bounds) navigationClip.Rect(bounds);
+                navigationViewport.Arrange(bounds);
+            }
             return final;
         }
 
         int64_t view;
         std::unique_ptr<AlphaMask> alphaMask;
         controls::Frame navigation{nullptr};
+        // A stable ancestor clips both pages and XAML's unloading transition
+        // visuals to this navigation column, independently of authored clips.
+        controls::Grid navigationViewport{nullptr};
+        xaml::Media::RectangleGeometry navigationClip{nullptr};
         xaml::UIElement navigationContent{nullptr};
 
         /// Whether assistive technology meets none of what stands in the panel.
@@ -338,6 +346,11 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view) 
         auto held = winrt::make<SwiftOmniUIPanel>(view).as<controls::Panel>();
         auto owner = panel(held);
         owner->navigation = controls::Frame();
+        owner->navigationViewport = controls::Grid();
+        owner->navigationViewport.UseLayoutRounding(false);
+        owner->navigationClip = xaml::Media::RectangleGeometry();
+        owner->navigationViewport.Clip(owner->navigationClip);
+        owner->navigationViewport.Children().Append(owner->navigation);
         owner->navigation.IsNavigationStackEnabled(false);
         owner->navigation.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
         owner->navigation.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
@@ -348,9 +361,15 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view) 
                 page.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
                 page.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
                 page.Background(nullptr);
+                // Put the theme transition on every Page shell explicitly.
+                // Its unload storyboard keeps the old shell visible until
+                // the exit completes, as well as animating the entering page.
+                xaml::Media::Animation::TransitionCollection transitions;
+                transitions.Append(xaml::Media::Animation::NavigationThemeTransition());
+                page.Transitions(transitions);
                 page.Content(args.Parameter().as<xaml::UIElement>());
             }));
-        held.Children().Append(owner->navigation);
+        held.Children().Append(owner->navigationViewport);
         return detach(held);
     } catch (...) {
         report("making a navigation frame");
@@ -369,7 +388,7 @@ extern "C" void swiftomniui_winui_navigation_set(
         if (!frame) return;
         std::vector<xaml::UIElement> children;
         if (background) children.push_back(as<xaml::UIElement>(background));
-        children.push_back(frame);
+        children.push_back(owner->navigationViewport);
         removeUnused(held.Children(), children);
         insertInOrder(held.Children(), children);
         auto next = content ? as<xaml::UIElement>(content) : xaml::UIElement{nullptr};
@@ -417,6 +436,9 @@ extern "C" void swiftomniui_winui_navigation_clear(SwiftOmniUIObjectRef handle) 
         if (owner->navigation) owner->navigation.Content(nullptr);
         owner->navigationContent = nullptr;
         owner->navigation = nullptr;
+        if (owner->navigationViewport) owner->navigationViewport.Children().Clear();
+        owner->navigationViewport = nullptr;
+        owner->navigationClip = nullptr;
         as<controls::Panel>(handle).Children().Clear();
     } catch (...) { report("releasing a navigation frame"); }
 }
