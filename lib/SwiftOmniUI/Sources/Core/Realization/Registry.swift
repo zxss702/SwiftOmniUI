@@ -109,7 +109,9 @@
 
         members(registration)
 
-        let appliers = registration.appliers
+        // Property order is a registration invariant. Sorting each patch also
+        // sorted unrelated layout/drawing keys for every newly realized row.
+        let appliers = registration.appliers.sorted { $0.key.name < $1.key.name }
         let wholes = registration.wholes
         let children = registration.childAppliers.map { child in
             (type: child.type, apply: { (view: View, kept: [HostChild]) in
@@ -126,9 +128,7 @@
 
                 var applied: Set<Prop> = []
 
-                for key in changed.sorted(by: { $0.name < $1.name }) {
-                    guard let apply = appliers[key] else { continue }
-
+                for (key, apply) in appliers where changed.contains(key) {
                     apply(made, read(key))
                     applied.insert(key)
                 }

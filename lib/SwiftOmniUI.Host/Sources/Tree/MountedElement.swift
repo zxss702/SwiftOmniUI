@@ -173,18 +173,22 @@ import CRT
             return standingValue(property, target: patch.properties[property]).map { (property, $0) }
         })
 
-        for property in patch.clearedProperties {
-            properties[property] = nil
-        }
-
-        for (property, value) in patch.properties {
-            properties[property] = value
+        // The initializer already exposes this exact property table to the
+        // native factory. Rewriting it on first apply only copies its shared
+        // Dictionary storage. Later sparse patches still merge normally.
+        if described {
+            for property in patch.clearedProperties {
+                properties[property] = nil
+            }
+            for (property, value) in patch.properties {
+                properties[property] = value
+            }
         }
 
         // A value written on its own leaves the key it was found by behind: the lookup key shadowing it lifts,
         // its own standing alone.
         for (property, keyProp) in Self.keyProperties
-        where patch.properties[property] != nil && patch.properties[keyProp] == nil {
+        where patch.properties[property] != nil && patch.properties[keyProp] == nil && properties[keyProp] != nil {
             properties[keyProp] = nil
         }
 
@@ -308,6 +312,12 @@ import CRT
 
     /// Reconciles a complete child arrangement by key.
     private func arrange(_ patches: [HostPatch], tree: MountedTree, virtualized: Bool) {
+        // First realization has no identities to reconcile or departures to
+        // retain. Compound lazy rows take this path for every nested wrapper.
+        guard !children.isEmpty else {
+            children = patches.map { MountedElement($0, tree: tree, parent: self) }
+            return
+        }
         let before = children
         let previous = Dictionary(uniqueKeysWithValues: children.map { ($0.id, $0) })
 
