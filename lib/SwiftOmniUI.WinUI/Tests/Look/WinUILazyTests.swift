@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-@_spi(Host) import SwiftOmniUICore
+@_spi(Host) @testable import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
 import XCTest
@@ -436,6 +436,21 @@ final class WinUILazyTests: XCTestCase {
             }
             WinUIScrollWork.install()
             defer { WinUIScrollWork.finish() }
+            let inspecting = ProcessInfo.processInfo.environment["SOUI_SCROLL_INSPECT"] == "1"
+            if inspecting { Inspection.start() }
+            defer {
+                if inspecting {
+                    Inspection.stop()
+                    for pass in Inspection.passes.sorted(by: {
+                        $0.describe + ($0.host?.apply ?? 0) > $1.describe + ($1.host?.apply ?? 0)
+                    }).prefix(4) {
+                        print("SCROLL inspect describe=\(pass.describe / 1_000) apply=\((pass.host?.apply ?? 0) / 1_000) made=\(pass.host?.made ?? 0)")
+                        for entry in pass.entries.sorted(by: { $0.own > $1.own }).prefix(6) {
+                            print("SCROLL ownms=\(entry.own / 1_000) type=\(entry.view) outcome=\(entry.outcome)")
+                        }
+                    }
+                }
+            }
             let probe = WinUILazyScreenProbe(window: hwnd, points: points)
             let raw = Unmanaged.passRetained(probe).toOpaque()
             let created = CreateThread(nil, 0, WinUILazyScreenProbe.entry, raw, 0, nil)

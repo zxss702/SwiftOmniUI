@@ -106,8 +106,10 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 for _ in 0..<16 { host.step(); host.frame() }
                 let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
                 let identity = try XCTUnwrap(lazy.mounted.keys.first)
-                lazy.measured.removeValue(forKey: identity)
-                lazy.measuredRevisions.removeValue(forKey: identity)
+                let invalidatedRow = try XCTUnwrap(lazy.mounted[identity]?.view)
+                invalidatedRow.invalidateMeasure()
+                XCTAssertTrue(lazy.needsRowMeasurements,
+                              "a row revision must schedule measurement without polling mounted rows")
                 lazy.cells.animatesChanges = true
                 lazy.cells.inserting.insert(identity)
                 lazy.places.patchArrived()
@@ -143,6 +145,8 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 XCTAssertLessThan(lazy.mounted.count, 80)
                 XCTAssertLessThan(builds.calls.count, 80, "offscreen bodies stay unevaluated")
                 let row = try XCTUnwrap(lazy.mounted[lazy.cells.orderedIdentities[0]]?.view)
+                let rowLayout = try XCTUnwrap(row as? WinUILayoutView)
+                XCTAssertNil(rowLayout.boxView, "transparent hover backgrounds need no decoration")
                 let elements = host.views(WinUIView.self).compactMap { $0.sourceElement?.winUI }
                 // Resolve once before measuring reuse, including window-owned ancestors.
                 for element in elements { _ = element.resolvedLayoutValues }
@@ -156,6 +160,8 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 for _ in 0..<4 { host.step(); host.frame() }
 
                 XCTAssertEqual(row.sourceElement?.value(.background), Color.black.propValue)
+                XCTAssertNotNil(rowLayout.boxView)
+                XCTAssertTrue(lazy.mounted[lazy.cells.orderedIdentities[0]]?.view === row)
                 XCTAssertEqual(elements.map(\.layoutInputResolutions), inputs)
                 for (element, before) in zip(elements, collections)
                     where element.view is WinUIStackView || element.view is WinUILazyView {
@@ -169,6 +175,7 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 row.heard(.pointer(.pointerExited, .zero))
                 for _ in 0..<4 { host.step(); host.frame() }
                 XCTAssertEqual(row.sourceElement?.value(.background), Color.clear.propValue)
+                XCTAssertNil(rowLayout.boxView)
             }
         }
     }

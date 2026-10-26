@@ -49,6 +49,23 @@ final class WinUILazyPrefetchTests: XCTestCase {
         // A reversal uses the new direction immediately at the next sample,
         // rather than averaging forward motion into the backward lead.
         XCTAssertEqual(samples.observe(offset: 32, time: 48, refreshInterval: 16)?.velocity, -2)
+
+        // Reverse inside a refresh, without even crossing the last merged
+        // offset. The new edge needs content on this observation, not later.
+        for direction in [-1.0, 1.0] {
+            var reversing = WinUILazyPrefetch.MotionSamples()
+            _ = reversing.observe(offset: 0, time: 0, refreshInterval: 16)
+            _ = reversing.observe(offset: direction * 32, time: 16, refreshInterval: 16)
+            XCTAssertNil(reversing.observe(offset: direction * 48, time: 24, refreshInterval: 16))
+            let reverse = reversing.observe(offset: direction * 40, time: 25, refreshInterval: 16)
+            XCTAssertEqual(reverse?.velocity, -direction * 0.5)
+            XCTAssertEqual(reverse?.interval, 16)
+            XCTAssertEqual(reverse?.acceleration, 0)
+            XCTAssertNil(reversing.observe(offset: direction * 32, time: 32, refreshInterval: 16))
+            let continued = reversing.observe(offset: direction * 8, time: 41, refreshInterval: 16)
+            XCTAssertEqual(continued?.velocity, -direction * 2)
+            XCTAssertEqual(continued?.acceleration, 0)
+        }
     }
 
     func testRepeatedAndBackwardsTimestampsCannotReplaceTheLastMovementSample() {

@@ -152,12 +152,10 @@ class WinUILazyView: WinUITravellingLayout {
     /// A mounted row has a real measurement before its first visible placement.
     /// Only rows that have not been requested keep an estimated document extent.
     override func prepareLayoutContent(in bounds: Rect, measuringNative: Bool) {
-        for (identity, item) in mounted where !item.departing {
-            if measured[identity] == nil || measuredRevisions[identity] != item.view.measurementRevision
-                || measuredContexts[identity] != item.view.layoutContextRevision {
-                measurementRows.insert(identity)
-            }
-        }
+        // setItems records new/replaced rows; measurement and context revisions
+        // notify rowMeasurementChanged directly. A changed cross-axis proposal
+        // records all rows in contentSize. Do not poll every retained row again
+        // for each native Measure/Arrange and each visible-window refinement.
         let previousQuery = Self.queryingSize
         let previousPreparation = isPreparingRows
         Self.queryingSize = 0
@@ -677,7 +675,11 @@ class WinUILazyView: WinUITravellingLayout {
                 // constructing a provisional screenful of tall unknown cards.
                 expansionRuns = max(1, min(known, Int((remaining / observed).rounded(.up))))
             }
+            let requestStarted = WinUIElement.workObserver == nil ? 0 : WinUIFrameClock.monotonic()
             tellWindow(span ?? 0..<0, realize: realize ?? 0..<0, demand: incoming)
+            if let observe = WinUIElement.workObserver, let sourceElement {
+                observe("window-request", sourceElement.type, WinUIFrameClock.monotonic() - requestStarted)
+            }
             // The coalesced turn completes visible demand before the next
             // composition. Optional ahead work never enters this loop. Native
             // callbacks only enqueue the turn, so scroll input can return first.
@@ -694,7 +696,11 @@ class WinUILazyView: WinUITravellingLayout {
                 // allocation here and again in XAML Measure repeats the whole
                 // incoming subtree's work. The normal native pass prepares the
                 // completed visible window once before Arrange.
+                let geometryStarted = WinUIElement.workObserver == nil ? 0 : WinUIFrameClock.monotonic()
                 prepareLayoutContent(in: Rect(0, 0, actual.width, actual.height), measuringNative: completingJump)
+                if let observe = WinUIElement.workObserver, let sourceElement {
+                    observe("window-geometry", sourceElement.type, WinUIFrameClock.monotonic() - geometryStarted)
+                }
                 needsArrangement = true
             }
             let after = grid ? cells.runs.revision : cells.extents.revision

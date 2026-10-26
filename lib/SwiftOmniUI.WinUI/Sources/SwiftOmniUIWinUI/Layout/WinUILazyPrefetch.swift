@@ -12,13 +12,32 @@ enum WinUILazyPrefetch {
     struct MotionSamples {
         private var latest: (offset: Double, time: Double)?
         private var preceding: (offset: Double, time: Double)?
+        private var observed: (offset: Double, time: Double)?
+        private var direction: Double = 0
 
         mutating func observe(offset: Double, time: Double, refreshInterval: Double)
             -> (velocity: Double, interval: Double, acceleration: Double)? {
             guard let latest else {
                 latest = (offset, time)
+                observed = (offset, time)
                 return nil
             }
+            guard let observed, time > observed.time else { return nil }
+            let movement = offset - observed.offset
+            self.observed = (offset, time)
+            if movement * direction < 0 {
+                // A refresh may contain both forward and backward movement.
+                // Do not keep prefetching the old edge while waiting to merge
+                // the next sample, or cancel the reversal against forward travel.
+                // Keep at least a refresh's denominator: short dispatcher
+                // fragments must not magnify a small reversal into a large lead.
+                let interval = max(refreshInterval, time - observed.time)
+                self.preceding = nil
+                self.latest = (offset, time)
+                direction = movement
+                return (movement / interval, interval, 0)
+            }
+            if movement != 0 { direction = movement }
             let elapsed = time - latest.time
             guard offset != latest.offset, elapsed > 0, elapsed >= refreshInterval else { return nil }
             let delta = offset - latest.offset
