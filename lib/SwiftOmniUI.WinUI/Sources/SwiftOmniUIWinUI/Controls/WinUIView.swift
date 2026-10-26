@@ -275,6 +275,7 @@ class WinUIView {
 
     /// Takes the next number and holds the element `make` makes, handed that number.
     init(allocation: ((SwiftOmniUIObjectRef) -> SwiftOmniUIObjectRef?)? = nil,
+         reportsAllocationFromArrange: Bool = false,
          _ make: (_ number: Int64) -> SwiftOmniUIObjectRef?) {
         number = Self.live.reserve()
         guard let handle = make(number) else { fatalError("the relay made no element - its log says why") }
@@ -291,10 +292,12 @@ class WinUIView {
         // System controls do not expose ArrangeOverride to Swift. Their
         // committed size notification publishes drawing geometry directly;
         // SOUI-owned slots have already committed it during parent Arrange.
-        swiftomniui_winui_on_size_changed(nativeAllocation ?? handle, number) { number, width, height in
-            MainActor.assumeIsolated {
-                guard let view = WinUIView.find(number) else { return }
-                if view.placingLayout == nil { view.commitNativeAllocation(width: width, height: height) }
+        if !reportsAllocationFromArrange {
+            swiftomniui_winui_on_size_changed(nativeAllocation ?? handle, number) { number, width, height in
+                MainActor.assumeIsolated {
+                    guard let view = WinUIView.find(number) else { return }
+                    if view.placingLayout == nil { view.commitNativeAllocation(width: width, height: height) }
+                }
             }
         }
     }

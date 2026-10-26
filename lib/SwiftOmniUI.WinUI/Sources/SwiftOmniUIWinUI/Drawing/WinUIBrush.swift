@@ -19,6 +19,10 @@ struct WinUIBrush: Equatable {
     var colors: [UInt32] = []
     var offsets: [Double] = []
 
+    /// Transparent decorations need no native drawing object. Gradients still
+    /// paint if any stop has coverage, including partially transparent ones.
+    var drawsInk: Bool { kind != 0 && colors.contains { $0 >> 24 != 0 } }
+
     /// Nothing painted.
     static let none = WinUIBrush()
 

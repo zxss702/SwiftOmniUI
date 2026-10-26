@@ -37,7 +37,7 @@ final class WinUIImageView: WinUIView {
     private var hasWrittenTint = false
 
     init() {
-        super.init { swiftomniui_winui_image_make($0) }
+        super.init(reportsAllocationFromArrange: true) { swiftomniui_winui_image_make($0) }
     }
 
     /// Whether the current content is a platform symbol rather than a file.

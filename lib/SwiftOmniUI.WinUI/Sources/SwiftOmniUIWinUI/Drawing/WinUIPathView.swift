@@ -39,7 +39,7 @@ final class WinUIPathView: WinUIView {
     private(set) var drawsInk = false
 
     init() {
-        super.init { number in swiftomniui_winui_path_make(number) }
+        super.init(reportsAllocationFromArrange: true) { number in swiftomniui_winui_path_make(number) }
     }
 
     /// Paints the shape: its outline `width` wide - WinUI holding the width whatever it draws - and its figure
@@ -48,14 +48,11 @@ final class WinUIPathView: WinUIView {
         fill: WinUIBrush, stroke: WinUIBrush, width: Double, outline: Double, dashes: [Double], dashOffset: Double,
         cap: LineCap, join: LineJoin, miter: Double
     ) {
-        func visible(_ brush: WinUIBrush) -> Bool {
-            brush.kind != 0 && brush.colors.contains { $0 >> 24 != 0 }
-        }
         let wasDrawing = drawsInk
         strokeWidth = ShapeArithmetic.strokeWidth(width)
         outlineWidth = ShapeArithmetic.strokeWidth(outline)
         painting = (fill, stroke, dashes, dashOffset, cap, join, miter)
-        drawsInk = visible(fill) || (strokeWidth > 0 && visible(stroke))
+        drawsInk = fill.drawsInk || (strokeWidth > 0 && stroke.drawsInk)
         // Empty spacers still participate in layout, input and accessibility.
         // They need neither composition brushes nor a path geometry. A later
         // visible fill must draw the current bounds even if those did not move.
@@ -97,7 +94,9 @@ final class WinUIPathView: WinUIView {
 
     /// A shape has no size of its own: it takes the room its layout gives it, and asks WinUI for none.
     override func measure(width: Double?, height: Double?) -> LayoutSize {
-        _ = super.measure(width: 0, height: 0)
+        // Intrinsic arithmetic already knows the answer. Probing XAML here
+        // replaces its prepared allocation with zero and makes every enclosing
+        // layout restore that proposal. Native preparation still runs normally.
         return LayoutSize(width: 0, height: 0)
     }
 

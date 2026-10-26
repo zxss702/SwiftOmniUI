@@ -192,7 +192,7 @@ class WinUILayoutView: WinUIView {
     private var childrenCommitPending = false
 
     init() {
-        super.init { number in swiftomniui_winui_panel_make(number) }
+        super.init(reportsAllocationFromArrange: true) { number in swiftomniui_winui_panel_make(number) }
     }
 
     init(_ make: (_ number: Int64) -> SwiftOmniUIObjectRef?) {
@@ -309,7 +309,7 @@ class WinUILayoutView: WinUIView {
         let stroke = WinUIBrush(box.stroke)
         let width = BoxArithmetic.outlineWidth(stroke: box.stroke, width: box.width)
 
-        if fill == .none, stroke == .none || width == 0 {
+        if !fill.drawsInk, !stroke.drawsInk || width == 0 {
             boxView = nil
         } else {
             let ellipse = outline == .ellipse

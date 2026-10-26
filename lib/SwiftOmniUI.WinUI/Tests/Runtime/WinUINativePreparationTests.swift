@@ -79,6 +79,27 @@ final class WinUINativePreparationTests: XCTestCase {
 
     func testRestoringAProbeWithUnchangedDesiredSizeDoesNotRemeasureTheNativeParent() {
         onUIThread {
+            // Clear spacers participate in arithmetic without replacing the
+            // native allocation already prepared for the containing row.
+            let spacer = WinUIPathView()
+            let spacerParent = PreparationCallbackPanel()
+            spacerParent.setItems([WinUILayoutItem(view: spacer)])
+            spacerParent.prepareMeasure(width: 320, height: 128)
+            swiftomniui_winui_arrange(spacerParent.handle, 0, 0, 320, 128)
+            let spacerMeasures = spacerParent.nativeMeasures
+            for width in [nil, 20.0, 480] as [Double?] {
+                XCTAssertEqual(spacer.measure(width: width, height: nil), .zero)
+                spacerParent.prepareMeasure(width: 320, height: 128)
+                XCTAssertEqual(spacerParent.nativeMeasures, spacerMeasures)
+            }
+            // The native owner can resize a shape with no Swift placing parent.
+            // ArrangeOverride must publish that size without SizeChanged help.
+            let standalone = WinUIPathView()
+            for width in [80.0, 120, 64] {
+                standalone.prepareMeasure(width: width, height: 40)
+                swiftomniui_winui_arrange(standalone.handle, 0, 0, width, 40)
+                XCTAssertEqual(standalone.committedFrame, Rect(0, 0, width, 40))
+            }
             let label = WinUILabelView()
             label.setText("Short")
             let child = PreparationCallbackPanel()
