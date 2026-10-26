@@ -59,6 +59,17 @@ final class WinUITextSpacingTests: XCTestCase {
             }
             XCTAssertEqual(swiftomniui_winui_text_spacing_probes(), prepared,
                            "unchanged paragraphs must not toggle MaxLines during every preparation")
+            label.setLineSpacing(0)
+            label.prepareMeasure(width: 90)
+            let unspaced = label.desiredSize
+            XCTAssertLessThan(unspaced.height, narrow.height)
+            XCTAssertEqual(Self.lineHeight(label), 0)
+            for width in [900.0, 90, 900, 90] { label.prepareMeasure(width: width) }
+            XCTAssertEqual(label.desiredSize, unspaced)
+            XCTAssertEqual(swiftomniui_winui_text_spacing_probes(), prepared)
+            label.setLineSpacing(12)
+            label.prepareMeasure(width: 90)
+            XCTAssertEqual(label.desiredSize, narrow)
         }
     }
 

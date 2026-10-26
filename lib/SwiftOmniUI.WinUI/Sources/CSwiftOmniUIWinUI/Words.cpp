@@ -472,12 +472,21 @@ extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, 
         auto block = labelWords(handle);
         block.CharacterSpacing(characterSpacing);
         auto resources = borrow<controls::Border>(handle).Resources();
-        resources.Insert(winrt::box_value(L"SwiftOmniUITextBaselineAdvance"),
-            winrt::box_value(std::isfinite(baselineAdvance) && baselineAdvance > 0 ? baselineAdvance : 0));
-        resources.Insert(winrt::box_value(L"SwiftOmniUITextSingleLineHeight"),
-            winrt::box_value(std::isfinite(singleLineHeight) && singleLineHeight > 0 ? singleLineHeight : 0));
+        auto baseline = std::isfinite(baselineAdvance) && baselineAdvance > 0 ? baselineAdvance : 0;
+        auto single = std::isfinite(singleLineHeight) && singleLineHeight > 0 ? singleLineHeight : 0;
+        auto baselineKey = winrt::box_value(L"SwiftOmniUITextBaselineAdvance");
+        auto singleKey = winrt::box_value(L"SwiftOmniUITextSingleLineHeight");
+        if (baseline != single) {
+            resources.Insert(baselineKey, winrt::box_value(baseline));
+            resources.Insert(singleKey, winrt::box_value(single));
+        } else {
+            // A constant line height is established here once. Only additive
+            // spacing needs to inspect the paragraph during every Measure.
+            if (resources.HasKey(baselineKey)) resources.Remove(baselineKey);
+            if (resources.HasKey(singleKey)) resources.Remove(singleKey);
+        }
         block.LineStackingStrategy(xaml::LineStackingStrategy::BaselineToBaseline);
-        block.LineHeight(std::isfinite(baselineAdvance) && baselineAdvance > 0 ? baselineAdvance : 0);
+        block.LineHeight(baseline);
         syncRichWords(handle);
         borrow<controls::Border>(handle).InvalidateMeasure();
     } catch (...) { report("spacing a label's words"); }
