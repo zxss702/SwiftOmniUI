@@ -269,6 +269,8 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_menu_button_make(int64_t view)
         button.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
         button.VerticalContentAlignment(xaml::VerticalAlignment::Center);
         controls::Grid face;
+        // Keep the label and chevron in SOUI's fractional DIP coordinates.
+        face.UseLayoutRounding(false);
         controls::ColumnDefinition labelColumn, indicatorColumn;
         labelColumn.Width(xaml::GridLengthHelper::FromValueAndType(1, xaml::GridUnitType::Star));
         indicatorColumn.Width(xaml::GridLengthHelper::Auto());
@@ -277,6 +279,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_menu_button_make(int64_t view)
         face.ColumnSpacing(2);
         face.Tag(winrt::box_value(2.0));
         controls::TextBlock chevron;
+        chevron.UseLayoutRounding(false);
         chevron.FontFamily(xaml::Media::FontFamily(L"Segoe Fluent Icons, Segoe MDL2 Assets"));
         chevron.FontSize(12);
         chevron.Text(L"\uE70D");
@@ -314,6 +317,17 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_toolbar_menu_button_make(int64
         report("making a toolbar menu button");
         return nullptr;
     }
+}
+
+extern "C" void swiftomniui_winui_menu_button_on_loaded(
+    SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t)
+) {
+    try {
+        borrow<controls::Button>(handle).Loaded(guarded("refreshing a menu button after attachment",
+            [view, ready](IInspectable const &, xaml::RoutedEventArgs const &) {
+                if (ready) ready(view);
+            }));
+    } catch (...) { report("following a menu button's native attachment"); }
 }
 
 extern "C" void swiftomniui_winui_menu_button_set_face(SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef content) {

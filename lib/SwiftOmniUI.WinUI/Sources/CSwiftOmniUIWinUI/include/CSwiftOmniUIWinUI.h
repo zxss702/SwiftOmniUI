@@ -632,6 +632,8 @@ void swiftomniui_winui_set_context_menu(SwiftOmniUIObjectRef element, int64_t vi
 /// A menu living in the view: a `Button` whose `Flyout` a press opens, its face a row - the label child before a
 /// chevron the indicator setting shows or hides.
 SwiftOmniUIObjectRef swiftomniui_winui_menu_button_make(int64_t view);
+/// Refresh pre-attachment size answers after the button's native template loads.
+void swiftomniui_winui_menu_button_on_loaded(SwiftOmniUIObjectRef button, int64_t view, void (*ready)(int64_t));
 
 /// A menu on a toolbar: the view's own menu button dressed as the bar's, whose flyout `menu_button_set_menu` writes.
 SwiftOmniUIObjectRef swiftomniui_winui_toolbar_menu_button_make(int64_t view);
