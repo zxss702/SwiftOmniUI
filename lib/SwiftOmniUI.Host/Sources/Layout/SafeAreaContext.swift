@@ -168,6 +168,29 @@
 extension MountedElement {
     public var isGeometryReader: Bool { value(.isGeometryReader)?.bool == true }
     public var safeAreaInsetEdge: Edge? { value(.safeAreaInsetEdge).flatMap(Edge.init(propValue:)) }
+
+    /// Follow only a bar's uninterrupted root wrappers. Its ScrollView needs
+    /// an intrinsic thickness; its document and nested layout children do not
+    /// become content-sized viewports. This does not depend on native promotion.
+    public var safeBarSizingAxes: Axis {
+        var child = self
+        while let parent = child.parent {
+            if let edge = parent.safeAreaInsetEdge {
+                // The decoration tag is present before native mounting. The
+                // parent's children array is filled only after its children
+                // mount, so consulting that array can cache a false answer.
+                guard child.value(.isLayoutDecoration)?.bool == true else { return .neither }
+                return edge == .top || edge == .bottom ? .vertical : .horizontal
+            }
+            guard parent.type != .scrollView, parent.type != .list,
+                  !parent.isGeometryReader,
+                  (parent.type == .grid && child.value(.isFrameContent)?.bool == true)
+                    || (parent.native != nil && !parent.native.presentsView)
+            else { return .neither }
+            child = parent
+        }
+        return .neither
+    }
     public var safeAreaPadding: EdgeInsets? {
         value(Prop("safeAreaPadding")) == nil ? nil : insets(Prop("safeAreaPadding"))
     }

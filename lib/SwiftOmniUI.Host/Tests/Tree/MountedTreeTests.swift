@@ -7,6 +7,31 @@ import XCTest
 
 /// The mounted tree every Swift runtime shares: patches, drift, leaving and the frame walk.
 final class MountedTreeTests: XCTestCase {
+    @MainActor
+    func testSafeBarIntrinsicSizingStopsAtTheScrollDocumentAndExcludesTheBase() throws {
+        let (tree, _) = Self.tree()
+        var nested = HostPatch(id: .manual("nested-scroll"), type: .scrollView)
+        nested.properties = [.orientation: Axis.vertical.propValue]
+        var scroll = HostPatch(id: .manual("bar-scroll"), type: .scrollView)
+        scroll.properties = [.orientation: Axis.vertical.propValue, .isFrameContent: .bool(true)]
+        scroll.children = .arranged([nested])
+        var frame = HostPatch(id: .manual("bar-frame"), type: .grid)
+        frame.properties = [.isLayoutDecoration: .bool(true)]
+        frame.children = .arranged([scroll])
+        var base = HostPatch(id: .manual("base-scroll"), type: .scrollView)
+        base.properties = [.orientation: Axis.vertical.propValue]
+        var inset = HostPatch(id: .manual("inset"), type: .zStack)
+        inset.properties = [.safeAreaInsetEdge: Edge.top.propValue]
+        inset.children = .arranged([base, frame])
+        tree.apply(inset, complete: true)
+
+        let root = try XCTUnwrap(tree.root)
+        XCTAssertEqual(root.first(id: .manual("bar-frame"))?.safeBarSizingAxes, .vertical)
+        XCTAssertEqual(root.first(id: .manual("bar-scroll"))?.layoutValues.safeBarSizingAxes, .vertical)
+        XCTAssertEqual(root.first(id: .manual("base-scroll"))?.layoutValues.safeBarSizingAxes, Axis.neither)
+        XCTAssertEqual(root.first(id: .manual("nested-scroll"))?.layoutValues.safeBarSizingAxes, Axis.neither)
+    }
+
     /// An arranged patch mounts every child in order, each with its native half applied once.
     @MainActor
     func testAPatchMountsItsChildrenInOrder() {

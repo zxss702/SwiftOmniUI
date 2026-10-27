@@ -741,6 +741,7 @@ import CRT
             values.scrollAxes = .neither
             values.expandingAxes = .both
         }
+        if values.scrollAxes != .neither { values.safeBarSizingAxes = safeBarSizingAxes }
         values.horizontal = value(.horizontalAlignment)?.enumeration
             ?? value(.horizontalAlignmentDefault)?.enumeration ?? 3
         values.vertical = value(.verticalAlignment)?.enumeration

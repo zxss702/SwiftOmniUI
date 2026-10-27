@@ -71,9 +71,11 @@ final class WinUIGridView: WinUITravellingLayout {
 
     private func queriedSize(width: Double?) -> LayoutSize {
         if sourceElement?.isGeometryReader == true { return GeometryReaderArithmetic.size(width: width) }
+        let barPadding = sourceElement?.safeAreaPadding != nil && sourceElement?.safeBarSizingAxes != .neither
+            ? sourceElement?.safeAreaPadding ?? EdgeInsets(0) : EdgeInsets(0)
         return GridArithmetic.size(of: items, rows: implicitRows, columns: implicitColumns,
                                    rowSpacing: rowSpacing, columnSpacing: columnSpacing,
-                                   padding: padding, width: width, flow: flowColumns)
+                                   padding: padding + barPadding, width: width, flow: flowColumns)
     }
 
     override func arrange(in bounds: Rect) {

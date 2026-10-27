@@ -35,6 +35,11 @@
     /// extent is not a minimum size for the enclosing layout.
     public var scrollAxes = Axis.neither
 
+    /// An inset bar has an intrinsic thickness, even when its root modifier
+    /// chain contains a scroller. Only that edge's axis sizes to its document;
+    /// ordinary viewport children and the document beneath it keep their rules.
+    public var safeBarSizingAxes = Axis.neither
+
     /// Axes on which this child or its content accepts the remaining proposal.
     public var expandingAxes = Axis.neither
 
@@ -114,10 +119,12 @@
         LayoutSize(
             width: boundedWidth(extent(self.width, measured: measured.width, offered: width,
                                        bound: (minimumWidth != nil || maximumWidth != nil),
-                                       scrolled: scrollAxes == .horizontal || scrollAxes == .both)),
+                                       scrolled: (scrollAxes == .horizontal || scrollAxes == .both)
+                                        && safeBarSizingAxes != .horizontal && safeBarSizingAxes != .both)),
             height: boundedHeight(extent(self.height, measured: measured.height, offered: nil,
                                          bound: (minimumHeight != nil || maximumHeight != nil),
-                                         scrolled: scrollAxes == .vertical || scrollAxes == .both)))
+                                         scrolled: (scrollAxes == .vertical || scrollAxes == .both)
+                                          && safeBarSizingAxes != .vertical && safeBarSizingAxes != .both)))
     }
 
     /// `proposed`, held within the child's least and most width and the room `available`.

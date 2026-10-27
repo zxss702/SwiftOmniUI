@@ -53,6 +53,15 @@ frame's reported extent; an outer frame constrains the combined base and bar.
 Both native hosts measure that combined extent before arranging the remaining
 safe region. The material itself remains a drawing decoration.
 
+A bar whose root is a ScrollView still needs intrinsic thickness. Along the
+inset's axis, its uninterrupted frame chain measures the document and applies
+the authored frame limits, rather than reporting a zero-sized viewport.
+Safe-area padding inside that chain contributes to the bar's natural size.
+The base scroller and the bar's scroll document keep ordinary viewport sizing;
+this rule is independent of native promotion and shared with GTK. Thus a
+standalone top bar containing a capped scroller remains visible using the
+same local overlay path as bottom and horizontal bars.
+
 ## The window's chrome
 
 The visible page's `windowBackground` paints the native root behind the entire

@@ -58,9 +58,11 @@ final class GTKGridView: GTKTravellingLayout {
 
     override func contentSize(width: Double?) -> LayoutSize {
         if sourceElement?.isGeometryReader == true { return GeometryReaderArithmetic.size(width: width) }
+        let barPadding = sourceElement?.safeAreaPadding != nil && sourceElement?.safeBarSizingAxes != .neither
+            ? sourceElement?.safeAreaPadding ?? EdgeInsets(0) : EdgeInsets(0)
         return GridArithmetic.size(
             of: items, rows: implicitRows, columns: implicitColumns,
-            rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, width: width,
+            rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding + barPadding, width: width,
             flow: flowColumns)
     }
 

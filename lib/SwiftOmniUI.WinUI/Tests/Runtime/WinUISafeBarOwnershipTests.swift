@@ -6,6 +6,7 @@
 @testable import SwiftOmniUIWinUI
 import CSwiftOmniUIWinUI
 import XCTest
+import SwiftOmniUIConformance
 
 @MainActor
 private final class SafeBarPreparationProbe: WinUILayoutView {
@@ -28,6 +29,40 @@ private final class SafeBarPreparationProbe: WinUILayoutView {
 }
 
 final class WinUISafeBarOwnershipTests: XCTestCase {
+    func testStandaloneTopScrollableBarKeepsIntrinsicHeightAndLocalOwnership() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView { Text("Changed file") }
+                    .frame(height: 128)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        ScrollView {
+                            Text("Commit title\nSecond line").id("commit-title")
+                        }
+                        .safeAreaPadding(.vertical, 16)
+                        .frame(maxHeight: 256)
+                        .id("commit-header")
+                    }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        Text("Author and hash").frame(height: 48).id("commit-footer")
+                    }
+                    .frame(width: 380)
+            }
+            for _ in 0..<8 { host.step(); host.frame() }
+            let header = try XCTUnwrap(host.view(id: .manual("commit-header")))
+            let footer = try XCTUnwrap(host.view(id: .manual("commit-footer")))
+            let title = try XCTUnwrap(host.view(id: .manual("commit-title")))
+            let body = try XCTUnwrap(host.views(WinUITextView.self).first { $0.text == "Changed file" })
+            XCTAssertNil(header.nativeSafeBarOwner)
+            XCTAssertNil(footer.nativeSafeBarOwner)
+            XCTAssertGreaterThan(header.laidOutFrame.height, 32)
+            XCTAssertLessThanOrEqual(header.laidOutFrame.height, 256)
+            XCTAssertGreaterThanOrEqual(title.origin.y, header.origin.y + 15)
+            XCTAssertGreaterThanOrEqual(body.origin.y, header.origin.y + header.laidOutFrame.height - 1)
+            XCTAssertGreaterThan(footer.origin.y, body.origin.y)
+            XCTAssertGreaterThan(title.laidOutFrame.height, 0)
+        }
+    }
+
     func testWindowDoesNotMeasureAPendingBarAtZeroWidthAndReusesItWhenReady() {
         onUIThread {
             let window = WinUIWindow()

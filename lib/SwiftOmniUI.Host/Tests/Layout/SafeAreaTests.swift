@@ -7,6 +7,26 @@ import XCTest
 
 /// Where a page's content stands against the window's safe area.
 final class SafeAreaTests: XCTestCase {
+    func testSafeBarScrollerUsesItsContentForThicknessWithoutChangingOrdinaryViewports() {
+        var viewport = LayoutValues()
+        viewport.scrollAxes = .vertical
+        let content = LayoutSize(width: 380, height: 72)
+        XCTAssertEqual(viewport.sized(content, offered: 380).height, 0)
+        viewport.safeBarSizingAxes = .vertical
+        viewport.maximumHeight = 256
+        XCTAssertEqual(viewport.sized(content, offered: 380).height, 72)
+        XCTAssertEqual(viewport.sized(LayoutSize(width: 380, height: 800), offered: 380).height, 256)
+        viewport.height = 40
+        XCTAssertEqual(viewport.sized(content, offered: 380).height, 40)
+
+        var horizontal = LayoutValues()
+        horizontal.scrollAxes = .horizontal
+        XCTAssertEqual(horizontal.sized(content).width, 0)
+        horizontal.safeBarSizingAxes = .horizontal
+        horizontal.maximumWidth = 100
+        XCTAssertEqual(horizontal.sized(content).width, 100)
+    }
+
     private let whole = Rect(x: 0, y: 0, width: 400, height: 800)
     private let safe = Rect(x: 0, y: 60, width: 400, height: 710)
 

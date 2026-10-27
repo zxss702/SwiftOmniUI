@@ -8,6 +8,41 @@ import CSwiftOmniUIGTK
 import XCTest
 
 final class GTKToolbarScrollTests: XCTestCase {
+    func testStandaloneTopScrollableBarUsesLocalOverlayAndContentHeight() throws {
+        try onUIThread {
+            let host = GTKRenderer.running {
+                ScrollView { Text("Changed file").id("changed-file") }
+                    .frame(height: 128)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        ScrollView { Text("Commit title\nSecond line").id("commit-title") }
+                            .safeAreaPadding(.vertical, 16)
+                            .frame(maxHeight: 256)
+                            .id("commit-header")
+                    }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        Text("Author and hash").frame(height: 48).id("commit-footer")
+                    }
+                    .frame(width: 380)
+            }
+            for _ in 0..<8 { host.step(); host.frame() }
+            let header = try XCTUnwrap(host.view(id: .manual("commit-header")))
+            let footer = try XCTUnwrap(host.view(id: .manual("commit-footer")))
+            let title = try XCTUnwrap(host.view(id: .manual("commit-title")))
+            let file = try XCTUnwrap(host.view(id: .manual("changed-file")))
+            XCTAssertNil(header.nativeSafeBarOwner)
+            XCTAssertNil(footer.nativeSafeBarOwner)
+            let headerRect = try XCTUnwrap(header.windowRect())
+            let titleRect = try XCTUnwrap(title.windowRect())
+            let fileRect = try XCTUnwrap(file.windowRect())
+            let footerRect = try XCTUnwrap(footer.windowRect())
+            XCTAssertGreaterThan(headerRect.height, 32)
+            XCTAssertLessThanOrEqual(headerRect.height, 256)
+            XCTAssertGreaterThanOrEqual(titleRect.y, headerRect.y + 15)
+            XCTAssertGreaterThanOrEqual(fileRect.y, headerRect.y + headerRect.height - 1)
+            XCTAssertGreaterThan(footerRect.y, fileRect.y)
+        }
+    }
+
     func testAPlainScrollerStartsBelowTheNativeHeaderAndStillScrolls() throws {
         try onUIThread {
             let host = GTKRenderer.running {
