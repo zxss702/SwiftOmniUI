@@ -183,12 +183,29 @@ final class DepartureTests: XCTestCase {
 /// The native halves a runtime hands out, the last one findable.
 @MainActor
 private final class Natives {
-    private(set) var last: NoView?
+    private(set) var last: TransitionNative?
     func make() -> any NativeElement {
-        let view = NoView()
+        let view = TransitionNative()
         last = view
         return view
     }
+}
+
+/// Unlike the ordinary no-view fixture, this native half advertises the
+/// transition properties whose presentation these tests actually exercise.
+@MainActor
+private final class TransitionNative: NativeElement {
+    let presentsView = true
+    var room: Rect?
+    var departingRoom: Rect? { room }
+    func standingValue(_ property: Prop) -> HostValue? { nil }
+    func animates(_ property: Prop) -> Bool {
+        property == .blur || TransitionSurface.presentsDrawing(property)
+    }
+    func applied(changed: Set<Prop>, wasDescribed: Bool) {}
+    func presentFrame(_ changed: Set<Prop>) {}
+    func arrangeChildren() {}
+    func leave() {}
 }
 
 /// A view that only stands somewhere.

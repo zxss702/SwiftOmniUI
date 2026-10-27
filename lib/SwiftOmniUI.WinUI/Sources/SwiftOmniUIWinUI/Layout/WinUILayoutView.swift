@@ -20,6 +20,16 @@ class WinUILayoutView: WinUIView {
     private var hasSizing = false
     private var nativePreparationDepth = 0
     private var hadSwiftAllocation = false
+    private var hasNativeMeasurement = false
+
+    override var requiresNativeMeasureInvalidation: Bool { hasNativeMeasurement }
+
+    override func beganNativeMeasure() {
+        // Set this before arithmetic runs: a write made inside the first
+        // MeasureOverride must still be able to request another native pass.
+        hasNativeMeasurement = true
+        super.beganNativeMeasure()
+    }
 
     private var hasSwiftAllocation: Bool {
         placingLayout != nil && nativeContentOwner == nil && nativeSafeBarOwner == nil
@@ -197,6 +207,8 @@ class WinUILayoutView: WinUIView {
 
     init(_ make: (_ number: Int64) -> SwiftOmniUIObjectRef?) {
         super.init(make)
+        // A custom native factory need not use our MeasureOverride callback.
+        hasNativeMeasurement = true
     }
 
     /// Puts `items` in the panel, in order, where they differ from the children it holds; whether they did.
@@ -207,7 +219,7 @@ class WinUILayoutView: WinUIView {
         let revisions = items.map { $0.view.parentMeasurementRevision }
         guard !sameArrangement || revisions != itemMeasurementRevisions else { return false }
 
-        if !sameArrangement {
+        if !sameArrangement, !self.items.isEmpty {
             let surviving = Set(items.map { ObjectIdentifier($0.view) })
             for previous in self.items where !surviving.contains(ObjectIdentifier(previous.view))
                 && previous.view.placingLayout === self {
@@ -265,10 +277,21 @@ class WinUILayoutView: WinUIView {
         holdNativeChildren(handles)
         // A dense lazy window can retain hundreds of seats. Membership checks
         // must not compare every old seat with every incoming seat per patch.
-        let previousNumbers = Set(previous.map(\.number))
-        let nextNumbers = Set(views.map(\.number))
-        for view in previous where !nextNumbers.contains(view.number) { view.nativeParentChanged() }
-        for view in views where !previousNumbers.contains(view.number) { view.nativeParentChanged() }
+        if previous.isEmpty {
+            for view in views { view.nativeParentChanged() }
+        } else if views.isEmpty {
+            for view in previous { view.nativeParentChanged() }
+        } else if previous.count == 1, views.count == 1 {
+            if previous[0] !== views[0] {
+                previous[0].nativeParentChanged()
+                views[0].nativeParentChanged()
+            }
+        } else {
+            let previousNumbers = Set(previous.map(\.number))
+            let nextNumbers = Set(views.map(\.number))
+            for view in previous where !nextNumbers.contains(view.number) { view.nativeParentChanged() }
+            for view in views where !previousNumbers.contains(view.number) { view.nativeParentChanged() }
+        }
         held = views
         heldBox = boxView
         // Native content must be attached before its size is queried again.
@@ -340,6 +363,7 @@ class WinUILayoutView: WinUIView {
 
     /// Forgets the kept sizes and asks WinUI to measure again.
     func invalidateMeasurements() {
+        guard WinUILayoutUpdates.visitNativeAncestors(self) else { return }
         invalidateOwnMeasurements()
         if self is WinUILazyView { return }
         if let parent = (self as? WinUIScrollDocument)?.scrollView ?? placingLayout {
@@ -466,10 +490,13 @@ class WinUILayoutView: WinUIView {
             let previous = (measured?.proposal == proposal ? measured?.size : nil)
                 ?? (proposal.height == nil ? measurements.cachedSize(offering: proposal.width)
                     : proposedSizes.first(where: { $0.proposal == proposal })?.size)
-            // Recompute this native caller, retaining unchanged descendants'
-            // proposal-keyed answers. Preparation still asks XAML to measure
-            // every selected allocation and refines genuinely changed sizes.
-            if nativePreparationDepth == 0 { forgetMeasurements() }
+            // XAML can enter Measure because a descendant became dirty, even
+            // when this panel's arithmetic inputs did not change. A complete
+            // plan measures those descendants and checks their revisions below;
+            // throwing it away here repeats the whole retained lazy window.
+            // Layouts without that dependency/preparation contract still need
+            // to recompute when entered directly by their native owner.
+        if nativePreparationDepth == 0 && !hasNativeProposals { forgetMeasurements() }
             _ = boxView?.measure(width: width, height: height)
             var size: LayoutSize
             if hasNativeProposals {

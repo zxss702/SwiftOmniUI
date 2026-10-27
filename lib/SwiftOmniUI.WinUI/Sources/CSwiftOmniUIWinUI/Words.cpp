@@ -412,7 +412,10 @@ extern "C" void swiftomniui_winui_text_set_lines(SwiftOmniUIObjectRef handle, bo
     try {
         invalidateWordsMeasurement(handle);
         auto block = labelWords(handle);
-        block.TextWrapping(wraps ? xaml::TextWrapping::Wrap : xaml::TextWrapping::NoWrap);
+        // A single-line limit truncates the continuous line. Wrapping first
+        // can move a whole word to a hidden second line and leave unused room
+        // before the ellipsis. Multiline labels keep normal wrapping.
+        block.TextWrapping(wraps && lines != 1 ? xaml::TextWrapping::Wrap : xaml::TextWrapping::NoWrap);
         block.TextTrimming(trims ? xaml::TextTrimming::CharacterEllipsis : xaml::TextTrimming::None);
         block.MaxLines(std::max(0, lines));
         syncRichWords(handle);

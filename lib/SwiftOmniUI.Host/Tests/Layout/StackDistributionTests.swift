@@ -67,6 +67,33 @@ final class StackDistributionTests: XCTestCase {
         XCTAssertEqual(arranged[1]?.x, 10)
     }
 
+    func testPaddedFixedIconKeepsItsMinimumBesideHigherPriorityFilename() {
+        // The fixed frame is inside padding, so the outer row item has no
+        // explicit width. Its zero-proposal answer still reserves 32 points.
+        var icon = StackChild(width: 32, height: 16)
+        icon.minimumProposalWidth = 32
+        var filename = StackChild(width: 1_000, height: 20)
+        filename.values.priority = 1
+        filename.values.expandingAxes = .horizontal
+        var actions = StackChild(width: 42, height: 18)
+        actions.values.width = 42
+        var status = StackChild(width: 16, height: 20)
+        status.values.width = 16
+
+        let arranged = places([icon, filename, actions, status], length: 240)
+        XCTAssertEqual(arranged.map { $0?.width }, [32, 150, 42, 16])
+        XCTAssertEqual(arranged.map { $0?.x }, [0, 32, 182, 224])
+    }
+
+    func testUnconstrainedRowDoesNotProbeMinimumWidths() {
+        let offers = StackOffers()
+        var icon = StackChild(width: 32, height: 16)
+        icon.minimumProposalWidth = 32
+        icon.offers = offers
+        _ = places([icon, StackChild(width: 80, height: 20)], length: 240)
+        XCTAssertFalse(offers.widths.contains { $0 == 0 })
+    }
+
     func testIntrinsicSharingReservesLargeMinimaBeforeAcceptingShortIdealWidths() {
         let marker = StackChild(width: 10, height: 20)
         var text = StackChild(width: 100, height: 20)
@@ -200,6 +227,7 @@ private struct StackChild: LayoutChild {
     let natural: LayoutSize
     var isShown = true
     var offers: StackOffers?
+    var minimumProposalWidth = 0.0
 
     init(width: Double, height: Double) {
         natural = LayoutSize(width: width, height: height)
@@ -208,7 +236,7 @@ private struct StackChild: LayoutChild {
     func size(offered width: Double?) -> LayoutSize {
         offers?.widths.append(width)
         let offered = values.offer(width)
-        let measured = LayoutSize(width: offered.map { min(natural.width, $0) } ?? natural.width,
+        let measured = LayoutSize(width: offered.map { max(minimumProposalWidth, min(natural.width, $0)) } ?? natural.width,
                                   height: natural.height)
         return values.sized(measured, offered: width)
     }

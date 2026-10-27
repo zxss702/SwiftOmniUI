@@ -70,7 +70,10 @@
     /// The value a transition draws, including a finished removal component
     /// held while the rest of that element's transition still runs.
     public func presentedValue(for key: DescribedKey) -> HostValue? {
-        transitions[key]?.presented ?? retainedTargets[key] ?? landingValues[key]
+        // Most properties read while realizing a lazy row belong to a static
+        // mount. Its integer index rules out all three property-key lookups.
+        guard keysByMount[key.mount] != nil else { return nil }
+        return transitions[key]?.presented ?? retainedTargets[key] ?? landingValues[key]
     }
 
     /// Starts, retargets or cuts short a property's animation; a nil `animation` snaps.

@@ -56,16 +56,19 @@ namespace {
     // the other. Keep the overlapping projected UIElements attached. Comparing
     // projections here is intentional: their ABI interface pointers need not
     // be identical even when they refer to the same XAML element.
-    bool syncEdgeChildren(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
+    bool syncEdgeChildren(controls::Panel const &owner,
+                          winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
                           std::vector<xaml::UIElement> const &held) {
-        if (sameChildren(items, held)) return true;
         auto oldCount = items.Size();
         auto newCount = static_cast<uint32_t>(held.size());
         uint32_t prefix = 0;
         while (prefix < oldCount && prefix < newCount && items.GetAt(prefix) == held[prefix]) ++prefix;
         if (prefix == std::min(oldCount, newCount)) {
             while (items.Size() > prefix) items.RemoveAtEnd();
-            for (uint32_t index = prefix; index < newCount; ++index) items.Append(held[index]);
+            for (uint32_t index = prefix; index < newCount; ++index) {
+                detachFromForeignPanel(owner, held[index]);
+                items.Append(held[index]);
+            }
             return true;
         }
 
@@ -79,7 +82,10 @@ namespace {
             }
             if (equal) {
                 for (uint32_t index = 0; index < oldStart; ++index) items.RemoveAt(0);
-                for (uint32_t index = overlap; index < newCount; ++index) items.Append(held[index]);
+                for (uint32_t index = overlap; index < newCount; ++index) {
+                    detachFromForeignPanel(owner, held[index]);
+                    items.Append(held[index]);
+                }
                 return true;
             }
         }
@@ -96,7 +102,10 @@ namespace {
                 }
                 if (equal) {
                     while (items.Size() > overlap) items.RemoveAtEnd();
-                    for (uint32_t index = offset; index > 0; --index) items.InsertAt(0, held[index - 1]);
+                    for (uint32_t index = offset; index > 0; --index) {
+                        detachFromForeignPanel(owner, held[index - 1]);
+                        items.InsertAt(0, held[index - 1]);
+                    }
                     return true;
                 }
             }
@@ -118,17 +127,19 @@ namespace {
     }
 
     void insertInOrder(winrt::Windows::Foundation::Collections::IVector<xaml::UIElement> const &items,
-                       std::vector<xaml::UIElement> const &held) {
+                       std::vector<xaml::UIElement> const &held, controls::Panel const &owner = nullptr) {
         if (sameChildren(items, held)) return;
         for (uint32_t index = 0; index < held.size(); ++index) {
             // A new tail need not search the prefix already put in order.
             if (index == items.Size()) {
+                if (owner) detachFromForeignPanel(owner, held[index]);
                 items.Append(held[index]);
                 continue;
             }
             if (items.GetAt(index) == held[index]) continue;
             uint32_t previous;
             if (items.IndexOf(held[index], previous)) items.RemoveAt(previous);
+            else if (owner) detachFromForeignPanel(owner, held[index]);
             items.InsertAt(index, held[index]);
         }
     }
@@ -491,12 +502,13 @@ extern "C" void swiftomniui_winui_panel_set_children(
         held.reserve(count);
         for (int32_t index = 0; index < count; ++index) held.push_back(as<xaml::UIElement>(children[index]));
         if (sameChildren(items, held)) return;
-        for (auto const &child : held) detachFromForeignPanel(owner, child);
         // A lazy window usually changes at its edges. Keep the intersecting
         // UIElements attached, preserving their native state and composition.
-        if (!syncEdgeChildren(items, held)) {
+        // Only inserted elements can belong to another panel. Querying native
+        // parents for the retained window repeats work for every dense row.
+        if (!syncEdgeChildren(owner, items, held)) {
             removeUnused(items, held);
-            insertInOrder(items, held);
+            insertInOrder(items, held, owner);
         }
     } catch (...) {
         report("holding a panel's children");

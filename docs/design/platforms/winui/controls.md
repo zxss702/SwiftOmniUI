@@ -93,6 +93,11 @@ The lines a label's break allows are the host layer's
 ([runs of words](../../host/tree.md#runs-of-words)); a `TextBlock` cuts words
 short only at their end, so a label cut at its start or in its middle is cut
 at its end.
+A single-line limit uses `NoWrap` and `CharacterEllipsis`: truncation can
+occur inside a filename or word, instead of wrapping a whole word onto a
+hidden second line. Multiline limits retain normal wrapping and indicate
+omitted content on the last visible line. `syncRichWords` carries the same
+wrapping and trimming to paragraphs containing inline images.
 
 A button drawn in the application's colours keeps them under the pointer and
 pressed: its fill is drawn a little fainter each time, as WinUI's own buttons

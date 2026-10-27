@@ -16,6 +16,68 @@ import XCTest
 }
 
 final class WinUIStructuralLayoutTests: XCTestCase {
+    func testPaddedFixedIconKeepsItsPlaceAndFilenameReclaimsHiddenActionsWidth() throws {
+        try onUIThread {
+            let hovered = State(wrappedValue: false)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                HStack(spacing: 8) {
+                    Image(.symbol("\u{E8A5}"))
+                        .frame(width: 16, height: 16)
+                        .padding(.leading, 16)
+                    Text("CSwiftOmniUIWinUI_header_with_a_long_filename")
+                        .lineLimit(1)
+                        .padding(.vertical, 4)
+                        .layoutPriority(1)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                    if hovered.wrappedValue {
+                        HStack(spacing: 6) {
+                            Button {} label: { Image(.symbol("\u{E710}")).frame(width: 18, height: 18) }
+                                .buttonStyle(.plain)
+                            Button {} label: { Image(.symbol("\u{E7A7}")).frame(width: 18, height: 18) }
+                                .buttonStyle(.plain)
+                        }
+                        .frame(width: 42, height: 18)
+                        .id("hover-actions")
+                    }
+                    Text("M").frame(width: 16).id("status-marker")
+                }
+                .frame(width: 240, height: 28)
+            }
+            var originalTextX: Double?
+            var originalTextWidth: Double?
+            var originalStatusX: Double?
+            for hovering in [false, true, false] {
+                hovered.wrappedValue = hovering
+                for _ in 0..<8 { host.step(); host.frame() }
+                let text = try XCTUnwrap(host.views(WinUITextView.self).first {
+                    $0.text.hasPrefix("CSwiftOmniUIWinUI_header")
+                })
+                let icon = try XCTUnwrap(host.views(WinUIImageView.self).first)
+                let status = try XCTUnwrap(host.view(id: .manual("status-marker")))
+                XCTAssertEqual(icon.laidOutFrame.width, 16, accuracy: 0.5)
+                XCTAssertGreaterThanOrEqual(text.origin.x, icon.origin.x + icon.laidOutFrame.width + 7)
+                if hovering {
+                    let actions = try XCTUnwrap(host.view(id: .manual("hover-actions")))
+                    XCTAssertLessThanOrEqual(text.origin.x + text.laidOutFrame.width, actions.origin.x - 7)
+                } else {
+                    XCTAssertNil(host.view(id: .manual("hover-actions")))
+                    XCTAssertLessThanOrEqual(text.origin.x + text.laidOutFrame.width, status.origin.x - 7)
+                }
+                if let originalTextX, let originalTextWidth, let originalStatusX {
+                    XCTAssertEqual(text.origin.x, originalTextX, accuracy: 0.5)
+                    XCTAssertEqual(status.origin.x, originalStatusX, accuracy: 0.5)
+                    // Hiding the action group returns its 42-point slot and
+                    // the additional 8-point inter-child gap to the filename.
+                    XCTAssertEqual(text.laidOutFrame.width, originalTextWidth - (hovering ? 50 : 0), accuracy: 0.5)
+                } else {
+                    originalTextX = text.origin.x
+                    originalTextWidth = text.laidOutFrame.width
+                    originalStatusX = status.origin.x
+                }
+            }
+        }
+    }
+
     func testSameChildWithNewMeasurementRevisionInvalidatesItsParent() {
         onUIThread {
             let parent = WinUIStackView(axis: .horizontal)

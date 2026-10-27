@@ -246,7 +246,11 @@ import CRT
 
         case .arranged(let childPatches):
             childOrderChanged = true
-            writingOrder = Dictionary(childPatches.enumerated().map { ($1.id, $0) }) { first, _ in first }
+            // Only overlapping layouts need authored order to break z-index
+            // ties. Split navigation also uses it to identify its sidebar.
+            if Self.layered.contains(type) || type == .navigationSplitView {
+                writingOrder = Dictionary(childPatches.enumerated().map { ($1.id, $0) }) { first, _ in first }
+            }
             arrange(childPatches, tree: tree, virtualized: lazy)
 
         case .changed(let childPatches):

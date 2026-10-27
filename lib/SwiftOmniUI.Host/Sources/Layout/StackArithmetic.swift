@@ -191,7 +191,7 @@
     private static func alongs<Child: LayoutChild>(
         _ items: [Child], naturals: [LayoutSize], axis: Axis, spacing: Double?, in content: Rect
     ) -> [Double] {
-        let minima = items.map { item in
+        var minima = items.map { item in
             let minimum = axis == .vertical ? item.values.minimumHeight : item.values.minimumWidth
             return max(max(0, minimum ?? 0), item.values.flex ?? 0)
         }
@@ -284,6 +284,20 @@
                 items[$0].isShown
                     && (axis == .vertical ? items[$0].values.height == nil
                                           : items[$0].values.width == nil)
+            }
+            if axis == .horizontal {
+                // A padded fixed frame can have no width on its outer node,
+                // yet still refuse a zero-width proposal. Respect that answer
+                // before priorities distribute the deficit. Otherwise an icon
+                // gets a zero slot while its fixed inner frame paints over the
+                // higher-priority text beside it. Only constrained rows need
+                // this probe; hosts cache it with their other size proposals.
+                for index in shown where !flexibleIndices.contains(index) && extents[index] > minima[index] {
+                    let minimum = items[index].size(offered: 0).width
+                    if minimum.isFinite {
+                        minima[index] = max(minima[index], min(extents[index], max(0, minimum)))
+                    }
+                }
             }
             var deficit = -room
             for priority in Set(shown.map { items[$0].values.priority }).sorted() {

@@ -165,6 +165,10 @@ extension WinUIElement {
                 items.remeasure(each.element)
                 break
             }
+            // A lazy panel's own placement can invalidate its outer owner;
+            // a row's content stops here. Never merge those two boundaries.
+            if !(each.view is WinUILazyView), !followingPresentation,
+               !WinUILayoutUpdates.visitLogicalAncestors(each) { break }
             invalidate(each.view)
             // The lazy panel measures its dirty rows and reports only an actual
             // change to its returned extent. Mounting a new visible Text must
@@ -180,6 +184,7 @@ extension WinUIElement {
         if view is WinUILazyView, !ownPlacementChanged { return }
         var layout = (view ?? parent?.nearestView)?.placingLayout
         while let parent = layout {
+            guard followingPresentation || WinUILayoutUpdates.visitNativeAncestors(parent) else { break }
             // Most placing parents are also mounted ancestors. Only the extra
             // native layouts (notably scroll documents) need another invalidation.
             invalidate(parent)

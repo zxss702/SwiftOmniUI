@@ -167,5 +167,27 @@ final class DescribedMotionTests: XCTestCase {
         described.follow(animator.advance(to: 200))
         XCTAssertEqual(described.takeOutputs().map(\.key), [staying])
         XCTAssertFalse(described.isActive)
+
+        // A mount with no active animation may still own a removal target or
+        // the final value waiting for its completion callback to be delivered.
+        let retained = DescribedKey(mount: 3, property: .opacity)
+        XCTAssertFalse(described.receive(key: retained, standing: .number(1), target: .number(0),
+                                        animation: nil, retainingTarget: true, now: 200, reducesMotion: false))
+        XCTAssertEqual(described.presentedValue(for: retained), .number(0))
+        XCTAssertNil(described.presentedValue(for: DescribedKey(mount: 4, property: .opacity)))
+        described.remove(mount: 3)
+        XCTAssertNil(described.presentedValue(for: retained))
+
+        var completed = false
+        described.receive(key: retained, standing: .number(1), target: .number(0),
+                          animation: .eased(100, .linear), landed: { completed = true },
+                          now: 200, reducesMotion: false)
+        described.follow(animator.advance(to: 300), deferringLandings: true)
+        XCTAssertFalse(described.isActive)
+        XCTAssertFalse(completed)
+        XCTAssertEqual(described.presentedValue(for: retained), .number(0))
+        for completion in described.takeLandings() { completion() }
+        XCTAssertTrue(completed)
+        XCTAssertNil(described.presentedValue(for: retained))
     }
 }

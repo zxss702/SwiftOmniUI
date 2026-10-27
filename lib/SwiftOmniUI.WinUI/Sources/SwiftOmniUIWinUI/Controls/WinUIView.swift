@@ -219,6 +219,7 @@ class WinUIView {
     }
 
     func nativeParentChanged() {
+        WinUILayoutUpdates.rearmAncestorWalks()
         hierarchyRevision &+= 1
         discardMeasurementResults()
     }
@@ -505,7 +506,12 @@ class WinUIView {
         nativeMeasurePending = false
     }
 
+    /// Native controls may measure internally, outside the panel callbacks.
+    /// Custom panels can prove that their first native measurement is still due.
+    var requiresNativeMeasureInvalidation: Bool { true }
+
     func requestNativeMeasure() {
+        guard requiresNativeMeasureInvalidation else { return }
         guard Self.arranging == 0, Self.measuring == 0 else {
             guard !nativeMeasurePending else { return }
             nativeMeasurePending = true

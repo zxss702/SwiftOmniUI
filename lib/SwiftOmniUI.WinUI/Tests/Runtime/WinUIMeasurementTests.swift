@@ -13,6 +13,18 @@ private final class CountedMeasureLayout: WinUILayoutView {
     var extent = 40.0
     var calls: [Double?: Int] = [:]
     var arrangements = 0
+    var invalidations = 0
+    var nativeInvalidations = 0
+
+    override func invalidateNativeMeasure() {
+        nativeInvalidations += 1
+        super.invalidateNativeMeasure()
+    }
+
+    override func invalidateOwnMeasurements() {
+        invalidations += 1
+        super.invalidateOwnMeasurements()
+    }
 
     override func arrange(in bounds: Rect) { arrangements += 1 }
 
@@ -110,6 +122,32 @@ final class WinUIMeasurementTests: XCTestCase {
 
     func testOnePatchInvalidatesSharedAncestorsOnceAcrossDifferentElements() throws {
         try onUIThread {
+            let fresh = CountedMeasureLayout()
+            ProgramWrite.perform {
+                fresh.extent = 55
+                fresh.invalidateMeasurements()
+                // An arithmetic read must not be mistaken for native Measure.
+                XCTAssertEqual(fresh.naturalSize(width: 160).height, 55)
+                fresh.extent = 65
+                fresh.invalidateMeasurements()
+            }
+            XCTAssertEqual(fresh.nativeInvalidations, 0)
+            XCTAssertEqual(fresh.naturalSize(width: 160).height, 65)
+            fresh.prepareMeasure(width: 160)
+            XCTAssertEqual(fresh.desiredSize.height, 65)
+            let before = fresh.nativeInvalidations
+            ProgramWrite.perform {
+                fresh.extent = 95
+                fresh.invalidateMeasurements()
+                fresh.invalidateMeasurements()
+            }
+            XCTAssertEqual(fresh.nativeInvalidations, before + 1)
+            fresh.prepareMeasure(width: 160)
+            XCTAssertEqual(fresh.desiredSize.height, 95)
+
+            // Native controls keep invalidation even before an explicit SOUI
+            // measurement: their templates may already have measured them.
+            XCTAssertTrue(WinUILabelView().requiresNativeMeasureInvalidation)
             let host = WinUIRenderer.running {
                 VStack { Text("First").id("first"); Text("Second").id("second") }
             }
@@ -129,6 +167,28 @@ final class WinUIMeasurementTests: XCTestCase {
 
     func testMeasurementBetweenWritesRearmsInvalidationInTheSameBatch() {
         onUIThread {
+            // A fixed-size ancestor can read its cache without consulting the
+            // child. That read must still reopen the child's propagation path.
+            let leaf = CountedMeasureLayout()
+            let branch = CountedMeasureLayout()
+            let root = CountedMeasureLayout()
+            branch.setItems([WinUILayoutItem(view: leaf)])
+            root.setItems([WinUILayoutItem(view: branch)])
+            let before = root.invalidations
+            ProgramWrite.perform {
+                leaf.invalidateMeasurements()
+                leaf.invalidateMeasurements()
+                XCTAssertEqual(root.invalidations, before + 1)
+                _ = root.naturalSize(width: 320)
+                leaf.invalidateMeasurements()
+                XCTAssertEqual(root.invalidations, before + 2)
+                let other = CountedMeasureLayout()
+                branch.placingLayout = other
+                let moved = other.invalidations
+                leaf.invalidateMeasurements()
+                XCTAssertEqual(other.invalidations, moved + 1,
+                               "a reparent must not retain a completed walk of the old ancestry")
+            }
             let child = CountedMeasureLayout()
             let parent = WinUIStackView(axis: .vertical)
             parent.setItems([WinUILayoutItem(view: child)])
@@ -150,6 +210,28 @@ final class WinUIMeasurementTests: XCTestCase {
 
     func testNativePreparationDoesNotRepeatNestedContentArithmetic() {
         onUIThread {
+            let stable = CountedMeasureLayout()
+            stable.prepareMeasure(width: 320, height: 40)
+            let calls = stable.calls
+            // Native ancestor invalidation alone must not discard unchanged
+            // arithmetic. Enter through XAML, outside prepareMeasure's scope.
+            swiftomniui_winui_invalidate_measure(stable.handle)
+            var nativeSize = [0.0, 0.0]
+            swiftomniui_winui_measure(stable.handle, 320, 40, &nativeSize)
+            XCTAssertEqual(stable.calls, calls)
+
+            let label = WinUILabelView()
+            label.setText("Native changes still invalidate the completed row plan")
+            let row = WinUIStackView(axis: .vertical)
+            row.setItems([WinUILayoutItem(view: label)])
+            row.prepareMeasure(width: 160)
+            let original = row.desiredSize.height
+            // Change the native font without a Swift cache notification. The
+            // plan must discover the new DesiredSize during child preparation.
+            swiftomniui_winui_set_font(label.handle, 36, false, false, nil, -1, 0)
+            swiftomniui_winui_measure(row.handle, 160, .infinity, &nativeSize)
+            XCTAssertGreaterThan(nativeSize[1], original)
+
             let child = CountedMeasureLayout()
             var root: WinUILayoutView = child
             for _ in 0..<8 {

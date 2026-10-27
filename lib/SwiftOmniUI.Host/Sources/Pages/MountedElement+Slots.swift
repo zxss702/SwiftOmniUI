@@ -27,12 +27,16 @@ extension MountedElement {
     /// The children a layout places: all of them, but the slots, which furnish the chrome and the menus wherever
     /// they are written and stand in no one's room.
     public var arrangedChildren: [MountedElement] {
-        children.filter { !NodeType.slotTypes.contains($0.type) }
+        guard children.contains(where: { NodeType.slotTypes.contains($0.type) }) else { return children }
+        return children.filter { !NodeType.slotTypes.contains($0.type) }
     }
 
     /// Current content, excluding branches retained only for their removal transition.
     public var currentChildren: [MountedElement] {
-        arrangedChildren.filter { !$0.isDeparting }
+        guard children.contains(where: { $0.isDeparting || NodeType.slotTypes.contains($0.type) }) else {
+            return children
+        }
+        return children.filter { !$0.isDeparting && !NodeType.slotTypes.contains($0.type) }
     }
 
     /// What stands in this element's `slot` - a page's title view, a title bar's content: the first element under

@@ -8,7 +8,52 @@ import XCTest
 
 final class WinUIGridViewTests: XCTestCase {
     @MainActor private static func checkDenseRowFramePlacement() {
+        // Exercise both rolling edges and the general reorder path. Incoming
+        // children already owned by another native panel must move, while the
+        // overlapping window stays attached and outgoing children leave.
+        for next in [[0, 1, 2, 3], [1, 2, 3], [3, 0, 1], [0, 3, 2], [2, 0, 1], [], [3, 4]] {
+            let destination = WinUIGridView(), donor = WinUIGridView()
+            let root = WinUIGridView()
+            let rows = (0..<5).map { _ in WinUILabelView() }
+            destination.setChildren(Array(rows[0..<3]))
+            donor.setChildren(Array(rows[3..<5]))
+            root.setItems([WinUILayoutItem(view: destination), WinUILayoutItem(view: donor)])
+            WinUITestHost.window.show(root)
+            WinUITestHost.pump(0.02)
+            XCTAssertNotNil(rows[0].layoutOffset(relativeTo: destination))
+            XCTAssertNotNil(rows[3].layoutOffset(relativeTo: donor))
+            destination.setChildren(next.map { rows[$0] })
+            destination.setChildren(next.map { rows[$0] })
+            WinUITestHost.pump(0.02)
+            for index in rows.indices {
+                XCTAssertEqual(rows[index].layoutOffset(relativeTo: destination) != nil,
+                               next.contains(index), "native ownership after \(next)")
+                XCTAssertEqual(rows[index].layoutOffset(relativeTo: donor) != nil,
+                               index >= 3 && !next.contains(index), "foreign ownership after \(next)")
+            }
+            destination.setChildren([])
+            donor.setChildren([])
+            WinUITestHost.window.show(nil)
+        }
         let grid = WinUIGridView()
+        // Native attachment, including the single-child frame fast path,
+        // invalidates only children whose actual parent has changed.
+        let first = WinUILabelView(), second = WinUILabelView()
+        let firstRevision = first.hierarchyRevision
+        let secondRevision = second.hierarchyRevision
+        grid.setChildren([first])
+        grid.setChildren([first])
+        XCTAssertEqual(first.hierarchyRevision, firstRevision + 1)
+        grid.setChildren([second])
+        XCTAssertEqual(first.hierarchyRevision, firstRevision + 2)
+        XCTAssertEqual(second.hierarchyRevision, secondRevision + 1)
+        grid.setChildren([])
+        XCTAssertEqual(second.hierarchyRevision, secondRevision + 2)
+        grid.setChildren([first, second])
+        grid.setChildren([second, first])
+        XCTAssertEqual(first.hierarchyRevision, firstRevision + 3)
+        XCTAssertEqual(second.hierarchyRevision, secondRevision + 3)
+        grid.setChildren([])
         let text = WinUILabelView()
         text.setText("文件夹内的多行文件名 A filename that wraps at the offered width.swift")
         text.setTextFont(size: 12, attributes: nil, family: nil)

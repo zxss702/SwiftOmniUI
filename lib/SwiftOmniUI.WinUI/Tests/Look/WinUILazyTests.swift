@@ -470,7 +470,7 @@ final class WinUILazyTests: XCTestCase {
                 host.frameClock.onFrame = { now in
                     oldFrame?(now)
                     guard let lazy else { return }
-                    trace.append("\(WinUIFrameClock.monotonic()) frame offset=\(scroll.scroller.standing.offset) span=\(String(describing: lazy.span)) built=\(lazy.cells.built) realize=\(String(describing: lazy.cells.window?.realize)) v=\(lazy.scrollVelocity) interval=\(lazy.scrollInterval) prep=\(lazy.preparationDuration) lead=\(lazy.scrollObservationLead) measure=\(lazy.needsRowMeasurements)")
+                    trace.append("\(WinUIFrameClock.monotonic()) frame offset=\(scroll.scroller.standing.offset) span=\(String(describing: lazy.span)) built=\(lazy.cells.built) realize=\(String(describing: lazy.cells.window?.realize)) v=\(lazy.scrollVelocity) interval=\(lazy.scrollInterval) prep=\(lazy.preparationDuration) lead=\(lazy.scrollObservationLead) measure=\(lazy.needsRowMeasurements) refresh=\(host.frameClock.refreshInterval) rendering=\(String(describing: host.frameClock.renderingTime))")
                 }
             }
             defer { host.frameClock.onFrame = oldFrame }

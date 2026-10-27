@@ -119,6 +119,12 @@ Intrinsic horizontal siblings share the remaining proposal by width: a short
 label accepts its ideal width and returns its unused share to longer siblings.
 Do not subtract the same deficit from each ideal width, which erases narrow
 list markers before the paragraph beside them has had a chance to wrap.
+When a horizontal row needs compression, intrinsic children are also asked
+for their size at zero width. A padded fixed frame can refuse that proposal
+even though its outer node states no width. This measured minimum survives
+priority-based compression, keeping the inner frame from painting over an
+adjacent label. Unconstrained rows and flexible viewport children need no
+extra minimum-width probe.
 Unsatisfied explicit sizes and minima can overflow the stack. A hidden child
 takes no room and no spacing.
 
