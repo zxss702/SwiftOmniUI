@@ -97,6 +97,10 @@ class WinUILayoutView: WinUIView {
     /// proposals. Specialized layouts with measurement side effects keep their
     /// contentSize pass until they provide this contract explicitly.
     var hasNativeProposals: Bool { false }
+    /// Opt in only when all arithmetic inputs invalidate this layout or are
+    /// represented by its plan's child dependencies. Native/custom layouts
+    /// may discover independent content changes inside MeasureOverride.
+    var retainsArithmeticOnNativeMeasure: Bool { false }
     func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] { [] }
 
     /// Only height-sensitive arithmetic needs distinct intrinsic answers for
@@ -496,7 +500,7 @@ class WinUILayoutView: WinUIView {
             // throwing it away here repeats the whole retained lazy window.
             // Layouts without that dependency/preparation contract still need
             // to recompute when entered directly by their native owner.
-        if nativePreparationDepth == 0 && !hasNativeProposals { forgetMeasurements() }
+            if nativePreparationDepth == 0 && !retainsArithmeticOnNativeMeasure { forgetMeasurements() }
             _ = boxView?.measure(width: width, height: height)
             var size: LayoutSize
             if hasNativeProposals {
@@ -513,7 +517,15 @@ class WinUILayoutView: WinUIView {
             lastSizingHeight = proposal.height
             hasSizing = true
             if !contentSizeDependsOnHeight || proposal.height == nil { measurements.store(size, offering: proposal.width) }
-            if let previous, previous != size { WinUIView.nativeSizeRevision &+= 1 }
+            if let previous, previous != size {
+                WinUIView.nativeSizeRevision &+= 1
+                // Native content can change outside a Swift property patch.
+                // Its new answer must reach cached parent arithmetic too;
+                // a global preparation counter alone leaves naturalSize stale
+                // until an unrelated write happens to invalidate that parent.
+                measurementRevision &+= 1
+                placingLayout?.invalidateMeasurements()
+            }
             measured = (proposal, size)
             let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
             let framed = values.sized(size, offered: proposal.width)
@@ -838,7 +850,7 @@ class WinUILayoutView: WinUIView {
     /// ordinary overlays only inherit the region and reserve no space.
     func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
         layoutSafeArea(in: contextBounds).child(
-            in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
+            in: place, preservingOutsets: child.carriesSafeAreaOutsets)
     }
 
     /// Places the children in `bounds`, in DIPs.

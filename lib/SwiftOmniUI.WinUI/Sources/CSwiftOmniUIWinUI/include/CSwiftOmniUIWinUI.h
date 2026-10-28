@@ -279,13 +279,25 @@ void swiftomniui_winui_window_set_background(SwiftOmniUIObjectRef window, bool h
 /// The native root's solid fill, where one is set. What a test reads.
 bool swiftomniui_winui_window_background(SwiftOmniUIObjectRef window, uint32_t *background);
 void swiftomniui_winui_window_set_content(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef content);
-/// A native overlay in the existing content row, below TitleBar and above its
-/// ScrollView, with its own Mica surface. It never creates another auto row or reduces the viewport.
+/// Native controls overlay the page without adding an auto row or shrinking
+/// its viewport. The window owns one material region beneath these controls.
 void swiftomniui_winui_window_set_safe_area_bars(SwiftOmniUIObjectRef window,
     SwiftOmniUIObjectRef const *bars, int32_t count);
-/// A noninteractive SystemBackdropElement with Mica, for a local inset on any edge.
+/// A noninteractive local material marker on any edge; window markers join
+/// the shared chrome union, while popup scopes keep their own live source.
 SwiftOmniUIObjectRef swiftomniui_winui_safe_area_background_make(void);
-/// Place the merged surface in its owning page's coordinates within the existing content row.
+void swiftomniui_winui_safe_area_background_source(SwiftOmniUIObjectRef background, SwiftOmniUIObjectRef source);
+void swiftomniui_winui_safe_area_register(SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef bar, SwiftOmniUIObjectRef material);
+void swiftomniui_winui_safe_area_host_set_background(SwiftOmniUIObjectRef host, bool shown);
+/// Commit material/control presentation with the host's existing animation sample.
+void swiftomniui_winui_material_present(void);
+/// Diagnostics inspect the committed state without repairing/refreshing it.
+bool swiftomniui_winui_window_material_covers(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
+/// Whether the current shared overlay redirects this control or an ancestor.
+bool swiftomniui_winui_window_material_redirects(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
+bool swiftomniui_winui_window_acrylic_samples(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
+bool swiftomniui_winui_window_acrylic_captures_viewport(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef viewport);
+/// Place promoted bars in their owning page coordinates within the existing content row.
 void swiftomniui_winui_window_set_safe_area_bar_frame(SwiftOmniUIObjectRef window, double x, double y, double width);
 
 /// The window's chrome across its top, its menu bar and the row of tabs beneath it; null for none. The first chrome
@@ -321,8 +333,9 @@ void swiftomniui_winui_window_set_limits(SwiftOmniUIObjectRef window, double con
 /// The system title bar's height in DIPs, including before XAML finishes loading its template.
 double swiftomniui_winui_window_title_bar_height(SwiftOmniUIObjectRef window);
 
-/// What the window is: whether the user may maximize, minimize and resize it, whether its backdrop is translucent
-/// (acrylic) or of the desktop's tint (Mica), and whether it floats over the application's other windows.
+/// What the window is: whether the user may maximize, minimize and resize it,
+/// and whether it floats over the application's other windows. Acrylic is the
+/// default backdrop; the retained translucency hint no longer selects Mica.
 void swiftomniui_winui_window_set_traits(SwiftOmniUIObjectRef window, bool maximizable, bool minimizable, bool resizable,
                                      bool translucent, bool floats);
 
@@ -443,6 +456,8 @@ void swiftomniui_winui_navigation_set(
     bool animated, bool back
 );
 void swiftomniui_winui_navigation_clear(SwiftOmniUIObjectRef panel);
+/// Extend the vertical clip into inherited unsafe chrome strips, keeping the column's horizontal clip.
+void swiftomniui_winui_navigation_set_vertical_outsets(SwiftOmniUIObjectRef panel, double top, double bottom);
 void swiftomniui_winui_panel_set_children(SwiftOmniUIObjectRef panel, SwiftOmniUIObjectRef const *children, int32_t count);
 
 /// A panel that redirects its live XAML source and mask through CompositionMaskBrush.

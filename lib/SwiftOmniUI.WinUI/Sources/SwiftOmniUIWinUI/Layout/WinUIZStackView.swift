@@ -10,7 +10,7 @@ import CSwiftOmniUIWinUI
 @MainActor
 class WinUIZStackView: WinUITravellingLayout {
     /// Local insets on every edge own a material behind the bar, above the
-    /// scrolling base. Promoted top bars draw their backing in native hosts.
+    /// scrolling base. Window markers join the shared native material region.
     private var safeAreaBackground: WinUIView?
 
     override func heldViews() -> [WinUIView] {
@@ -26,7 +26,12 @@ class WinUIZStackView: WinUITravellingLayout {
             background.placingLayout = self
             safeAreaBackground = background
         }
+        // Source identity belongs to mounting, independently of whether a
+        // cached native placement plan needs to be rebuilt on this pass.
+        swiftomniui_winui_safe_area_background_source(safeAreaBackground!.handle, current[0].view.presentationHandle)
+        swiftomniui_winui_safe_area_register(handle, current[1].view.presentationHandle, safeAreaBackground?.presentationHandle)
         views.insert(safeAreaBackground!, at: index)
+        holdInDrawingOrder()
         return views
     }
 
@@ -83,6 +88,22 @@ class WinUIZStackView: WinUITravellingLayout {
     }
 
     override var hasNativeProposals: Bool { true }
+    override var retainsArithmeticOnNativeMeasure: Bool { true }
+
+    override func prepareLayoutContent(in bounds: Rect, measuringNative: Bool) {
+        super.prepareLayoutContent(in: bounds, measuringNative: measuringNative)
+        guard sourceElement?.safeAreaInsetEdge != nil else { return }
+        let current = items.filter { !$0.departing }
+        guard current.count == 2, current[1].view.nativeSafeBarOwner == nil,
+              current[1].element?.safeBarBackgroundHidden != true else { return }
+        // Native ownership/background visibility can settle after setItems.
+        // Ensure the decoration exists before selecting a cached first plan.
+        if safeAreaBackground == nil || (isAttached && safeAreaBackground?.isAttached == false) {
+            let previous = safeAreaBackground
+            holdChildren()
+            if previous !== safeAreaBackground || safeAreaBackground?.isAttached == false { forgetLayoutPlans() }
+        }
+    }
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
         if let placements = placement?.placements, !placements.isEmpty {
             insetContext = nil
@@ -134,6 +155,7 @@ class WinUIZStackView: WinUITravellingLayout {
         let current = items.filter { !$0.departing }
         guard let edge = sourceElement?.safeAreaInsetEdge, current.count == 2 else { return }
         let base = current[0], bar = current[1]
+        swiftomniui_winui_safe_area_register(handle, bar.view.presentationHandle, safeAreaBackground?.presentationHandle)
         let context = layoutSafeArea(in: bounds)
         let physicalEdge = SafeAreaArithmetic.physicalEdge(edge, direction: direction)
         let barPlace = proposals.first(where: { $0.view === bar.view })?.place ?? Rect(0, 0, 0, 0)
@@ -188,13 +210,23 @@ class WinUIZStackView: WinUITravellingLayout {
     /// Draws the children back to front as the run ranks them, or in their order without one - the order a click
     /// reaches them in too, with nothing moved and nothing laid out again.
     private func holdInDrawingOrder() {
+        if sourceElement?.safeAreaInsetEdge != nil {
+            // Fixed inset chrome must stay above the scrolling branch even
+            // when a lazy file list installs/reorders transition presenters.
+            // Give the material its own rank instead of tying it with the bar
+            // and relying on child insertion order after deferred attachment.
+            let top = Int32(items.count + 1)
+            let bar = items.last(where: { !$0.departing })?.view
+            for (index, item) in items.enumerated() {
+                let decoration = item.view === bar || item.element?.value(.isLayoutDecoration)?.bool == true
+                item.view.setZIndex(decoration ? top + 1 : Int32(index))
+            }
+            safeAreaBackground?.setZIndex(top)
+            return
+        }
         let ordered = ZStackArithmetic.drawingOrder(of: items.count, placedBy: placement?.placements ?? [])
-        let barIndex = sourceElement?.safeAreaInsetEdge != nil ? items.lastIndex(where: { !$0.departing }) : nil
         for (rank, index) in ordered.enumerated() {
             items[index].view.setZIndex(ordered == Array(items.indices) ? 0 : Int32(rank))
-            if index == barIndex {
-                safeAreaBackground?.setZIndex(ordered == Array(items.indices) ? 0 : Int32(rank))
-            }
         }
     }
 
@@ -270,7 +302,7 @@ class WinUIZStackView: WinUITravellingLayout {
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
         if sourceElement?.safeAreaInsetEdge != nil {
             if insetBase === child, let insetContext {
-                return insetContext.child(in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
+                return insetContext.child(in: place, preservingOutsets: child.carriesSafeAreaOutsets)
             }
             // The inset's content receives the incoming edge proposal, not its
             // own contribution, so GeometryReader inside a bar cannot loop.
@@ -280,6 +312,7 @@ class WinUIZStackView: WinUITravellingLayout {
     }
 
     override func detach() {
+        swiftomniui_winui_safe_area_register(handle, nil, nil)
         safeAreaBackground?.detach()
         safeAreaBackground = nil
         super.detach()

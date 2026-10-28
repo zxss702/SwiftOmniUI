@@ -6,6 +6,7 @@
 // Design: docs/design/platforms/winui/layout.md#scrolling
 
 #include "Relay.h"
+#include "AcrylicScene.h"
 
 #include <algorithm>
 #include <array>
@@ -412,6 +413,7 @@ namespace {
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
     try {
         controls::ScrollView scroller;
+        registerAcrylicScroller(scroller);
         auto insets = std::make_shared<ScrollerInsets>();
         insets->view = view;
         for (auto at = insetStates.begin(); at != insetStates.end();) {

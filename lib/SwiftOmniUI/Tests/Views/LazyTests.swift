@@ -767,16 +767,19 @@ private struct LazyPage: View {
             }
         }.node))
 
-        let shown = try lazy(.lazyVStack, in: realize(["0.3", "0.4"], in: renders, lazy: stack))
-        XCTAssertEqual(shown.children.map(\.id), [.manual("0.3"), .manual("0.4")], "in the order they show")
-        XCTAssertEqual(shown.child("0.3")?.props[.text], .string("3"))
+        // Hosts can submit stale IDs and an unordered window. Resolve only
+        // existing rows and restore source order before building them.
+        let identities = try XCTUnwrap(stack.lazyRows?.identities)
+        let shown = try lazy(.lazyVStack, in: realize([identities[4], "missing", identities[3]], in: renders, lazy: stack))
+        XCTAssertEqual(shown.children.map(\.id), [.manual(identities[3]), .manual(identities[4])], "in the order they show")
+        XCTAssertEqual(shown.child(identities[3])?.props[.text], .string("3"))
         XCTAssertEqual(built.count, 2, "only the two asked rows were built")
         XCTAssertEqual(built.numbers[3], 1)
         XCTAssertEqual(built.numbers[4], 1)
 
-        let moved = try lazy(.lazyVStack, in: realize(["0.4", "0.500"], in: renders, lazy: stack))
-        XCTAssertEqual(moved.children.map(\.id), [.manual("0.4"), .manual("0.500")])
-        XCTAssertNil(moved.child("0.3"), "the row the window left is let go")
+        let moved = try lazy(.lazyVStack, in: realize([identities[4], identities[500]], in: renders, lazy: stack))
+        XCTAssertEqual(moved.children.map(\.id), [.manual(identities[4]), .manual(identities[500])])
+        XCTAssertNil(moved.child(identities[3]), "the row the window left is let go")
         XCTAssertEqual(built.numbers[500], 1, "the new row was built once")
         XCTAssertEqual(built.numbers[4], 1, "a retained row must be reused before executing its builder")
         XCTAssertEqual(built.numbers[3], 1, "the row let go was never rebuilt")

@@ -140,7 +140,8 @@ final class WinUIWindow {
         let size = page.laidOutFrame
         guard size.width > 0, size.height > 0 else { return }
         let origin = page.origin, root = content.origin
-        let frame = Rect(origin.x - root.x, origin.y - root.y, size.width, 0)
+        let safe = page.layoutSafeArea(in: Rect(0, 0, size.width, size.height)).safe
+        let frame = Rect(origin.x - root.x + safe.x, origin.y - root.y + safe.y, safe.width, 0)
         guard frame != safeBarFrame else { return }
         safeBarFrame = frame
         swiftomniui_winui_window_set_safe_area_bar_frame(handle, frame.x, frame.y, frame.width)
@@ -251,8 +252,9 @@ final class WinUIWindow {
             // readers still observe them and scrollers can extend behind them.
             // Read committed metrics here; measuring chrome during Arrange
             // would recursively enter the native layout engine.
-            let caption = max(swiftomniui_winui_window_title_bar_height(self.handle),
-                              self.titleBar.laidOutFrame.height)
+            let caption = self.titleBarStands
+                ? max(swiftomniui_winui_window_title_bar_height(self.handle), self.titleBar.laidOutFrame.height)
+                : 0
             let menu = self.menuBarStands ? self.menuBar.laidOutFrame.height : 0
             let tabs = self.tabsStandInWindow ? self.tabRow.laidOutFrame.height : 0
             let top = max(0, caption + menu + tabs)

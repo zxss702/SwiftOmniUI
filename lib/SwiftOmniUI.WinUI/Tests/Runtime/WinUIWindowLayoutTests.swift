@@ -25,6 +25,30 @@ private final class WindowLayoutProbe: WinUILayoutView {
 }
 
 final class WinUIWindowLayoutTests: XCTestCase {
+    func testDefaultMicaAndExplicitTranslucencySurviveTraitUpdatesAndRootFills() {
+        onUIThread {
+            let window = WinUIWindow()
+            defer { window.close() }
+            var frame = [Double](repeating: 0, count: 13)
+            swiftomniui_winui_window_frame(window.handle, &frame)
+            XCTAssertEqual(frame[10], 0, "ordinary windows start with Mica, not Desktop Acrylic")
+            for translucent in [false, true, false] {
+                swiftomniui_winui_window_set_traits(window.handle, true, true, true, translucent, false)
+                swiftomniui_winui_window_frame(window.handle, &frame)
+                XCTAssertEqual(frame[10], translucent ? 1 : 0,
+                               "only explicitly translucent windows opt into Desktop Acrylic")
+            }
+            swiftomniui_winui_window_set_background(window.handle, true, 0xff123456)
+            var background: UInt32 = 0
+            XCTAssertTrue(swiftomniui_winui_window_background(window.handle, &background))
+            XCTAssertEqual(background, 0xff123456, "authored opaque root colours still cover the default backdrop")
+            swiftomniui_winui_window_set_background(window.handle, false, 0)
+            XCTAssertFalse(swiftomniui_winui_window_background(window.handle, &background))
+            swiftomniui_winui_window_frame(window.handle, &frame)
+            XCTAssertEqual(frame[10], 0)
+        }
+    }
+
     func testFirstAllocationIncludesTheDeclaredChromeBeforeActivation() {
         onUIThread {
             let window = WinUIWindow()

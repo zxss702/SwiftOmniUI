@@ -7,6 +7,7 @@
 // Design: docs/design/platforms/winui/pages.md
 
 #include "Relay.h"
+#include "AcrylicScene.h"
 
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Windows.UI.h>
@@ -108,7 +109,10 @@ namespace {
 
     void fill(controls::ContentControl const &slot, SwiftOmniUIObjectRef element) {
         auto shown = element ? as<xaml::UIElement>(element) : xaml::UIElement{nullptr};
-        if (slot.Content() != shown) slot.Content(shown);
+        if (slot.Content() != shown) {
+            slot.Content(shown);
+            acrylicStructureChanged(slot);
+        }
     }
 
     using SplitWidths = winrt::Windows::Foundation::Collections::IVector<double>;
@@ -169,11 +173,17 @@ namespace {
         bool resizable = widths.GetAt(0) < widths.GetAt(2);
         auto [beside, length] = splitRoom(split, width, alone);
         auto mode = beside ? controls::SplitViewDisplayMode::Inline : controls::SplitViewDisplayMode::Overlay;
+        // The mode can already be Inline when its default style first loads.
+        // Do not leave that first pane using the opaque native chrome brush.
+        if (beside) {
+            auto fill = split.PaneBackground().try_as<media::SolidColorBrush>();
+            if (!fill || fill.Color().A != 0)
+                split.PaneBackground(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+        }
         if (split.DisplayMode() != mode) {
             // Inline columns reveal the window surface. An overlay needs the
             // native themed pane brush to cover the detail behind it.
-            if (beside) split.PaneBackground(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
-            else split.ClearValue(controls::SplitView::PaneBackgroundProperty());
+            if (!beside) split.ClearValue(controls::SplitView::PaneBackgroundProperty());
             split.DisplayMode(mode);
         }
         bool handleShown = split.IsPaneOpen() && beside && !alone && resizable;
@@ -204,6 +214,7 @@ namespace {
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view) {
     try {
         controls::TitleBar bar;
+        bar.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
         // Keep an 8-DIP gap between the trailing toolbar and native caption
         // buttons instead of TitleBar's default 48-DIP drag strip.
         bar.Resources().Insert(winrt::box_value(L"TitleBarMinDragRegionWidth"), winrt::box_value(8.0));
@@ -278,7 +289,7 @@ extern "C" void swiftomniui_winui_title_bar_set(
         bar.IsBackButtonVisible(back);
         bar.IsPaneToggleButtonVisible(paneToggle);
         if (hasBackground) bar.Background(media::SolidColorBrush(color(background)));
-        else bar.ClearValue(controls::Control::BackgroundProperty());
+        else bar.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
         if (hasForeground) bar.Foreground(media::SolidColorBrush(color(foreground)));
         else bar.ClearValue(controls::Control::ForegroundProperty());
         auto theme = words == 1 ? xaml::ElementTheme::Dark
@@ -582,6 +593,7 @@ extern "C" void swiftomniui_winui_split_clear(SwiftOmniUIObjectRef handle) {
         auto split = borrow<controls::SplitView>(handle);
         split.Pane().as<controls::Grid>().Children().GetAt(0).as<controls::ContentControl>().Content(nullptr);
         split.Content().as<controls::Grid>().Children().Clear();
+        acrylicStructureChanged(split);
     } catch (...) { report("releasing split columns"); }
 }
 
@@ -633,6 +645,7 @@ extern "C" void swiftomniui_winui_split_set(
         detail.Visibility(contentShown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
         standInRow(detail, 0, row);
         standInRow(detail, 1, content);
+        acrylicStructureChanged(split);
         if (split.IsPaneOpen() != open) split.IsPaneOpen(open);
         sizeSplit(split);
     } catch (...) {
@@ -643,6 +656,7 @@ extern "C" void swiftomniui_winui_split_set(
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_tabs_make(int64_t view) {
     try {
         controls::SelectorBar tabs;
+        tabs.Background(media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
         tabs.SelectionChanged(guarded("handling SelectionChanged",
             [view](controls::SelectorBar const &sender, controls::SelectorBarSelectionChangedEventArgs const &) {
             if (settingTabs) return;

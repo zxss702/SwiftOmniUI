@@ -210,15 +210,16 @@ final class WinUIMeasurementTests: XCTestCase {
 
     func testNativePreparationDoesNotRepeatNestedContentArithmetic() {
         onUIThread {
-            let stable = CountedMeasureLayout()
+            let stable = WinUIStackView(axis: .vertical)
+            stable.setItems([WinUILayoutItem(view: CountedMeasureLayout())])
             stable.prepareMeasure(width: 320, height: 40)
-            let calls = stable.calls
+            let calls = WinUILayoutView.sizings
             // Native ancestor invalidation alone must not discard unchanged
             // arithmetic. Enter through XAML, outside prepareMeasure's scope.
             swiftomniui_winui_invalidate_measure(stable.handle)
             var nativeSize = [0.0, 0.0]
             swiftomniui_winui_measure(stable.handle, 320, 40, &nativeSize)
-            XCTAssertEqual(stable.calls, calls)
+            XCTAssertEqual(WinUILayoutView.sizings, calls)
 
             let label = WinUILabelView()
             label.setText("Native changes still invalidate the completed row plan")
@@ -615,13 +616,16 @@ final class WinUIMeasurementTests: XCTestCase {
             let root = WinUIStackView(axis: .horizontal)
             root.spacing = 0
             root.setItems([WinUILayoutItem(view: words), fixed])
+            // Establish the native allocation before simulating a dirty
+            // parent pass at the same proposal, as XAML does before Arrange.
+            root.prepareMeasure(width: 320, height: 100)
             root.arrange(width: 320, height: 100)
             XCTAssertLessThan(words.placedFrame.width, 280)
             let revision = words.measurementRevision
 
             // A native template/content change can invalidate XAML without a
             // Swift property patch. Keep the prior arithmetic deliberately.
-            words.setText(String(repeating: "Native words changed ", count: 20))
+            swiftomniui_winui_text_set_text(words.handle, String(repeating: "Native words changed ", count: 20))
             XCTAssertEqual(words.measurementRevision, revision)
             // Model the native dirty parent pass, bypassing Swift invalidation.
             swiftomniui_winui_invalidate_measure(root.handle)

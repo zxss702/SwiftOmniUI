@@ -8,6 +8,7 @@
 // Design: docs/design/platforms/winui/pages.md#the-windows-chrome
 
 #include "Relay.h"
+#include "ChromeAcrylic.h"
 
 #include <algorithm>
 #include <cmath>
@@ -28,13 +29,6 @@ using winrt::Windows::System::VirtualKeyModifiers;
 namespace windowing = winrt::Microsoft::UI::Windowing;
 
 namespace {
-    controls::SystemBackdropElement safeAreaBackground() {
-        controls::SystemBackdropElement surface;
-        surface.SystemBackdrop(xaml::Media::MicaBackdrop());
-        surface.IsHitTestVisible(false);
-        return surface;
-    }
-
     controls::Grid root(xaml::Window const &window) {
         return window.Content().as<controls::Grid>();
     }
@@ -113,7 +107,15 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number) {
     try {
         xaml::Window window;
         window.SystemBackdrop(xaml::Media::MicaBackdrop());
-        window.Content(rows({true, true, true, false}));
+        auto grid = rows({true, true, true, false});
+        window.Content(grid);
+        setAcrylicWindowBackdrop(grid, window.SystemBackdrop());
+        try {
+            auto material = winrt::make<ChromeAcrylic>().as<xaml::FrameworkElement>();
+            controls::Grid::SetRowSpan(material, 4);
+            controls::Canvas::SetZIndex(material, 1);
+            grid.Children().Append(material);
+        } catch (...) { report("creating the optional window material layer"); }
         // The window's state is read at each of them: a minimized window is also told it lost its activation, and
         // one hidden - with the window it belongs to, or by its scene - stands off the screen as a minimized one.
         window.Activated(guarded("handling Activated",
@@ -162,7 +164,9 @@ extern "C" void swiftomniui_winui_window_set_title(SwiftOmniUIObjectRef handle, 
 
 extern "C" void swiftomniui_winui_window_set_content(SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef content) {
     try {
-        standInRow(root(borrow<xaml::Window>(handle)), 3, content);
+        auto grid = root(borrow<xaml::Window>(handle));
+        standInRow(grid, 3, content);
+        setAcrylicContentRoot(grid, content ? as<xaml::FrameworkElement>(content) : xaml::FrameworkElement{nullptr});
     } catch (...) {
         report("filling a window");
     }
@@ -195,8 +199,72 @@ extern "C" void swiftomniui_winui_window_set_overlay(SwiftOmniUIObjectRef handle
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_safe_area_background_make(void) {
     try {
-        return detach(safeAreaBackground());
-    } catch (...) { report("making a safe area Mica background"); return nullptr; }
+        return detach(winrt::make<LocalAcrylic>());
+    } catch (...) { report("making a safe area acrylic background"); return nullptr; }
+}
+
+extern "C" void swiftomniui_winui_safe_area_host_set_background(SwiftOmniUIObjectRef handle, bool shown) {
+    try { as<xaml::FrameworkElement>(handle).Resources().Insert(winrt::box_value(L"safeBarAcrylic"), winrt::box_value(shown)); }
+    catch (...) { report("setting a promoted safe bar's material visibility"); }
+}
+
+extern "C" void swiftomniui_winui_material_present(void) {
+    try {
+        presentAcrylicScenes();
+        for (auto const &root : acrylicWindowRoots()) refreshWindowMaterial(root.as<controls::Grid>());
+    } catch (...) { report("presenting material with the host animation transaction"); }
+}
+
+extern "C" bool swiftomniui_winui_window_material_redirects(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element) {
+    try {
+        auto grid = root(borrow<xaml::Window>(window));
+        for (auto const &child : grid.Children()) {
+            auto host = child.as<xaml::FrameworkElement>();
+            if (winrt::unbox_value_or<winrt::hstring>(host.Tag(), L"") != L"chromeAcrylic") continue;
+            auto layer = winrt::get_self<ChromeAcrylic>(host.as<xaml::IFrameworkElementOverrides>());
+            for (auto const &bar : layer->bars) {
+                auto source = bar.element.get();
+                if (!source || !bar.visual.IsVisible()) continue;
+                for (xaml::DependencyObject at = as<xaml::UIElement>(element); at; at = xaml::Media::VisualTreeHelper::GetParent(at))
+                    if (at == source) return true;
+            }
+            break;
+        }
+        return false;
+    } catch (...) { report("reading a material control's committed presentation owner"); return false; }
+}
+
+extern "C" bool swiftomniui_winui_window_material_covers(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element) {
+    try {
+        auto grid = root(borrow<xaml::Window>(window));
+        for (auto const &child : grid.Children()) {
+            auto host = child.as<xaml::FrameworkElement>();
+            if (winrt::unbox_value_or<winrt::hstring>(host.Tag(), L"") != L"chromeAcrylic") continue;
+            auto layer = winrt::get_self<ChromeAcrylic>(host.as<xaml::IFrameworkElementOverrides>());
+            auto target = as<xaml::FrameworkElement>(element);
+            if (!target.IsLoaded()) return false;
+            auto size = target.ActualSize();
+            if (size.x <= 0 || size.y <= 0) return false;
+            using Rect = winrt::Windows::Foundation::Rect;
+            std::vector<Rect> uncovered{target.TransformToVisual(host).TransformBounds({0, 0, size.x, size.y})};
+            for (auto const &cover : layer->drawing.regions) {
+                std::vector<Rect> next;
+                for (auto const &rect : uncovered) {
+                    auto x = std::max(rect.X, cover.X), y = std::max(rect.Y, cover.Y);
+                    auto right = std::min(rect.X + rect.Width, cover.X + cover.Width);
+                    auto bottom = std::min(rect.Y + rect.Height, cover.Y + cover.Height);
+                    if (right <= x || bottom <= y) { next.push_back(rect); continue; }
+                    if (x > rect.X) next.push_back({rect.X, rect.Y, x - rect.X, rect.Height});
+                    if (right < rect.X + rect.Width) next.push_back({right, rect.Y, rect.X + rect.Width - right, rect.Height});
+                    if (y > rect.Y) next.push_back({x, rect.Y, right - x, y - rect.Y});
+                    if (bottom < rect.Y + rect.Height) next.push_back({x, bottom, right - x, rect.Y + rect.Height - bottom});
+                }
+                uncovered = std::move(next);
+            }
+            return uncovered.empty();
+        }
+        return false;
+    } catch (...) { report("reading the committed material region"); return false; }
 }
 
 extern "C" void swiftomniui_winui_window_set_safe_area_bars(
@@ -218,7 +286,7 @@ extern "C" void swiftomniui_winui_window_set_safe_area_bars(
             layer.Visibility(xaml::Visibility::Collapsed);
             layer.VerticalAlignment(xaml::VerticalAlignment::Top);
             controls::Grid::SetRow(layer, 3);
-            controls::Canvas::SetZIndex(layer, 1);
+            controls::Canvas::SetZIndex(layer, 2);
             controls::StackPanel stack;
             stack.Tag(winrt::box_value(L"safeAreaBarContent"));
             layer.Children().Append(stack);
@@ -233,8 +301,7 @@ extern "C" void swiftomniui_winui_window_set_safe_area_bars(
             if (resources.HasKey(key)) edge.Background(resources.Lookup(key).try_as<xaml::Media::Brush>());
             else edge.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{48, 128, 128, 128}));
             layer.Children().Append(edge);
-            // Each hosted bar supplies its own optional Mica background, so
-            // transparent and material-backed bars can share this stack.
+            // Controls stand above the one shared window material.
             children.Append(layer);
         }
         auto held = layer.Children().GetAt(0).as<controls::StackPanel>().Children();
@@ -306,7 +373,9 @@ extern "C" void swiftomniui_winui_window_set_background(
                 static_cast<uint8_t>(background >> 8), static_cast<uint8_t>(background)};
             fill = xaml::Media::SolidColorBrush(color);
         }
-        root(borrow<xaml::Window>(handle)).Background(fill);
+        auto grid = root(borrow<xaml::Window>(handle));
+        grid.Background(fill);
+        refreshWindowMaterial(grid);
     } catch (...) {
         report("painting a window's background");
     }
@@ -540,11 +609,17 @@ extern "C" void swiftomniui_winui_window_set_traits(
             if (presenter.IsResizable() != resizable) presenter.IsResizable(resizable);
             if (presenter.IsAlwaysOnTop() != floats) presenter.IsAlwaysOnTop(floats);
         }
-        // The backdrop is made again only where it turns.
-        auto acrylic = window.SystemBackdrop().try_as<xaml::Media::DesktopAcrylicBackdrop>();
-        if (translucent == static_cast<bool>(acrylic)) return;
-        if (translucent) window.SystemBackdrop(xaml::Media::DesktopAcrylicBackdrop());
-        else window.SystemBackdrop(xaml::Media::MicaBackdrop());
+        // Ordinary windows use the system Mica foundation. An explicit
+        // translucency request retains the native Desktop Acrylic option.
+        auto previousBackdrop = window.SystemBackdrop();
+        if (translucent) {
+            if (!window.SystemBackdrop().try_as<xaml::Media::DesktopAcrylicBackdrop>())
+                window.SystemBackdrop(xaml::Media::DesktopAcrylicBackdrop());
+        } else if (!window.SystemBackdrop().try_as<xaml::Media::MicaBackdrop>()) {
+            window.SystemBackdrop(xaml::Media::MicaBackdrop());
+        }
+        setAcrylicWindowBackdrop(root(window), window.SystemBackdrop());
+        if (previousBackdrop != window.SystemBackdrop()) refreshWindowMaterial(root(window));
     } catch (...) {
         report("setting what a window is");
     }

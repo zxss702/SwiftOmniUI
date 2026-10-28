@@ -170,6 +170,15 @@ class WinUIView {
         return context.resizedLayout(to: bounds).ignoring(sourceElement?.ignoresSafeArea)
     }
 
+    /// Layout containers carry the outside strips to whichever descendant
+    /// actually touches that edge. Their number of children must not consume
+    /// a window inset before a nested ScrollView can see it. Explicit clips
+    /// remain boundaries, and ordinary leaf controls still use safe placement.
+    var carriesSafeAreaOutsets: Bool {
+        if let layout = self as? WinUILayoutView { return !layout.box.clips }
+        return sourceElement?.observesSafeArea == true
+    }
+
     /// Update document arithmetic before its presenter measures; native
     /// invalidations and margins are committed outside the layout pass.
     func safeAreaChanged() {}

@@ -32,6 +32,7 @@ final class WinUIStackView: WinUITravellingLayout {
     }
 
     override var hasNativeProposals: Bool { true }
+    override var retainsArithmeticOnNativeMeasure: Bool { true }
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
         let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
         let places = StackArithmetic.places(of: items, axis: axis, spacing: spacing, padding: padding,
@@ -43,10 +44,16 @@ final class WinUIStackView: WinUITravellingLayout {
 
     override func arrange(in bounds: Rect) {
         beginArrangement(in: bounds)
-        let byView = Dictionary(uniqueKeysWithValues: items.map { ($0.view.number, $0) })
+        // nativeProposals preserves item order and only omits unplaced items.
+        // Walk that subsequence instead of allocating a lookup table for every
+        // HStack/VStack in every newly arranged lazy row.
+        var index = items.startIndex
         for proposal in preparedLayoutPlan(in: bounds) {
-            guard let view = proposal.view, let item = byView[view.number] else { continue }
-            place(item, at: proposal.place)
+            guard let view = proposal.view else { continue }
+            while index < items.endIndex, items[index].view !== view { index += 1 }
+            guard index < items.endIndex else { break }
+            place(items[index], at: proposal.place)
+            index += 1
         }
     }
 }

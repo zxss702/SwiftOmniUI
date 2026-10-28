@@ -199,6 +199,9 @@ extension WinUIRenderer: TurnPresenter {
         if let text = scenes.changed(root: runtime.tree.root) { WinUIPersistence.writeScenes(text) }
         if runtime.tree.chromeMayChange { showWindows() }
         LazyCells.realizing = false
+        if WinUIView.arranging == 0, WinUIView.measuring == 0 {
+            swiftomniui_winui_material_present()
+        }
     }
 
     func perform(_ call: HostActCall) {
@@ -222,6 +225,12 @@ extension WinUIRenderer: FramePresenter {
         if impact.windowChrome {
             showWindows(keepingSizing: true)
             refreshWindowChrome()
+        }
+        // Opacity/move/scale presentation does not require native layout.
+        // Material and redirected controls commit the same sampled frame,
+        // including the structural sample after a removal completes.
+        if WinUIView.arranging == 0, WinUIView.measuring == 0 {
+            swiftomniui_winui_material_present()
         }
     }
 

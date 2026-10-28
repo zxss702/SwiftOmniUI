@@ -6,6 +6,7 @@
 // Design: docs/design/platforms/winui/layout.md#a-layout-is-a-panel
 
 #include "Relay.h"
+#include "AcrylicScene.h"
 
 #include <algorithm>
 #include <unordered_set>
@@ -160,6 +161,7 @@ namespace {
     /// measures and arranges the original children in the parent's coordinates.
     struct MaskSourcePanel : controls::PanelT<MaskSourcePanel> {
         explicit MaskSourcePanel(bool mask) : mask(mask) {
+            Resources().Insert(winrt::box_value(L"safeBarLocalPresentation"), winrt::box_value(true));
             HorizontalAlignment(xaml::HorizontalAlignment::Stretch);
             VerticalAlignment(xaml::VerticalAlignment::Stretch);
             if (mask) {
@@ -302,7 +304,7 @@ namespace {
             if (alphaMask) alphaMask->measure(available);
             double size[2] = {0, 0};
             callbacks.measure(view, available.Width, available.Height, size);
-            if (navigationViewport) navigationViewport.Measure(available);
+            if (navigationViewport) navigationViewport.Measure({available.Width, available.Height + navigationTop + navigationBottom});
             return Size(static_cast<float>(size[0]), static_cast<float>(size[1]));
         }
 
@@ -310,8 +312,9 @@ namespace {
             if (alphaMask) alphaMask->arrange(final);
             callbacks.arrange(view, final.Width, final.Height);
             if (navigationViewport) {
-                auto bounds = Rect(0, 0, final.Width, final.Height);
-                if (navigationClip.Rect() != bounds) navigationClip.Rect(bounds);
+                auto bounds = Rect(0, -navigationTop, final.Width, final.Height + navigationTop + navigationBottom);
+                auto clip = Rect(0, 0, bounds.Width, bounds.Height);
+                if (navigationClip.Rect() != clip) navigationClip.Rect(clip);
                 navigationViewport.Arrange(bounds);
             }
             return final;
@@ -324,6 +327,8 @@ namespace {
         // visuals to this navigation column, independently of authored clips.
         controls::Grid navigationViewport{nullptr};
         xaml::Media::RectangleGeometry navigationClip{nullptr};
+        float navigationTop = 0;
+        float navigationBottom = 0;
         xaml::UIElement navigationContent{nullptr};
 
         /// Whether assistive technology meets none of what stands in the panel.
@@ -454,6 +459,16 @@ extern "C" void swiftomniui_winui_navigation_clear(SwiftOmniUIObjectRef handle) 
     } catch (...) { report("releasing a navigation frame"); }
 }
 
+extern "C" void swiftomniui_winui_navigation_set_vertical_outsets(
+    SwiftOmniUIObjectRef handle, double top, double bottom
+) {
+    try {
+        auto owner = panel(as<xaml::UIElement>(handle));
+        owner->navigationTop = static_cast<float>(std::max(0.0, top));
+        owner->navigationBottom = static_cast<float>(std::max(0.0, bottom));
+    } catch (...) { report("extending the navigation clip under native chrome"); }
+}
+
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_masked_panel_make(int64_t view) {
     try {
         auto held = winrt::make<SwiftOmniUIPanel>(view).as<controls::Panel>();
@@ -510,6 +525,7 @@ extern "C" void swiftomniui_winui_panel_set_children(
             removeUnused(items, held);
             insertInOrder(items, held, owner);
         }
+        acrylicStructureChanged(owner);
     } catch (...) {
         report("holding a panel's children");
     }

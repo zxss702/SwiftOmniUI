@@ -10,8 +10,6 @@ import CSwiftOmniUIWinUI
 @MainActor
 final class WinUISafeAreaBarHost: WinUILayoutView {
     let bar: WinUIView
-    private var background: WinUIView?
-    private var backgroundHidden = false
     private var contribution: [Double] = []
     private var measurePending = false
     private var released = false
@@ -42,12 +40,10 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     }
 
     func updateBackground() {
-        backgroundHidden = bar.sourceElement?.safeBarBackgroundHidden == true
-        if !backgroundHidden, background == nil {
-            background = WinUIView { _ in swiftomniui_winui_safe_area_background_make() }
-            background?.placingLayout = self
-        }
-        setChildren((backgroundHidden ? [] : background.map { [$0] } ?? []) + [bar])
+        // One window surface clips Acrylic to enabled chrome/bar regions.
+        // A second brush here would blur/tint the shared surface again.
+        swiftomniui_winui_safe_area_host_set_background(handle, bar.sourceElement?.safeBarBackgroundHidden != true)
+        setChildren([bar])
     }
 
     /// Logical contribution changes are committed outside native layout.
@@ -78,12 +74,8 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
         let item = WinUILayoutItem(view: bar, values: bar.sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues())
         let bounds = Rect(0, 0, width ?? size.width, max(0, size.height - spacing))
-        var proposals = [NativeProposal(view: bar, place: SingleChildArithmetic.place(
+        return [NativeProposal(view: bar, place: SingleChildArithmetic.place(
             of: item, in: bounds, padding: EdgeInsets(0), direction: direction))]
-        if let background, !backgroundHidden {
-            proposals.append(NativeProposal(view: background, place: Rect(0, 0, width ?? size.width, size.height)))
-        }
-        return proposals
     }
 
     override func arrange(in bounds: Rect) {
@@ -100,8 +92,6 @@ final class WinUISafeAreaBarHost: WinUILayoutView {
         drawingAncestors.removeAll()
         onSourcePlaced = nil
         setChildren([])
-        background?.detach()
-        background = nil
         bar.nativeSafeBarOwner = nil
         bar.clearSafeBarDrawing()
         bar.placingLayout?.holdChildren()

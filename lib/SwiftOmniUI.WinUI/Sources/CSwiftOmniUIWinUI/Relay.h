@@ -198,10 +198,10 @@ namespace swiftomniui {
         return nullptr;
     }
 
-    /// Whether `element` is one of a window's layers over its rows - its sheets or its overlay - and no row's own.
+    /// Whether `element` is a window decoration/layer, rather than one row's own content.
     inline bool isLayer(xaml::FrameworkElement const &element) {
         auto name = winrt::unbox_value_or<winrt::hstring>(element.Tag(), L"");
-        return name == L"sheets" || name == L"overlay" || name == L"safeAreaBars";
+        return name == L"sheets" || name == L"overlay" || name == L"safeAreaBars" || name == L"chromeAcrylic";
     }
 
     /// Stands `element` in `row` of `grid` in place of what stood there; nothing for null.

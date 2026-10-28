@@ -61,6 +61,7 @@ final class WinUIGridView: WinUITravellingLayout {
     }
 
     override var hasNativeProposals: Bool { true }
+    override var retainsArithmeticOnNativeMeasure: Bool { true }
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
         let bounds = Rect(0, 0, width ?? size.width, size.height)
         let places = childPlaces(in: bounds)
@@ -86,10 +87,15 @@ final class WinUIGridView: WinUITravellingLayout {
             }
             return
         }
-        let byView = Dictionary(uniqueKeysWithValues: items.map { ($0.view.number, $0) })
+        // The plan is an ordered subsequence of items, including when hidden
+        // cells have no rectangle. Do not rebuild a hash table on each pass.
+        var index = items.startIndex
         for proposal in preparedLayoutPlan(in: bounds) {
-            guard let view = proposal.view, let item = byView[view.number] else { continue }
-            place(item, at: proposal.place)
+            guard let view = proposal.view else { continue }
+            while index < items.endIndex, items[index].view !== view { index += 1 }
+            guard index < items.endIndex else { break }
+            place(items[index], at: proposal.place)
+            index += 1
         }
     }
 
@@ -153,7 +159,7 @@ final class WinUIGridView: WinUITravellingLayout {
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
         let context = layoutSafeArea(in: contextBounds)
             .padding(SafeAreaArithmetic.physicalInsets(sourceElement?.safeAreaPadding ?? EdgeInsets(0), direction: direction))
-        return context.child(in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
+        return context.child(in: place, preservingOutsets: child.carriesSafeAreaOutsets)
     }
 
 }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "Relay.h"
+#include "AcrylicSurface.h"
 
 #include <algorithm>
 #include <cmath>
@@ -172,6 +173,10 @@ namespace {
             radius = next;
             resizeSurface();
             if (output) output.IsVisible(next > 0);
+            auto key = winrt::box_value(L"safeBarLocalPresentation");
+            auto previous = source.Resources().TryLookup(key);
+            if (!previous || winrt::unbox_value<bool>(previous) != (next > 0))
+                source.Resources().Insert(key, winrt::box_value(next > 0));
             // As in Gallery's OpacityMaskView, VisualSurface omits only its
             // source root's opacity. Descendant opacity and input stay intact.
             if (sourceVisual) sourceVisual.Opacity(next > 0 ? 0 : 1);
@@ -229,6 +234,16 @@ namespace {
         if (auto content = parent.try_as<controls::ContentPresenter>(); content && content.Content() == element)
             return [content](auto const &next) { content.Content(next); };
         throw winrt::hresult_error(E_NOTIMPL, L"The native parent has no replaceable blur presentation slot");
+    }
+}
+
+namespace swiftomniui {
+    composition::CompositionEffectBrush contentBlur(composition::Compositor const &compositor,
+        composition::CompositionBrush const &source, float sigma) {
+        auto brush = blurFactory(compositor).CreateBrush();
+        brush.SetSourceParameter(L"Source", source);
+        brush.Properties().InsertScalar(L"Blur.StandardDeviation", sigma);
+        return brush;
     }
 }
 

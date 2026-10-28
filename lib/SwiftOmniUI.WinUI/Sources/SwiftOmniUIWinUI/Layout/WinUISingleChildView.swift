@@ -17,6 +17,7 @@ class WinUISingleChildView: WinUILayoutView {
     }
 
     override var hasNativeProposals: Bool { true }
+    override var retainsArithmeticOnNativeMeasure: Bool { true }
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
         guard let item = items.first, item.isShown else { return [] }
         let place = childPlace(item, in: Rect(0, 0, width ?? size.width, size.height))

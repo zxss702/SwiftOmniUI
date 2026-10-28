@@ -9,20 +9,71 @@ navigation model to reconcile with them.
 
 ## Page-level safe bars
 
-Top inset surfaces occupy a native Grid/StackPanel overlay in the existing
+Top inset controls occupy a native Grid/StackPanel overlay in the existing
 content row, directly beneath TitleBar, menus and tabs. They do not create an
-auto row or shrink the ScrollView viewport. Each bar owns an optional
-`SystemBackdropElement` with `MicaBackdrop`, independent of `TitleBar.Background`.
-The common surface uses a native theme brush for the lower scroll edge;
-sheets and authored window overlays remain above it. Explicit bar backgrounds
-stay on their original views.
+auto row or shrink the ScrollView viewport. Local insets on every edge keep
+normal layout markers, including the sidebar and trailing expert selector.
+
+`ChromeAcrylic` owns one window-coordinate region union for the toolbar,
+promoted bars, and page-local markers. Its native `SystemBackdropElement` uses
+the window's Mica provider and the same geometry as the transparent content
+blur above it. Explicit root fills remain above Mica. There is no extra white
+tint, luminosity adjustment or fallback-colour approximation of Mica. The
+native Mica underlay replaces sharp drawing inside the region; otherwise the
+transparent blur would leave sharp text showing through. Mica is an external
+backdrop link, not an ordinary capturable XAML visual: it is deliberately not
+put through the content visual surface.
+
+`AcrylicScene` retains a content-only frontier of live visual surfaces,
+excluding fixed controls and every material output in that scope. It splits
+at outer scroll viewports and inset ancestors, never at document rows. A
+scope owns one shared native Direct2D Gaussian effect through Composition;
+its input is reduced to one quarter of the width and height, with the blur
+radius adjusted accordingly. Consumers crop the shared result after filtering.
+The graph has no previous-frame input and no `CompositionBackdropBrush`.
+Fixed local controls are redirected above the union inside its mask; their
+native identity still owns input, focus, hover, automation and popup menus.
+Native toolbar and promoted controls already stand above this layer.
+
+Local markers whose owning subtree is fading, transformed, projected, blurred,
+or masked retain their native subtree presentation instead of redirecting its
+controls into a stationary window overlay. They sample the same shared filtered
+texture through the inverse presentation transform; the native ancestor applies
+opacity/motion to both material and controls. At rest they rejoin the window
+union. A bar's own content opacity remains distinct from its container's opacity.
+Captured content and redirected controls restore ancestor opacity together,
+with source-local sizes and presentation matrices instead of resizing captures
+to transformed bounding boxes. The existing host presentation transaction commits
+these changes even when opacity/motion produces no native layout. No extra frame
+clock, retry dispatcher, or per-view animation is created.
+
+The material's backing Grid contains fixed native background controls. Its
+region is a Direct2D winding geometry attached through a Composition clip;
+the redirected fixed controls own a separate clip over that same geometry.
+Region changes never replace XAML `Path.Data` during `LayoutUpdated`.
+`Path.Data` affects measurement and rejects sharing a geometry between
+owners: a failed second assignment after the first invalidated measurement
+would otherwise repeat indefinitely on subsequent layout callbacks.
+Unchanged regions retain their existing geometry and clips.
+
+Native `LayoutUpdated` is the scope's post-layout geometry commit, after
+column and viewport placement. Regions and sources are resolved from the
+actual attached tree on initial layout and subsequent layout changes. No
+per-frontier Loaded/SizeChanged watcher, retry dispatcher, timer, or
+Rendering/Rendered subscription repairs first-load placement. Ordinary
+scroll motion remains a live compositor input. Independent popup and nested
+scrolling-bar scopes retain their own acyclic content/effect graph. Optional
+material connection failures are reported without failing window creation.
+The resting native caption buttons remain transparent.
 
 The overlay's origin and width follow the visible page's native allocation,
 including the NavigationSplitView detail column. Its page-sized proposal must
 match the source inset's logical proposal: measuring a detail bar at full
 window width would both cover the sidebar and alternate layout proposals.
-Source placement queues a coalesced geometry update; unchanged geometry
-does not write XAML layout properties again.
+Source placement queues a coalesced layout update; unchanged geometry does not
+write XAML layout properties again. This layout bookkeeping never samples or
+refreshes material pixels. The lower scroll edge uses a native theme brush;
+sheets and authored window overlays remain above it.
 
 Only a navigation stack or split view's uninterrupted page-root modifier chain
 is promoted. Outside navigation, top bars use the same local inset path as
@@ -30,20 +81,19 @@ bottom and horizontal bars, including inside popovers. Local layouts,
 finite frames, clipping, side boundaries and negative spacing retain ordinary
 local hosting. The mounted source keeps geometry, animation and coordinate
 ancestry while native ownership changes are coalesced after layout. Old hosts
-release their children before new ones attach them; weak queued callbacks do
-nothing after release or window teardown.
+release their children before new ones attach them; weak queued layout callbacks
+do nothing after release or window teardown.
 
-Local safe-area insets on top, bottom, leading and trailing edges also own a
-noninteractive `SystemBackdropElement` with `MicaBackdrop`. It is drawn immediately
-behind the bar and above the base content, filling the reserved strip including
-margins and positive spacing. It does not participate in intrinsic sizing or
-change the safe-area contribution. Promoted top bars draw their material in the
-window's merged stack. Explicit backgrounds remain above the material. Mica follows the system
-theme, wallpaper and fallback policy; it does not blur the application's text.
+The local decoration fills the reserved strip, including margins and positive
+spacing, without contributing intrinsic size or changing the safe-area amount.
+The drawing order is explicitly content, native Mica foundation and transparent
+content blur, then fixed controls. The marker is included before selecting an
+inset's cached layout plan. Hidden markers contribute no region; hiding a
+background never changes the bar's safe-area or intrinsic sizing.
 
 `hiddenSafeBarBackground(_:)`, available on Windows and Linux, hides only the
 native SafeBar backing. Apply it after `safeAreaInset` or on a containing subtree;
-the nearest explicit value wins. Windows omits each local/promoted bar's Mica
+the nearest explicit value wins. Windows omits each local/promoted bar's Acrylic
 surface. GTK keeps hidden-background bars local rather than adding them to the
 painted native toolbar. Content, explicit authored backgrounds and safe-area
 contributions remain intact.
@@ -66,7 +116,12 @@ same local overlay path as bottom and horizontal bars.
 
 The visible page's `windowBackground` paints the native root behind the entire
 client area; removing it restores the system backdrop. A composed page can
-supply that colour around its navigation arrangement.
+supply that colour around its navigation arrangement. The default system
+backdrop is `MicaBackdrop`, including after ordinary window-trait updates.
+An explicit translucency request selects `DesktopAcrylicBackdrop`; removing that
+request restores Mica. The in-app material above scrolling content samples the
+clean application content over this native foundation. An explicit opaque page/root
+background remains opaque.
 
 Hiding `.windowToolbar` removes the XAML title bar and its layout row. Content
 then reaches the window's top edge, beneath Windows' native caption buttons,
@@ -75,7 +130,7 @@ cleared so it does not intercept controls along that edge. Showing the toolbar
 again reattaches the same native title bar and restores its height.
 
 A window has one chrome: WinUI's `TitleBar`, across the top of a window
-whose content extends under its title bar, over a Mica backdrop, as
+whose content extends under its title bar, over a Mica backdrop by default, as
 Windows' own applications stand. The renderer composes it again from what
 the window shows after every render, and after every change the user makes
 that the application may not render for - a tab chosen, the sidebar shown:
@@ -114,6 +169,12 @@ that the application may not render for - a tab chosen, the sidebar shown:
 - the visible page's menus stand on a menu bar beneath the chrome
   ([menus](#menus)).
 
+TitleBar, its command bars, the menu bar and the tab row have transparent default
+fills, so their controls draw above the shared window material. Authored
+title-bar colours still win. Caption buttons remain Windows-owned: normal and
+inactive backgrounds are transparent; native hover/pressed behaviour, including
+the close button's red hover, remains intact.
+
 A page that hides its navigation bar puts neither the way back nor its
 actions on the chrome.
 
@@ -142,11 +203,19 @@ selected navigation transition. The departing page remains under native
 transition ownership; SOUI does not add a separate animation clock or snapshot.
 
 The Frame stands in a stable Grid viewport with a rectangular XAML clip. Its
-rectangle follows the navigation column's final native allocation and changes
-only when those bounds change. Both incoming content and unloading transition
+viewport and native Frame/Page allocation extend vertically by inherited unsafe
+outsets so scrolling content can draw beneath the window chrome. Extending only
+the clip would leave the Frame's own layout/template bounds unchanged. The
+horizontal bounds stay within the navigation column, and the clip
+changes only when those bounds or outsets change. Both incoming content and unloading transition
 visuals are confined to that viewport, so horizontal movement cannot paint over
 the neighboring sidebar. The viewport contributes no second Swift placement or
-safe-area inset; native Grid/Frame/Page still own the page's allocation.
+safe-area inset; native Grid/Frame/Page still own the page's allocation. The
+SplitView receives the same extended vertical allocation, including its pane
+and content presenters. Page safe-area coordinates are converted from this
+extended frame once. Multi-child layout containers forward outsets to children
+touching an edge; ordinary leaves and explicitly clipped subtrees do not gain
+an outside viewport. Initial/terminal document padding still reserves each bar.
 
 `IsNavigationStackEnabled` is false and page caching is disabled; Swift's path
 remains the only navigation history. A view still held by an old page during a

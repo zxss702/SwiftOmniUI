@@ -105,6 +105,10 @@ class WinUILazyView: WinUITravellingLayout {
     var isPreparingRows = false
 
     override var hasNativeProposals: Bool { true }
+    // Preparation always consumes dirty rows and cross-axis changes before
+    // checking the plan. Those paths invalidate changed geometry explicitly;
+    // a native callback alone need not discard the whole retained window.
+    override var retainsArithmeticOnNativeMeasure: Bool { true }
 
     // A committed window can contain new rows (including empty fragments)
     // even when its range and the document's estimated extent did not change.

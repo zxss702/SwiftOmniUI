@@ -84,6 +84,13 @@ final class WinUILazyInvalidationTests: XCTestCase {
                 XCTAssertGreaterThan(words.desiredSize.height, 20)
                 XCTAssertEqual(row.laidOutFrame.height, lazy.measured[identity]?.size.height ?? 0, accuracy: 1)
                 XCTAssertGreaterThan(words.laidOutFrame.height, 20)
+                _ = lazy.measure(width: 120, height: 240)
+                let revision = lazy.measurements.revision
+                let measurements = cells.measurements
+                _ = lazy.measure(width: 120, height: 240)
+                XCTAssertEqual(lazy.measurements.revision, revision,
+                               "an unchanged native callback must retain the lazy window's arithmetic")
+                XCTAssertEqual(cells.measurements, measurements)
             }
         }
     }

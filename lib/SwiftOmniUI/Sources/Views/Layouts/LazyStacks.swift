@@ -482,60 +482,70 @@ struct LazyHStackElement: StackBase {
         node.lazyRowReadings = readings
         let make: ([String: String]) -> [Node] = { retained in
             var nextReads: [String: Set<ObjectIdentifier>] = [:]
-            let nodes: [Node] = realized.wrappedValue.filter { positions.position(of: $0) != nil }
-                .sorted { positions.position(of: $0)! < positions.position(of: $1)! }
-                .compactMap { identity in
-                    guard let place = positions.position(of: identity) else { return nil }
-                    var low = 0, high = boundaries.count
-                    while low < high {
-                        let middle = low + (high - low) / 2
-                        if boundaries[middle] <= place { low = middle + 1 } else { high = middle }
-                    }
-                    let segment = low - 1, local = place - boundaries[segment]
-                    if let id = retained[identity] {
-                        // reconcileChildren keeps the existing rendered subtree. Do
-                        // not construct a view just to discard its description there.
-                        var kept = Node(type: .fragment, id: id)
-                        kept.lazyIdentity = identity
-                        nextReads[identity] = readings.rows[identity] ?? []
-                        return kept
-                    }
-                    let (made, rowReads) = ReadScope.observed { () -> Node in
-                        var child: Node
-                        switch segments[segment] {
-                        case .nodes(let nodes):
-                            child = nodes[local]
-                        case .rows(let rows):
-                            child = rows.lazyRow(at: local).node
-                        }
-                        if child.type == .fragment { child.materialize() }
-                        // A builder fragment has no box. Apply the container's defaults to its actual
-                        // children, where explicit alignment and flexible frame modifiers are visible.
-                        if child.type == .fragment, child.children.count == 1 {
-                            child.children[0].lazyIdentity = identity
-                        }
-                        child.lazyIdentity = identity
-                        if child.type == .fragment {
-                            for index in child.children.indices { prepare(&child.children[index], place) }
-                        } else {
-                            prepare(&child, place)
-                        }
-                        if child.type != .fragment { child.props[.lazyRowStack] = rowStack }
-                        // A fragment is retained by the differ even though only
-                        // its children mount. Its identity must survive window shifts too.
-                        if child.id == nil { child.id = identity }
-                        if child.type == .fragment {
-                            var variant = 0
-                            for index in child.children.indices where child.children[index].id == nil {
-                                child.children[index].id = variant == 0 ? identity : "\(identity)\u{0}\(variant)"
-                                variant += 1
-                            }
-                        }
-                        return child
-                    }
-                    nextReads[identity] = rowReads
-                    return made
+            // A viewport request normally arrives in source order. Resolve
+            // each position once, including removed IDs, instead of looking
+            // through the identity index again for every sort comparison.
+            var selected: [(identity: String, place: Int)] = []
+            let requested = realized.wrappedValue
+            selected.reserveCapacity(requested.count)
+            var ordered = true
+            for identity in requested {
+                guard let place = positions.position(of: identity) else { continue }
+                if let last = selected.last, last.place > place { ordered = false }
+                selected.append((identity, place))
+            }
+            if !ordered { selected.sort { $0.place < $1.place } }
+            let nodes: [Node] = selected.map { identity, place in
+                var low = 0, high = boundaries.count
+                while low < high {
+                    let middle = low + (high - low) / 2
+                    if boundaries[middle] <= place { low = middle + 1 } else { high = middle }
                 }
+                let segment = low - 1, local = place - boundaries[segment]
+                if let id = retained[identity] {
+                    // reconcileChildren keeps the existing rendered subtree. Do
+                    // not construct a view just to discard its description there.
+                    var kept = Node(type: .fragment, id: id)
+                    kept.lazyIdentity = identity
+                    nextReads[identity] = readings.rows[identity] ?? []
+                    return kept
+                }
+                let (made, rowReads) = ReadScope.observed { () -> Node in
+                    var child: Node
+                    switch segments[segment] {
+                    case .nodes(let nodes):
+                        child = nodes[local]
+                    case .rows(let rows):
+                        child = rows.lazyRow(at: local).node
+                    }
+                    if child.type == .fragment { child.materialize() }
+                    // A builder fragment has no box. Apply the container's defaults to its actual
+                    // children, where explicit alignment and flexible frame modifiers are visible.
+                    if child.type == .fragment, child.children.count == 1 {
+                        child.children[0].lazyIdentity = identity
+                    }
+                    child.lazyIdentity = identity
+                    if child.type == .fragment {
+                        for index in child.children.indices { prepare(&child.children[index], place) }
+                    } else {
+                        prepare(&child, place)
+                    }
+                    if child.type != .fragment { child.props[.lazyRowStack] = rowStack }
+                    // A fragment is retained by the differ even though only
+                    // its children mount. Its identity must survive window shifts too.
+                    if child.id == nil { child.id = identity }
+                    if child.type == .fragment {
+                        var variant = 0
+                        for index in child.children.indices where child.children[index].id == nil {
+                            child.children[index].id = variant == 0 ? identity : "\(identity)\u{0}\(variant)"
+                            variant += 1
+                        }
+                    }
+                    return child
+                }
+                nextReads[identity] = rowReads
+                return made
+            }
             readings.rows = nextReads
             return nodes
         }

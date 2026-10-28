@@ -171,13 +171,21 @@ final class WinUISplitView: WinUILayoutView {
     }
 
     override func contentSize(proposal: ProposedViewSize) -> LayoutSize {
-        sidebar.measure(width: proposal.width, height: proposal.height)
+        let bounds = Rect(0, 0, proposal.width ?? 0, proposal.height ?? 0)
+        let whole = layoutSafeArea(in: bounds).bounds
+        let extra = max(0, bounds.y - whole.y) + max(0, whole.y + whole.height - bounds.height)
+        let size = sidebar.measure(width: proposal.width, height: proposal.height.map { $0 + extra })
+        return LayoutSize(width: size.width, height: max(0, size.height - extra))
     }
 
     override var hasNativeProposals: Bool { true }
 
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
-        [NativeProposal(view: sidebar, place: Rect(0, 0, width ?? size.width, size.height))]
+        let bounds = Rect(0, 0, width ?? size.width, size.height)
+        let whole = layoutSafeArea(in: bounds).bounds
+        // Extend the native SplitView itself, not just a descendant scroller:
+        // its template clips the pane/content to its own allocation.
+        return [NativeProposal(view: sidebar, place: Rect(0, whole.y, bounds.width, whole.height))]
     }
 
     override func arrange(in bounds: Rect) {
@@ -197,20 +205,21 @@ final class WinUISplitView: WinUILayoutView {
     }
 
     private func safeArea(for page: WinUIView, in bounds: Rect) -> SafeAreaContext {
-        // A page has no column position until it joins the native tree. Its
-        // first Measure uses the incoming allocation's safe region.
-        let preservingOutsets = page.sourceElement?.observesSafeArea == true
-        let actual = page.laidOutFrame
-        guard isAttached, page.isAttached, allocatedBounds.width > 0, allocatedBounds.height > 0,
-              actual.width > 0, actual.height > 0, let offset = page.layoutOffset(relativeTo: self) else {
-            return layoutSafeArea(in: bounds).child(in: bounds, preservingOutsets: preservingOutsets)
-        }
-        // Pair layout size with layout offset. TransformToVisual includes a
-        // native transition's translation; interpreting it as an unsafe strip
-        // feeds animated drawing back into the next layout's available width.
-        let place = Rect(offset.x, offset.y, actual.width, actual.height)
-        return layoutSafeArea(in: allocatedBounds).child(
-            in: place, preservingOutsets: preservingOutsets).resizedLayout(to: bounds)
+        // The native page proposal already includes the extended viewport.
+        // Convert that proposal, never the last Arrange's height/Y: after an
+        // auxiliary-detail toggle those metrics belong to the previous native
+        // parent and can silently remove/double the toolbar contribution.
+        let whole = layoutSafeArea(in: bounds).bounds
+        let top = max(0, bounds.y - whole.y)
+        let bottom = max(0, whole.y + whole.height - bounds.y - bounds.height)
+        let row = pages.dropFirst().first?.view === page ? (detailRow?.laidOutFrame.height ?? 0) : 0
+        let offset = isAttached && page.isAttached ? page.layoutOffset(relativeTo: self) : nil
+        let width = offset == nil ? bounds.width : max(bounds.width, contextBounds.width)
+        let proposal = Rect(0, 0, width, max(0, bounds.height - top - bottom + row))
+        let place = Rect(offset?.x ?? 0, -top + row, bounds.width, bounds.height)
+        return layoutSafeArea(in: proposal)
+            .child(in: place, preservingOutsets: page.carriesSafeAreaOutsets)
+            .resizedLayout(to: bounds)
     }
 
     override func safeAreaChanged() {
@@ -264,6 +273,11 @@ final class WinUISplitView: WinUILayoutView {
                 next.append(NativeSlot(owner: sidebar, position: 2, view: pages[1].view))
             }
             if let detailRow { next.append(NativeSlot(owner: three ? middle : sidebar, position: 1, view: detailRow)) }
+            let moved = next.filter { new in
+                !ownedSlots.contains { old in
+                    old.owner === new.owner && old.position == new.position && old.view === new.view
+                }
+            }.map(\.view)
             // Detach only changed slots, before attaching any moved page. Replacing
             // the detail must not unload an unchanged pane and its scroll presenter.
             for old in ownedSlots where !next.contains(where: {
@@ -287,6 +301,14 @@ final class WinUISplitView: WinUILayoutView {
                     sidebar: pages.first?.view, detail: pages.dropFirst().first?.view, row: detailRow,
                     open: isPresented, widths: SplitColumnWidth(sidebarPaneLength),
                     contentWidths: SplitColumnWidth(contentPaneLength))
+            }
+            // A two/three-column switch reparents the retained NavigationStack.
+            // Its old native proposal/context is no longer valid even if the
+            // Swift owner and eventual page dimensions are unchanged.
+            for view in moved where view.nativeLayoutOwner === self {
+                view.safeAreaContext = nil
+                view.nativeParentChanged()
+                view.safeAreaChanged()
             }
         }
     }

@@ -478,7 +478,9 @@ extern "C" bool swiftomniui_winui_menu_open_submenu_for_testing(SwiftOmniUIObjec
 
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_menu_bar_make(int64_t) {
     try {
-        return detach(controls::MenuBar());
+        controls::MenuBar bar;
+        bar.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+        return detach(bar);
     } catch (...) {
         report("making a menu bar");
         return nullptr;

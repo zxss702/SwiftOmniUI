@@ -23,7 +23,8 @@ extension View {
     /// bars reserve their edges in modifier order. A ScrollView can draw and
     /// scroll beneath them while keeping its first and last content clear.
     /// `spacing` reserves additional room after the bar. Windows supplies native
-    /// Mica backing on every edge; page-level top bars share a merged surface.
+    /// in-app Acrylic backing on every edge; page-level top bars share a merged
+    /// surface with the window's chrome.
     /// Other hosts retain their platform's default backing.
     ///
     /// - Parameters:

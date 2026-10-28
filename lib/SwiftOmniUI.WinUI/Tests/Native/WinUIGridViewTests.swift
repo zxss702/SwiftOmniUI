@@ -8,6 +8,31 @@ import XCTest
 
 final class WinUIGridViewTests: XCTestCase {
     @MainActor private static func checkDenseRowFramePlacement() {
+        // Placement plans omit hidden children but retain source order. Check
+        // lookup-free arrangement across holes and reordered retained views.
+        for layout in [WinUIStackView(axis: .vertical), WinUIStackView(axis: .horizontal), WinUIGridView()] as [WinUILayoutView] {
+            let rows = (0..<5).map { _ in WinUIPathView() }
+            for order in [[0, 1, 2, 3, 4], [4, 2, 0, 3, 1], [1, 3, 4, 0, 2]] {
+                let items = order.map { index -> WinUILayoutItem in
+                    var item = WinUILayoutItem(view: rows[index], isShown: index % 2 == 0)
+                    item.values.width = Double(20 + index)
+                    item.values.height = Double(12 + index)
+                    item.values.margin = EdgeInsets(Double(index))
+                    return item
+                }
+                layout.setItems(items)
+                layout.prepareMeasure(width: 320, height: 160)
+                let expected = WinUILayoutView.querySize {
+                    layout.nativeProposals(width: 320, size: LayoutSize(width: 320, height: 160))
+                }
+                layout.arrange(width: 320, height: 160)
+                XCTAssertEqual(expected.count, 3)
+                for proposal in expected {
+                    XCTAssertEqual(proposal.view?.placedFrame, proposal.place,
+                                   "visible items after hidden/reordered children must keep their own slot")
+                }
+            }
+        }
         // Exercise both rolling edges and the general reorder path. Incoming
         // children already owned by another native panel must move, while the
         // overlapping window stays attached and outgoing children leave.

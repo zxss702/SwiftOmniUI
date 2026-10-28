@@ -35,11 +35,17 @@ final class WinUINavigationView: WinUILayoutView {
             page.nativeLayoutOwner = self
             page.rootSafeAreaContext = { [weak self, weak page] bounds in
                 guard let self, let page else { return SafeAreaContext(bounds: bounds) }
-                // The native page fills this frame's current proposal. Using
-                // its previous allocation clips a first or resized Measure to
-                // old bounds and invents unsafe strips along otherwise safe edges.
-                return self.layoutSafeArea(in: bounds).child(
-                    in: bounds, preservingOutsets: page.sourceElement?.observesSafeArea == true)
+                // Frame/Page now receive the extended native viewport. Convert
+                // the original proposal once; resizing that already-expanded
+                // proposal before conversion would add the chrome twice.
+                let inherited = self.layoutSafeArea(in: bounds).bounds
+                let top = max(0, bounds.y - inherited.y)
+                let bottom = max(0, inherited.y + inherited.height - bounds.y - bounds.height)
+                let proposal = Rect(0, 0, bounds.width, max(0, bounds.height - top - bottom))
+                let frame = Rect(0, -top, bounds.width, bounds.height)
+                return self.layoutSafeArea(in: proposal)
+                    .child(in: frame, preservingOutsets: page.carriesSafeAreaOutsets)
+                    .resizedLayout(to: bounds)
             }
             page.safeAreaContext = nil
         }
@@ -60,6 +66,11 @@ final class WinUINavigationView: WinUILayoutView {
         Self.querySize { SingleChildArithmetic.size(of: items.last, padding: EdgeInsets(0), width: width) }
     }
 
+    override func contentSize(proposal: ProposedViewSize) -> LayoutSize {
+        updateViewport(in: Rect(0, 0, proposal.width ?? 0, proposal.height ?? 0))
+        return contentSize(width: proposal.width)
+    }
+
     override func safeAreaChanged() {
         super.safeAreaChanged()
         if let page = items.last?.view {
@@ -73,6 +84,20 @@ final class WinUINavigationView: WinUILayoutView {
         page.nativeLayoutOwner = nil
         page.rootSafeAreaContext = nil
         page.safeAreaContext = nil
+    }
+
+    override func arrange(in bounds: Rect) {
+        updateViewport(in: bounds)
+    }
+
+    private func updateViewport(in bounds: Rect) {
+        // Preserve the horizontal column clip while admitting ScrollView ink
+        // beneath inherited native chrome above/below the page allocation.
+        let context = layoutSafeArea(in: bounds)
+        let whole = context.bounds
+        let top = max(0, bounds.y - whole.y)
+        let bottom = max(0, whole.y + whole.height - bounds.y - bounds.height)
+        swiftomniui_winui_navigation_set_vertical_outsets(handle, top, bottom)
     }
 
     override func detach() {
