@@ -690,11 +690,9 @@ import CRT
         case .textEditor:
             values.expandingAxes = .both
         case .scrollView:
-            values.isScrollViewport = true
             values.scrollAxes = value(.orientation)?.enumeration.flatMap(Axis.init(rawValue:)) ?? .vertical
             values.expandingAxes = values.scrollAxes == .vertical ? .both : values.scrollAxes
         case .list:
-            values.isScrollViewport = true
             // A native list consumes a viewport even with no realized rows.
             // Its cells must not supply the enclosing stack's ideal height.
             if case .row? = value(.itemsLayout).flatMap(ItemsLayout.init(propValue:)) {
@@ -704,7 +702,6 @@ import CRT
             }
             values.expandingAxes = .both
         case .webView:
-            values.isScrollViewport = true
             values.scrollAxes = .both
         case .page, .navigationStack, .tabView, .navigationSplitView:
             // An arrangement is a viewport: it takes the room it is given and

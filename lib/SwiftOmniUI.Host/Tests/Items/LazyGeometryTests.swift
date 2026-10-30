@@ -503,17 +503,15 @@ final class LazyGeometryTests: XCTestCase {
     func testScrollAxesUseViewportSpaceAndKeepCrossAxisAndBounds() {
         var values = LayoutValues()
         values.scrollAxes = .vertical
-        values.isScrollViewport = true
-        XCTAssertEqual(values.sized(LayoutSize(width: 120, height: 40_000)), LayoutSize(width: 120, height: 10))
+        XCTAssertEqual(values.sized(LayoutSize(width: 120, height: 40_000)), LayoutSize(width: 120, height: 40_000))
         values.minimumHeight = 80
-        XCTAssertEqual(values.sized(LayoutSize(width: 120, height: 40_000)).height, 80)
+        XCTAssertEqual(values.sized(LayoutSize(width: 120, height: 40)).height, 80)
         values.maximumHeight = 240
         XCTAssertEqual(values.sized(LayoutSize(width: 120, height: 40_000)).height, 240)
         values.height = 300
         XCTAssertEqual(values.sized(LayoutSize(width: 120, height: 40_000)).height, 240)
         values = LayoutValues()
         values.scrollAxes = .horizontal
-        values.isScrollViewport = true
-        XCTAssertEqual(values.sized(LayoutSize(width: 40_000, height: 56)), LayoutSize(width: 10, height: 56))
+        XCTAssertEqual(values.sized(LayoutSize(width: 40_000, height: 56)), LayoutSize(width: 40_000, height: 56))
     }
 }

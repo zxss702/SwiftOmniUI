@@ -35,10 +35,6 @@
     /// extent is not a minimum size for the enclosing layout.
     public var scrollAxes = Axis.neither
 
-    /// True for a native viewport itself, not for stacks or frames containing
-    /// one. Such containers must keep their measured ideal size.
-    public var isScrollViewport = false
-
     /// An inset bar has an intrinsic thickness, even when its root modifier
     /// chain contains a scroller. Only that edge's axis sizes to its document;
     /// ordinary viewport children and the document beneath it keep their rules.
@@ -123,12 +119,10 @@
         LayoutSize(
             width: boundedWidth(extent(self.width, measured: measured.width, offered: width,
                                        bound: (minimumWidth != nil || maximumWidth != nil),
-                                       maximum: maximumWidth,
                                        scrolled: (scrollAxes == .horizontal || scrollAxes == .both)
                                         && safeBarSizingAxes != .horizontal && safeBarSizingAxes != .both)),
             height: boundedHeight(extent(self.height, measured: measured.height, offered: nil,
                                          bound: (minimumHeight != nil || maximumHeight != nil),
-                                         maximum: maximumHeight,
                                          scrolled: (scrollAxes == .vertical || scrollAxes == .both)
                                           && safeBarSizingAxes != .vertical && safeBarSizingAxes != .both)))
     }
@@ -144,21 +138,16 @@
     }
 
     /// One axis of `sized`: a stated size wins. A scroller accepts a finite
-    /// viewport proposal, but its document does not determine its ideal extent
-    /// along that axis when the proposal is unspecified.
+    /// viewport proposal. Without a proposal, keep the measured content extent
+    /// and let boundedWidth/boundedHeight cap it; a maximum is not a request
+    /// to fill that much space.
     private func extent(
-        _ stated: Double?, measured: Double, offered: Double?, bound: Bool,
-        maximum: Double?, scrolled: Bool
+        _ stated: Double?, measured: Double, offered: Double?, bound: Bool, scrolled: Bool
     ) -> Double {
         if let stated { return stated }
         if scrolled {
             if let offered, offered.isFinite { return max(0, offered) }
-            // A bounded flexible frame supplies its maximum when its parent
-            // leaves this axis unspecified (for example, a nested scroller).
-            if let maximum, maximum.isFinite { return max(0, maximum) }
-            // Do not use the entire document as a viewport's ideal size, or
-            // discard a containing stack's already measured child heights.
-            return isScrollViewport ? 10 : measured
+            return measured
         }
         guard bound, let offered, offered.isFinite else { return measured }
         return offered

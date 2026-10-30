@@ -322,14 +322,16 @@ a runtime calls after it reports the locale) - and nothing else.
 
 ## Scrolling
 
-A viewport accepts a finite proposal along its scrolling axis. An unspecified
-axis asks for its ideal extent (10 DIPs), rather than zero or the entire
-document. A finite maximum frame supplies a bounded viewport even inside
-another ScrollView. Scroll axes travel through stacks and frames to keep
-viewport allocation flexible, but viewport identity does not: those containers
-keep the heights and widths they measure from their children. In particular,
-an outer lazy row must not erase a nested scroller's bounded height. Safe-bar
-intrinsic thickness still sizes to content along that bar's edge axis.
+A viewport accepts a finite proposal along its scrolling axis. Without a
+proposal it keeps its measured content extent, capped by any frame bounds.
+For a nested vertical ScrollView with `maxHeight: 256`, content measuring 80
+DIPs takes 80 DIPs and needs no inner scrolling; content measuring 800 DIPs
+takes 256 DIPs and scrolls within that viewport. A maximum is a cap, not a
+fixed size. Scroll axes travel through containing stacks and frames to keep
+allocation flexible, without erasing their measured child sizes. Lazy content
+uses its existing extent estimates and refines mounted rows, rather than
+realizing the entire document to answer an intrinsic query. Safe-bar intrinsic
+thickness still sizes to content along that bar's edge axis.
 
 A scroller's content is held to the scroller's width when it scrolls only
 down, or not at all, and offered no width when it scrolls across, where its

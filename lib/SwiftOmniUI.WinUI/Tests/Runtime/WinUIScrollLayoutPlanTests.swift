@@ -23,6 +23,57 @@ private final class ScrollPlanMeasureProbe: WinUILayoutView {
 }
 
 final class WinUIScrollLayoutPlanTests: XCTestCase {
+    func testNestedLazyScrollerFitsShortContentAndScrollsOnlyAboveItsMaximum() throws {
+        try onUIThread {
+            let paragraphs = State(wrappedValue: 2)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        Text("Before").frame(height: 24)
+                        VStack(alignment: .leading, spacing: 0) {
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 0) {
+                                    ForEach(0..<paragraphs.wrappedValue) { number in
+                                        Text("Thought paragraph \(number)")
+                                            .frame(height: 28)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
+                            }.frame(maxHeight: 256)
+                        }
+                        Text("After").frame(height: 24)
+                    }
+                }.frame(width: 320, height: 480)
+            }
+            // Includes just below / above the cap and shrinkage after scrolling.
+            for count in [2, 9, 10, 300, 1, 2] {
+                paragraphs.wrappedValue = count
+                let height = min(Double(count * 28), 256)
+                host.settle {
+                    guard let inner = host.views(WinUIScrollView.self).dropFirst().first else { return false }
+                    return abs(inner.scroller.laidOutFrame.height - height) < 1
+                        && (count * 28 <= 256 ? inner.scroller.standing.reach.y < 1
+                                             : inner.scroller.standing.reach.y > 0)
+                }
+                let inner = try XCTUnwrap(host.views(WinUIScrollView.self).dropFirst().first)
+                XCTAssertEqual(inner.scroller.laidOutFrame.height, height, accuracy: 1)
+                if count * 28 <= 256 {
+                    XCTAssertEqual(inner.scroller.standing.reach.y, 0, accuracy: 1)
+                    XCTAssertEqual(inner.scroller.standing.offset.y, 0, accuracy: 1)
+                } else {
+                    XCTAssertGreaterThan(inner.scroller.standing.reach.y, 0)
+                    inner.scroller.move(to: Point(0, 20))
+                    host.settle { abs(inner.scroller.standing.offset.y - 20) < 1 }
+                    XCTAssertEqual(inner.scroller.standing.offset.y, 20, accuracy: 1)
+                }
+                if count == 300 {
+                    let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).last)
+                    XCTAssertLessThan(lazy.cells.built.count, count)
+                }
+            }
+        }
+    }
+
     func testExpandingABoundedNestedLazyScrollerKeepsItsViewportHeight() throws {
         try onUIThread {
             let expanded = State(wrappedValue: false)

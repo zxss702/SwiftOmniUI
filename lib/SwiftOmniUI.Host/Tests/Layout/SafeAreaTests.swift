@@ -10,9 +10,8 @@ final class SafeAreaTests: XCTestCase {
     func testSafeBarScrollerUsesItsContentForThicknessWithoutChangingOrdinaryViewports() {
         var viewport = LayoutValues()
         viewport.scrollAxes = .vertical
-        viewport.isScrollViewport = true
         let content = LayoutSize(width: 380, height: 72)
-        XCTAssertEqual(viewport.sized(content, offered: 380).height, 10)
+        XCTAssertEqual(viewport.sized(content, offered: 380).height, 72)
         viewport.safeBarSizingAxes = .vertical
         viewport.maximumHeight = 256
         XCTAssertEqual(viewport.sized(content, offered: 380).height, 72)
@@ -22,8 +21,7 @@ final class SafeAreaTests: XCTestCase {
 
         var horizontal = LayoutValues()
         horizontal.scrollAxes = .horizontal
-        horizontal.isScrollViewport = true
-        XCTAssertEqual(horizontal.sized(content).width, 10)
+        XCTAssertEqual(horizontal.sized(content).width, 380)
         horizontal.safeBarSizingAxes = .horizontal
         horizontal.maximumWidth = 100
         XCTAssertEqual(horizontal.sized(content).width, 100)

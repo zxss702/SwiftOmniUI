@@ -60,7 +60,7 @@ final class ChildMeasureTests: XCTestCase {
         var frame = LayoutValues()
         frame.scrollAxes = .vertical
         frame.maximumHeight = 256
-        let bounded = frame.sized(LayoutSize(width: 320, height: 10), offered: 320)
+        let bounded = frame.sized(LayoutSize(width: 320, height: 800), offered: 320)
         XCTAssertEqual(bounded.height, 256,
                        "an outer ScrollView's unspecified height must not erase a bounded inner viewport")
 
@@ -76,17 +76,29 @@ final class ChildMeasureTests: XCTestCase {
         XCTAssertEqual(frame.sized(bounded, offered: 320).height, 64)
     }
 
-    func testHorizontalViewportAndContainingFrameKeepDistinctIdealSizes() {
+    func testNestedViewportMaximumCapsContentWithoutFillingUnusedSpace() {
+        var frame = LayoutValues()
+        frame.scrollAxes = .vertical
+        frame.maximumHeight = 256
+        // Growth and shrinkage must both return the current intrinsic extent.
+        for contentHeight in [80.0, 256, 800, 40, 0, 120] {
+            XCTAssertEqual(frame.sized(LayoutSize(width: 320, height: contentHeight), offered: 320).height,
+                           min(contentHeight, 256))
+        }
+        frame.minimumHeight = 64
+        XCTAssertEqual(frame.sized(LayoutSize(width: 320, height: 40), offered: 320).height, 64)
+    }
+
+    func testHorizontalViewportMaximumCapsTheMeasuredContentWithoutAnOffer() {
         var viewport = LayoutValues()
-        viewport.isScrollViewport = true
         viewport.scrollAxes = .horizontal
-        XCTAssertEqual(viewport.sized(LayoutSize(width: 40_000, height: 48)).width, 10)
+        XCTAssertEqual(viewport.sized(LayoutSize(width: 40_000, height: 48)).width, 40_000)
         XCTAssertEqual(viewport.sized(LayoutSize(width: 40_000, height: 48), offered: 120).width, 120)
 
         var frame = viewport
-        frame.isScrollViewport = false
         frame.maximumWidth = 192
-        XCTAssertEqual(frame.sized(LayoutSize(width: 10, height: 48)).width, 192)
+        XCTAssertEqual(frame.sized(LayoutSize(width: 96, height: 48)).width, 96)
+        XCTAssertEqual(frame.sized(LayoutSize(width: 400, height: 48)).width, 192)
         frame.maximumWidth = nil
         XCTAssertEqual(frame.sized(LayoutSize(width: 96, height: 48)).width, 96)
     }
