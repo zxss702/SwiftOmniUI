@@ -45,6 +45,7 @@ private struct ForegroundCapsule: View {
     }
 
     func testASpacerStaysClearWithoutForegroundAndWithItsOwnForeground() throws {
+        try testAFixedSpacerKeepsItsExtentWithoutAnExtraLayoutContainer()
         let views: [any View] = [
             Spacer(),
             Spacer().foregroundStyle(.red),
@@ -69,6 +70,16 @@ private struct ForegroundCapsule: View {
         XCTAssertEqual(spacer.props[.fill], Brush.solidColor(.clear).propValue)
         XCTAssertEqual(spacer.props[.flex], 12.0.propValue)
         XCTAssertEqual(patch.child(.manual("shape"))?.props[.fill], gradient.brush.propValue.resolvingColorScheme())
+    }
+
+    func testAFixedSpacerKeepsItsExtentWithoutAnExtraLayoutContainer() throws {
+        let patch = Renders().render(Spacer(minLength: 12)
+            .frame(width: 100, height: 20, alignment: .trailing).node)
+        let spacer = try XCTUnwrap(patch.subtree.first { $0.type == .rectangle })
+        XCTAssertEqual(spacer.props[.width], 100.0.propValue)
+        XCTAssertEqual(spacer.props[.height], 20.0.propValue)
+        XCTAssertEqual(spacer.props[.flex], 12.0.propValue)
+        XCTAssertFalse(patch.subtree.contains { $0.type == .grid })
     }
 
     func testASpacerKeepsAnExplicitBackgroundVisibleThroughItsClearFill() throws {

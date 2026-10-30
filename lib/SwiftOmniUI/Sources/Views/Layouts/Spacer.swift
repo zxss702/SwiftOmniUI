@@ -33,4 +33,14 @@ public struct Spacer: View {
     public var body: some View {
         Rectangle().fill(.clear).flex(minLength)
     }
+
+    /// Empty space has no inner drawing to align inside a separate frame.
+    /// Keep its explicit extent on the flexible layout item itself.
+    public func frame(width: Double? = nil, height: Double? = nil,
+                      alignment: Alignment = .center) -> some View {
+        Rectangle().fill(.clear).flex(minLength).modified { node in
+            if let width { node.write(VisualElementContract.width, width) }
+            if let height { node.write(VisualElementContract.height, height) }
+        }
+    }
 }
