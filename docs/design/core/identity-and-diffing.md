@@ -322,6 +322,7 @@ watches what everything under it wrote, folded by each key's `reduce`:
 
 ```text
   seeds fold in written order        a node's own `.preference` writes first
+  the first offer passes through     no reduction against the default
   children fold in child order       each child's folded answers next
   transforms run last                `.transformPreference` rewrites once
   fragments are transparent          a Group or ForEach folds as if inline
@@ -342,6 +343,10 @@ read that state. Publishing selection geometry therefore does not rebuild the
 document producing it. Native text layout reports identify their retained text
 box in the renderer's weak dependency index. Only that text and the ownership
 path to its observers refold; unrelated branches retain their previous answers.
+An unobserved `Text` creates no layout seed, origin anchor or layout report
+handlers. The differ wires them after inherited `reportsTextLayout` requests
+have reached the concrete text. Custom attributes remain part of the authored
+text and are copied into that report box when a reader is present.
 
 Preference seeds, observers and transforms written on a composed view follow
 its body's root during expansion, including a body that splices several roots.
