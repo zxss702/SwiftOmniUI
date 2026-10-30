@@ -47,6 +47,47 @@ final class PagesTests: XCTestCase {
         _ = WindowPresentation().show(try XCTUnwrap(runtime.tree.root), in: runtime.lifecycle)
 
         XCTAssertEqual(told, [4, 5, 1])
+        try checkPagePathAfterNestedTopologyChanges()
+    }
+
+    private func checkPagePathAfterNestedTopologyChanges() throws {
+        let runtime = runtime(node("outer", .page, children: [
+            node("branch", .grid, children: [node("words", .text)])
+        ])) { _ in }
+        let outer = try XCTUnwrap(runtime.tree.root)
+        XCTAssertNil(outer.contentArrangement)
+        XCTAssertNil(outer.contentArrangement)
+        let branch = try XCTUnwrap(outer.first(id: .manual("branch")))
+        let navigation = node("navigation", .navigationStack, children: [node("detail", .page)])
+        var update = HostPatch(id: .manual("outer"), type: .page)
+        update.children = .changed([node("branch", .grid, children: [navigation])])
+        runtime.tree.apply(update, complete: false)
+        let nested = try XCTUnwrap(outer.first(id: .manual("navigation")))
+        XCTAssertTrue(outer.contentArrangement === nested,
+                      "insertion below a cached empty branch must refresh the page path")
+        XCTAssertEqual(outer.visiblePage?.id, .manual("detail"))
+        branch.isDeparting = true
+        XCTAssertNil(outer.contentArrangement, "departing branches no longer own the page path")
+        branch.isDeparting = false
+        XCTAssertTrue(outer.contentArrangement === nested, "revival restores the arrangement")
+        update.children = .changed([node("branch", .grid, children: [
+            node("toolbar", .toolbarItems, children: [navigation]), node("words", .text)
+        ])])
+        runtime.tree.apply(update, complete: false)
+        XCTAssertNil(outer.contentArrangement, "slot content must not become the page's arrangement")
+        update.children = .changed([node("branch", .grid, children: [
+            node("first", .navigationStack), node("second", .navigationStack)
+        ])])
+        runtime.tree.apply(update, complete: false)
+        XCTAssertEqual(outer.contentArrangement?.id, .manual("first"))
+        update.children = .changed([node("branch", .grid, children: [
+            node("second", .navigationStack), node("first", .navigationStack)
+        ])])
+        runtime.tree.apply(update, complete: false)
+        XCTAssertEqual(outer.contentArrangement?.id, .manual("second"), "reordering replaces the cached first match")
+        update.children = .changed([node("branch", .grid, children: [node("words", .text)])])
+        runtime.tree.apply(update, complete: false)
+        XCTAssertNil(outer.contentArrangement, "removal invalidates a previously found arrangement")
     }
 
     /// A pop tells the page leaving everything it hears on a move before the page arriving hears anything.

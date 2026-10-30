@@ -28,7 +28,14 @@ import CRT
 
     /// The elements this one holds, in order - a grid's and a ZStack's in the order they are drawn, by
     /// `zIndex`, ties in the order written.
-    public private(set) var children: [MountedElement] = []
+    public private(set) var children: [MountedElement] = [] {
+        didSet { invalidateContentArrangement() }
+    }
+
+    // Page-path lookup depends on child topology, not text, paint, or scroll
+    // offsets. Cache absence as well: ordinary lazy rows contain no pages.
+    var hasCachedContentArrangement = false
+    weak var cachedContentArrangement: MountedElement?
 
     /// Whether the last patch changed this element's children - the first counts.
     public private(set) var childrenChanged = false
@@ -88,7 +95,9 @@ import CRT
 
     /// Whether the element rides a removal transition - kept in its parent's
     /// children and shown while it goes.
-    public internal(set) var isDeparting = false
+    public internal(set) var isDeparting = false {
+        didSet { if isDeparting != oldValue { parent?.invalidateContentArrangement() } }
+    }
 
     /// Which departure is in flight: a landing of an old one - reversed, or
     /// left behind by a newer - touches nothing.
@@ -681,9 +690,11 @@ import CRT
         case .textEditor:
             values.expandingAxes = .both
         case .scrollView:
+            values.isScrollViewport = true
             values.scrollAxes = value(.orientation)?.enumeration.flatMap(Axis.init(rawValue:)) ?? .vertical
             values.expandingAxes = values.scrollAxes == .vertical ? .both : values.scrollAxes
         case .list:
+            values.isScrollViewport = true
             // A native list consumes a viewport even with no realized rows.
             // Its cells must not supply the enclosing stack's ideal height.
             if case .row? = value(.itemsLayout).flatMap(ItemsLayout.init(propValue:)) {
@@ -693,6 +704,7 @@ import CRT
             }
             values.expandingAxes = .both
         case .webView:
+            values.isScrollViewport = true
             values.scrollAxes = .both
         case .page, .navigationStack, .tabView, .navigationSplitView:
             // An arrangement is a viewport: it takes the room it is given and

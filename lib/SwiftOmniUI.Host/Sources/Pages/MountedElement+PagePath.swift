@@ -32,11 +32,25 @@ extension MountedElement {
     /// The arrangement this page's content composes to, found down its arranged
     /// children. Slots stay with their owner; a found arrangement keeps its own.
     public var contentArrangement: MountedElement? {
-        func arrangement(in element: MountedElement) -> MountedElement? {
-            if NodeType.pageTypes.contains(element.type) { return element }
-            return element.currentChildren.lazy.compactMap(arrangement).first
+        if hasCachedContentArrangement { return cachedContentArrangement }
+        var found: MountedElement?
+        for child in currentChildren {
+            found = NodeType.pageTypes.contains(child.type) ? child : child.contentArrangement
+            if found != nil { break }
         }
-        return currentChildren.lazy.compactMap(arrangement).first
+        cachedContentArrangement = found
+        hasCachedContentArrangement = true
+        return found
+    }
+
+    /// Every branch examined by contentArrangement caches its answer. A
+    /// changed branch therefore invalidates just that path; an already dirty
+    /// branch stops repeated propagation while a lazy patch adds many rows.
+    func invalidateContentArrangement() {
+        guard hasCachedContentArrangement else { return }
+        hasCachedContentArrangement = false
+        cachedContentArrangement = nil
+        parent?.invalidateContentArrangement()
     }
 
     /// The page whose title names the window while this arrangement shows: the visible page, but tabs on a stack are
