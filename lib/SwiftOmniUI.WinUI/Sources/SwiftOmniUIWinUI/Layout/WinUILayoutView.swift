@@ -21,6 +21,7 @@ class WinUILayoutView: WinUIView {
     private var nativePreparationDepth = 0
     private var hadSwiftAllocation = false
     private var hasNativeMeasurement = false
+    private var hasNativeArrangement = false
 
     override var requiresNativeMeasureInvalidation: Bool { hasNativeMeasurement }
 
@@ -220,8 +221,11 @@ class WinUILayoutView: WinUIView {
     func setItems(_ items: [WinUILayoutItem]) -> Bool {
         let sameArrangement = items.count == self.items.count
             && zip(items, self.items).allSatisfy { $0.arranges(like: $1) }
-        let revisions = items.map { $0.view.parentMeasurementRevision }
-        guard !sameArrangement || revisions != itemMeasurementRevisions else { return false }
+        if sameArrangement,
+           items.count == itemMeasurementRevisions.count,
+           zip(items, itemMeasurementRevisions).allSatisfy({ $0.view.parentMeasurementRevision == $1 }) {
+            return false
+        }
 
         if !sameArrangement, !self.items.isEmpty {
             let surviving = Set(items.map { ObjectIdentifier($0.view) })
@@ -231,7 +235,9 @@ class WinUILayoutView: WinUIView {
             }
         }
         self.items = items
-        for item in items { item.view.placingLayout = self }
+        for item in items where item.view.placingLayout !== self {
+            item.view.placingLayout = self
+        }
         if !sameArrangement { holdChildren() }
         itemMeasurementRevisions = items.map { $0.view.parentMeasurementRevision }
         invalidateMeasurements()
@@ -252,7 +258,7 @@ class WinUILayoutView: WinUIView {
     var allowsNativeSafeBars = false
 
     func setChildren(_ proposed: [WinUIView]) {
-        let views = allowsNativeSafeBars ? proposed : proposed.filter { $0.nativeSafeBarOwner == nil }
+        let views = proposed.filter { !$0.isLayoutOnly && (allowsNativeSafeBars || $0.nativeSafeBarOwner == nil) }
         let childrenChanged = views.count != held.count || !zip(views, held).allSatisfy({ $0 === $1 })
         // Compare before deferring: an unchanged proposal completes no work,
         // and a return to the mounted list cancels an older pending replacement.
@@ -278,7 +284,13 @@ class WinUILayoutView: WinUIView {
 
         let handles: [SwiftOmniUIObjectRef?] = (boxView.map { [$0.presentationHandle] } ?? []) + views.map(\.presentationHandle)
         let previous = held
+        let attachmentObserver = self is WinUILazyView ? WinUIElement.workObserver : nil
+        let attachmentStarted = attachmentObserver == nil ? 0 : WinUIFrameClock.monotonic()
         holdNativeChildren(handles)
+        if let attachmentObserver, let sourceElement {
+            attachmentObserver("rows-native-attach", sourceElement.type,
+                               WinUIFrameClock.monotonic() - attachmentStarted)
+        }
         // A dense lazy window can retain hundreds of seats. Membership checks
         // must not compare every old seat with every incoming seat per patch.
         if previous.isEmpty {
@@ -350,6 +362,11 @@ class WinUILayoutView: WinUIView {
 
     /// Asks WinUI to arrange the children again: a place in the air lands in the pass it asks for.
     func invalidateArrange() {
+        // A new panel already owes XAML its first Arrange. Initial properties
+        // and child attachment need no extra queued native invalidation per
+        // wrapper in a lazy row. Once Arrange begins, writes can request the
+        // next pass normally, including writes made inside that first pass.
+        guard hasNativeArrangement else { return }
         guard !WinUILayoutUpdates.enqueue(self, measure: false) else { return }
         guard WinUIView.arranging == 0, WinUIView.measuring == 0 else {
             guard !nativeArrangePending else { return }
@@ -725,6 +742,7 @@ class WinUILayoutView: WinUIView {
 
     /// Answers WinUI's arrange: places the box and every child in `width` by `height` DIPs, inside the pass.
     func arrange(width: Double, height: Double) {
+        hasNativeArrangement = true
         let bounds = Self.nativeRect(Rect(0, 0, width, height))
         let nativeRoomChanged = !isNativeArranging && placingLayout == nil
             && allocatedBounds.width > 0 && allocatedBounds.height > 0

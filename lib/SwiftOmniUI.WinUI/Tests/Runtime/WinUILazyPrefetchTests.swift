@@ -36,9 +36,28 @@ final class WinUILazyPrefetchTests: XCTestCase {
     }
 
     func testSeveralNoticesWithinARefreshKeepTheirWholeMovementForTheNextSample() {
+        for direction in [-1.0, 1.0] {
+            var firstFrame = WinUILazyPrefetch.MotionSamples()
+            _ = firstFrame.observe(offset: 0, time: 0, refreshInterval: 8.333)
+            let early = firstFrame.observe(offset: 20 * direction, time: 8.1, refreshInterval: 8.333)
+            XCTAssertEqual(early?.velocity ?? 0, 20 * direction / 8.333, accuracy: 0.001)
+            XCTAssertEqual(early?.acceleration, 0)
+            let merged = firstFrame.observe(offset: 40 * direction, time: 16.2, refreshInterval: 8.333)
+            XCTAssertEqual(merged?.velocity ?? 0, 40 * direction / 16.2, accuracy: 0.001)
+
+            var starting = WinUILazyPrefetch.MotionSamples()
+            XCTAssertNil(starting.observe(offset: 0, time: 0, refreshInterval: 16))
+            XCTAssertNil(starting.observe(offset: 0, time: 160, refreshInterval: 16))
+            let first = starting.observe(offset: 16 * direction, time: 176, refreshInterval: 16)
+            XCTAssertEqual(first?.velocity, direction)
+            XCTAssertEqual(first?.interval, 16)
+            XCTAssertNil(starting.observe(offset: 16 * direction, time: 192, refreshInterval: 16))
+            XCTAssertEqual(starting.observe(offset: 32 * direction, time: 208, refreshInterval: 16)?.velocity, 0.5 * direction)
+        }
+
         var samples = WinUILazyPrefetch.MotionSamples()
         XCTAssertNil(samples.observe(offset: 0, time: 0, refreshInterval: 16))
-        XCTAssertNil(samples.observe(offset: 8, time: 4, refreshInterval: 16))
+        XCTAssertEqual(samples.observe(offset: 8, time: 4, refreshInterval: 16)?.velocity, 0.5)
         XCTAssertNil(samples.observe(offset: 16, time: 8, refreshInterval: 16))
         XCTAssertNil(samples.observe(offset: 24, time: 12, refreshInterval: 16))
         let next = samples.observe(offset: 32, time: 16, refreshInterval: 16)
@@ -85,6 +104,21 @@ final class WinUILazyPrefetchTests: XCTestCase {
     }
 
     func testDistanceUsesMeasuredSpeedAndReadinessInTheMovingDirection() {
+        var prepared = WinUILazyPrefetch.PreparedRows()
+        XCTAssertNil(prepared.arranged(started: 100, rendered: 96, identities: ["table"]))
+        XCTAssertNil(prepared.arranged(started: 105, rendered: 96, identities: ["cell"]))
+        XCTAssertNil(prepared.completed(at: 96), "an unchanged Rendered time confirms no new pixels")
+        let first = prepared.arranged(started: 119, rendered: 112, identities: ["next"])
+        XCTAssertEqual(first?.duration, 12,
+                       "new arrangement must consume the preceding completed batch before replacing it")
+        XCTAssertEqual(first?.identities, ["table", "cell"])
+        let second = prepared.completed(at: 128)
+        XCTAssertEqual(second?.duration, 9, "preparation time belongs to one batch, not the entire gesture")
+        XCTAssertEqual(second?.identities, ["next"])
+        XCTAssertNil(prepared.completed(at: 144))
+        XCTAssertNil(prepared.arranged(started: 145, rendered: 144, identities: ["discarded"]))
+        prepared.reset()
+        XCTAssertNil(prepared.completed(at: 160), "idle/detach cannot charge the next gesture for discarded work")
         for direction in [-1.0, 1.0] {
             XCTAssertEqual(WinUILazyPrefetch.distance(velocity: direction * 4, interval: 16, readiness: 20,
                                                     neighbour: 40), direction * 104)

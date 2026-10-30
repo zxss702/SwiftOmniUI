@@ -185,7 +185,7 @@ private struct SelectionInput: Equatable {
             let values = samples[kind, default: []].sorted()
             guard !values.isEmpty else { continue }
             print("BLACKBOARD phase=\(phase) work=\(kind) count=\(values.count) totalms=\(values.reduce(0, +)) p95ms=\(values[Int(Double(values.count - 1) * 0.95)]) maxms=\(values.last!) over8ms=\(values.filter { $0 > 8 }.count)")
-            if phase == "scroll", kind == "frame" || kind == "turn",
+            if phase == "scroll", kind == "frame" || kind == "turn" || kind.hasPrefix("job-"),
                let value = ProcessInfo.processInfo.environment["SOUI_SCROLL_BUDGET_MS"], let budget = Double(value) {
                 XCTAssertLessThanOrEqual(values.last!, budget, "\(kind) work exceeded the requested scroll budget")
             }
@@ -344,6 +344,10 @@ final class WinUIMarkdownScrollTests: XCTestCase {
             let cache = WinUIFrameReportCache()
             let cached = label.frameReport(safeArea: Rect(0, 0, 500, 500), cache: cache, generation: 1)
             XCTAssertEqual(cached, report)
+            let reads = cache.nativeOffsetReads
+            XCTAssertEqual(label.frameReport(safeArea: Rect(0, 0, 500, 500), cache: cache, generation: 10), report)
+            XCTAssertEqual(cache.nativeOffsetReads, reads,
+                           "a new reporting frame must not repeat unchanged native parent walks")
             label.setTransform(HostDrawingTransform(translationX: 17))
             let translated = label.frameReport(safeArea: Rect(0, 0, 500, 500), cache: cache, generation: 2)
             XCTAssertEqual(translated.count, 10)
@@ -362,6 +366,12 @@ final class WinUIMarkdownScrollTests: XCTestCase {
             XCTAssertEqual(resized, label.frameReport(safeArea: Rect(0, 0, 500, 500)),
                            "a later layout must replace all cached ancestor positions")
             XCTAssertNotEqual(resized[12], report[12])
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            swiftomniui_winui_scroller_move(scroll.scroller.handle, 0, 100, false)
+            for _ in 0..<12 { host.step() }
+            let scrolled = label.frameReport(safeArea: Rect(0, 0, 500, 500), cache: cache, generation: 5)
+            XCTAssertEqual(scrolled, label.frameReport(safeArea: Rect(0, 0, 500, 500)),
+                           "cached local offsets must still use the document's current native root transform")
         }
     }
 

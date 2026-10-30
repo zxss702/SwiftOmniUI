@@ -58,6 +58,16 @@ class WinUIView {
 
     /// Logical ancestry survives native toolbar hosting.
     weak var sourceElement: MountedElement?
+    /// Empty layout seats need no XAML attachment. A later drawing/input
+    /// change restores the same native handle, so the mounted identity stays.
+    private(set) var isLayoutOnly = false
+
+    func setLayoutOnly(_ layoutOnly: Bool) {
+        guard isLayoutOnly != layoutOnly else { return }
+        isLayoutOnly = layoutOnly
+        discardMeasurementResults()
+        placingLayout?.holdChildren()
+    }
     var safeAreaContext: SafeAreaContext? {
         didSet { if safeAreaContext != oldValue { safeAreaChanged() } }
     }
@@ -201,6 +211,9 @@ class WinUIView {
     /// How deep the layout passes under way stand: a place written inside one lands at once.
     static var arranging = 0
     static var measuring = 0
+    /// 原生布局期间复用挂接状态，父子关系改变后失效。
+    private static var attachmentPass: UInt64 = 0
+    private var attachmentInPass: (pass: UInt64, attached: Bool)?
     /// A native owner changed its allocated room, independently of the Swift
     /// animation sample. Descendants follow that proposal immediately.
     static var allocatingNativeRoom = 0
@@ -214,6 +227,7 @@ class WinUIView {
     /// Global depth protects native tree mutations; per-view depth permits a
     /// parent in Arrange to measure a child before that child enters Arrange.
     func withNativeMeasure<Result>(_ body: () -> Result) -> Result {
+        if Self.measuring == 0, Self.arranging == 0 { Self.attachmentPass &+= 1 }
         nativeMeasureDepth += 1
         Self.measuring += 1
         defer { nativeMeasureDepth -= 1; Self.measuring -= 1 }
@@ -221,6 +235,7 @@ class WinUIView {
     }
 
     func withNativeArrange<Result>(_ body: () -> Result) -> Result {
+        if Self.measuring == 0, Self.arranging == 0 { Self.attachmentPass &+= 1 }
         nativeArrangeDepth += 1
         Self.arranging += 1
         defer { nativeArrangeDepth -= 1; Self.arranging -= 1 }
@@ -228,6 +243,8 @@ class WinUIView {
     }
 
     func nativeParentChanged() {
+        // A child-list mutation can change descendants' XamlRoot as well.
+        Self.attachmentPass &+= 1
         WinUILayoutUpdates.rearmAncestorWalks()
         hierarchyRevision &+= 1
         discardMeasurementResults()
@@ -565,6 +582,7 @@ class WinUIView {
     /// Select the real native allocation independently of intrinsic answers.
     /// A parent's Arrange may prepare children that have not entered Arrange.
     func prepareMeasure(width: Double, height: Double? = nil) {
+        guard !isLayoutOnly else { return }
         precondition(!isNativeArranging, "an arranging view cannot measure itself")
         _ = measureNative(width: width, height: height, preparing: true)
     }
@@ -668,6 +686,7 @@ class WinUIView {
                 layout.standsAt = place.width
             }
             commitAllocationGeometry(in: place)
+            if isLayoutOnly { return }
             withNativeArrange {
                 swiftomniui_winui_arrange(presentationHandle, place.x, place.y, room.width, room.height)
             }
@@ -735,6 +754,56 @@ class WinUIView {
         return Point(offset[0], offset[1])
     }
 
+    private struct ReportOffsetStamp: Equatable {
+        let place: Rect
+        let allocation: Rect
+        let words: Rect?
+        let revision: Int
+        let hierarchy: Int
+        let context: Int
+        let parentAllocation: Rect?
+        let parentRevision: Int
+        let parentHierarchy: Int
+        let parentContext: Int
+    }
+    @MainActor private final class ReportOffset {
+        weak var parent: WinUILayoutView?
+        let stamp: ReportOffsetStamp
+        let point: Point
+        init(parent: WinUILayoutView, stamp: ReportOffsetStamp, point: Point) {
+            self.parent = parent; self.stamp = stamp; self.point = point
+        }
+    }
+    private var reportOffset: ReportOffset?
+
+    /// Scrolling changes the document's root transform, not every label's
+    /// allocation within it. Keep the native local answer until layout inputs
+    /// change. Native-owned controls and extra presentation boundaries continue
+    /// to query XAML, whose internal offsets Swift does not own.
+    func reportingLayoutOffset(relativeTo parent: WinUILayoutView) -> (point: Point, cached: Bool)? {
+        let ownsLayout = self is WinUILabelView || self is WinUIImageView || self is WinUIPathView
+            || (self as? WinUILayoutView)?.retainsArithmeticOnNativeMeasure == true
+        guard ownsLayout, let placed, let committedFrame,
+              nativeAllocation == nil, blurPresenter == nil,
+              nativeContentOwner == nil, nativeLayoutOwner == nil, nativeSafeBarOwner == nil,
+              parent.nativeAllocation == nil, parent.blurPresenter == nil,
+              !(parent is WinUIScrollView) else {
+            reportOffset = nil
+            return layoutOffset(relativeTo: parent).map { ($0, false) }
+        }
+        let stamp = ReportOffsetStamp(
+            place: placed, allocation: committedFrame, words: wordsRoom,
+            revision: measurementRevision, hierarchy: hierarchyRevision, context: layoutContextRevision,
+            parentAllocation: parent.committedFrame, parentRevision: parent.measurementRevision,
+            parentHierarchy: parent.hierarchyRevision, parentContext: parent.layoutContextRevision)
+        if let previous = reportOffset, previous.parent === parent, previous.stamp == stamp {
+            return (previous.point, true)
+        }
+        guard let point = layoutOffset(relativeTo: parent) else { reportOffset = nil; return nil }
+        reportOffset = ReportOffset(parent: parent, stamp: stamp, point: point)
+        return (point, false)
+    }
+
     /// Where the view stands, in DIPs: its frame in its parent, its place in the window, and the frame the
     /// window's content - clear of its chrome - stands in there.
     // A placement context already supplies the safe region. Resolve a window
@@ -775,12 +844,25 @@ class WinUIView {
 
     /// Where WinUI laid the element out in its parent, in DIPs.
     var laidOutFrame: Rect {
+        if isLayoutOnly { return committedFrame ?? placed ?? Rect(0, 0, 0, 0) }
         var frame = [0.0, 0.0, 0.0, 0.0]
         swiftomniui_winui_frame(presentationHandle, &frame)
         return Rect(x: frame[0], y: frame[1], width: frame[2], height: frame[3])
     }
 
-    var isAttached: Bool { swiftomniui_winui_is_attached(handle) }
+    var isAttached: Bool {
+        // Native hierarchy mutations are deferred while a layout pass runs.
+        // Every plan/dependency in that pass sees the same attachment; do not
+        // repeat IsLoaded/XamlRoot COM queries for each nested preparation.
+        // Outside layout, always ask XAML so Loaded/Unloaded stays observable.
+        let inPass = Self.measuring > 0 || Self.arranging > 0
+        if inPass, let attachmentInPass, attachmentInPass.pass == Self.attachmentPass {
+            return attachmentInPass.attached
+        }
+        let attached = swiftomniui_winui_is_attached(handle)
+        if inPass { attachmentInPass = (Self.attachmentPass, attached) }
+        return attached
+    }
 
     /// The control's one accent colour; nil for the platform's.
     /// Design: docs/design/platforms/winui/controls.md#a-controls-accent
@@ -972,6 +1054,7 @@ class WinUIView {
 /// queries for every label, all the way to its scroll document, every frame.
 @MainActor
 final class WinUIFrameReportCache {
+    private(set) var nativeOffsetReads = 0
     struct Coordinates {
         let document: WinUIScrollDocument
         let offset: Point
@@ -1031,12 +1114,13 @@ final class WinUIFrameReportCache {
             return result
         }
         guard view.drawing.isIdentity, let parent = view.placingLayout,
-              let above = read(parent), let local = view.layoutOffset(relativeTo: parent) else {
+              let above = read(parent), let local = view.reportingLayoutOffset(relativeTo: parent) else {
             unsupported.insert(view.number)
             return nil
         }
+        if !local.cached { nativeOffsetReads += 1 }
         let result = Coordinates(document: above.document,
-                                 offset: Point(above.offset.x + local.x, above.offset.y + local.y))
+                                 offset: Point(above.offset.x + local.point.x, above.offset.y + local.point.y))
         coordinates[view.number] = result
         return result
     }

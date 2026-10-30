@@ -68,7 +68,80 @@ private struct DenseFilePage: View {
 }
 
 final class WinUIDenseLazyTests: XCTestCase {
-    func testDenseSidebarFillsAndScrollsWithManySimultaneousRows() throws { try exercise(grid: false) }
+    func testDirectSpacerFrameMatchesTheGeneralFrameInAStack() throws {
+        try onUIThread {
+            // Generic dispatch deliberately retains the ordinary View.frame
+            // wrapper, providing an independent layout reference.
+            @MainActor func generalFrame<V: View>(_ view: V, width: Double?, height: Double?) -> some View {
+                view.frame(width: width, height: height)
+            }
+            for (width, height) in [(100.0 as Double?, 20.0 as Double?), (100, nil), (nil, 20)] {
+                let host = WinUIRenderer.running(reducesMotion: true) {
+                    VStack {
+                        HStack(spacing: 3) {
+                            Text("Before")
+                            Spacer(minLength: 12).frame(width: width, height: height).id("fast-space")
+                            Text("After").id("fast-after")
+                        }.frame(width: 320, height: 40)
+                        HStack(spacing: 3) {
+                            Text("Before")
+                            generalFrame(Spacer(minLength: 12), width: width, height: height).id("reference-space")
+                            Text("After").id("reference-after")
+                        }.frame(width: 320, height: 40)
+                    }
+                }
+                for _ in 0..<16 { host.step() }
+                let fast = try XCTUnwrap(host.view(id: .manual("fast-space")))
+                let reference = try XCTUnwrap(host.view(id: .manual("reference-space")))
+                XCTAssertTrue(fast.isLayoutOnly)
+                XCTAssertFalse(fast.isAttached, "a plain spacer must not join the native render tree")
+                XCTAssertEqual(fast.laidOutFrame.width, reference.laidOutFrame.width, accuracy: 0.01)
+                XCTAssertEqual(fast.laidOutFrame.height, reference.laidOutFrame.height, accuracy: 0.01)
+                let after = try XCTUnwrap(host.view(id: .manual("fast-after")))
+                let referenceAfter = try XCTUnwrap(host.view(id: .manual("reference-after")))
+                XCTAssertEqual(after.origin.x, referenceAfter.origin.x, accuracy: 0.01)
+            }
+
+            let visible = State(wrappedValue: false)
+            let interactive = State(wrappedValue: false)
+            @MainActor func emptySeat() -> ModifiedContent {
+                var seat = Rectangle().fill(visible.wrappedValue ? Color("#FF0000") : .clear).flex(0).node
+                seat.write(VisualElementContract.width, 80)
+                seat.write(VisualElementContract.height, 20)
+                let view = ModifiedContent(node: seat).id("retained-space")
+                return interactive.wrappedValue ? view.onTapGesture {} : view
+            }
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                HStack {
+                    emptySeat()
+                    Text("After").id("after-retained-space")
+                }.frame(width: 320, height: 40)
+            }
+            for _ in 0..<16 { host.step() }
+            let seat = try XCTUnwrap(host.view(id: .manual("retained-space")))
+            let after = try XCTUnwrap(host.view(id: .manual("after-retained-space")))
+            let followingOrigin = after.origin
+            XCTAssertTrue(seat.isLayoutOnly)
+            XCTAssertFalse(seat.isAttached)
+            for state in [1, 0, 2, 0] {
+                visible.wrappedValue = state == 1
+                interactive.wrappedValue = state == 2
+                for _ in 0..<16 { host.step() }
+                XCTAssertTrue(host.view(id: .manual("retained-space")) === seat,
+                              "drawing/input promotion retains the mounted native handle")
+                XCTAssertEqual(seat.isLayoutOnly, state == 0)
+                XCTAssertEqual(seat.isAttached, state != 0)
+                XCTAssertEqual(after.origin, followingOrigin, "native promotion does not move the arithmetic seat")
+                if state == 1 { XCTAssertEqual(seat.pixels(at: [(40, 10)]), [0xFFFF_0000]) }
+                if state == 2 { XCTAssertFalse(seat.hearing.isEmpty) }
+            }
+        }
+    }
+
+    func testDenseSidebarFillsAndScrollsWithManySimultaneousRows() throws {
+        try testDirectSpacerFrameMatchesTheGeneralFrameInAStack()
+        try exercise(grid: false)
+    }
     func testDenseFileGridFillsAndScrollsWithManySimultaneousRows() throws { try exercise(grid: true) }
     func testDenseFileGridFillsDuringContinuousFastScroll() throws { try exercise(grid: true, continuous: true) }
 

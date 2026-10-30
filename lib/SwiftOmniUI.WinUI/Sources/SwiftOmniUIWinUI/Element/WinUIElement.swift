@@ -29,6 +29,8 @@ final class WinUIElement: NativeElement {
     var layoutItemsDirty = true
     private(set) var layoutItemCollections = 0
     private var cachedLayoutValues: LayoutValues?
+    private var hasAppliedProperties = false
+    private var hasLeftTree = false
     private(set) var layoutInputResolutions = 0
 
     private struct PendingLayout {
@@ -78,6 +80,15 @@ final class WinUIElement: NativeElement {
         var branch = view != nil ? element.mount : layoutItem?.mount
         var owner = parent
         while let each = owner {
+            // Mounting applies children before their parent. A fresh parent
+            // will collect the complete child list in its own first apply,
+            // then propagate its derived inputs to its parent. Do not queue
+            // every ancestor once more for each leaf of a new lazy row.
+            if coalesces, !each.hasAppliedProperties {
+                each.layoutItemsDirty = true
+                each.cachedLayoutValues = nil
+                break
+            }
             // This branch's previous write already dirtied every ancestor.
             // Stop at an unread queued owner instead of walking the same path
             // for every Text/Image in a newly mounted compound row. A value
@@ -179,6 +190,7 @@ final class WinUIElement: NativeElement {
     }
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {
+        defer { hasAppliedProperties = true }
         var started = Self.workObserver == nil ? 0 : WinUIFrameClock.monotonic()
         if !wasDescribed || element.childOrderChanged || !changed.isDisjoint(with: Self.layoutInputs) {
             // A described height owns dependent vertical geometry, not every
@@ -209,6 +221,19 @@ final class WinUIElement: NativeElement {
         if changed.contains(Prop("hiddenSafeBarBackground")) { refreshSafeBarBackgrounds() }
         if let view, let host { element.applyDrawnChildren(to: view, through: WinUIRegistrations.registry, in: host.runtime) }
         configureGestures()
+        if let path = view as? WinUIPathView {
+            // A plain Spacer has a retained arithmetic seat but no drawing,
+            // input, geometry reader or automation surface. Its XAML node can
+            // stay detached while StackArithmetic still measures/places it.
+            let container = parent?.nearestView
+            let arithmeticParent = container is WinUIStackView || container is WinUIGridView || container is WinUIZStackView
+            let emptySpace = arithmeticParent && type == .rectangle && element.value(.flex) != nil && !path.drawsInk
+                && element.events.isEmpty && !element.readsOwnFrame && element.children.isEmpty
+                && element.value(.hint) == nil && element.value(.pointerStyle) == nil
+                && MountedElement.accessibilityProperties.allSatisfy { element.value($0) == nil }
+                && path.nativeContentOwner == nil && path.nativeLayoutOwner == nil && path.nativeSafeBarOwner == nil
+            path.setLayoutOnly(emptySpace)
+        }
         if let label = view as? WinUITextView {
             label.onTextLayout = element.value(TextContract.reportsLayout.token)?.bool == true ? { [weak self] report in
                 guard let self, let host = self.host else { return }
@@ -259,7 +284,11 @@ final class WinUIElement: NativeElement {
     }
 
     func leave() {
-        layoutItemChanged()
+        // MountedElement leaves parents before descendants. Only the root of
+        // a removed subtree can change the surviving layout; descendants still
+        // release their callbacks but must not enqueue those dead ancestors.
+        if parent?.hasLeftTree != true { layoutItemChanged() }
+        hasLeftTree = true
         if let view { host?.runtime.frames.follow(self, order: view.number, reads: false) }
         view?.detach()
     }

@@ -132,10 +132,10 @@ namespace {
         try {
             auto content = scroller.Content().try_as<xaml::UIElement>();
             auto presenter = scroller.ScrollPresenter();
+            auto root = scroller.XamlRoot();
             if (!content || !scroller.IsLoaded() || !element.IsLoaded()
-                || !scroller.XamlRoot() || scroller.XamlRoot() != element.XamlRoot()
+                || !root || root != element.XamlRoot()
                 || !presenter) return SwiftOmniUIViewportNotReady;
-            if (!isDescendantOf(element, content)) return SwiftOmniUIViewportNotReady;
             auto width = scroller.ViewportWidth(), height = scroller.ViewportHeight();
             if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0)
                 return SwiftOmniUIViewportNotReady;
@@ -159,17 +159,24 @@ namespace {
             // Virtualization follows layout viewports. A native pane transition,
             // clipShape or alpha mask changes presentation, not the allocation
             // whose rows must already exist before it is revealed.
+            auto owner = content.as<xaml::DependencyObject>();
+            bool ownsElement = false;
             for (xaml::DependencyObject at = element; at; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
+                if (!ownsElement && at == owner) ownsElement = true;
                 auto visual = at.try_as<xaml::UIElement>();
                 if (!visual) continue;
                 if (visual.Visibility() == xaml::Visibility::Collapsed) return SwiftOmniUIViewportNotReady;
-                if (auto presenter = visual.try_as<controls::Primitives::ScrollPresenter>()) {
-                    auto across = presenter.ViewportWidth(), down = presenter.ViewportHeight();
+                if (auto clipper = visual.try_as<controls::Primitives::ScrollPresenter>()) {
+                    // The initial bounds already include this exact presenter.
+                    // Only other (nested or enclosing) presenters can narrow it.
+                    if (clipper == presenter) continue;
+                    auto across = clipper.ViewportWidth(), down = clipper.ViewportHeight();
                     if (!std::isfinite(across) || !std::isfinite(down) || across <= 0 || down <= 0)
                         return SwiftOmniUIViewportNotReady;
                     intersect(visual, {0, 0, static_cast<float>(across), static_cast<float>(down)});
                 }
             }
+            if (!ownsElement) return SwiftOmniUIViewportNotReady;
             double values[]{left, top, std::max(0.0, right - left), std::max(0.0, bottom - top), displayed.X, displayed.Y};
             if (!std::all_of(std::begin(values), std::end(values), [](double value) { return std::isfinite(value); }))
                 return SwiftOmniUIViewportNotReady;

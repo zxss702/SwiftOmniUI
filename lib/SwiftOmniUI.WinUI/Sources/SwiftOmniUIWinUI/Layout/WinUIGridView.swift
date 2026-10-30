@@ -140,9 +140,14 @@ final class WinUIGridView: WinUITravellingLayout {
         let margin = values.margin
         let across = max(0, content.width - margin.left - margin.right)
         let down = max(0, content.height - margin.top - margin.bottom)
-        let natural = item.size(offered: across)
         let fillsAcross = values.flex != nil || values.expandingAxes == .horizontal || values.expandingAxes == .both
         let fillsDown = values.flex != nil || values.expandingAxes == .vertical || values.expandingAxes == .both
+        // A fixed or filling axis does not consume the child's intrinsic size.
+        // Native preparation still measures the child at the final allocation;
+        // avoid an extra arithmetic descent through nested fixed-size frames.
+        let needsNaturalWidth = !fillsAcross && values.horizontal != 3 && values.width == nil
+        let needsNaturalHeight = !fillsDown && values.vertical != 3 && values.height == nil
+        let natural = needsNaturalWidth || needsNaturalHeight ? item.size(offered: across) : .zero
         let width = Extent.of(option: fillsAcross ? 3 : values.horizontal, stated: values.width,
                               natural: natural.width, available: across,
                               minimum: values.minimumWidth, maximum: values.maximumWidth, allowsOverflow: true)

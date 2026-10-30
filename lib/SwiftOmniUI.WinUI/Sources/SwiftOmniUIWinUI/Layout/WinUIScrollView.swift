@@ -26,6 +26,7 @@ final class WinUIScrollView: WinUILayoutView {
     /// The user's movement, and its rest.
     private let movement = ScrollMovement()
     private var horizontalSamples = WinUILazyPrefetch.MotionSamples()
+    private var lazyMotionStart: (offset: Point, time: Double)?
     private var verticalSamples = WinUILazyPrefetch.MotionSamples()
     private var lazyVelocity = Point(0, 0)
     private var lazyAcceleration = Point(0, 0)
@@ -284,7 +285,9 @@ final class WinUIScrollView: WinUILayoutView {
             finishReaderDestination()
             programTarget = nil
             movement.holdBegan()
+            lazyMotionStart = (scroller.standing.offset, WinUIFrameClock.monotonic())
         } else {
+            lazyMotionStart = nil
             movement.holdEnded(rests: false)
         }
         for ear in scroller.ears { ear.moved() }
@@ -307,6 +310,16 @@ final class WinUIScrollView: WinUILayoutView {
     private func observeLazyMotion(at offset: Point, now: Double) {
         let refresh = WinUIFrameClock.current?.refreshInterval ?? 0
         guard held else { return }
+        if let start = lazyMotionStart {
+            lazyMotionStart = nil
+            // The host's frame clock can use another origin (including a
+            // deterministic test clock). Translate the captured start into it,
+            // using the measured elapsed interval, rather than discarding the
+            // first movement merely to establish an offset baseline.
+            let elapsed = max(0, WinUIFrameClock.monotonic() - start.time)
+            _ = horizontalSamples.observe(offset: start.offset.x, time: now - elapsed, refreshInterval: refresh)
+            _ = verticalSamples.observe(offset: start.offset.y, time: now - elapsed, refreshInterval: refresh)
+        }
         // Sample once per display frame. Mixing ViewChanged and Rendering
         // timestamps gives fragments of one movement different time origins,
         // causing the predicted lead to alternately grow and collapse.
@@ -330,10 +343,12 @@ final class WinUIScrollView: WinUILayoutView {
     func frame(now: Double) {
         if held {
             let offset = scroller.standing.offset
-            // RenderingTime identifies the physical frame. Dispatcher arrival
-            // time compresses queued callbacks after a slow layout into an
-            // artificial acceleration, requesting still more expensive rows.
-            observeLazyMotion(at: offset, now: WinUIFrameClock.current?.renderingTime ?? now)
+            // This position is read now, rather than at RenderingTime (the
+            // frame XAML started earlier). Layout can advance the native
+            // offset while delaying that callback. Pairing its newer position
+            // with an older frame timestamp invents an acceleration and makes
+            // the following realization request still larger.
+            observeLazyMotion(at: offset, now: WinUIFrameClock.current?.now() ?? now)
             if case .ready(let rect) = scroller.viewport(of: document) {
                 lazyObservationLead = Point(offset.x - rect.x, offset.y - rect.y)
             } else { lazyObservationLead = Point(0, 0) }

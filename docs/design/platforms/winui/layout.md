@@ -131,6 +131,11 @@ bounds, preserving edge distances and consumed insets. Native-owned content
 uses the actual column's allocation, including changes from sidebar toggles.
 Promoted bars retain their logical identity and native ownership dependency.
 
+One native Measure/Arrange traversal shares each view's attachment answer.
+Nested plan validation does not repeatedly query `IsLoaded` and `XamlRoot`.
+Changing a native parent invalidates the shared answers, and the next traversal
+or any query outside layout reads XAML again, including after reattachment.
+
 A parent's selected safe-area projection is a plan input, not a content
 change. Selecting it discards dependent arithmetic and plans synchronously,
 without requesting another native Measure from the pass consuming it. Actual
@@ -156,6 +161,13 @@ measurement. Native tree updates requested by a viewport callback complete
 after the active pass, and their own invalidation resumes layout. Realization
 follows actual scrolling and clipped viewport geometry; program destinations
 remain a separate preparation request.
+
+Motion samples pair the native offset with the clock at that read, rather
+than the earlier `RenderingTime`. A delayed callback can otherwise associate
+a recent offset with an old frame and invent a large acceleration. Preparation
+timing consumes every batch confirmed by native `Rendered` before another
+arrangement replaces it; continuous batches in one gesture do not merge across
+completed display frames. The distance prediction uses those measured costs.
 
 Intrinsic queries do not commit lazy row geometry. Selected native Measure
 prepares row measurements and the extent index before building a plan;
@@ -197,6 +209,12 @@ A control's style aligns it inside the place its parent arranges it in - a
 SwiftOmniUI layout decides the place itself. So every element the host holds is
 told to stretch across whatever place it is arranged in, once, as it is made:
 the layout's place is the control's size.
+
+A clear, noninteractive Spacer in Stack/Grid/ZStack retains its arithmetic
+seat but stays outside the native child list. Its logical allocation is
+committed without a native Measure or Arrange. Geometry readers, gestures,
+accessibility, tooltips and visible shapes keep a native boundary; changing
+an empty seat to visible or interactive restores its same native handle.
 
 ## Desired size
 

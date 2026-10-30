@@ -223,7 +223,7 @@ class WinUILazyView: WinUITravellingLayout {
     var preparationDuration: Double { max(latestPreparationDuration, preparedRowCosts.maximum ?? 0) }
     private(set) var scrollObservationLead = 0.0
     private var preparationStarted: Double?
-    private var arrangedPreparation: (started: Double, rendered: Double, identities: Set<String>)?
+    private var arrangedPreparation = WinUILazyPrefetch.PreparedRows()
     private var displayInterval: Double {
         let refresh = WinUIFrameClock.current?.refreshInterval ?? 0
         return refresh > 0 ? refresh : scrollInterval
@@ -307,12 +307,18 @@ class WinUILazyView: WinUITravellingLayout {
         }
         cells.prefetchReady = { [weak self] in
             guard let self else { return false }
-            guard !self.isDetached, !self.cells.animatesChanges,
-                  WinUIView.arranging == 0, WinUIView.measuring == 0,
-                  self.placed != nil else { return false }
-            // Native layout completes the previous request. Do not synchronously
-            // measure image-heavy rows to permit another prefetch in this turn.
-            return !self.needsRowMeasurements && !self.hasUnplacedRows()
+            let reason: String
+            if self.isDetached { reason = "detached" }
+            else if self.cells.animatesChanges { reason = "animation" }
+            else if WinUIView.arranging != 0 || WinUIView.measuring != 0 { reason = "layout-pass" }
+            else if self.placed == nil { reason = "unallocated" }
+            else if self.needsRowMeasurements { reason = "measurement" }
+            else if self.hasUnplacedRows() { reason = "placement" }
+            else { reason = "ready" }
+            if let observer = WinUIElement.workObserver, let sourceElement = self.sourceElement {
+                observer("prefetch-gate-" + reason, sourceElement.type, 0)
+            }
+            return reason == "ready"
         }
         swiftomniui_winui_panel_watch_viewport(handle, true)
     }
@@ -359,6 +365,14 @@ class WinUILazyView: WinUITravellingLayout {
     }
 
     func setItems(_ items: [(identity: String, item: WinUILayoutItem)], contentChanged: Bool = false) {
+        let observer = WinUIElement.workObserver
+        var stageStarted = observer == nil ? 0 : WinUIFrameClock.monotonic()
+        func recordStage(_ name: String) {
+            guard let observer, let sourceElement else { return }
+            let now = WinUIFrameClock.monotonic()
+            observer(name, sourceElement.type, now - stageStarted)
+            stageStarted = now
+        }
         let sourceID = cells.element?.lazyRows.map(ObjectIdentifier.init)
         let sourceChanged = !hasMountedSource || mountedSourceID != sourceID
         let now = Dictionary(items.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
@@ -413,8 +427,11 @@ class WinUILazyView: WinUITravellingLayout {
         }
         mounted = now
         measuredEmptyGeneration = -1
+        recordStage("rows-update")
         refreshContent(contentChanged: contentChanged)
+        recordStage("rows-refresh")
         setChildren(items.map(\.item.view))
+        recordStage("rows-attach")
         // Recycling and row patches only change this panel's arrangement.
         // The document is invalidated when measured content extent actually
         // changes, never for a paint-only update or an overscan row swap.
@@ -751,14 +768,7 @@ class WinUILazyView: WinUITravellingLayout {
         return low..<high
     }
 
-    /// Predict the physical coverage first, then remove exactly the run which
-    /// LazyCells' normal neighbour will add back to the request.
-    func realizationSpan(in rect: Rect) -> Range<Double>? {
-        let span = windowSpan(in: rect)
-        guard scrollVelocity != 0 else { return span }
-        let grid = self is WinUILazyGridView
-        let perRun = cells.window?.perRun ?? 1
-        let runCount = (cells.orderedIdentities.count + perRun - 1) / perRun
+    private var predictedTravel: Double {
         // Preparation already includes time spent waiting on UI work. Adding
         // the same blocked observation interval again creates positive feedback:
         // a slow batch widens the next batch, which blocks the following one.
@@ -768,9 +778,20 @@ class WinUILazyView: WinUITravellingLayout {
         // Its surface can wait until the next refresh while native scrolling
         // continues. Include that display period separately from the next
         // observation period; neither is a fixed millisecond work budget.
-        let extra = WinUILazyPrefetch.distance(velocity: scrollVelocity, interval: leadInterval,
+        return WinUILazyPrefetch.distance(velocity: scrollVelocity, interval: leadInterval,
                                               readiness: readiness + displayInterval, neighbour: 0,
                                               observationLead: scrollObservationLead, acceleration: scrollAcceleration)
+    }
+
+    /// Predict the physical coverage first, then remove exactly the run which
+    /// LazyCells' normal neighbour will add back to the request.
+    func realizationSpan(in rect: Rect) -> Range<Double>? {
+        let span = windowSpan(in: rect)
+        guard scrollVelocity != 0 else { return span }
+        let grid = self is WinUILazyGridView
+        let perRun = cells.window?.perRun ?? 1
+        let runCount = (cells.orderedIdentities.count + perRun - 1) / perRun
+        let extra = predictedTravel
         var expanded = rect
         if axis == .vertical {
             expanded.y += min(0, extra)
@@ -802,11 +823,14 @@ class WinUILazyView: WinUITravellingLayout {
         if scrollVelocity > 0 {
             let last = max(runs.upperBound - 1, overlapsBuilt ? afterBuilt - 1 : 0)
             let start = offset(last)
-            return span.lowerBound..<max(span.upperBound, start)
+            // Nested lazy content needs the actual predicted intersection, not
+            // merely its outer row's boundary. Rounding inward leaves that
+            // child empty until it is already visible.
+            return span.lowerBound..<max(predicted.upperBound, start)
         }
         let first = min(runs.lowerBound, overlapsBuilt ? firstBuilt : runCount)
         let afterFirst = offset(first + 1)
-        return min(span.lowerBound, afterFirst)..<span.upperBound
+        return min(predicted.lowerBound, afterFirst)..<span.upperBound
     }
 
     private func scheduleOffscreenWindow() {
@@ -946,15 +970,12 @@ class WinUILazyView: WinUITravellingLayout {
             // An idle pause is not rendering latency for the next gesture.
             preparationStarted = nil
             preparingIdentities.removeAll(keepingCapacity: true)
-            arrangedPreparation = nil
-        } else if onFrame, let prepared = arrangedPreparation,
-           swiftomniui_winui_last_rendered_time() > prepared.rendered {
+            arrangedPreparation.reset()
+        } else if onFrame, let prepared = arrangedPreparation.completed(at: swiftomniui_winui_last_rendered_time()) {
             // Rendering announces an upcoming frame and can fire more than
             // once per refresh. Only Rendered confirms that XAML completed a
             // frame after these rows received their native arrangement.
-            recordPreparationDuration(swiftomniui_winui_last_rendered_time() - prepared.started,
-                                      identities: prepared.identities)
-            arrangedPreparation = nil
+            recordPreparationDuration(prepared.duration, identities: prepared.identities)
         }
         guard let rect = currentNativeViewport() else { return }
         if let scroll = watching {
@@ -1146,13 +1167,9 @@ class WinUILazyView: WinUITravellingLayout {
         placedAnchors.removeAll(keepingCapacity: true)
         if let started = preparationStarted, cells.requestedItemsAreCurrent,
            !needsRowMeasurements, !hasUnplacedRows() {
-            if var prepared = arrangedPreparation {
-                prepared.started = min(prepared.started, started)
-                prepared.rendered = swiftomniui_winui_last_rendered_time()
-                prepared.identities.formUnion(preparingIdentities)
-                arrangedPreparation = prepared
-            } else {
-                arrangedPreparation = (started, swiftomniui_winui_last_rendered_time(), preparingIdentities)
+            if let completed = arrangedPreparation.arranged(
+                started: started, rendered: swiftomniui_winui_last_rendered_time(), identities: preparingIdentities) {
+                recordPreparationDuration(completed.duration, identities: completed.identities)
             }
             preparingIdentities.removeAll(keepingCapacity: true)
             preparationStarted = nil
@@ -1172,7 +1189,7 @@ class WinUILazyView: WinUITravellingLayout {
         measuredEmptyGeneration = -1
         cells.cancelPrefetch()
         preparationStarted = nil
-        arrangedPreparation = nil
+        arrangedPreparation.reset()
         preparingIdentities.removeAll()
         preparedRowCosts = WinUILazyCrossExtents()
         super.detach()

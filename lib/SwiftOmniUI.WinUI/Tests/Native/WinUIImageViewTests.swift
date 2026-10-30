@@ -345,7 +345,8 @@ final class WinUIImageViewTests: XCTestCase {
             host.settle { host.view(id: .manual("search"))?.laidOutFrame.width == 20 }
             host.layOut()
             for (id, size) in [("folder", 16), ("search", 20)] {
-                let image = try XCTUnwrap(host.view(id: .manual(id)) as? WinUIImageView)
+                let frame = try XCTUnwrap(host.view(id: .manual(id)))
+                let image = try XCTUnwrap(frame.sourceElement?.first(type: .image)?.winUI.view as? WinUIImageView)
                 let points = (0..<size).flatMap { y in
                     (0..<size).map { x in (Double(x) + 0.5, Double(y) + 0.5) }
                 }
@@ -366,7 +367,8 @@ final class WinUIImageViewTests: XCTestCase {
             }
             host.settle { host.view(id: .manual("styledDisclosure"))?.laidOutFrame.width == 24 }
             host.layOut()
-            let image = try XCTUnwrap(host.view(id: .manual("styledDisclosure")) as? WinUIImageView)
+            let frame = try XCTUnwrap(host.view(id: .manual("styledDisclosure")))
+            let image = try XCTUnwrap(frame.sourceElement?.first(type: .image)?.winUI.view as? WinUIImageView)
             XCTAssertTrue(image.found)
             XCTAssertGreaterThan(image.measure(width: nil, height: nil).width, 0)
             let points = (0..<24).flatMap { y in
