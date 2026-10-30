@@ -403,10 +403,7 @@ public struct Node {
     /// `textRenderer` carries the `"custom"` marker hosts declare against.
     var textRenderer: (any TextRenderer)?
 
-    /// The report a `Text.Layout` reads: shared by the `Text.LayoutKey` seed
-    /// the element offers, the handler that hears `textLayoutChanged`, and
-    /// `.customAttribute`, which writes the attributes a report puts back on
-    /// its runs. Never crosses.
+    /// 文本自定义属性；仅在读取 LayoutKey 时连接布局报告。
     var textLayoutBox: TextLayoutBox?
 
     /// A custom `Layout` object the element arranges its children by. A code

@@ -34,6 +34,11 @@ private struct SumKey: PreferenceKey {
     }
 }
 
+private struct FirstKey: PreferenceKey {
+    static let defaultValue = 0
+    static func reduce(value: inout Int, nextValue: () -> Int) {}
+}
+
 /// A collecting key - arrays of what descendants offered, in order.
 private struct BlocksKey: PreferenceKey {
     struct Layout: Equatable {
@@ -103,6 +108,21 @@ private struct Ear: View {
 
         XCTAssertEqual(heard.values, [7],
                        "each child's seed folded in order through reduce")
+
+        let first = Received<Int>()
+        renders.render(stack([
+            VStack {
+                Text("first").preference(key: FirstKey.self, value: 3)
+                Text("second").preference(key: FirstKey.self, value: 4)
+            }.onPreferenceChange(FirstKey.self) { first.values.append($0) }.node,
+        ], id: "root"))
+        XCTAssertEqual(first.values, [3], "a sole offer passes through wrappers without reducing the default")
+
+        var value: Any = 3
+        var reads = 0
+        PreferenceKeyBox(FirstKey.self).reduce(&value) { reads += 1; return 4 }
+        XCTAssertEqual(value as? Int, 3)
+        XCTAssertEqual(reads, 0, "a reducer that retains the first value does not evaluate the next one")
     }
 
     func testAnUnchangedAnswerStaysQuiet() {

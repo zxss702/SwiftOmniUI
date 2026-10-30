@@ -23,8 +23,10 @@ struct PreferenceKeyBox {
         key = ObjectIdentifier(K.self)
         makeDefault = { K.defaultValue }
         reduce = { value, next in
-            guard var typed = value as? K.Value, let next = next() as? K.Value else { return }
-            K.reduce(value: &typed) { next }
+            // swiftlint:disable:next force_cast
+            var typed = value as! K.Value
+            // swiftlint:disable:next force_cast
+            K.reduce(value: &typed) { next() as! K.Value }
             value = typed
         }
         same = { first, second in
@@ -110,8 +112,7 @@ struct FoldedPreference {
 }
 
 extension Differ {
-    /// What a node's subtree offers for each key: its writes in written order,
-    /// each child's folded answers in the children's order, its transforms last.
+    /// 按树顺序合并偏好；首个值直接传递，后续同键值才归约，最后应用变换。
     func foldedPreferences(
         seeds: [PreferenceSeed],
         transforms: [PreferenceTransform],
@@ -119,19 +120,28 @@ extension Differ {
     ) -> [ObjectIdentifier: FoldedPreference] {
         var folded: [ObjectIdentifier: FoldedPreference] = [:]
 
-        func offer(_ box: PreferenceKeyBox, _ value: Any) {
-            var running = folded[box.key]?.value ?? box.makeDefault()
-            box.reduce(&running, { value })
-            folded[box.key] = FoldedPreference(box: box, value: running)
-        }
-
         for seed in seeds {
-            offer(seed.box, seed.value())
+            let value = seed.value()
+            if var running = folded[seed.box.key] {
+                seed.box.reduce(&running.value) { value }
+                folded[seed.box.key] = running
+            } else {
+                folded[seed.box.key] = FoldedPreference(box: seed.box, value: value)
+            }
         }
 
         for child in children {
-            for (_, answer) in child.preferenceValues {
-                offer(answer.box, answer.value)
+            if folded.isEmpty {
+                folded = child.preferenceValues
+            } else {
+                for (key, answer) in child.preferenceValues {
+                    if var running = folded[key] {
+                        answer.box.reduce(&running.value) { answer.value }
+                        folded[key] = running
+                    } else {
+                        folded[key] = answer
+                    }
+                }
             }
         }
 

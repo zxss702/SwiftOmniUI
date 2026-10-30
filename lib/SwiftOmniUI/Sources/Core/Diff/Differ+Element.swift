@@ -391,6 +391,33 @@ extension Differ {
         node.resolveControlStyle(in: scope)
         node.resolveShapeFill()
 
+        // 继承订阅已确定，仅为读取 LayoutKey 的文本建立布局偏好和回调。
+        if node.type == .text, node.props[TextContract.reportsLayout.token]?.bool == true {
+            let box = node.textLayoutBox ?? TextLayoutBox()
+            node.textLayoutBox = box
+            let anchorBox = AnchorBox()
+            node.anchorBoxes.append(anchorBox)
+            node.addHandler(.textFrameChanged) {
+                guard let numbers = MemberValues.carried(
+                    EventBuffer.current, by: "textFrameChanged", as: [Double].self),
+                    let report = FrameReport(numbers)
+                else { return }
+                anchorBox.update(report)
+            }
+            node.preferenceSeeds.append(PreferenceSeed(
+                box: PreferenceKeyBox(Text.LayoutKey.self), lazy: { [box, anchorBox] in
+                    [Text.Layout(box: box, anchorBox: anchorBox)]
+                }))
+            node.addHandler(TextContract.textLayoutChanged.token) {
+                guard let report = MemberValues.carried(
+                    EventBuffer.current, by: TextContract.textLayoutChanged.name,
+                    as: TextLayoutReport.self)
+                else { return }
+                box.fill(report)
+                Renderer.shared.setNeedsTextPreferenceRender(for: box)
+            }
+        }
+
         // Inside a publishing branch any element may be the one holding the
         // focus - it reports the platform's moves, which is how the store
         // knows what the chain publishes now.

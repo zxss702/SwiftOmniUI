@@ -31,6 +31,11 @@
     /// The registrations, by node type.
     private var entries: [NodeType: Entry] = [:]
 
+    // Native creation asks this for every node. Keep the registration's
+    // derived type list separately: that lookup need not copy an Entry's
+    // closures/member sets or map its child appliers on every realization.
+    private var drawnChildTypes: [NodeType: [NodeType]] = [:]
+
     /// The application's events these registrations raise - an element's own
     /// are its registration's.
     private var applicationEvents: Set<HostRealizedMember> = []
@@ -145,6 +150,7 @@
             members: registration.members,
             worn: Realized.worn.map { ObjectIdentifier($0) },
             children: children)
+        drawnChildTypes[Realized.nodeType] = children.isEmpty ? nil : children.map(\.type)
     }
 
     /// A property the host's shared element machinery realizes on every
@@ -232,7 +238,7 @@
     /// - Parameter type: the parent's node type.
     /// - Returns: the children's node types.
     public func childTypes(of type: NodeType) -> [NodeType] {
-        entries[type]?.children.map(\.type) ?? []
+        drawnChildTypes[type] ?? []
     }
 
     /// Hands the view of an element of `type` every child of each contract its registration draws itself, as

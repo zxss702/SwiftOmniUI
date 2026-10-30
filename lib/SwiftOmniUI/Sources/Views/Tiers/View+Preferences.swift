@@ -35,6 +35,9 @@ extension View {
         _ transform: @escaping (K.Value) -> K.Value
     ) -> ModifiedContent {
         revised {
+            if ObjectIdentifier(K.self) == ObjectIdentifier(Text.LayoutKey.self) {
+                $0.writeInherited(TextContract.reportsLayout, true)
+            }
             $0.preferenceTransforms.append(PreferenceTransform(box: PreferenceKeyBox(K.self)) { value in
                 (value as? K.Value).map(transform) ?? value
             })
@@ -104,6 +107,9 @@ extension View {
         perform action: @escaping (K.Value) -> Void
     ) -> ModifiedContent {
         revised {
+            if ObjectIdentifier(K.self) == ObjectIdentifier(Text.LayoutKey.self) {
+                $0.writeInherited(TextContract.reportsLayout, true)
+            }
             $0.preferenceObservers.append(PreferenceObserver(box: PreferenceKeyBox(K.self)) { _, new in
                 guard let new = new as? K.Value else { return }
                 action(new)
@@ -178,11 +184,7 @@ private struct PreferenceBacked<K: PreferenceKey, Base: View, Content: View>: Vi
     }
 
     var body: some View {
-        let heard = base.revised { node in
-            if ObjectIdentifier(K.self) == ObjectIdentifier(Text.LayoutKey.self) {
-                node.writeInherited(TextContract.reportsLayout, true)
-            }
-        }.onPreferenceChange(K.self) { value = $0 }
+        let heard = base.onPreferenceChange(K.self) { value = $0 }
         return Group {
             if over {
                 heard.overlay { PreferenceLayer<K, Content>(value: $value, transform: transform) }

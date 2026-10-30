@@ -72,52 +72,15 @@ public struct Text: VisualElement, TextElement, FontElement, TextAlignmentElemen
     /// The node this control describes.
     public var node: Node
 
-    /// A text's node, wired to answer `Text.LayoutKey`: the seed offers a
-    /// `Layout` reading a shared box, the handler fills it when the host says
-    /// how the words were laid out.
-    private static func wiredNode() -> Node {
-        var node = Node(contract: TextContract.self)
-        let box = TextLayoutBox()
-        node.textLayoutBox = box
-        // The text's position feeds `Layout.origin` without treating every
-        // text as a business geometry read that suppresses layout animation.
-        let anchorBox = AnchorBox()
-        node.anchorBoxes.append(anchorBox)
-        node.addHandler(.textFrameChanged) {
-            guard let numbers = MemberValues.carried(
-                EventBuffer.current, by: "textFrameChanged", as: [Double].self),
-                let report = FrameReport(numbers)
-            else { return }
-            anchorBox.update(report)
-        }
-        // The offer is asked at fold: a text the walk carries answers for the
-        // report the host last handed in, not the one its render saw.
-        node.preferenceSeeds.append(PreferenceSeed(
-            box: PreferenceKeyBox(LayoutKey.self), lazy: { [box, anchorBox] in
-                [Layout(box: box, anchorBox: anchorBox)]
-            }))
-        node.addHandler(TextContract.textLayoutChanged.token) {
-            guard let report = MemberValues.carried(
-                EventBuffer.current, by: TextContract.textLayoutChanged.name,
-                as: TextLayoutReport.self)
-            else { return }
-            box.fill(report)
-            // Native geometry changes the retained preference's answer.
-            // Refold those answers without rebuilding authored view bodies.
-            Renderer.shared.setNeedsTextPreferenceRender(for: box)
-        }
-        return node
-    }
-
     /// An empty one - what a `Style<Text>` is written against.
     public init() {
-        node = Self.wiredNode()
+        node = Node(contract: TextContract.self)
     }
 
     /// A label showing `content`, verbatim - a `String` is never looked up;
     /// the literal that is a key is `Text(_ key:)`, which a literal prefers.
     @_disfavoredOverload public init<S: StringProtocol>(_ content: S) {
-        node = Self.wiredNode()
+        node = Node(contract: TextContract.self)
         node.write(TextElementContract.text, String(content))
     }
 
@@ -130,7 +93,7 @@ public struct Text: VisualElement, TextElement, FontElement, TextAlignmentElemen
     /// The host answers the key, and `key.displayString` stands written as
     /// `text` for everywhere the tables do not reach.
     public init(_ key: LocalizedStringKey) {
-        node = Self.wiredNode()
+        node = Node(contract: TextContract.self)
         node.write(TextElementContract.text, key.displayString)
         node.write(TextElementContract.textKey, key)
     }
@@ -204,11 +167,11 @@ extension Text {
         answer.node.children = [Node(
             contract: SpansContract.self,
             children: lhs.concatenatedSpans + rhs.concatenatedSpans)]
-        for (type, attribute) in lhs.node.textLayoutBox?.attributes ?? [:] {
-            answer.node.textLayoutBox?.attributes[type] = attribute
-        }
-        for (type, attribute) in rhs.node.textLayoutBox?.attributes ?? [:] {
-            answer.node.textLayoutBox?.attributes[type] = attribute
+        if lhs.node.textLayoutBox != nil || rhs.node.textLayoutBox != nil {
+            let box = TextLayoutBox()
+            box.attributes = lhs.node.textLayoutBox?.attributes ?? [:]
+            box.attributes.merge(rhs.node.textLayoutBox?.attributes ?? [:]) { _, next in next }
+            answer.node.textLayoutBox = box
         }
         return answer
     }
@@ -254,8 +217,11 @@ extension Text {
     ///
     /// - Parameter attribute: what each run of this text answers.
     public func customAttribute<A: TextAttribute>(_ attribute: A) -> Text {
-        let copy = self
-        copy.node.textLayoutBox?.attributes[ObjectIdentifier(A.self)] = attribute
+        var copy = self
+        let box = TextLayoutBox()
+        box.attributes = node.textLayoutBox?.attributes ?? [:]
+        box.attributes[ObjectIdentifier(A.self)] = attribute
+        copy.node.textLayoutBox = box
         return copy
     }
 }

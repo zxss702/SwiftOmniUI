@@ -50,6 +50,16 @@ import XCTest
 
         XCTAssertTrue(Self.view(of: LampContract.nodeType, in: registry) is LampView)
         XCTAssertNil(Self.view(of: TextContract.nodeType, in: registry))
+        XCTAssertTrue(registry.childTypes(of: LampContract.nodeType).isEmpty)
+        registry.add(LampContract.self, create: { _ in LampView() }) { lamp in
+            lamp.children(TextContract.self, members: []) { _, _ in }
+            lamp.children(ImageContract.self, members: []) { _, _ in }
+        }
+        XCTAssertEqual(registry.childTypes(of: LampContract.nodeType), [.text, .image])
+        // Replacing the registration must remove its old drawn-child contract,
+        // otherwise later native nodes would incorrectly lose their own views.
+        registry.add(LampContract.self, create: { _ in LampView() })
+        XCTAssertTrue(registry.childTypes(of: LampContract.nodeType).isEmpty)
     }
 
     /// A property registered alone reaches the view as the type its contract

@@ -121,7 +121,15 @@ private func findEvent(_ patch: HostPatch, _ event: String) -> Int? {
                        "one native text report must not refold every other mounted text")
     }
     func testTextOriginReportsDoNotBecomeBusinessGeometryReads() throws {
+        let plain = Text("unread")
+        XCTAssertNil(plain.node.textLayoutBox)
+        XCTAssertTrue(plain.node.preferenceSeeds.isEmpty)
+        XCTAssertTrue(plain.node.anchorBoxes.isEmpty)
+        XCTAssertTrue(plain.node.events.isEmpty)
         let renders = Renders()
+        let unread = renders.settled(stack([plain.node], id: "root"))
+        XCTAssertNil(findEvent(unread, "textFrameChanged"))
+        XCTAssertNil(findEvent(unread, "textLayoutChanged"))
         let heard = Received<[Text.Layout]>()
         let patch = renders.settled(stack([
             LayoutEar(heard: heard) { Text("body") }.node,
