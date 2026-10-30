@@ -3,6 +3,7 @@
 
 @_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
+import CSwiftOmniUIWinUI
 
 /// A NavigationSplitView: the sidebar page in WinUI's own navigation pane - beside the detail page where the window is wide,
 /// over it and closed by a click beside it where it is narrow - which WinUI places, as it places any Windows app's.
@@ -302,6 +303,12 @@ final class WinUISplitView: WinUILayoutView {
                     open: isPresented, widths: SplitColumnWidth(sidebarPaneLength),
                     contentWidths: SplitColumnWidth(contentPaneLength))
             }
+            // Register semantic pages, not the nested native SplitView wrappers:
+            // main content and trailing detail must remain separate blur sources.
+            let columns: [OpaquePointer?] = pages.prefix(three ? 3 : 2).map { $0.view.handle }
+            columns.withUnsafeBufferPointer {
+                swiftomniui_winui_material_columns(handle, $0.baseAddress, Int32($0.count))
+            }
             // A two/three-column switch reparents the retained NavigationStack.
             // Its old native proposal/context is no longer valid even if the
             // Swift owner and eventual page dimensions are unchanged.
@@ -314,6 +321,7 @@ final class WinUISplitView: WinUILayoutView {
     }
 
     override func detach() {
+        swiftomniui_winui_material_columns(handle, nil, 0)
         for page in pages { release(page.view) }
         sidebar.clear()
         middle.clear()

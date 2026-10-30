@@ -17,6 +17,98 @@ import XCTest
 }
 
 final class WinUISafeBarColumnTests: XCTestCase {
+    func testNavigationColumnsCropBeforeFilteringAndMergeOnlyTheirOwnBars() throws {
+        try onUIThread {
+            let detailShown = State(wrappedValue: true)
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                NavigationSplitView {
+                    ScrollView { Color.red.frame(height: 1800) }.id("partition-sidebar")
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            Text("Inner").frame(height: 32).id("partition-inner-bar")
+                        }
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            Text("Outer").frame(height: 44).id("partition-outer-bar")
+                        }
+                        .navigationSplitViewColumnWidth(220)
+                } content: {
+                    NavigationStack {
+                        ScrollView { Color.green.frame(height: 1800) }.id("partition-content")
+                    }
+                } detail: {
+                    ScrollView { Color.blue.frame(height: 1800) }.id("partition-detail")
+                        .navigationSplitViewColumnWidth(detailShown.wrappedValue ? 280 : 0)
+                }
+            }
+            for shown in [true, false, true] {
+                detailShown.wrappedValue = shown
+                for _ in 0..<8 { host.step(); host.frame() }
+                let window = try XCTUnwrap(host.window)
+                @MainActor func crop(_ id: String) throws -> [Double] {
+                    let view = try XCTUnwrap(host.view(id: .manual(id)))
+                    var rect = [Double](repeating: 0, count: 4)
+                    XCTAssertTrue(swiftomniui_winui_window_material_sampling_bounds(window.handle, view.handle, &rect))
+                    XCTAssertEqual(rect[1], 0, accuracy: 0.01, "each column includes its slice of toolbar")
+                    XCTAssertGreaterThan(rect[2], 0)
+                    XCTAssertTrue(swiftomniui_winui_window_material_follows_column(window.handle, view.handle),
+                                  "toolbar pixels must inherit the page's native slot animation and lifetime")
+                    return rect
+                }
+                let sidebar = try crop("partition-sidebar")
+                XCTAssertEqual(try crop("partition-inner-bar"), sidebar)
+                XCTAssertEqual(try crop("partition-outer-bar"), sidebar)
+                let content = try crop("partition-content")
+                XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, window.titleBar.handle),
+                              "column masks must cover the complete toolbar after each detail toggle")
+                XCTAssertLessThanOrEqual(sidebar[0] + sidebar[2], content[0] + 1,
+                                         "the sidebar must be cropped out of the main column's filter input")
+                if shown {
+                    let detail = try crop("partition-detail")
+                    XCTAssertLessThanOrEqual(content[0] + content[2], detail[0] + 1,
+                                             "trailing detail cannot enter the main column's Gaussian kernel")
+                } else {
+                    let detail = try XCTUnwrap(host.view(id: .manual("partition-detail")))
+                    var retired = [Double](repeating: 0, count: 4)
+                    XCTAssertFalse(swiftomniui_winui_window_material_sampling_bounds(window.handle, detail.handle, &retired),
+                                   "closing detail must retire its retained toolbar filter")
+                    XCTAssertFalse(swiftomniui_winui_window_material_follows_column(window.handle, detail.handle))
+                    let fullWidth = try XCTUnwrap(window.content).laidOutFrame.width
+                    XCTAssertEqual(content[0] + content[2], fullWidth, accuracy: 1,
+                                   "main content must replace the closed detail's toolbar slice")
+                }
+            }
+        }
+    }
+
+    func testSidebarToolbarMaterialIsOwnedByTheNativeAnimatedPane() throws {
+        try onUIThread {
+            let shown = State(wrappedValue: true)
+            // Keep real native transitions enabled. Ownership must be correct
+            // during opening/closing, not repaired after an animation timeout.
+            let host = WinUIRenderer.running(room: WinUITestHost.wideRoom) {
+                NavigationSplitView(shown.projectedValue) {
+                    ScrollView { Text("Files").frame(height: 1800) }.id("animated-pane-source")
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            Text("Tabs").frame(height: 48)
+                        }
+                        .navigationSplitViewColumnWidth(220)
+                } detail: {
+                    ScrollView { Text("Conversation").frame(height: 1800) }.id("animated-main-source")
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            let pane = try XCTUnwrap(host.view(id: .manual("animated-pane-source")))
+            let main = try XCTUnwrap(host.view(id: .manual("animated-main-source")))
+            for open in [true, false, true, false, true] {
+                shown.wrappedValue = open
+                host.step(); host.layOut(); host.frame()
+                XCTAssertTrue(swiftomniui_winui_window_material_follows_column(window.handle, pane.handle),
+                              "pane and toolbar material must share the native PaneRoot's moving clip and visibility")
+                XCTAssertTrue(swiftomniui_winui_window_material_follows_column(window.handle, main.handle),
+                              "main toolbar slice must follow ContentRoot rather than a stationary window overlay")
+            }
+        }
+    }
+
     func testSidebarSafeBarFollowsAncestorDepartureWithoutLayoutSamples() throws {
         try onUIThread {
             let clock = TestClock()

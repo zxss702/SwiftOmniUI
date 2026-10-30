@@ -69,6 +69,9 @@ namespace swiftomniui {
     void setMemoryPicture(controls::Image const &image, xaml::Media::ImageSource const &source);
     controls::RichTextBlock richWords(SwiftOmniUIObjectRef handle);
     void syncRichWords(SwiftOmniUIObjectRef handle);
+    void followRichWordsLoaded(SwiftOmniUIObjectRef handle, controls::RichTextBlock const &rich);
+    bool wordsUseSpacing(SwiftOmniUIObjectRef handle);
+    void wordsUseSpacing(SwiftOmniUIObjectRef handle, bool usesSpacing);
     /// Resolve additive line spacing using XAML's native measurements before
     /// the caller measures the label at its final constraint.
     void measureWords(SwiftOmniUIObjectRef handle, winrt::Windows::Foundation::Size available);
@@ -201,7 +204,8 @@ namespace swiftomniui {
     /// Whether `element` is a window decoration/layer, rather than one row's own content.
     inline bool isLayer(xaml::FrameworkElement const &element) {
         auto name = winrt::unbox_value_or<winrt::hstring>(element.Tag(), L"");
-        return name == L"sheets" || name == L"overlay" || name == L"safeAreaBars" || name == L"chromeAcrylic";
+        return name == L"sheets" || name == L"overlay" || name == L"safeAreaBars"
+            || name == L"chromeAcrylic" || name == L"columnAcrylic";
     }
 
     /// Stands `element` in `row` of `grid` in place of what stood there; nothing for null.

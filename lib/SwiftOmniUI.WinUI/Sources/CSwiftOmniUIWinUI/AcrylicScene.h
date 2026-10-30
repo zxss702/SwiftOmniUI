@@ -9,8 +9,9 @@
 
 namespace swiftomniui {
     struct AcrylicScene;
-    // All material strips in a window sample this content-only scene in the
-    // same coordinates. Neither local material nor fixed bar controls enter it.
+    // Material strips share a content-only scene in their native column's
+    // coordinates. Neighbouring columns, animated template ancestors and fixed
+    // chrome are outside its captured input.
     std::shared_ptr<AcrylicScene> acrylicScene(xaml::FrameworkElement const &source,
                                              xaml::FrameworkElement const &target);
     xaml::FrameworkElement acrylicSceneRoot(std::shared_ptr<AcrylicScene> const &scene);
@@ -24,6 +25,13 @@ namespace swiftomniui {
     void presentAcrylicScenes();
     std::vector<xaml::FrameworkElement> acrylicWindowRoots();
     bool acrylicSceneIsWindow(std::shared_ptr<AcrylicScene> const &scene);
+    // Navigation columns never share captures or filters. Bounds are native
+    // slot-local, including the column's slice of window chrome.
+    std::vector<xaml::FrameworkElement> acrylicWindowColumns(xaml::FrameworkElement const &root);
+    controls::Panel acrylicColumnOwner(xaml::FrameworkElement const &column, xaml::FrameworkElement const &root);
+    winrt::Windows::Foundation::Rect acrylicSceneBounds(std::shared_ptr<AcrylicScene> const &scene);
+    winrt::Windows::Foundation::Rect acrylicLayoutBounds(xaml::FrameworkElement const &element, xaml::FrameworkElement const &root);
+    bool acrylicSceneContains(std::shared_ptr<AcrylicScene> const &scene, xaml::FrameworkElement const &element);
     std::vector<xaml::FrameworkElement> acrylicSceneBars(std::shared_ptr<AcrylicScene> const &scene);
     std::vector<winrt::Windows::Foundation::Rect> acrylicSceneRegions(std::shared_ptr<AcrylicScene> const &scene);
     xaml::Media::SystemBackdrop acrylicFoundationBackdrop(xaml::FrameworkElement const &target);

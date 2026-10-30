@@ -146,6 +146,13 @@ drawing extending beyond the panel's allocation remains visible unless an
 ancestor explicitly clips it.
 
 Solid and gradient brushes are Composition brushes mapped over the figure.
+The shape's `ShapeVisual` explicitly uses `CompositionBorderMode.Soft` rather
+than inheriting a hard bitmap/clip boundary from an enclosing XAML visual.
+SafeBar fixed-control redirection uses the same soft edge policy and linear
+surface interpolation, at its original source size. It does not reuse the
+quarter-resolution content-blur output for labels or vector backgrounds.
+This preserves fractional edge coverage when a capsule is captured and placed
+at a fractional coordinate, while retaining its solid fill and sharp text.
 Radial gradients retain the per-axis radii supplied by `HostBrush.reach`.
 Dashes and phase retain the relay's outline-width units. Public `StrokeStyle`
 path lengths are divided by the current width at the Swift boundary; miter

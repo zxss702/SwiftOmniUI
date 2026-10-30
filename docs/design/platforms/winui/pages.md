@@ -14,8 +14,30 @@ content row, directly beneath TitleBar, menus and tabs. They do not create an
 auto row or shrink the ScrollView viewport. Local insets on every edge keep
 normal layout markers, including the sidebar and trailing expert selector.
 
-`ChromeAcrylic` owns one window-coordinate region union for the toolbar,
-promoted bars, and page-local markers. Its native `SystemBackdropElement` uses
+`ChromeAcrylic` partitions content sampling by the outer NavigationSplitView's
+semantic sidebar, content and auxiliary detail pages. The nested native
+SplitViews implementing those pages are not material domains. Each column's
+native horizontal bounds extend to the top of the window, so that slice of
+toolbar and all of the column's SafeBar markers share one filter and region.
+Changing column widths or hiding detail updates those bounds at the existing
+post-layout commit. No neighbouring column enters the filter input: the clean
+scene is cropped to its column **before** downsampling and filtering.
+Sampling and region masks use the native column slot's own coordinates, before
+PaneRoot/ContentRoot animation. A wholly offscreen opening frame must not
+publish an empty input/mask that stays empty throughout a compositor-only
+transition. Window chrome is mapped into the slot using native layout offsets,
+without subtracting its animated translation; the template applies that once
+to content, material and fixed controls together.
+
+`ColumnAcrylic` is mounted in the actual native SplitView pane/content Grid,
+as a sibling of its page. It inherits the system template's PaneRoot or
+ContentRoot presentation, including the moving clip, translation and delayed
+Visibility change at the end of the close storyboard. Its toolbar slice and
+page SafeBars therefore have the same animation owner; the window coordinator
+does not draw a second, stationary copy or run a parallel storyboard. A
+standalone NavigationStack keeps its material in the window layer.
+
+Each column's native `SystemBackdropElement` uses
 the window's Mica provider and the same geometry as the transparent content
 blur above it. Explicit root fills remain above Mica. There is no extra white
 tint, luminosity adjustment or fallback-colour approximation of Mica. The
@@ -29,7 +51,9 @@ excluding fixed controls and every material output in that scope. It splits
 at outer scroll viewports and inset ancestors, never at document rows. A
 scope owns one shared native Direct2D Gaussian effect through Composition;
 its input is reduced to one quarter of the width and height, with the blur
-radius adjusted accordingly. Consumers crop the shared result after filtering.
+radius adjusted accordingly. The column filters together cover approximately
+the window's area, rather than each filtering a full window. Within a column,
+consumers crop that shared result after filtering.
 The graph has no previous-frame input and no `CompositionBackdropBrush`.
 Fixed local controls are redirected above the union inside its mask; their
 native identity still owns input, focus, hover, automation and popup menus.
@@ -37,10 +61,12 @@ Native toolbar and promoted controls already stand above this layer.
 
 Local markers whose owning subtree is fading, transformed, projected, blurred,
 or masked retain their native subtree presentation instead of redirecting its
-controls into a stationary window overlay. They sample the same shared filtered
+controls into a stationary overlay. They sample the same shared filtered
 texture through the inverse presentation transform; the native ancestor applies
-opacity/motion to both material and controls. At rest they rejoin the window
-union. A bar's own content opacity remains distinct from its container's opacity.
+opacity/motion to both material and controls. At rest they rejoin the column
+union. Redirected control opacity stops at the native column slot: opacity
+above it is inherited by the material, rather than being applied a second time.
+A bar's own content opacity remains distinct from its container's opacity.
 Captured content and redirected controls restore ancestor opacity together,
 with source-local sizes and presentation matrices instead of resizing captures
 to transformed bounding boxes. The existing host presentation transaction commits
@@ -65,6 +91,13 @@ scroll motion remains a live compositor input. Independent popup and nested
 scrolling-bar scopes retain their own acyclic content/effect graph. Optional
 material connection failures are reported without failing window creation.
 The resting native caption buttons remain transparent.
+
+Two/three-column reconfiguration unmounts the retired column layer and clears
+its brush, mask, control captures and native backdrop connection. Inactive
+scenes return an empty sampling region, even when a marker still retains the
+scene. The main column then owns the closed detail's previous toolbar area.
+Native slot row replacement preserves material layers without treating them
+as page content; slot clearing is detected from the actual native parent.
 
 The overlay's origin and width follow the visible page's native allocation,
 including the NavigationSplitView detail column. Its page-sized proposal must

@@ -3,12 +3,94 @@
 
 @_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
+import CSwiftOmniUIWinUI
 @testable import SwiftOmniUIWinUI
 import XCTest
 
 /// Composition drawing must be sampled on screen, over a known backdrop.
 /// RenderTargetBitmap excludes child visuals and cannot verify these vectors.
 final class WinUICompositionPathTests: XCTestCase {
+    func testCapsuleKeepsAntialiasedEdgesInsideRedirectedSafeBar() throws {
+        try onUIThread {
+            let width = State(wrappedValue: 96.0)
+            let offset = State(wrappedValue: 0.0)
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                NavigationSplitView {
+                    Text("Sidebar").navigationSplitViewColumnWidth(220)
+                } content: {
+                    ZStack {
+                        Color.white
+                        Capsule().fill(.black).id("ordinary-pill")
+                            .frame(width: width.wrappedValue, height: 32)
+                            .offset(x: offset.wrappedValue, y: offset.wrappedValue)
+                    }
+                } detail: {
+                    ScrollView { Text("Expert actions").frame(height: 1200) }
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            ScrollView(.horizontal) {
+                                HStack {
+                                    Button {} label: {
+                                        Text("Expert").foregroundStyle(.white)
+                                            .frame(width: width.wrappedValue, height: 32)
+                                            .background {
+                                                Capsule().fill(.black).id("redirected-pill")
+                                            }
+                                    }.buttonStyle(.plain)
+                                        .offset(x: offset.wrappedValue, y: offset.wrappedValue)
+                                }.padding(8)
+                            }
+                            .frame(height: 48)
+                            .background(Color.white)
+                            .id("expert-pill-bar")
+                        }
+                        .navigationSplitViewColumnWidth(280)
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            let ordinary = try XCTUnwrap(host.view(id: .manual("ordinary-pill")))
+            let redirected = try XCTUnwrap(host.view(id: .manual("redirected-pill")))
+            let bar = try XCTUnwrap(host.view(id: .manual("expert-pill-bar")))
+            for (nextWidth, nextOffset) in [(96.0, 0.0), (138, 0.35), (96, 0)] {
+                width.wrappedValue = nextWidth
+                offset.wrappedValue = nextOffset
+                for _ in 0..<8 { host.step(); host.frame() }
+                XCTAssertTrue(swiftomniui_winui_window_material_redirects(window.handle, bar.presentationHandle),
+                              "this must exercise the captured fixed-control path, not just the ordinary shape")
+                // Sample along both curved edges. Pure black/white alone is an
+                // aliased silhouette; fractional coverage must survive capture.
+                // Presented pixels are required: RenderTargetBitmap omits the
+                // Composition ShapeVisual and SafeBar redirection entirely.
+                var edge: [(Double, Double)] = []
+                for row in 0..<32 {
+                    let y = (Double(row) + 0.5) / 2
+                    let x = 16 - (256 - (y - 16) * (y - 16)).squareRoot()
+                    for delta in [-0.75, -0.25, 0.25, 0.75] {
+                        edge.append((max(0.125, x + delta), y))
+                        edge.append((min(nextWidth - 0.125, nextWidth - x - delta), y))
+                    }
+                }
+                for pill in [ordinary, redirected] {
+                    host.settle {
+                        pill.presentedPixels(at: [(nextWidth / 2, 28)], in: window) == [0xFF00_0000]
+                    }
+                    XCTAssertEqual(pill.presentedPixels(at: [(nextWidth / 2, 28)], in: window), [0xFF00_0000],
+                                   "antialiasing must not blur or lighten the solid interior")
+                    let pixels = pill.presentedPixels(at: edge, in: window)
+                    XCTAssertEqual(pixels.count, edge.count)
+                    let coverage = pixels.filter { pixel in
+                        let value = pixel & 255
+                        return value > 8 && value < 247
+                            && abs(Int(pixel >> 8 & 255) - Int(value)) <= 2
+                            && abs(Int(pixel >> 16 & 255) - Int(value)) <= 2
+                    }
+                    XCTAssertGreaterThan(coverage.count, 4, "curved edges must retain antialiased coverage")
+                    XCTAssertEqual(pill.presentedPixels(at: [(1, 1), (nextWidth - 2, 1)], in: window),
+                                   [0xFFFF_FFFF, 0xFFFF_FFFF], "the capsule must retain clear corners")
+                }
+            }
+        }
+    }
+
     func testRoundedVectorKeepsItsAlphaAndGeometryWhileChangingWidth() throws {
         try onUIThread {
             let width = State(wrappedValue: 100.0)

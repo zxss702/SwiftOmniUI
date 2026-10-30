@@ -23,7 +23,7 @@ namespace swiftomniui {
             composition::CompositionSurfaceBrush inputBrush{nullptr}, reducedBrush{nullptr};
             composition::SpriteVisual downsample{nullptr}, filtered{nullptr};
             composition::CompositionEffectBrush effect{nullptr};
-            winrt::Windows::Foundation::Numerics::float2 extent{};
+            winrt::Windows::Foundation::Rect bounds{};
 
             explicit FilteredContent(std::shared_ptr<AcrylicScene> scope) : scene(std::move(scope)) {
                 auto visual = acrylicSceneVisual(scene);
@@ -54,16 +54,21 @@ namespace swiftomniui {
             void update() {
                 auto root = acrylicSceneRoot(scene);
                 if (!root) return;
-                auto size = root.ActualSize();
-                if (size.x <= 0 || size.y <= 0 || size == extent) return;
+                auto next = acrylicSceneBounds(scene);
+                if (next.Width <= 0 || next.Height <= 0) { bounds = {}; return; }
+                if (next == bounds) return;
+                const winrt::Windows::Foundation::Numerics::float2 size{next.Width, next.Height};
                 auto reducedSize = winrt::Windows::Foundation::Numerics::float2{
                     std::ceil(size.x * reduction), std::ceil(size.y * reduction)};
+                // Crop BEFORE filtering: neighbouring columns never enter the
+                // Gaussian kernel. Total filtered pixel area stays window-sized.
+                input.SourceOffset({next.X, next.Y});
                 input.SourceSize(size);
                 downsample.Size(reducedSize);
                 reduced.SourceSize(reducedSize);
                 filtered.Size(reducedSize);
                 result.SourceSize(reducedSize);
-                extent = size;
+                bounds = next;
             }
         };
         std::vector<std::weak_ptr<FilteredContent>> filters;
@@ -98,6 +103,16 @@ namespace swiftomniui {
     std::shared_ptr<AcrylicScene> AcrylicSource::scene() const {
         return state->filter ? state->filter->scene : nullptr;
     }
+    winrt::Windows::Foundation::Rect AcrylicSource::samplingBounds() const {
+        if (!state->filter || state->filter->bounds.Width <= 0 || state->filter->bounds.Height <= 0) return {};
+        auto bounds = state->filter->bounds;
+        const auto root = acrylicSceneRoot(state->filter->scene);
+        if (acrylicSceneIsWindow(state->filter->scene)) {
+            const auto slot = acrylicLayoutBounds(root, root.XamlRoot().Content().as<Element>());
+            bounds.X += slot.X; bounds.Y += slot.Y;
+        }
+        return bounds;
+    }
     xaml::Media::Brush AcrylicSource::update(Element const &target, Size size) {
         auto source = state->source.get();
         if (!source || !target.IsLoaded() || size.Width <= 0 || size.Height <= 0) return nullptr;
@@ -115,12 +130,14 @@ namespace swiftomniui {
             state->filter = std::move(filter);
         }
         state->filter->update();
+        if (state->filter->bounds.Width <= 0 || state->filter->bounds.Height <= 0) return nullptr;
         auto root = acrylicSceneRoot(scope);
         auto inverse = target.TransformToVisual(root).Inverse();
         if (!inverse) return nullptr; // A zero-scale insertion has no visible surface yet.
-        auto origin = inverse.TransformPoint({0, 0});
-        auto x = inverse.TransformPoint({1, 0});
-        auto y = inverse.TransformPoint({0, 1});
+        const auto bounds = state->filter->bounds;
+        auto origin = inverse.TransformPoint({bounds.X, bounds.Y});
+        auto x = inverse.TransformPoint({bounds.X + 1, bounds.Y});
+        auto y = inverse.TransformPoint({bounds.X, bounds.Y + 1});
         const winrt::Windows::Foundation::Numerics::float3x2 mapping{
             (x.X - origin.X) / reduction, (x.Y - origin.Y) / reduction,
             (y.X - origin.X) / reduction, (y.Y - origin.Y) / reduction, origin.X, origin.Y};

@@ -2,16 +2,16 @@
 #pragma once
 #include "AcrylicSurface.h"
 #include <algorithm>
+#include <array>
 
 namespace swiftomniui {
-    // One window-wide union for toolbar, promoted bars and resting page strips.
-    // The system Mica underlay and the filtered content have the identical mask.
-    struct ChromeAcrylic : controls::PanelT<ChromeAcrylic> {
+    // Lives INSIDE the real native column slot. SplitView's template owns its
+    // visibility, translation, opacity and moving clip, including the toolbar
+    // slice. No second animation or per-frame geometry mirroring is needed.
+    struct ColumnAcrylic : controls::PanelT<ColumnAcrylic> {
         AcrylicLayer drawing;
         AcrylicSource material;
-        winrt::Windows::Foundation::Size extent{};
-        xaml::FrameworkElement::LayoutUpdated_revoker layoutCommitted;
-        bool committing = false;
+        winrt::weak_ref<controls::Panel> nativeOwner;
         winrt::Microsoft::UI::Composition::ContainerVisual fixedControls{nullptr};
         struct Bar {
             winrt::weak_ref<xaml::FrameworkElement> element;
@@ -25,6 +25,7 @@ namespace swiftomniui {
             auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(self).Compositor();
             if (!fixedControls) {
                 fixedControls = compositor.CreateContainerVisual();
+                fixedControls.BorderMode(composition::CompositionBorderMode::Soft);
                 xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(self, fixedControls);
             }
             auto elements = drawing.regions.empty() ? std::vector<xaml::FrameworkElement>{}
@@ -41,17 +42,23 @@ namespace swiftomniui {
                     auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(element);
                     bar.capture.SourceVisual(visual);
                     bar.brush = compositor.CreateSurfaceBrush(bar.capture);
+                    // Fixed controls are full-detail content, not the reduced
+                    // blur input. Preserve antialiased alpha during fractional
+                    // placement/scaling of the captured labels and capsules.
+                    bar.brush.BitmapInterpolationMode(composition::CompositionBitmapInterpolationMode::Linear);
                     bar.brush.Stretch(composition::CompositionStretch::None);
                     bar.brush.HorizontalAlignmentRatio(0);
                     bar.brush.VerticalAlignmentRatio(0);
                     bar.visual = compositor.CreateSpriteVisual();
+                    bar.visual.BorderMode(composition::CompositionBorderMode::Soft);
                     bar.visual.Brush(bar.brush);
                     bar.visual.IsHitTestVisible(false);
                 }
                 const auto size = element.ActualSize();
-                const auto visible = acrylicVisibleBounds(element, self);
+                const auto owner = nativeOwner.get();
+                const auto visible = owner.TransformToVisual(self).TransformBounds(acrylicVisibleBounds(element, owner));
                 const auto clipped = acrylicLocalClip(element, self, visible);
-                const auto opacity = acrylicPresentationOpacity(element, self);
+                const auto opacity = acrylicPresentationOpacity(element, nativeOwner.get());
                 const bool shown = clipped.Width > 0 && clipped.Height > 0 && opacity > 0;
                 if (bar.visual.IsVisible() != shown) bar.visual.IsVisible(shown);
                 if (bar.visual.Opacity() != opacity) bar.visual.Opacity(opacity);
@@ -89,76 +96,164 @@ namespace swiftomniui {
             if (fixedControls.Clip() != drawing.controlsClip) fixedControls.Clip(drawing.controlsClip);
             for (auto &old : previous) old.capture.SourceVisual(nullptr);
         }
-        ChromeAcrylic() {
-            Tag(winrt::box_value(L"chromeAcrylic"));
+        ColumnAcrylic() {
+            Tag(winrt::box_value(L"columnAcrylic"));
             IsHitTestVisible(false);
             UseLayoutRounding(false);
             IInspectable self = *this;
             drawing.mount(self.as<controls::Panel>());
-            Loaded([this](auto const &, auto const &) {
-                IInspectable projected = *this;
-                auto self = projected.as<xaml::FrameworkElement>();
-                auto weak = get_weak();
-                // The one region owner observes the native post-layout boundary.
-                // No per-bar size/load subscriptions or presentation-frame retries.
-                layoutCommitted = self.LayoutUpdated(winrt::auto_revoke, [weak](auto const &, auto const &) {
-                    auto self = weak.get();
-                    if (!self || self->committing) return;
-                    self->committing = true;
-                    self->refresh();
-                    self->committing = false;
-                });
-            });
-            Unloaded([this](auto const &, auto const &) {
-                layoutCommitted.revoke(); material.reset(); drawing.close();
-                for (auto &bar : bars) bar.capture.SourceVisual(nullptr);
-                bars.clear();
-                if (fixedControls) fixedControls.Children().RemoveAll();
-            });
+            Unloaded([this](auto const &, auto const &) { clear(); });
+        }
+        void clear() {
+            material.reset(); drawing.clear();
+            for (auto &bar : bars) bar.capture.SourceVisual(nullptr);
+            bars.clear();
+            if (fixedControls) fixedControls.Children().RemoveAll();
         }
         winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size available) {
             drawing.measure(available); return {0, 0};
         }
         winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) {
-            extent = final; drawing.arrange(final); return final;
+            drawing.arrange(final); return final;
+        }
+        void refresh(xaml::FrameworkElement const &root, xaml::FrameworkElement const &source,
+                     std::vector<winrt::Windows::Foundation::Rect> const &chrome) {
+            IInspectable projected = *this;
+            auto self = projected.as<xaml::FrameworkElement>();
+            material.source(source);
+            auto size = self.ActualSize();
+            if (!self.IsLoaded() || size.x <= 0 || size.y <= 0) return;
+            auto brush = material.update(self, {size.x, size.y});
+            auto scope = material.scene();
+            std::vector<winrt::Windows::Foundation::Rect> regions;
+            if (scope) {
+                const auto bounds = acrylicSceneBounds(scope);
+                auto local = acrylicSceneRegions(scope);
+                const auto scopeRoot = acrylicSceneRoot(scope);
+                // Window toolbar geometry is layout input. Do not subtract
+                // PaneTransform's current animation sample: the native parent
+                // will move/clip the complete column layer itself.
+                const auto slot = acrylicLayoutBounds(scopeRoot, root);
+                for (auto rect : chrome) {
+                    rect.X -= slot.X; rect.Y -= slot.Y;
+                    local.push_back(rect);
+                }
+                auto mapping = scopeRoot.TransformToVisual(self);
+                for (auto const &rect : local) {
+                    auto x = std::max(rect.X, bounds.X), y = std::max(rect.Y, bounds.Y);
+                    auto right = std::min(rect.X + rect.Width, bounds.X + bounds.Width);
+                    auto bottom = std::min(rect.Y + rect.Height, bounds.Y + bounds.Height);
+                    if (right > x && bottom > y) regions.push_back(mapping.TransformBounds({x, y, right - x, bottom - y}));
+                }
+            }
+            drawing.paint(self, regions, brush);
+            paintControls(self);
+        }
+    };
+
+    // Coordinates registration at the existing native post-layout boundary.
+    // The window overlay no longer owns column pixels or their animation.
+    struct ChromeAcrylic : controls::PanelT<ChromeAcrylic> {
+        std::array<winrt::com_ptr<ColumnAcrylic>, 3> columns;
+        // Diagnostics are a snapshot only; never use them to draw another union.
+        std::vector<winrt::Windows::Foundation::Rect> regions;
+        xaml::FrameworkElement::LayoutUpdated_revoker layoutCommitted;
+        bool committing = false;
+        ChromeAcrylic() {
+            Tag(winrt::box_value(L"chromeAcrylic"));
+            IsHitTestVisible(false);
+            UseLayoutRounding(false);
+            for (auto &column : columns) column = winrt::make_self<ColumnAcrylic>();
+            Loaded([this](auto const &, auto const &) {
+                IInspectable projected = *this;
+                auto self = projected.as<xaml::FrameworkElement>();
+                auto weak = get_weak();
+                layoutCommitted = self.LayoutUpdated(winrt::auto_revoke, [weak](auto const &, auto const &) {
+                    auto self = weak.get();
+                    if (self) self->refresh();
+                });
+            });
+            Unloaded([this](auto const &, auto const &) {
+                layoutCommitted.revoke();
+                for (auto &column : columns) unmount(*column.get());
+                regions.clear();
+            });
+        }
+        static void unmount(ColumnAcrylic &column) {
+            IInspectable projected = column;
+            auto element = projected.as<xaml::FrameworkElement>();
+            if (auto owner = column.nativeOwner.get()) {
+                uint32_t index;
+                if (owner.Children().IndexOf(element, index)) owner.Children().RemoveAt(index);
+            }
+            column.nativeOwner = {};
+            column.clear();
+        }
+        void mount(ColumnAcrylic &column, controls::Panel const &owner) {
+            IInspectable projected = column;
+            auto element = projected.as<xaml::FrameworkElement>();
+            // Native slot clearing/template replacement can detach the panel
+            // while the retained logical owner is unchanged.
+            if (column.nativeOwner.get() == owner && xaml::Media::VisualTreeHelper::GetParent(element) == owner) return;
+            unmount(column);
+            controls::Grid::SetRow(element, 0);
+            auto grid = owner.try_as<controls::Grid>();
+            controls::Grid::SetRowSpan(element, grid ? std::max(1, static_cast<int>(grid.RowDefinitions().Size())) : 1);
+            controls::Canvas::SetZIndex(element, 1);
+            column.nativeOwner = winrt::make_weak(owner);
+            owner.Children().Append(element);
+        }
+        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size available) {
+            for (auto const &child : Children()) child.Measure(available);
+            return {0, 0};
+        }
+        winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) {
+            for (auto const &child : Children()) child.Arrange({0, 0, final.Width, final.Height});
+            return final;
         }
         void refresh() {
-            char const *operation = "locating the shared material's native content";
+            if (committing) return;
+            committing = true;
             try {
                 IInspectable projected = *this;
                 auto self = projected.as<xaml::FrameworkElement>();
                 auto grid = xaml::Media::VisualTreeHelper::GetParent(self).try_as<controls::Grid>();
-                if (!grid || !self.IsLoaded()) return;
-                xaml::FrameworkElement source{nullptr};
-                std::vector<winrt::Windows::Foundation::Rect> next;
-                auto append = [&](xaml::FrameworkElement const &element) {
-                    if (!element.IsLoaded() || element.Visibility() != xaml::Visibility::Visible
-                        || element.ActualWidth() <= 0 || element.ActualHeight() <= 0) return;
-                    auto visible = element.Resources().TryLookup(winrt::box_value(L"safeBarAcrylic"));
-                    if (visible && !winrt::unbox_value<bool>(visible)) return;
-                    auto rect = acrylicVisibleBounds(element, self);
-                    if (rect.Width > 0 && rect.Height > 0) next.push_back(rect);
-                };
-                for (auto const &child : grid.Children()) {
-                    auto element = child.as<xaml::FrameworkElement>();
-                    auto tag = winrt::unbox_value_or<winrt::hstring>(element.Tag(), L"");
-                    if (tag == L"safeAreaBars" && element.Visibility() == xaml::Visibility::Visible) {
-                        auto stack = element.as<controls::Grid>().Children().GetAt(0).as<controls::StackPanel>();
-                        for (auto const &bar : stack.Children()) append(bar.as<xaml::FrameworkElement>());
-                    } else if (!isLayer(element) && controls::Grid::GetRow(element) < 3) append(element);
-                    else if (!isLayer(element) && controls::Grid::GetRow(element) == 3) source = element;
+                if (grid && self.IsLoaded()) {
+                    std::vector<winrt::Windows::Foundation::Rect> chrome;
+                    auto append = [&](xaml::FrameworkElement const &element) {
+                        if (!element.IsLoaded() || element.Visibility() != xaml::Visibility::Visible) return;
+                        auto visible = element.Resources().TryLookup(winrt::box_value(L"safeBarAcrylic"));
+                        if (visible && !winrt::unbox_value<bool>(visible)) return;
+                        auto rect = acrylicVisibleBounds(element, grid);
+                        if (rect.Width > 0 && rect.Height > 0) chrome.push_back(rect);
+                    };
+                    for (auto const &child : grid.Children()) {
+                        auto element = child.as<xaml::FrameworkElement>();
+                        auto tag = winrt::unbox_value_or<winrt::hstring>(element.Tag(), L"");
+                        if (tag == L"safeAreaBars" && element.Visibility() == xaml::Visibility::Visible) {
+                            auto stack = element.as<controls::Grid>().Children().GetAt(0).as<controls::StackPanel>();
+                            for (auto const &bar : stack.Children()) append(bar.as<xaml::FrameworkElement>());
+                        } else if (!isLayer(element) && controls::Grid::GetRow(element) < 3) append(element);
+                    }
+                    const auto sources = acrylicWindowColumns(grid);
+                    regions.clear();
+                    for (size_t index = 0; index < columns.size(); ++index) {
+                        auto &column = *columns[index].get();
+                        auto source = index < sources.size() ? sources[index] : xaml::FrameworkElement{nullptr};
+                        auto owner = source ? acrylicColumnOwner(source, grid) : controls::Panel{nullptr};
+                        if (!owner && source) owner = projected.as<controls::Panel>(); // standalone NavigationStack
+                        if (!owner) { unmount(column); continue; }
+                        mount(column, owner);
+                        column.refresh(grid, source, chrome);
+                        if (!column.drawing.regions.empty()) {
+                            IInspectable surface = column;
+                            auto mapping = surface.as<xaml::FrameworkElement>().TransformToVisual(self);
+                            for (auto const &rect : column.drawing.regions) regions.push_back(mapping.TransformBounds(rect));
+                        }
+                    }
                 }
-                material.source(source);
-                operation = "updating the shared material's clean content filter";
-                auto brush = material.update(self, extent);
-                operation = "resolving the shared material's local regions";
-                auto local = acrylicSceneRegions(material.scene());
-                next.insert(next.end(), local.begin(), local.end());
-                operation = "publishing the shared material's composition region";
-                drawing.paint(self, next, brush);
-                operation = "redirecting fixed controls above the shared material";
-                paintControls(self);
-            } catch (...) { report(operation); }
+            } catch (...) { report("committing native column material ownership"); }
+            committing = false;
         }
     };
     inline void refreshWindowMaterial(controls::Grid const &grid) {
@@ -171,5 +266,4 @@ namespace swiftomniui {
             }
         }
     }
-
 }

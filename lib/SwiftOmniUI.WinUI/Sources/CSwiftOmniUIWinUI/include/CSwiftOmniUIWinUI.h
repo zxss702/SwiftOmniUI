@@ -253,6 +253,8 @@ void swiftomniui_winui_pump(double seconds);
 
 /// Posts one turn to the UI thread's queue; any thread.
 void swiftomniui_winui_post_turn(void);
+/// Posts passive metadata work below native input/layout/rendering; false when the queue is unavailable.
+bool swiftomniui_winui_post_metadata(void (*work)(void));
 
 /// Keeps the loop alive while windows exist; false schedules shutdown after queued activations.
 void swiftomniui_winui_keep_scene_alive(bool alive);
@@ -288,6 +290,7 @@ void swiftomniui_winui_window_set_safe_area_bars(SwiftOmniUIObjectRef window,
 SwiftOmniUIObjectRef swiftomniui_winui_safe_area_background_make(void);
 void swiftomniui_winui_safe_area_background_source(SwiftOmniUIObjectRef background, SwiftOmniUIObjectRef source);
 void swiftomniui_winui_safe_area_register(SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef bar, SwiftOmniUIObjectRef material);
+void swiftomniui_winui_material_columns(SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef const *columns, int32_t count);
 void swiftomniui_winui_safe_area_host_set_background(SwiftOmniUIObjectRef host, bool shown);
 /// Commit material/control presentation with the host's existing animation sample.
 void swiftomniui_winui_material_present(void);
@@ -297,6 +300,10 @@ bool swiftomniui_winui_window_material_covers(SwiftOmniUIObjectRef window, Swift
 bool swiftomniui_winui_window_material_redirects(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
 bool swiftomniui_winui_window_acrylic_samples(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
 bool swiftomniui_winui_window_acrylic_captures_viewport(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef viewport);
+/// Reads the committed pre-filter crop for the column containing element; never refreshes it.
+bool swiftomniui_winui_window_material_sampling_bounds(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element, double *rect);
+/// The committed material is a sibling of the page in its native animated split slot.
+bool swiftomniui_winui_window_material_follows_column(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
 /// Place promoted bars in their owning page coordinates within the existing content row.
 void swiftomniui_winui_window_set_safe_area_bar_frame(SwiftOmniUIObjectRef window, double x, double y, double width);
 
@@ -424,6 +431,9 @@ void swiftomniui_winui_update_layout(SwiftOmniUIObjectRef element);
 
 /// Listens for a lazy panel's native effective viewport; ordinary panels do not subscribe.
 void swiftomniui_winui_panel_watch_viewport(SwiftOmniUIObjectRef panel, bool enabled);
+/// Allocation boundary for an application's native scrolling control.
+SwiftOmniUIObjectRef swiftomniui_winui_hosted_viewport_make(SwiftOmniUIObjectRef control);
+void swiftomniui_winui_hosted_viewport_set(SwiftOmniUIObjectRef viewport, double top, double right, double bottom, double left);
 
 /// Moves, turns and scales the element where its layout put it: DIPs and degrees, about the point
 /// (`centerX`, `centerY`) of it, in DIPs.
@@ -478,8 +488,9 @@ void swiftomniui_winui_blur_clear(SwiftOmniUIObjectRef presenter);
 /// How words look on a text block or any control showing them: the font - a size of 0 or less and an empty
 /// family are the platform's - the colour as 0xAARRGGBB, `has` false putting back the platform's, and the room
 /// around them in DIPs.
-void swiftomniui_winui_set_font(SwiftOmniUIObjectRef element, double size, bool bold, bool italic, char const *family,
-                               int32_t textStyle, double weight);
+/// Returns the font size accepted by the native element, including inherited/style defaults.
+double swiftomniui_winui_set_font(SwiftOmniUIObjectRef element, double size, bool bold, bool italic, char const *family,
+                                 int32_t textStyle, double weight);
 
 /// Native text-style readers created; repeated rows reuse these rather than making temporary controls.
 uint64_t swiftomniui_winui_font_probes(void);

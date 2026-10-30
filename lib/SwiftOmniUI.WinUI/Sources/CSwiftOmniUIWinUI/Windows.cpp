@@ -222,7 +222,7 @@ extern "C" bool swiftomniui_winui_window_material_redirects(SwiftOmniUIObjectRef
             auto host = child.as<xaml::FrameworkElement>();
             if (winrt::unbox_value_or<winrt::hstring>(host.Tag(), L"") != L"chromeAcrylic") continue;
             auto layer = winrt::get_self<ChromeAcrylic>(host.as<xaml::IFrameworkElementOverrides>());
-            for (auto const &bar : layer->bars) {
+            for (auto const &column : layer->columns) for (auto const &bar : column->bars) {
                 auto source = bar.element.get();
                 if (!source || !bar.visual.IsVisible()) continue;
                 for (xaml::DependencyObject at = as<xaml::UIElement>(element); at; at = xaml::Media::VisualTreeHelper::GetParent(at))
@@ -232,6 +232,47 @@ extern "C" bool swiftomniui_winui_window_material_redirects(SwiftOmniUIObjectRef
         }
         return false;
     } catch (...) { report("reading a material control's committed presentation owner"); return false; }
+}
+
+extern "C" bool swiftomniui_winui_window_material_sampling_bounds(
+    SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element, double *rect
+) {
+    try {
+        if (!rect) return false;
+        auto grid = root(borrow<xaml::Window>(window));
+        for (auto const &child : grid.Children()) {
+            auto host = child.as<xaml::FrameworkElement>();
+            if (winrt::unbox_value_or<winrt::hstring>(host.Tag(), L"") != L"chromeAcrylic") continue;
+            auto layer = winrt::get_self<ChromeAcrylic>(host.as<xaml::IFrameworkElementOverrides>());
+            for (auto const &column : layer->columns) {
+                if (!acrylicSceneContains(column->material.scene(), as<xaml::FrameworkElement>(element))) continue;
+                const auto bounds = column->material.samplingBounds();
+                rect[0] = bounds.X; rect[1] = bounds.Y; rect[2] = bounds.Width; rect[3] = bounds.Height;
+                return bounds.Width > 0 && bounds.Height > 0;
+            }
+        }
+        return false;
+    } catch (...) { report("reading a column's committed material sampling bounds"); return false; }
+}
+
+extern "C" bool swiftomniui_winui_window_material_follows_column(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element) {
+    try {
+        auto grid = root(borrow<xaml::Window>(window));
+        auto target = as<xaml::FrameworkElement>(element);
+        for (auto const &child : grid.Children()) {
+            auto host = child.as<xaml::FrameworkElement>();
+            if (winrt::unbox_value_or<winrt::hstring>(host.Tag(), L"") != L"chromeAcrylic") continue;
+            auto layer = winrt::get_self<ChromeAcrylic>(host.as<xaml::IFrameworkElementOverrides>());
+            for (auto const &column : layer->columns) {
+                if (!acrylicSceneContains(column->material.scene(), target)) continue;
+                auto slot = acrylicColumnOwner(target, grid);
+                IInspectable projected = *column.get();
+                return slot && column->nativeOwner.get() == slot
+                    && xaml::Media::VisualTreeHelper::GetParent(projected.as<xaml::FrameworkElement>()) == slot;
+            }
+        }
+        return false;
+    } catch (...) { report("reading native column material ownership"); return false; }
 }
 
 extern "C" bool swiftomniui_winui_window_material_covers(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element) {
@@ -247,7 +288,7 @@ extern "C" bool swiftomniui_winui_window_material_covers(SwiftOmniUIObjectRef wi
             if (size.x <= 0 || size.y <= 0) return false;
             using Rect = winrt::Windows::Foundation::Rect;
             std::vector<Rect> uncovered{target.TransformToVisual(host).TransformBounds({0, 0, size.x, size.y})};
-            for (auto const &cover : layer->drawing.regions) {
+            for (auto const &cover : layer->regions) {
                 std::vector<Rect> next;
                 for (auto const &rect : uncovered) {
                     auto x = std::max(rect.X, cover.X), y = std::max(rect.Y, cover.Y);

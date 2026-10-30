@@ -22,6 +22,11 @@ namespace swiftomniui {
         std::vector<Inset> insets;
         struct WindowRoot { winrt::weak_ref<Element> root, content; xaml::Media::SystemBackdrop backdrop{nullptr}; };
         std::vector<WindowRoot> windows;
+        struct Columns {
+            winrt::weak_ref<Element> owner;
+            std::vector<winrt::weak_ref<Element>> pages;
+        };
+        std::vector<Columns> columnGroups;
         std::vector<winrt::weak_ref<Element>> scrollers;
         std::vector<std::weak_ptr<AcrylicScene>> scenes;
         uint64_t generation = 0;
@@ -63,7 +68,9 @@ namespace swiftomniui {
                     {0, 0, static_cast<float>(parent.ActualWidth()), static_cast<float>(parent.ActualHeight())}));
             if (auto split = parent.try_as<controls::SplitView>(); split && parent != element) {
                 const bool pane = descendant(element, split.Pane());
-                if (pane && !split.IsPaneOpen()) return {};
+                // IsPaneOpen is the requested destination, not presentation.
+                // The native PaneRoot keeps its moving clip/visibility until
+                // the close storyboard completes. Material inherits that tree.
                 auto slot = (pane ? split.Pane() : split.Content()).try_as<Element>();
                 if (slot) {
                     auto room = slot.ActualSize();
@@ -74,6 +81,20 @@ namespace swiftomniui {
         }
         auto room = root.ActualSize();
         return intersect(bounds, {0, 0, room.x, room.y});
+    }
+
+    Rect acrylicLayoutBounds(Element const &element, Element const &root) {
+        if (!element || !root) return {};
+        float x = 0, y = 0;
+        xaml::DependencyObject at = element;
+        for (; at && at != root; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
+            if (auto node = at.try_as<xaml::UIElement>()) {
+                const auto offset = node.ActualOffset(); x += offset.x; y += offset.y;
+            }
+        }
+        if (!at) return {};
+        const auto size = element.ActualSize();
+        return {x, y, size.x, size.y};
     }
 
     float acrylicPresentationOpacity(Element const &element, Element const &root) {
@@ -118,7 +139,7 @@ namespace swiftomniui {
     }
 
     struct AcrylicScene : std::enable_shared_from_this<AcrylicScene> {
-        winrt::weak_ref<Element> content, root;
+        winrt::weak_ref<Element> content, root, window;
         composition::ContainerVisual visual{nullptr};
         uint64_t revision = std::numeric_limits<uint64_t>::max();
         bool committing = false;
@@ -325,6 +346,38 @@ namespace swiftomniui {
         return result;
     }
 
+    std::vector<Element> acrylicWindowColumns(Element const &root) {
+        Element content{nullptr};
+        for (auto const &window : windows) if (window.root.get() == root) content = window.content.get();
+        if (!content) return {};
+        // Only the outer NavigationSplitView partitions window chrome. A split
+        // inside a column continues to use that column's shared material.
+        for (auto const &group : columnGroups) {
+            auto owner = group.owner.get();
+            if (!owner || !descendant(owner, content)) continue;
+            bool nested = false;
+            for (auto const &other : columnGroups) if (auto outer = other.owner.get(); outer && outer != owner
+                && descendant(outer, content) && descendant(owner, outer)) { nested = true; break; }
+            if (nested) continue;
+            std::vector<Element> result;
+            for (auto const &entry : group.pages) if (auto page = entry.get(); page && page.IsLoaded()
+                && descendant(page, owner)) result.push_back(page);
+            if (!result.empty()) return result;
+        }
+        return {content};
+    }
+
+    controls::Panel acrylicColumnOwner(Element const &column, Element const &root) {
+        for (auto at = xaml::Media::VisualTreeHelper::GetParent(column); at && at != root;
+             at = xaml::Media::VisualTreeHelper::GetParent(at)) {
+            if (auto split = at.try_as<controls::SplitView>()) {
+                auto slot = descendant(column, split.Pane()) ? split.Pane() : split.Content();
+                return slot.try_as<controls::Panel>();
+            }
+        }
+        return nullptr;
+    }
+
     void presentAcrylicScenes() {
         // Called by the existing host presentation transaction. Snapshot the
         // scopes because a local marker can rebind to its newly mounted scope.
@@ -340,6 +393,7 @@ namespace swiftomniui {
         if (!xamlRoot) return {};
         auto coordinates = xamlRoot.Content().try_as<Element>();
         if (!coordinates) return {};
+        Element window{nullptr};
         Element content{nullptr};
         for (auto const &entry : windows)
             if (entry.root.get() == coordinates) { content = entry.content.get(); break; }
@@ -375,6 +429,14 @@ namespace swiftomniui {
                 }
             }
             coordinates = content;
+        } else {
+            window = coordinates;
+            for (auto const &column : acrylicWindowColumns(window))
+                if (descendant(source, column)) {
+                    content = column;
+                    if (auto owner = acrylicColumnOwner(column, window)) coordinates = owner;
+                    break;
+                }
         }
         std::erase_if(scenes, [](auto const &scene) { return scene.expired(); });
         for (auto const &entry : scenes) if (auto scene = entry.lock()) {
@@ -383,6 +445,7 @@ namespace swiftomniui {
             }
         }
         auto scene = std::make_shared<AcrylicScene>(content, coordinates);
+        if (window) scene->window = winrt::make_weak(window);
         scenes.push_back(scene);
         scene->refresh();
         scene->watch();
@@ -392,9 +455,28 @@ namespace swiftomniui {
     Element acrylicSceneRoot(std::shared_ptr<AcrylicScene> const &scene) { return scene->root.get(); }
     composition::Visual acrylicSceneVisual(std::shared_ptr<AcrylicScene> const &scene) { return scene->visual; }
     bool acrylicSceneIsWindow(std::shared_ptr<AcrylicScene> const &scene) {
-        return scene && std::any_of(windows.begin(), windows.end(), [&](auto const &entry) {
-            return entry.root.get() == scene->root.get() && entry.content.get() == scene->content.get();
-        });
+        return scene && scene->window.get();
+    }
+    Rect acrylicSceneBounds(std::shared_ptr<AcrylicScene> const &scene) {
+        if (!scene) return {};
+        auto root = scene->root.get(), content = scene->content.get();
+        if (!root || !content) return {};
+        auto size = root.ActualSize();
+        if (!acrylicSceneIsWindow(scene)) return {0, 0, size.x, size.y};
+        if (!descendant(content, root)) return {};
+        auto window = scene->window.get();
+        const auto columns = acrylicWindowColumns(window);
+        // A detached/retired scene can outlive a two/three-column switch via
+        // marker observers. It must not keep its old toolbar crop alive.
+        if (std::find(columns.begin(), columns.end(), content) == columns.end()) return {};
+        // Capture in native slot coordinates, BEFORE its animated ancestors.
+        // An offscreen opening frame must not freeze an empty window crop for
+        // the rest of an independent system animation. Visibility and moving
+        // clips apply once, when the native column presents the result.
+        return {0, 0, size.x, size.y};
+    }
+    bool acrylicSceneContains(std::shared_ptr<AcrylicScene> const &scene, Element const &element) {
+        return scene && element && descendant(element, scene->content.get());
     }
     xaml::Media::SystemBackdrop acrylicFoundationBackdrop(Element const &target) {
         auto root = target.XamlRoot();
@@ -490,6 +572,33 @@ namespace swiftomniui {
     }
 }
 
+extern "C" void swiftomniui_winui_material_columns(
+    SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef const *columns, int32_t count
+) {
+    using namespace swiftomniui;
+    try {
+        auto element = as<xaml::FrameworkElement>(owner);
+        std::erase_if(columnGroups, [](auto const &entry) { return !entry.owner.get(); });
+        auto found = std::find_if(columnGroups.begin(), columnGroups.end(), [&](auto const &entry) {
+            return entry.owner.get() == element;
+        });
+        if (count == 0) {
+            if (found != columnGroups.end()) { columnGroups.erase(found); ++generation; }
+            return;
+        }
+        if (found != columnGroups.end() && found->pages.size() == static_cast<size_t>(count)) {
+            bool same = true;
+            for (int32_t i = 0; i < count; ++i) if (found->pages[i].get() != as<xaml::FrameworkElement>(columns[i])) same = false;
+            if (same) return;
+        }
+        Columns next{winrt::make_weak(element), {}};
+        for (int32_t i = 0; i < count; ++i) next.pages.push_back(winrt::make_weak(as<xaml::FrameworkElement>(columns[i])));
+        if (found == columnGroups.end()) columnGroups.push_back(std::move(next));
+        else *found = std::move(next);
+        ++generation;
+    } catch (...) { report("registering navigation material columns"); }
+}
+
 extern "C" void swiftomniui_winui_safe_area_register(
     SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef bar, SwiftOmniUIObjectRef material
 ) {
@@ -523,7 +632,7 @@ extern "C" bool swiftomniui_winui_window_acrylic_samples(SwiftOmniUIObjectRef wi
     try {
         auto root = borrow<xaml::Window>(window).Content().as<xaml::FrameworkElement>();
         auto source = as<xaml::FrameworkElement>(element);
-        for (auto const &entry : scenes) if (auto scene = entry.lock(); scene && scene->root.get() == root) {
+        for (auto const &entry : scenes) if (auto scene = entry.lock(); scene && (scene->window.get() == root || scene->root.get() == root)) {
             for (auto const &part : scene->parts)
                 if (auto ancestor = part.element.get(); !part.background && ancestor && descendant(source, ancestor)) return true;
         }
@@ -538,7 +647,7 @@ extern "C" bool swiftomniui_winui_window_acrylic_captures_viewport(SwiftOmniUIOb
         auto element = as<Element>(viewport);
         // Read the retained scene, never create/refresh one while diagnosing
         // first-load readiness (that would hide the missing notification).
-        for (auto const &entry : scenes) if (auto scene = entry.lock(); scene && scene->root.get() == root) {
+        for (auto const &entry : scenes) if (auto scene = entry.lock(); scene && (scene->window.get() == root || scene->root.get() == root)) {
             for (auto const &part : scene->parts) {
                 if (part.background || part.element.get() != element || !part.capture || !part.sprite.IsVisible()) continue;
                 auto size = part.capture.SourceSize();

@@ -29,6 +29,10 @@ namespace {
                 auto element = self.as<controls::Panel>();
                 auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(element).Compositor();
                 drawing = compositor.CreateShapeVisual();
+                // This visual also renders inside a SafeBar's offscreen
+                // capture. Do not inherit an aliased boundary from the XAML
+                // handout/tree: retain fractional coverage at curved edges.
+                drawing.BorderMode(composition::CompositionBorderMode::Soft);
                 drawing.Shapes().Append(compositor.CreateSpriteShape(compositor.CreatePathGeometry()));
                 drawing.Size(element.ActualSize());
                 xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(element, drawing);

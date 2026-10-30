@@ -14,6 +14,7 @@ namespace swiftomniui {
         bool source(xaml::FrameworkElement const &element);
         void reset();
         std::shared_ptr<AcrylicScene> scene() const;
+        winrt::Windows::Foundation::Rect samplingBounds() const;
         xaml::Media::Brush update(xaml::FrameworkElement const &target,
                                  winrt::Windows::Foundation::Size size);
     };
@@ -33,11 +34,15 @@ namespace swiftomniui {
         winrt::Microsoft::UI::Composition::CompositionGeometricClip regionClip{nullptr}, controlsClip{nullptr};
         bool foundationFailed = false;
 
-        void mount(controls::Panel const &owner) {
+        bool usesFoundation = true;
+        void mount(controls::Panel const &owner, bool withFoundation = true) {
+            usesFoundation = withFoundation;
             try {
-                foundation = controls::SystemBackdropElement();
-                foundation.IsHitTestVisible(false);
-                foundation.Opacity(0);
+                if (withFoundation) {
+                    foundation = controls::SystemBackdropElement();
+                    foundation.IsHitTestVisible(false);
+                    foundation.Opacity(0);
+                }
             } catch (...) {
                 foundationFailed = true;
                 report("creating the optional bar Mica foundation");
@@ -51,6 +56,15 @@ namespace swiftomniui {
             owner.Children().Append(backing);
         }
         void close() { if (foundation) foundation.SystemBackdrop(nullptr); }
+        void clear() {
+            close();
+            backing.Opacity(0);
+            fill.Background(nullptr);
+            surface.Background(nullptr);
+            regions.clear();
+            regionClip = nullptr;
+            controlsClip = nullptr;
+        }
         void measure(winrt::Windows::Foundation::Size available) { backing.Measure(available); }
         void arrange(winrt::Windows::Foundation::Size size) { backing.Arrange({0, 0, size.Width, size.Height}); }
         void paint(xaml::FrameworkElement const &self,
@@ -81,9 +95,9 @@ namespace swiftomniui {
                 regions = next;
             }
             if (surface.Background() != brush) surface.Background(brush);
-            auto background = acrylicFoundationFill(self);
+            auto background = usesFoundation ? acrylicFoundationFill(self) : nullptr;
             if (fill.Background() != background) fill.Background(background);
-            if (!foundationFailed && self.IsLoaded() && !next.empty()) {
+            if (foundation && !foundationFailed && self.IsLoaded() && !next.empty()) {
                 try {
                     auto backdrop = acrylicFoundationBackdrop(self);
                     if (foundation.SystemBackdrop() != backdrop) foundation.SystemBackdrop(backdrop);
@@ -96,6 +110,7 @@ namespace swiftomniui {
             // changes rendering only and never defers its first real size.
             const double opacity = !next.empty() && !foundationFailed ? 1 : 0;
             if (foundation && foundation.Opacity() != opacity) foundation.Opacity(opacity);
+            if (backing.Opacity() != 1) backing.Opacity(1);
         }
     };
 
