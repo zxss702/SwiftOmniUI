@@ -32,10 +32,39 @@ private struct SpannedPage: View {
     }
 }
 
+private struct TextPositionPage: View {
+    @Binding var readsLayout: Bool
+    var body: some View {
+        VStack {
+            if readsLayout {
+                Text("tracked").id("tracked")
+                    .backgroundPreferenceValue(Text.LayoutKey.self) { _ in Color.clear }
+            } else {
+                Text("tracked").id("tracked")
+            }
+            Text("plain").id("plain")
+            Text("business").onFrameChanged { _ in }.id("business")
+            Text("observed").onPreferenceChange(Text.LayoutKey.self) { _ in }.id("observed")
+            Text("transformed").transformPreference(Text.LayoutKey.self) { $0 }.id("transformed")
+        }
+    }
+}
+
 final class WinUILabelViewTests: XCTestCase {
     func testAttachmentRefreshKeepsProposalsAlreadyMeasuredInTheLiveTree() throws {
-        onUIThread {
+        try onUIThread {
             let host = WinUIRenderer.bare(reducesMotion: true)
+            var order: [Int] = []
+            WinUIDoorbell.afterMetadata {
+                order.append(1)
+                WinUIDoorbell.afterMetadata { order.append(3) }
+                WinUIDoorbell.afterPass { order.append(2) }
+            }
+            WinUIDoorbell.afterPass { order.append(0) }
+            WinUIDoorbell.commitPending()
+            XCTAssertEqual(order, [0], "visible work must not drain passive geometry")
+            host.settle { order.count == 4 }
+            XCTAssertEqual(order, [0, 1, 2, 3], "a metadata continuation yields to the next visible/layout turn")
             let text = AttachmentMeasuredText()
             text.setTextFont(size: 14, attributes: nil, family: nil)
             text.setText("A filename with enough words to wrap differently at each width")
@@ -43,6 +72,12 @@ final class WinUILabelViewTests: XCTestCase {
             WinUITestHost.window.show(text)
             for _ in 0..<4 { host.step() }
             XCTAssertTrue(text.isAttached)
+            text.withNativeMeasure {
+                XCTAssertTrue(text.isAttached)
+                text.withNativeArrange {
+                    XCTAssertTrue(text.isAttached)
+                }
+            }
             let wide = text.measure(width: 240, height: nil)
             let narrow = text.measure(width: 60, height: nil)
             XCTAssertGreaterThan(narrow.height, wide.height)
@@ -56,6 +91,35 @@ final class WinUILabelViewTests: XCTestCase {
             XCTAssertGreaterThan(text.queries, before)
             XCTAssertEqual(text.measure(width: 80, height: nil), detached)
             WinUITestHost.window.show(nil)
+            for _ in 0..<4 { host.step() }
+            text.withNativeMeasure { XCTAssertFalse(text.isAttached, "another pass must observe Unloaded") }
+            WinUITestHost.window.show(text)
+            for _ in 0..<4 { host.step() }
+            text.withNativeArrange { XCTAssertTrue(text.isAttached, "reusing a view must observe its new attachment") }
+            WinUITestHost.window.show(nil)
+
+            let readsLayout = State(wrappedValue: false)
+            let positions = WinUIRenderer.running(reducesMotion: true) {
+                TextPositionPage(readsLayout: readsLayout.projectedValue)
+            }
+            for _ in 0..<12 { positions.step() }
+            for (words, expected) in [("plain", false), ("tracked", false), ("business", true),
+                                      ("observed", true), ("transformed", true)] {
+                let label = try XCTUnwrap(positions.views(WinUITextView.self).first {
+                    $0.sourceElement?.string(.text) == words
+                }?.sourceElement?.winUI)
+                XCTAssertEqual(label.readsFrame, expected, words)
+            }
+            positions.runtime.performUserTransaction { readsLayout.wrappedValue = true }
+            for _ in 0..<12 { positions.step() }
+            XCTAssertTrue(try XCTUnwrap(positions.views(WinUITextView.self).first {
+                $0.sourceElement?.string(.text) == "tracked"
+            }?.sourceElement?.winUI).readsFrame)
+            positions.runtime.performUserTransaction { readsLayout.wrappedValue = false }
+            for _ in 0..<12 { positions.step() }
+            XCTAssertFalse(try XCTUnwrap(positions.views(WinUITextView.self).first {
+                $0.sourceElement?.string(.text) == "tracked"
+            }?.sourceElement?.winUI).readsFrame, "removing the reader retires passive position tracking")
         }
     }
 

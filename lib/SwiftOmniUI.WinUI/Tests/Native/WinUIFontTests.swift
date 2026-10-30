@@ -79,8 +79,12 @@ final class WinUIFontTests: XCTestCase {
             var expected: (size: Double, weight: Int)?
             for _ in 0..<100 {
                 let label = WinUITextView()
-                label.setFont(size: nil, attributes: nil, family: nil, textStyle: .headline)
+                var labelLook = TextLook()
+                labelLook.textStyle = .headline
+                label.setTextFont(labelLook)
                 let style = label.wordsStyle
+                XCTAssertEqual(label.look.size, style.size,
+                               "the setter returns the resolved native style size")
                 if let expected {
                     XCTAssertEqual(style.size, expected.size)
                     XCTAssertEqual(style.weight, expected.weight)
@@ -97,11 +101,12 @@ final class WinUIFontTests: XCTestCase {
             XCTAssertLessThanOrEqual(swiftomniui_winui_font_probes() - before, 1,
                                      "200 font applications share one native style reader")
             let explicit = WinUITextView()
-            explicit.setFont(size: 21, attributes: .italic, family: nil, textStyle: .headline, weight: 650)
+            XCTAssertEqual(explicit.setFont(size: 21, attributes: .italic, family: nil,
+                                           textStyle: .headline, weight: 650), 21)
             XCTAssertEqual(explicit.wordsStyle.size, 21)
             XCTAssertEqual(explicit.wordsStyle.weight, 650)
-            explicit.setFont(size: nil, attributes: nil, family: nil, textStyle: .headline)
             let system = try XCTUnwrap(expected)
+            XCTAssertEqual(explicit.setFont(size: nil, attributes: nil, family: nil, textStyle: .headline), system.size)
             XCTAssertEqual(explicit.wordsStyle.size, system.size)
             XCTAssertEqual(explicit.wordsStyle.weight, system.weight)
         }

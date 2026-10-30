@@ -176,6 +176,14 @@ again. Pending work holds the frame clock; lazy realization and deferred
 measurement therefore do not depend exclusively on dispatcher progress
 during continuous input.
 
+Passive selection glyph reads use a separate low-priority dispatcher queue.
+One label is read per native turn; its continuation yields to native input,
+layout, rendering and ordinary doorbell work. Normal `commitPending` does not
+drain these reads. Queue entries hold text views weakly and skip retired rows,
+so a table scrolled away from cannot retain its native cells until metadata
+finishes. The completed selection snapshot still publishes as one transaction.
+This changes metadata scheduling, not the construction or painting of rows.
+
 The thread is started from a nonisolated function: a closure written inside a
 `MainActor` function is `MainActor`'s, and the runtime reports it as a data
 race the moment another thread runs it.

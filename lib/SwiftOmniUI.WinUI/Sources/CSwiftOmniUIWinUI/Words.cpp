@@ -161,9 +161,9 @@ namespace {
 
     /// Runs `block` on a label's text block, or `control` on a control; the element is one or the other.
     template <typename OnBlock, typename OnControl>
-    void either(SwiftOmniUIObjectRef handle, OnBlock block, OnControl control) {
+    void either(SwiftOmniUIObjectRef handle, OnBlock block, OnControl control, bool writes = true) {
         auto object = as<IInspectable>(handle);
-        if (auto text = wordsOf(object)) { block(text); syncRichWords(handle); }
+        if (auto text = wordsOf(object)) { block(text); if (writes) syncRichWords(handle); }
         else if (auto other = object.try_as<controls::Control>()) control(other);
     }
 
@@ -310,8 +310,8 @@ swiftomniui::TextFontDefaults swiftomniui::textFontDefaults(int32_t textStyle) {
 extern "C" uint64_t swiftomniui_winui_font_probes(void) { return fontProbes; }
 extern "C" uint64_t swiftomniui_winui_text_spacing_probes(void) { return spacingProbes; }
 
-extern "C" void swiftomniui_winui_set_font(SwiftOmniUIObjectRef handle, double size, bool bold, bool italic,
-                                         char const *family, int32_t textStyle, double requestedWeight) {
+extern "C" double swiftomniui_winui_set_font(SwiftOmniUIObjectRef handle, double size, bool bold, bool italic,
+                                           char const *family, int32_t textStyle, double requestedWeight) {
     try {
         auto font = textFontDefaults(textStyle);
         auto weight = requestedWeight > 0 ? winrt::Windows::UI::Text::FontWeight{
@@ -319,6 +319,7 @@ extern "C" void swiftomniui_winui_set_font(SwiftOmniUIObjectRef handle, double s
             : bold ? winrt::Microsoft::UI::Text::FontWeights::Bold() : winrt::Windows::UI::Text::FontWeight{font.weight};
         auto style = italic ? winrt::Windows::UI::Text::FontStyle::Italic : winrt::Windows::UI::Text::FontStyle::Normal;
         auto named = family && *family ? media::FontFamily(text(family)) : media::FontFamily{nullptr};
+        double acceptedSize = 0;
         auto apply = [&](auto const &element, auto sizeProperty, auto familyProperty) {
             if (size > 0) element.FontSize(size);
             else if (textStyle >= 0) element.FontSize(font.size);
@@ -327,6 +328,7 @@ extern "C" void swiftomniui_winui_set_font(SwiftOmniUIObjectRef handle, double s
             element.FontStyle(style);
             if (named) element.FontFamily(named);
             else element.ClearValue(familyProperty);
+            acceptedSize = element.FontSize();
         };
         either(handle,
             [&](controls::TextBlock const &block) {
@@ -335,8 +337,10 @@ extern "C" void swiftomniui_winui_set_font(SwiftOmniUIObjectRef handle, double s
             [&](controls::Control const &control) {
                 apply(control, controls::Control::FontSizeProperty(), controls::Control::FontFamilyProperty());
             });
+        return acceptedSize;
     } catch (...) {
         report("setting a font");
+        return 0;
     }
 }
 
@@ -474,20 +478,26 @@ extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, 
         invalidateWordsMeasurement(handle);
         auto block = labelWords(handle);
         block.CharacterSpacing(characterSpacing);
-        auto resources = borrow<controls::Border>(handle).Resources();
         auto baseline = std::isfinite(baselineAdvance) && baselineAdvance > 0 ? baselineAdvance : 0;
         auto single = std::isfinite(singleLineHeight) && singleLineHeight > 0 ? singleLineHeight : 0;
-        auto baselineKey = winrt::box_value(L"SwiftOmniUITextBaselineAdvance");
-        auto singleKey = winrt::box_value(L"SwiftOmniUITextSingleLineHeight");
-        if (baseline != single) {
-            resources.Insert(baselineKey, winrt::box_value(baseline));
-            resources.Insert(singleKey, winrt::box_value(single));
-        } else {
-            // A constant line height is established here once. Only additive
-            // spacing needs to inspect the paragraph during every Measure.
-            if (resources.HasKey(baselineKey)) resources.Remove(baselineKey);
-            if (resources.HasKey(singleKey)) resources.Remove(singleKey);
+        if (baseline != single || wordsUseSpacing(handle)) {
+            auto resources = borrow<controls::Border>(handle).Resources();
+            auto baselineKey = winrt::box_value(L"SwiftOmniUITextBaselineAdvance");
+            auto singleKey = winrt::box_value(L"SwiftOmniUITextSingleLineHeight");
+            if (baseline != single) {
+                // Text/font may have changed while the adapter was disabled.
+                // Do not reuse a width decision from that earlier paragraph.
+                auto decisionsKey = winrt::box_value(spacingDecisionsKey);
+                if (resources.HasKey(decisionsKey)) resources.Lookup(decisionsKey).as<SpacingDecisions>().Clear();
+                resources.Insert(baselineKey, winrt::box_value(baseline));
+                resources.Insert(singleKey, winrt::box_value(single));
+            } else {
+                // A constant line height needs no per-measure adapter.
+                if (resources.HasKey(baselineKey)) resources.Remove(baselineKey);
+                if (resources.HasKey(singleKey)) resources.Remove(singleKey);
+            }
         }
+        wordsUseSpacing(handle, baseline != single);
         block.LineStackingStrategy(xaml::LineStackingStrategy::BaselineToBaseline);
         block.LineHeight(baseline);
         syncRichWords(handle);
@@ -496,6 +506,7 @@ extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, 
 }
 
 void swiftomniui::invalidateWordsMeasurement(SwiftOmniUIObjectRef handle) {
+    if (!wordsUseSpacing(handle)) return;
     auto border = as<IInspectable>(handle).try_as<controls::Border>();
     if (!border) return;
     auto key = winrt::box_value(spacingDecisionsKey);
@@ -504,6 +515,7 @@ void swiftomniui::invalidateWordsMeasurement(SwiftOmniUIObjectRef handle) {
 }
 
 void swiftomniui::measureWords(SwiftOmniUIObjectRef handle, winrt::Windows::Foundation::Size available) {
+    if (!wordsUseSpacing(handle)) return;
     auto border = as<IInspectable>(handle).try_as<controls::Border>();
     if (!border) return;
     auto resources = border.Resources();
@@ -581,23 +593,7 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
             // formatted outside its embedded-element host. Attach the loaded
             // notification to the visible paragraph as well as the Border:
             // replacing a plain label does not reload that Border.
-            auto viewKey = winrt::box_value(L"SwiftOmniUITextLoadedView");
-            auto callbackKey = winrt::box_value(L"SwiftOmniUITextLoadedCallback");
-            if (border.Resources().HasKey(viewKey) && border.Resources().HasKey(callbackKey)) {
-                auto view = winrt::unbox_value<int64_t>(border.Resources().Lookup(viewKey));
-                auto ready = reinterpret_cast<void (*)(int64_t)>(static_cast<uintptr_t>(
-                    winrt::unbox_value<uint64_t>(border.Resources().Lookup(callbackKey))));
-                rich.Loaded(guarded("completing an attached rich label's measurement",
-                    [view, ready, weak = winrt::make_weak(border)](IInspectable const &sender, xaml::RoutedEventArgs const &) {
-                        if (auto border = weak.get()) {
-                            auto key = winrt::box_value(spacingDecisionsKey);
-                            if (border.Resources().HasKey(key))
-                                border.Resources().Lookup(key).as<SpacingDecisions>().Clear();
-                        }
-                        sender.as<xaml::UIElement>().InvalidateMeasure();
-                        if (ready) ready(view);
-                    }));
-            }
+            followRichWordsLoaded(handle, rich);
             syncRichWords(handle);
         } else if (!needsRich && rich) {
             auto border = borrow<controls::Border>(handle); border.Child(block); border.Tag(nullptr); rich = nullptr;
@@ -907,7 +903,7 @@ extern "C" void swiftomniui_winui_text_style(SwiftOmniUIObjectRef handle, double
                 style[2] = 0;
                 style[3] = 0;
                 style[4] = argb(control.Foreground());
-            });
+            }, false);
     } catch (...) {
         report("reading how words look");
     }

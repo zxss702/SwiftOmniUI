@@ -114,9 +114,9 @@ class WinUITextView: WinUIView {
         guard onTextLayout != nil else { return }
         guard textLayoutDirty, !textLayoutPending else { return }
         textLayoutPending = true
-        Self.pendingTextLayouts.append(self)
+        Self.pendingTextLayouts.append(TextLayoutBatch.Label(view: self))
         guard Self.pendingTextLayouts.count == 1 else { return }
-        WinUIDoorbell.afterPass {
+        WinUIDoorbell.afterMetadata {
             let labels = Self.pendingTextLayouts
             Self.pendingTextLayouts = []
             TextLayoutBatch(labels).advance()
@@ -129,29 +129,38 @@ class WinUITextView: WinUIView {
     /// snapshot in one transaction so preference readers do not rebuild once
     /// per cell. This does not defer or progressively construct visible rows.
     @MainActor private final class TextLayoutBatch {
-        let labels: [WinUITextView]
+        struct Label {
+            weak var view: WinUITextView?
+        }
+        let labels: [Label]
         var index = 0
-        var reports: [(WinUITextView, UInt64, TextLayoutReport)] = []
+        var reports: [(Label, UInt64, TextLayoutReport)] = []
 
-        init(_ labels: [WinUITextView]) { self.labels = labels }
+        init(_ labels: [Label]) { self.labels = labels }
 
         func advance() {
-            if index < labels.count {
-                let label = labels[index]
+            while index < labels.count {
+                let held = labels[index]
                 index += 1
+                guard let label = held.view else { continue }
                 label.textLayoutPending = false
+                // Scrolling can retire a table while passive work waits. Do
+                // not retain its native controls or post a turn for every
+                // discarded cell; skip retired entries without reading XAML.
+                guard !label.isDetached, label.onTextLayout != nil else { continue }
                 if let report = label.readTextLayout() {
-                    reports.append((label, label.textLayoutRevision, report))
+                    reports.append((held, label.textLayoutRevision, report))
                 }
+                break
             }
             if index < labels.count {
-                WinUIDoorbell.afterPass { self.advance() }
+                WinUIDoorbell.afterMetadata { self.advance() }
                 return
             }
             let publish = {
                 let start = WinUITextView.textWorkObserver == nil ? 0 : WinUIFrameClock.monotonic()
-                for (label, revision, report) in self.reports {
-                    guard !label.isDetached, label.isAttached,
+                for (held, revision, report) in self.reports {
+                    guard let label = held.view, !label.isDetached, label.isAttached,
                           revision == label.textLayoutRevision else { continue }
                     label.onTextLayout?(report)
                 }
@@ -162,7 +171,7 @@ class WinUITextView: WinUIView {
         }
     }
 
-    private static var pendingTextLayouts: [WinUITextView] = []
+    private static var pendingTextLayouts: [TextLayoutBatch.Label] = []
     static var textWorkObserver: ((String, Double) -> Void)?
 
     private func readTextLayout() -> TextLayoutReport? {
@@ -250,15 +259,21 @@ class WinUITextView: WinUIView {
     }
 
     func setTextFont(_ font: TextLook) {
-        setFont(size: font.size, attributes: font.attributes, family: font.winUIFontFamily,
-                textStyle: font.textStyle, weight: font.weight)
-        look.size = wordsStyle.size
+        // The native setter already resolved the inherited/style defaults.
+        // Keep that size without reading weight, lines, alignment and colour
+        // back through a second native traversal for every realized label.
+        let acceptedSize = setFont(size: font.size, attributes: font.attributes, family: font.winUIFontFamily,
+                                   textStyle: font.textStyle, weight: font.weight)
+        look.size = acceptedSize > 0 ? acceptedSize : wordsStyle.size
         look.attributes = font.attributes
         look.family = font.family
         look.textStyle = font.textStyle
         look.weight = font.weight
         look.design = font.design
-        writeSpacing()
+        // Native font changes already reflow ordinary text. Recalculate only
+        // authored spacing whose native values depend on that font's metrics.
+        if look.letterSpacing != 0 || look.lineHeight != nil || look.lineSpacing != 0 { writeSpacing() }
+        else { invalidateTextLayout() }
     }
 
     /// How the words break - wrapped, on one line, or cut short - and the most lines; nil for any

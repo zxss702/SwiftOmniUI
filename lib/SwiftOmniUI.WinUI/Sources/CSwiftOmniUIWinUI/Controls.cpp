@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 #include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.h>
@@ -22,6 +23,50 @@ using namespace swiftomniui;
 namespace primitives = winrt::Microsoft::UI::Xaml::Controls::Primitives;
 
 namespace {
+    struct LabelData;
+    using LabelTable = std::unordered_map<void *, std::weak_ptr<LabelData>>;
+    struct LabelData {
+        std::weak_ptr<LabelTable> table;
+        void *handle = nullptr;
+        int64_t view = 0;
+        void (*ready)(int64_t) = nullptr;
+        bool usesSpacing = false;
+        ~LabelData() {
+            if (auto entries = table.lock()) {
+                auto found = entries->find(handle);
+                // A retained rich paragraph may outlive its old Border. Do
+                // not erase a new label if XAML has reused that address.
+                if (found != entries->end() && found->second.expired()) entries->erase(found);
+            }
+        }
+    };
+
+    std::shared_ptr<LabelTable> const &labelTable() {
+        static auto table = std::make_shared<LabelTable>();
+        return table;
+    }
+    std::shared_ptr<LabelData> labelData(SwiftOmniUIObjectRef handle) {
+        auto const &table = labelTable();
+        auto found = table->find(handle);
+        return found == table->end() ? nullptr : found->second.lock();
+    }
+    std::shared_ptr<LabelData> followLabel(controls::Border const &label) {
+        auto handle = static_cast<SwiftOmniUIObjectRef>(winrt::get_abi(label));
+        if (auto data = labelData(handle)) return data;
+        auto data = std::make_shared<LabelData>();
+        auto table = labelTable();
+        data->table = table;
+        data->handle = handle;
+        (*table)[handle] = data;
+        // The native event owns the data, which owns no native object. Plain
+        // labels need no ResourceDictionary or boxed callback cookies.
+        label.Loaded(guarded("completing a loaded label's measurement",
+            [data](IInspectable const &, xaml::RoutedEventArgs const &) {
+                if (data->ready) data->ready(data->view);
+            }));
+        return data;
+    }
+
     /// Whether a button keeps its pressed look - what `button_set_on` wrote
     /// into its tag, `isOn` worn on the element at all.
     bool keeps(primitives::ToggleButton const &button) {
@@ -74,6 +119,25 @@ namespace {
             resources.Insert(winrt::box_value(winrt::hstring(std::wstring(L"ButtonBorderBrush") + state.suffix)), transparent);
         }
     }
+}
+
+bool swiftomniui::wordsUseSpacing(SwiftOmniUIObjectRef handle) {
+    auto data = labelData(handle);
+    return data && data->usesSpacing;
+}
+void swiftomniui::wordsUseSpacing(SwiftOmniUIObjectRef handle, bool usesSpacing) {
+    followLabel(borrow<controls::Border>(handle))->usesSpacing = usesSpacing;
+}
+void swiftomniui::followRichWordsLoaded(SwiftOmniUIObjectRef handle, controls::RichTextBlock const &rich) {
+    auto border = borrow<controls::Border>(handle);
+    auto data = followLabel(border);
+    rich.Loaded(guarded("completing an attached rich label's measurement",
+        [data, weak = winrt::make_weak(border)](IInspectable const &sender, xaml::RoutedEventArgs const &) {
+            if (auto border = weak.get())
+                invalidateWordsMeasurement(static_cast<SwiftOmniUIObjectRef>(winrt::get_abi(border)));
+            sender.as<xaml::UIElement>().InvalidateMeasure();
+            if (data->ready) data->ready(data->view);
+        }));
 }
 
 controls::TextBlock swiftomniui::wordsOf(IInspectable const &element) {
@@ -131,6 +195,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_text_make(void) {
         controls::Border label;
         label.Background(clearGround());
         label.Child(block);
+        followLabel(label);
         return detach(label);
     } catch (...) {
         report("making a label");
@@ -142,17 +207,9 @@ extern "C" void swiftomniui_winui_text_on_loaded(
     SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t)
 ) {
     try {
-        auto label = borrow<controls::Border>(handle);
-        xaml::RoutedEventHandler loaded = guarded("completing a loaded label's measurement",
-            [view, ready](IInspectable const &, xaml::RoutedEventArgs const &) {
-                if (ready) ready(view);
-            });
-        // Delegates implement IUnknown, not IInspectable, so do not box
-        // the handler in a ResourceDictionary. Retain the C callback cookie.
-        label.Resources().Insert(winrt::box_value(L"SwiftOmniUITextLoadedView"), winrt::box_value(view));
-        label.Resources().Insert(winrt::box_value(L"SwiftOmniUITextLoadedCallback"),
-            winrt::box_value(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(ready))));
-        label.Loaded(loaded);
+        auto data = followLabel(borrow<controls::Border>(handle));
+        data->view = view;
+        data->ready = ready;
     } catch (...) { report("following a label's native attachment"); }
 }
 

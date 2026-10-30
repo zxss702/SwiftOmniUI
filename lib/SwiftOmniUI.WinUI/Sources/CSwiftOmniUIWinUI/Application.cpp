@@ -462,6 +462,16 @@ extern "C" void swiftomniui_winui_post_turn(void) {
     turnQueued.store(false);
 }
 
+extern "C" bool swiftomniui_winui_post_metadata(void (*work)(void)) {
+    try {
+        if (auto dispatcher = dispatcherQueue()) {
+            return dispatcher.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
+                guarded("reading passive layout metadata", [work] { work(); }));
+        }
+    } catch (...) { report("posting passive layout metadata"); }
+    return false;
+}
+
 extern "C" void swiftomniui_winui_keep_scene_alive(bool alive) {
     if (!ownsMessageLoop) return;
     try {

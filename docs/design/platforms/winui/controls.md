@@ -18,6 +18,10 @@ System text-style sizes and weights are read through one native `TextBlock`
 per style, shared by text and symbol images. Applying a font to another row
 does not construct another temporary control. The reader checks the current
 application style resource, so replacing that resource still changes the font.
+The native font setter returns the size it accepted. A newly realized label
+uses that result instead of reading every typography and foreground property
+back just to obtain the size. Style inspection itself never synchronizes or
+rewrites a rich paragraph.
 
 A label is a `TextBlock` standing in a `Border`: a text block draws nothing
 behind its words and stands them at its top whatever its height, so the
@@ -33,6 +37,11 @@ reading `Text.LayoutKey` requests source-grapheme rectangles from the live text
 block's `TextPointer`s after layout. UTF-16 rectangles are joined into Swift
 graphemes; raised inline text is transformed back into the owning label's
 coordinates. Labels without a layout reader do no per-character geometry work.
+The core installs the `Text.LayoutKey` seed, origin anchor and report handlers
+only when a LayoutKey observer, transform or preference layer requests them.
+Unobserved text needs no preference folding or per-scroll position event;
+removing the reader retires the report handlers. Explicit
+frame, named-space, safe-area and drawing-size readers remain independent.
 `GetCharacterRect` supplies a zero-width caret, not a glyph rectangle. A source
 character's extent joins its leading forward-affinity caret and trailing
 backward-affinity caret; the latter stays on the preceding row at a soft wrap.

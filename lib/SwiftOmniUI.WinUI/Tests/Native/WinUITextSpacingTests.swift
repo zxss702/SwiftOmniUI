@@ -70,6 +70,22 @@ final class WinUITextSpacingTests: XCTestCase {
             label.setLineSpacing(12)
             label.prepareMeasure(width: 90)
             XCTAssertEqual(label.desiredSize, narrow)
+            // A paragraph can change while additive spacing is disabled.
+            // Re-enabling it must not reuse the former single-line decision
+            // for this width, including after a font change.
+            label.setLineSpacing(0)
+            label.setText("short")
+            label.setTextFont(size: 24, attributes: nil, family: nil)
+            label.setLineSpacing(12)
+            label.prepareMeasure(width: 90)
+            XCTAssertEqual(Self.lineHeight(label), 0)
+            let short = label.desiredSize.height
+            label.setLineSpacing(0)
+            label.setText("alpha beta gamma delta epsilon zeta")
+            label.setLineSpacing(12)
+            label.prepareMeasure(width: 90)
+            XCTAssertGreaterThan(Self.lineHeight(label), 0)
+            XCTAssertGreaterThan(label.desiredSize.height, short * 2)
         }
     }
 
