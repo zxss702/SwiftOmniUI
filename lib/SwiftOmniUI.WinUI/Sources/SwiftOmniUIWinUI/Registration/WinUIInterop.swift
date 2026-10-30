@@ -34,11 +34,23 @@ public protocol WinUIControl: AnyObject {
     /// change the size it asks its parent for. Viewport controls may return
     /// false: their native document layout changes inside the allocated room.
     var contentAffectsSize: Bool { get }
+
+    /// Opt in when the control owns a scrolling document. The native viewport
+    /// then extends beneath enclosing SafeBars/window chrome. Keep the reported
+    /// insets INSIDE the scrolling document, not as padding on its viewport.
+    var scrollsUnderSafeArea: Bool { get }
+
+    /// Remaining physical safe insets in DIPs, committed after the host layout
+    /// transaction. Insets replace the previous values; they are not cumulative.
+    /// The control retains ownership of its document, scrollbars and minimap.
+    func safeAreaInsetsDidChange(top: Double, right: Double, bottom: Double, left: Double)
 }
 
 extension WinUIControl {
     public var sizesToContentHeight: Bool { true }
     public var contentAffectsSize: Bool { true }
+    public var scrollsUnderSafeArea: Bool { false }
+    public func safeAreaInsetsDidChange(top: Double, right: Double, bottom: Double, left: Double) {}
 }
 
 /// The controls an application adds to this host - its own elements, each realized with a control of its own.

@@ -28,6 +28,19 @@ font/wrapping setting. These writes invalidate the host's cached proposals
 and prepare the native control again at its allocated width. Native XAML
 invalidation alone cannot refresh the Swift layout's preparation cache.
 
+A native document control can opt into `scrollsUnderSafeArea`. Its ordinary
+safe layout slot still determines parent arithmetic, while a native allocation
+boundary extends the actual control into the inherited unsafe bounds. The
+original control handle, input and focus identity are retained. Its live
+viewport is also a clean material capture boundary, like a host ScrollView.
+
+The host commits `safeAreaInsetsDidChange(top:right:bottom:left:)` after its
+layout transaction, replacing the previous physical DIP values. The application
+puts those insets in its **scrolling document**, not on the outer control or
+scroll viewport; it owns any indicator/minimap insets and safe caret reveal.
+This keeps initial content readable while allowing it to scroll beneath fixed
+chrome. Ordinary controls retain their existing safe placement by default.
+
 The application's relay reaches back through callbacks of its own, naming the
 control by a number its Swift half gave the element as it made it, held
 weakly by that number. A relay no C++ exception leaves, as the host's.

@@ -29,6 +29,26 @@ namespace composition = winrt::Microsoft::UI::Composition;
 using winrt::Windows::Foundation::Rect;
 
 namespace {
+    // Preserve the control handle and native input identity while allocating
+    // its viewport beyond the safe layout slot, as SOUI ScrollView does.
+    struct HostedViewport : controls::PanelT<HostedViewport> {
+        xaml::FrameworkElement control;
+        xaml::Thickness outsets{};
+        explicit HostedViewport(xaml::FrameworkElement const &element) : control(element) {
+            UseLayoutRounding(false);
+            Children().Append(control);
+            registerAcrylicScroller(control);
+        }
+        Size MeasureOverride(Size) { return {0, 0}; }
+        Size ArrangeOverride(Size final) {
+            const Size room{static_cast<float>(final.Width + outsets.Left + outsets.Right),
+                            static_cast<float>(final.Height + outsets.Top + outsets.Bottom)};
+            control.Measure(room);
+            control.Arrange({static_cast<float>(-outsets.Left), static_cast<float>(-outsets.Top), room.Width, room.Height});
+            return final;
+        }
+    };
+
     struct SwiftOmniUIPanel;
 
     // Use projected equality for every native child comparison. An unchanged
@@ -558,3 +578,19 @@ extern "C" void swiftomniui_winui_panel_watch_viewport(SwiftOmniUIObjectRef hand
     }
 }
 
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_hosted_viewport_make(SwiftOmniUIObjectRef control) {
+    try { return detach(winrt::make<HostedViewport>(as<xaml::FrameworkElement>(control)).as<controls::Panel>()); }
+    catch (...) { report("making a native scrolling control's allocation boundary"); return nullptr; }
+}
+
+extern "C" void swiftomniui_winui_hosted_viewport_set(
+    SwiftOmniUIObjectRef handle, double top, double right, double bottom, double left
+) {
+    try {
+        auto viewport = winrt::get_self<HostedViewport>(as<xaml::IFrameworkElementOverrides>(handle));
+        const xaml::Thickness next{left, top, right, bottom};
+        if (viewport->outsets == next) return;
+        viewport->outsets = next;
+        viewport->InvalidateArrange();
+    } catch (...) { report("allocating a native scrolling control beneath safe chrome"); }
+}
