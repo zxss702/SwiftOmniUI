@@ -55,4 +55,39 @@ final class ChildMeasureTests: XCTestCase {
         XCTAssertEqual(size.width, 30)
         XCTAssertEqual(size.height, 40)
     }
+
+    func testNestedViewportFrameKeepsItsBoundThroughContainingStacks() {
+        var frame = LayoutValues()
+        frame.scrollAxes = .vertical
+        frame.maximumHeight = 256
+        let bounded = frame.sized(LayoutSize(width: 320, height: 10), offered: 320)
+        XCTAssertEqual(bounded.height, 256,
+                       "an outer ScrollView's unspecified height must not erase a bounded inner viewport")
+
+        var stack = LayoutValues()
+        stack.scrollAxes = .vertical
+        let withHeader = LayoutSize(width: bounded.width, height: bounded.height + 24)
+        XCTAssertEqual(stack.sized(withHeader, offered: 320), withHeader,
+                       "inherited scroll axes describe flexibility, not native viewport identity")
+
+        frame.maximumHeight = 128
+        XCTAssertEqual(frame.sized(bounded, offered: 320).height, 128)
+        frame.height = 64
+        XCTAssertEqual(frame.sized(bounded, offered: 320).height, 64)
+    }
+
+    func testHorizontalViewportAndContainingFrameKeepDistinctIdealSizes() {
+        var viewport = LayoutValues()
+        viewport.isScrollViewport = true
+        viewport.scrollAxes = .horizontal
+        XCTAssertEqual(viewport.sized(LayoutSize(width: 40_000, height: 48)).width, 10)
+        XCTAssertEqual(viewport.sized(LayoutSize(width: 40_000, height: 48), offered: 120).width, 120)
+
+        var frame = viewport
+        frame.isScrollViewport = false
+        frame.maximumWidth = 192
+        XCTAssertEqual(frame.sized(LayoutSize(width: 10, height: 48)).width, 192)
+        frame.maximumWidth = nil
+        XCTAssertEqual(frame.sized(LayoutSize(width: 96, height: 48)).width, 96)
+    }
 }

@@ -322,11 +322,14 @@ a runtime calls after it reports the locale) - and nothing else.
 
 ## Scrolling
 
-A horizontal viewport accepts the finite width its parent offers. Only an
-unbounded width query reports zero along the scrolling axis; the document's
-width is not the viewport's ideal width. This also holds when the viewport is
-wrapped in a frame or used as a native button's label: returning zero for a
-finite proposal would collapse the content and its input area.
+A viewport accepts a finite proposal along its scrolling axis. An unspecified
+axis asks for its ideal extent (10 DIPs), rather than zero or the entire
+document. A finite maximum frame supplies a bounded viewport even inside
+another ScrollView. Scroll axes travel through stacks and frames to keep
+viewport allocation flexible, but viewport identity does not: those containers
+keep the heights and widths they measure from their children. In particular,
+an outer lazy row must not erase a nested scroller's bounded height. Safe-bar
+intrinsic thickness still sizes to content along that bar's edge axis.
 
 A scroller's content is held to the scroller's width when it scrolls only
 down, or not at all, and offered no width when it scrolls across, where its
