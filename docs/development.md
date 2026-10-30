@@ -5,15 +5,15 @@
 ```text
 Package.swift                      all SwiftOmniUI targets, products and test entry points
 Sources/SwiftOmniUI/             the facade `import SwiftOmniUI` lands on
-lib/SwiftOmniUI/Sources/               platform-neutral SwiftOmniUI core
-lib/SwiftOmniUI/Tests/                 core tests and shared test support
-lib/SwiftOmniUI.Host/                  the host layer every host stands on, and its tests
-lib/SwiftOmniUI.Conformance/           the conformance suite every host's tests run
-lib/SwiftOmniUI.Android/               Android Views host target, its Java layer and tests
-lib/SwiftOmniUI.WinUI/                 WinUI host target, its C++/WinRT relay and tests
-lib/SwiftOmniUI.GTK/                   GTK host target, Swift over GTK's C API, and tests
-lib/SwiftOmniUI.Web/                   Web host target over WebAssembly
-lib/SwiftOmniUI.VSCode/                the editor extension
+lib/SwiftOmniUI/Core/Sources/               platform-neutral SwiftOmniUI core
+lib/SwiftOmniUI/Core/Tests/                 core tests and shared test support
+lib/SwiftOmniUI/SwiftOmniUI.Host/                  the host layer every host stands on, and its tests
+lib/SwiftOmniUI/SwiftOmniUI.Conformance/           the conformance suite every host's tests run
+lib/SwiftOmniUI/SwiftOmniUI.Android/               Android Views host target, its Java layer and tests
+lib/SwiftOmniUI/SwiftOmniUI.WinUI/                 WinUI host target, its C++/WinRT relay and tests
+lib/SwiftOmniUI/SwiftOmniUI.GTK/                   GTK host target, Swift over GTK's C API, and tests
+lib/SwiftOmniUI/SwiftOmniUI.Web/                   Web host target over WebAssembly
+lib/SwiftOmniUI/SwiftOmniUI.VSCode/                the editor extension
 .scripts/Android/                  Android Views builds, runs, devices and tests
 .scripts/WinUI/                    WinUI builds, runs and tests, and the Windows App SDK
 .scripts/GTK/                      GTK builds and runs
@@ -51,7 +51,7 @@ declares no platform host target and compiles no line of one host's half, and a
 `Platforms/GTK/` folder needs no condition inside it.
 
 The host's own scripts set the variable for a build. The editor gets it from
-the SwiftOmniUI extension (`lib/SwiftOmniUI.VSCode`):
+the SwiftOmniUI extension (`lib/SwiftOmniUI/SwiftOmniUI.VSCode`):
 choosing GTK in its status bar sets the variable for the Swift language
 server and restarts it, which then resolves `Platforms/GTK` and completes the
 code inside `#if GTK`, with no window reload. A
@@ -108,7 +108,7 @@ Treat one control, property, event, or host action as one vertical change:
 7. Let the host say what it realizes, only after its tests pass. A member a
    registration takes or raises records itself: with `SWIFTOMNIUI_UPDATE_EXPORTS=1`,
    `SWIFTOMNIUI_HOST=gtk swift test --filter SwiftOmniUIGTKTests` and
-   `.scripts/Android/test-android.sh <serial>` write `exports/gtk.txt` and
+   `.scripts/Android/test-android.sh <serial>` write `lib/SwiftOmniUI/exports/gtk.txt` and
    `android.txt`, and the contracts name each member's owner when the
    documents are rendered. What a registry cannot know stays written by hand,
    in `GTKRealization` and `AndroidRealization` - every judgement: a partial
@@ -130,7 +130,7 @@ Build the smaller example as a GTK application:
 SWIFTOMNIUI_HOST=gtk swift build --package-path apps/HelloWorld --product HelloWorldGTK
 ```
 
-In VS Code, the SwiftOmniUI extension (`lib/SwiftOmniUI.VSCode`) runs either
+In VS Code, the SwiftOmniUI extension (`lib/SwiftOmniUI/SwiftOmniUI.VSCode`) runs either
 application: "SwiftOmniUI: Debug" and "SwiftOmniUI: Release" build and start the one
 chosen in its status bar, on the host chosen there; installing it is under
 [Working in VS Code](getting-started.md#working-in-vs-code).
@@ -249,7 +249,7 @@ An application's other dynamic dependencies still require actual link and runtim
 verification before claiming that a process has one copy of a protocol.
 
 A release has one version, stated in the editor extension's
-`lib/SwiftOmniUI.VSCode/package.json`. Every other place that names it - the
+`lib/SwiftOmniUI/SwiftOmniUI.VSCode/package.json`. Every other place that names it - the
 published-package line in each application `Package.swift`, each Android head's
 version, the bug report's example - names the same one, and
 `ReleaseTests` holds them to it.

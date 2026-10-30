@@ -1,7 +1,7 @@
 # SwiftOmniUI handbook
 
 This handbook is the complete conceptual guide to the current SwiftOmniUI model.
-The declarations in `lib/SwiftOmniUI/Sources` are the API reference, the Gallery
+The declarations in `lib/SwiftOmniUI/Core/Sources` are the API reference, the Gallery
 exercises the contract, and the platform matrix records which native hosts have
 proved each part.
 
@@ -108,7 +108,7 @@ SwiftOmniUI uses one source for each kind of question:
 | Question | Source |
 | --- | --- |
 | What SwiftOmniUI means | this handbook and public `///` documentation |
-| What an application can spell | public declarations in `lib/SwiftOmniUI/Sources` |
+| What an application can spell | public declarations in `lib/SwiftOmniUI/Core/Sources` |
 | What crosses a host boundary | the element contracts and [Host contract](internals/host-contract.md) |
 | What a particular host implements | [Platform contract](platform-contract.md) and the [control dictionary](controls/README.md) |
 | What works as visible behavior | the native Gallery |

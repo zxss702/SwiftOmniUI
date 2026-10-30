@@ -41,10 +41,10 @@ equivalent - `ItemsView`, `SplitView`, `Dialogs.openFiles` - lands internal or
 
 ## Keep the core platform-neutral
 
-Code under `lib/SwiftOmniUI/Sources` and `lib/SwiftOmniUI.Host/Sources` does not
+Code under `lib/SwiftOmniUI/Core/Sources` and `lib/SwiftOmniUI/SwiftOmniUI.Host/Sources` does not
 import Foundation or a platform UI framework. Each host is a sibling package of
-its own - `lib/SwiftOmniUI.Android`, `lib/SwiftOmniUI.WinUI`,
-`lib/SwiftOmniUI.GTK`, `lib/SwiftOmniUI.Web` - standing on the host layer, with its build in
+its own - `lib/SwiftOmniUI/SwiftOmniUI.Android`, `lib/SwiftOmniUI/SwiftOmniUI.WinUI`,
+`lib/SwiftOmniUI/SwiftOmniUI.GTK`, `lib/SwiftOmniUI/SwiftOmniUI.Web` - standing on the host layer, with its build in
 `.scripts/<Platform>`. Swift written for one host alone stands under that
 host's condition - `#if ANDROID`, `#if WINUI`, `#if GTK`, `#if WEB` - which
 its builds define.

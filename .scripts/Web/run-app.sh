@@ -68,7 +68,7 @@ products="$(SWIFTOMNIUI_HOST=web swift build --package-path "$app_dir" --scratch
 rm -rf "$site"
 mkdir -p "$site"
 cp "$products/$product.wasm" "$site/"
-cp "$checkout/lib/SwiftOmniUI.Web/JavaScript/swiftomniui-web.js" "$checkout/lib/SwiftOmniUI.Web/JavaScript/swiftomniui-web.css" "$site/"
+cp "$checkout/lib/SwiftOmniUI/SwiftOmniUI.Web/JavaScript/swiftomniui-web.js" "$checkout/lib/SwiftOmniUI/SwiftOmniUI.Web/JavaScript/swiftomniui-web.css" "$site/"
 stamp="$(date +%s)"
 # The application's own scripts - the custom elements its controls show - beside the page, each loaded before it.
 scripts=""
@@ -81,7 +81,7 @@ if [[ -d "$app_dir/Platforms/Web/Page" ]]; then
 fi
 sed -e "s/{{application}}/$application/g" -e "s/{{module}}/$product.wasm/g" -e "s/{{stamp}}/$stamp/g" \
   -e "s#{{scripts}}#$scripts#" \
-  "$checkout/lib/SwiftOmniUI.Web/JavaScript/index.html" > "$site/index.html"
+  "$checkout/lib/SwiftOmniUI/SwiftOmniUI.Web/JavaScript/index.html" > "$site/index.html"
 if [[ -d "$app_dir/Resources/Images" ]]; then
   mkdir -p "$site/Images"
   cp -R "$app_dir/Resources/Images/." "$site/Images/"

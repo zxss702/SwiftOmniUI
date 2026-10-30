@@ -1,4 +1,4 @@
-<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
+<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under lib/SwiftOmniUI/exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
 
 # ZStack
 
@@ -30,7 +30,7 @@ See [the dictionary](README.md) for how a mark is given.
 | GTK 4 | ❌ | 16 ✅ · 14 – | `GtkFixed` | [0.0, 0.0, 60.0, 40.0] expected, [0.0, 0.0, 20.0, 20.0] came - the whole room |
 | Web |  |  | `position: absolute` | no host yet |
 
-Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Layouts/ZStackContract.swift`.
+Declared in `lib/SwiftOmniUI/Core/Sources/Contracts/Elements/Layouts/ZStackContract.swift`.
 
 ## ZStack's own members
 

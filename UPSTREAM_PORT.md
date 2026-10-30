@@ -1,7 +1,7 @@
 # Upstream selective port — progress & handoff
 
 摘取式合并（不做整体 merge，见 AGENTS.md「Upstream merges are cherry-picks, not merges」）。
-全部工作已提交于 `8e765f394`（另加未提交的 `lib/SwiftOmniUI.Web/Package.swift` floor 降级）。
+全部工作已提交于 `8e765f394`（另加未提交的 `lib/SwiftOmniUI/SwiftOmniUI.Web/Package.swift` floor 降级）。
 
 ## 已完成
 
@@ -46,7 +46,7 @@ scroll/list 60 帧 settle、`place(of:)`/`focused`/`scrollHolds` driver acts、
   `SwiftOmniUIMenus.popup`、`JavaAPI.swift` 全套 JNI 绑定。
 - 待做：Swift 侧成员接线 + **Map/Pin 全家** + acts
   （`localizedString`/`moveToRegion`/`scrollToDescendant`/`persistSceneValue`/文件 acts）
-  + Lazy 成员注册管线核查（`exports/android.txt` 可能是旧快照）。
+  + Lazy 成员注册管线核查（`lib/SwiftOmniUI/exports/android.txt` 可能是旧快照）。
 
 ### Web 宿主未覆盖项（我们的增量，上游没有）
 
@@ -54,7 +54,7 @@ scroll/list 60 帧 settle、`place(of:)`/`focused`/`scrollHolds` driver acts、
   `matchedGeometry`/`symbolEffect`/`controlSize`/`flex`/`tag`
   （Web 的 `VisualElementContract` 只覆盖 7 个成员）；
   `Masked`/`CustomLayout`/`ModalStack`/`Popover`/`Sheet`/`FileImporter` 等 → 进 `unrealized` 报告。
-- WASM 编译未验证（Swift SDK 已装：`swift build --swift-sdk` in `lib/SwiftOmniUI.Web`）。
+- WASM 编译未验证（Swift SDK 已装：`swift build --swift-sdk` in `lib/SwiftOmniUI/SwiftOmniUI.Web`）。
 
 ## 验证待办
 
@@ -62,7 +62,7 @@ scroll/list 60 帧 settle、`place(of:)`/`focused`/`scrollHolds` driver acts、
 - [ ] GTK exports 再生后复测（VM: `SWIFTOMNIUI_UPDATE_EXPORTS=1 xvfb-run -a swift test`）
 - [ ] `SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests`（core）
 - [ ] GTK VM 环境需 `libwebkitgtk-6.0-dev` + `fonts-ubuntu` + `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1`（webview 测试）
-- [ ] `exports/`、`exports/marks/`、`docs/controls/` 再生产物提交
+- [ ] `lib/SwiftOmniUI/exports/`、`lib/SwiftOmniUI/exports/marks/`、`docs/controls/` 再生产物提交
 
 ## 后续（明确排在迁移之后）
 

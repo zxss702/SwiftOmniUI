@@ -84,7 +84,7 @@ build_head () {
     --project-cache-dir "$build/gradle-project" \
     --console=plain --quiet \
     -Pswiftomniui.build="$build/gradle" \
-    -Pswiftomniui.java="$repository_dir/lib/SwiftOmniUI.Android/Java" \
+    -Pswiftomniui.java="$repository_dir/lib/SwiftOmniUI/SwiftOmniUI.Android/Java" \
     -Pswiftomniui.libraries="$build/jniLibs" \
     -Pswiftomniui.assets="$build/assets" \
     -Pswiftomniui.res="$build/res" \

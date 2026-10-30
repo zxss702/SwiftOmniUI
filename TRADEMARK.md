@@ -50,7 +50,7 @@ that changes them is rebranded:
 
 - the `Package.swift` manifests - the Swift module names, which is what
   `import SwiftOmniUI` reads.
-- `lib/SwiftOmniUI/Sources/Bridge/Exports.swift` - the `@_cdecl("swiftomniui_…")` names.
+- `lib/SwiftOmniUI/Core/Sources/Bridge/Exports.swift` - the `@_cdecl("swiftomniui_…")` names.
   They are the C ABI between the Swift library and a host written in another
   language, so a fork that does not also fork such a host can leave them alone.
 

@@ -11,7 +11,7 @@ which, member by member - and shows any other control's name in red where the co
 belongs, so a gap is visible rather than silent.
 
 ```text
-lib/SwiftOmniUI.Android/
+lib/SwiftOmniUI/SwiftOmniUI.Android/
   Sources/SwiftOmniUIAndroid/    the host: its runtime, elements, registrations, layout and JNI
   Sources/CSwiftOmniUIAndroid/   the NDK's C surface: JNI, the looper, the log
   Java/swiftomniui/android/      the Java layer: the activity, the layout view group, the frame callback, the listener

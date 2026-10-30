@@ -1,4 +1,4 @@
-<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
+<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under lib/SwiftOmniUI/exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
 
 # Switch
 
@@ -30,7 +30,7 @@ See [the dictionary](README.md) for how a mark is given.
 | GTK 4 | ✅ | 21 ✅ · 11 – | `GtkSwitch` |  |
 | Web |  |  | checkbox `<input>` with `role=switch` | no host yet |
 
-Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Controls/SwitchContract.swift`.
+Declared in `lib/SwiftOmniUI/Core/Sources/Contracts/Elements/Controls/SwitchContract.swift`.
 
 ## Switch's own members
 

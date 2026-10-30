@@ -1,4 +1,4 @@
-<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
+<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under lib/SwiftOmniUI/exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
 
 # Masked
 
@@ -30,7 +30,7 @@ See [the dictionary](README.md) for how a mark is given.
 | GTK 4 | ✅ | 17 ✅ · 14 – | `GskMaskNode` over the content child |  |
 | Web |  |  | CSS `mask-image` | no host yet |
 
-Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Layouts/MaskedContract.swift`.
+Declared in `lib/SwiftOmniUI/Core/Sources/Contracts/Elements/Layouts/MaskedContract.swift`.
 
 ## Masked's own members
 

@@ -23,26 +23,26 @@ the package and its targets, what crosses between them, and where each part of t
         |
         |  @_spi(Host)
         v
-  SwiftOmniUIHost  (lib/SwiftOmniUI.Host, a target)
+  SwiftOmniUIHost  (lib/SwiftOmniUI/SwiftOmniUI.Host, a target)
     Sources                               the host layer every host stands on
         |
         |  typed HostRender / HostPatch
         v
-  SwiftOmniUI.Web (lib/SwiftOmniUI.Web)                SwiftOmniUI.Android (lib/SwiftOmniUI.Android)
+  SwiftOmniUI.Web (lib/SwiftOmniUI/SwiftOmniUI.Web)                SwiftOmniUI.Android (lib/SwiftOmniUI/SwiftOmniUI.Android)
     Swift, compiled to WebAssembly, in the       Swift, in the application's process,
     page's own process                           Java beneath it through JNI
         |                                             |
         v                                             v
     DOM elements                                Android views
 
-  SwiftOmniUI.WinUI (lib/SwiftOmniUI.WinUI)            SwiftOmniUI.GTK (lib/SwiftOmniUI.GTK)
+  SwiftOmniUI.WinUI (lib/SwiftOmniUI/SwiftOmniUI.WinUI)            SwiftOmniUI.GTK (lib/SwiftOmniUI/SwiftOmniUI.GTK)
     Swift, in the application's process,         Swift, in the application's process,
     C++/WinRT beneath it behind a C ABI          over GTK 4's and libadwaita's C API
         |                                             |
         v                                             v
     WinUI 3 elements                              GTK widgets
 
-  lib/SwiftOmniUI.VSCode                      the editor extension: new application,
+  lib/SwiftOmniUI/SwiftOmniUI.VSCode                      the editor extension: new application,
                                           build, run and debug for every head
 ```
 

@@ -4,7 +4,7 @@
 #
 # Runs the GTK host's suite. A run with SWIFTOMNIUI_UPDATE_EXPORTS=1 writes each
 # verdict file under the revision its family stands at
-# (lib/SwiftOmniUI.Conformance/revisions.txt); SWIFTOMNIUI_STALE_ONLY=1 runs only the
+# (lib/SwiftOmniUI/SwiftOmniUI.Conformance/revisions.txt); SWIFTOMNIUI_STALE_ONLY=1 runs only the
 # conformance families whose verdicts stand at another revision, or at none.
 #
 # USAGE:

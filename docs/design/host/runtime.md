@@ -3,7 +3,7 @@
 A runtime is the part of a host that turns the core's patches and cycles into
 native views, and turns what the user does back into state. Every runtime has
 the same elements, one job each, named alike in every language. The
-toolkit-neutral elements are the host layer, `lib/SwiftOmniUI.Host` - the module
+toolkit-neutral elements are the host layer, `lib/SwiftOmniUI/SwiftOmniUI.Host` - the module
 `SwiftOmniUIHost`, which reaches the core through `@_spi(Host)` - and every host,
 Swift in the application's process, uses them as they are. Its folders are
 its parts; [the host layer](../../internals/host-layer.md) maps them.
@@ -14,12 +14,12 @@ its parts; [the host layer](../../internals/host-layer.md) maps them.
   application              views, @State, handlers, engines
        |
        v
-  SwiftOmniUI core             state, keys, diffing, timing laws        lib/SwiftOmniUI/Sources
+  SwiftOmniUI core             state, keys, diffing, timing laws        lib/SwiftOmniUI/Core/Sources
        |                   HostRender / HostPatch (typed)
        v
   host layer               CoreLink        PatchIntake
   SwiftOmniUIHost             MountedTree     MountedElement
-  lib/SwiftOmniUI.Host         Animator        StateChannels
+  lib/SwiftOmniUI/SwiftOmniUI.Host         Animator        StateChannels
                            DescribedMotion LayoutMotion
                            DisplayCycle    ProgramWrite
                            Pump            HandlerDispatch
@@ -27,10 +27,10 @@ its parts; [the host layer](../../internals/host-layer.md) maps them.
        v
   toolkit half             frame signal, each element's native half,
   one target per host     realizations, layout views, scrolling, gestures,
-  (lib/SwiftOmniUI.Android,    focus, accessibility, windows and menus
-  lib/SwiftOmniUI.WinUI,
-  lib/SwiftOmniUI.GTK,
-  lib/SwiftOmniUI.Web)
+  (lib/SwiftOmniUI/SwiftOmniUI.Android,    focus, accessibility, windows and menus
+  lib/SwiftOmniUI/SwiftOmniUI.WinUI,
+  lib/SwiftOmniUI/SwiftOmniUI.GTK,
+  lib/SwiftOmniUI/SwiftOmniUI.Web)
        |
        v
   native views

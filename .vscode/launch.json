@@ -1,6 +1,6 @@
 {
   // Debugging SwiftOmniUI's applications - through the SwiftOmniUI extension,
-  // lib/SwiftOmniUI.VSCode (install artifacts/swiftomniui-*.vsix, built by `npm run package`).
+  // lib/SwiftOmniUI/SwiftOmniUI.VSCode (install artifacts/swiftomniui-*.vsix, built by `npm run package`).
   //
   // "SwiftOmniUI: Debug" and "SwiftOmniUI: Release" are the whole of it. The extension's
   // status bar chooses:

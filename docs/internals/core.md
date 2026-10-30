@@ -1,6 +1,6 @@
 # SwiftOmniUI core
 
-The core is the `SwiftOmniUI` target, in `lib/SwiftOmniUI/Sources`, exposed by
+The core is the `SwiftOmniUI` target, in `lib/SwiftOmniUI/Core/Sources`, exposed by
 an ordinary library product from the root package. Every host depends on that
 target directly. It imports no
 Foundation and no platform framework, depends on no package and exports no C
@@ -48,7 +48,7 @@ decides again; one concept has one owner, one spelling and one source:
   ([One process, one host](host-contract.md#one-process-one-host))
 
 ```text
-lib/SwiftOmniUI/Sources/
+lib/SwiftOmniUI/Core/Sources/
   Views/         what an application writes
     Structure/ Navigation/ Menus/   the application, its pages, their furniture
     Tiers/ Mixins/ Bindings/        tier protocols, modifiers, carried twins
@@ -531,7 +531,7 @@ force ([values a host is handed](host-contract.md#values-a-host-is-handed)).
 
 ## Testing
 
-The core's suite, `lib/SwiftOmniUI/Tests`, is `swift test` at the repository
+The core's suite, `lib/SwiftOmniUI/Core/Tests`, is `swift test` at the repository
 root. It needs no toolkit, runs on every platform the core builds on, and
 asserts on the typed patch a host is handed, by the rule each case keeps,
 never against a stored copy
@@ -561,7 +561,7 @@ never against a stored copy
 - **The host layer's suite**, `swift test --filter SwiftOmniUIHostTests`,
   proves its rules with no toolkit, the core's `HostMotionLaw` among them
   (`MotionLawTests`). ([Testing](host-layer.md#testing))
-- **The conformance suite**, `lib/SwiftOmniUI.Conformance`, proves the contract's
+- **The conformance suite**, `lib/SwiftOmniUI/SwiftOmniUI.Conformance`, proves the contract's
   effects through every host's driver; its own tests prove the runner and that
   every member has its case (`ContractCompletenessTests`).
   ([Conformance](../design/host/conformance.md))

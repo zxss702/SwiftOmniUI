@@ -1,6 +1,6 @@
 # Values an application passes
 
-`lib/SwiftOmniUI/Sources/Types` holds the values an application hands to SwiftOmniUI:
+`lib/SwiftOmniUI/Core/Sources/Types` holds the values an application hands to SwiftOmniUI:
 colours, insets, rectangles, brushes, animation, transforms, placements, dates
 and times, gestures, the closed vocabularies, and the objects that carry what
 the host knows. Each value says how it crosses to a host and how it comes

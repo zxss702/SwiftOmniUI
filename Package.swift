@@ -50,20 +50,20 @@ var targets: [Target] = [
         // by an application only through the facade above.
         .target(
             name: "SwiftOmniUICore",
-            path: "lib/SwiftOmniUI/Sources",
+            path: "lib/SwiftOmniUI/Core/Sources",
             swiftSettings: settings
         ),
         .target(
             name: "SwiftOmniUIHost",
             dependencies: ["SwiftOmniUICore"],
-            path: "lib/SwiftOmniUI.Host/Sources",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Host/Sources",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
         .target(
             name: "SwiftOmniUIFoundation",
             dependencies: ["SwiftOmniUICore",
                 .target(name: "SwiftOmniUINetworking", condition: .when(platforms: [.linux]))],
-            path: "lib/SwiftOmniUI.Foundation/Sources",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Foundation/Sources",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
         .target(
@@ -73,20 +73,20 @@ var targets: [Target] = [
                 .product(name: "NIOCore", package: "swift-nio", condition: .when(platforms: [.linux])),
                 .product(name: "NIOHTTP1", package: "swift-nio", condition: .when(platforms: [.linux])),
             ],
-            path: "lib/SwiftOmniUI.Networking/Sources",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Networking/Sources",
             swiftSettings: settings
         ),
         .target(
             name: "SwiftOmniUIConformance",
             dependencies: ["SwiftOmniUICore",
                 "SwiftOmniUIHost"],
-            path: "lib/SwiftOmniUI.Conformance/Sources",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Conformance/Sources",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
         .target(
             name: "SwiftOmniUIHead",
             dependencies: host.map { [.target(name: "SwiftOmniUI\($0)")] } ?? [],
-            path: "lib/SwiftOmniUI.Head/Sources",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Head/Sources",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
             // A WinUI head is a windowed application: started by itself it opens no console, and started from one it
             // writes there. A Web head's module exports its function table, through which the page calls the host
@@ -107,24 +107,24 @@ var targets: [Target] = [
 if selectedHost != "Android" && selectedHost != "Web" {
     targets += [
         .testTarget(name: "SwiftOmniUITests", dependencies: ["SwiftOmniUICore"],
-            path: "lib/SwiftOmniUI/Tests", swiftSettings: settings),
+            path: "lib/SwiftOmniUI/Core/Tests", swiftSettings: settings),
         .testTarget(
             name: "SwiftOmniUIHostTests",
             dependencies: ["SwiftOmniUIHost", "SwiftOmniUICore"],
-            path: "lib/SwiftOmniUI.Host/Tests",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Host/Tests",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
         .testTarget(
             name: "SwiftOmniUIFoundationTests",
             dependencies: ["SwiftOmniUIFoundation"],
-            path: "lib/SwiftOmniUI.Foundation/Tests",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Foundation/Tests",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
         .testTarget(
             name: "SwiftOmniUIConformanceTests",
             dependencies: ["SwiftOmniUIConformance", "SwiftOmniUICore",
                 "SwiftOmniUIHost"],
-            path: "lib/SwiftOmniUI.Conformance/Tests",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Conformance/Tests",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
     ]
@@ -139,12 +139,12 @@ case "GTK"?:
     targets += [
         .systemLibrary(name: "CFreeType", path: "lib/NativeFont.FT", pkgConfig: "freetype2"),
         .systemLibrary(name: "CNativeFontShaping", path: "lib/NativeFont.Shaping", pkgConfig: "pangocairo"),
-        .systemLibrary(name: "CSwiftOmniUIGTK", path: "lib/SwiftOmniUI.GTK/Sources/CSwiftOmniUIGTK", pkgConfig: "libadwaita-1"),
+        .systemLibrary(name: "CSwiftOmniUIGTK", path: "lib/SwiftOmniUI/SwiftOmniUI.GTK/Sources/CSwiftOmniUIGTK", pkgConfig: "libadwaita-1"),
         .target(
             name: "SwiftOmniUIGTK",
             dependencies: ["CSwiftOmniUIGTK", "CFreeType", "CNativeFontShaping", "SwiftOmniUICore",
                 "SwiftOmniUIHost"],
-            path: "lib/SwiftOmniUI.GTK/Sources/SwiftOmniUIGTK",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.GTK/Sources/SwiftOmniUIGTK",
             resources: [.copy("Resources/Icons")],
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
             // The fonts an application registers are fontconfig's; the font map told they changed is pangoft2's.
@@ -160,7 +160,7 @@ case "GTK"?:
                 "SwiftOmniUIConformance",
                 "SwiftOmniUIWebViewGTK",
             ],
-            path: "lib/SwiftOmniUI.GTK/Tests",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.GTK/Tests",
             exclude: ["Resources"],
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
@@ -183,7 +183,7 @@ case "WinUI"?:
     targets += [
         .target(
             name: "CSwiftOmniUIWinUI",
-            path: "lib/SwiftOmniUI.WinUI/Sources/CSwiftOmniUIWinUI",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.WinUI/Sources/CSwiftOmniUIWinUI",
             cxxSettings: [.headerSearchPath("../../.projection")],
             // An SVG is handed to WinUI from memory; a zone's offset is ICU's, and the kept values stand in the
             // user's local data; a canvas draws with Direct2D and DirectWrite on a Direct3D device.
@@ -197,7 +197,7 @@ case "WinUI"?:
             name: "SwiftOmniUIWinUI",
             dependencies: ["CSwiftOmniUIWinUI", "SwiftOmniUICore",
                 "SwiftOmniUIHost"],
-            path: "lib/SwiftOmniUI.WinUI/Sources/SwiftOmniUIWinUI",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.WinUI/Sources/SwiftOmniUIWinUI",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
         .testTarget(
@@ -210,7 +210,7 @@ case "WinUI"?:
                 "SwiftOmniUIJsonData",
                 .product(name: "JsonData", package: "JsonData"),
             ],
-            path: "lib/SwiftOmniUI.WinUI/Tests",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.WinUI/Tests",
             // The pictures a test shows, read from where they stand rather than bundled.
             exclude: ["Resources"],
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
@@ -218,7 +218,7 @@ case "WinUI"?:
         .target(
             name: "CWebViewWinUI",
             path: "lib/Backends/WebView.WinUI/Relay",
-            cxxSettings: [.unsafeFlags(["-I", Context.packageDirectory + "/lib/SwiftOmniUI.WinUI/.projection"])],
+            cxxSettings: [.unsafeFlags(["-I", Context.packageDirectory + "/lib/SwiftOmniUI/SwiftOmniUI.WinUI/.projection"])],
             linkerSettings: [.linkedLibrary("shcore"), .linkedLibrary("shlwapi")]
         ),
         .target(
@@ -240,14 +240,14 @@ case "Android"?:
     targets += [
         .target(
             name: "CSwiftOmniUIAndroid",
-            path: "lib/SwiftOmniUI.Android/Sources/CSwiftOmniUIAndroid",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Android/Sources/CSwiftOmniUIAndroid",
             linkerSettings: [.linkedLibrary("android"), .linkedLibrary("log")]
         ),
         .target(
             name: "SwiftOmniUIAndroid",
             dependencies: ["CSwiftOmniUIAndroid", "SwiftOmniUICore",
                 "SwiftOmniUIHost"],
-            path: "lib/SwiftOmniUI.Android/Sources/SwiftOmniUIAndroid",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Android/Sources/SwiftOmniUIAndroid",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
         .target(
@@ -258,7 +258,7 @@ case "Android"?:
                 "SwiftOmniUIHost",
                 "SwiftOmniUIConformance",
             ],
-            path: "lib/SwiftOmniUI.Android/Tests/Sources",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Android/Tests/Sources",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
     ]
@@ -267,15 +267,15 @@ case "Web"?:
         .library(name: "SwiftOmniUIWeb", targets: ["SwiftOmniUIWeb"]),
     ]
     targets += [
-        .systemLibrary(name: "CSwiftOmniUIWeb", path: "lib/SwiftOmniUI.Web/Sources/CSwiftOmniUIWeb"),
+        .systemLibrary(name: "CSwiftOmniUIWeb", path: "lib/SwiftOmniUI/SwiftOmniUI.Web/Sources/CSwiftOmniUIWeb"),
         .target(
             name: "SwiftOmniUIWeb",
             dependencies: ["CSwiftOmniUIWeb", "SwiftOmniUICore",
                 "SwiftOmniUIHost"],
-            path: "lib/SwiftOmniUI.Web/Sources/SwiftOmniUIWeb",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Web/Sources/SwiftOmniUIWeb",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
-        .systemLibrary(name: "CWebTesting", path: "lib/SwiftOmniUI.Web/Testing/Sources/CWebTesting"),
+        .systemLibrary(name: "CWebTesting", path: "lib/SwiftOmniUI/SwiftOmniUI.Web/Testing/Sources/CWebTesting"),
         .testTarget(
             name: "SwiftOmniUIWebTests",
             dependencies: [
@@ -283,7 +283,7 @@ case "Web"?:
                 "SwiftOmniUIHost", "SwiftOmniUICore",
                 "SwiftOmniUIConformance",
             ],
-            path: "lib/SwiftOmniUI.Web/Testing/Tests",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.Web/Testing/Tests",
             exclude: ["Resources"],
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
             // The stack a Web head links with: 8 MB, first in memory (docs/design/platforms/web/runtime.md#the-stack).
@@ -309,7 +309,7 @@ targets += [
             // The same ordinary JsonData product applications consume.
             .product(name: "JsonData", package: "JsonData"),
         ],
-        path: "lib/SwiftOmniUI.JsonData/Sources",
+        path: "lib/SwiftOmniUI/SwiftOmniUI.JsonData/Sources",
         swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
     ),
 ]
@@ -318,7 +318,7 @@ if selectedHost != "Android" && selectedHost != "Web" {
         .testTarget(
             name: "SwiftOmniUIJsonDataTests",
             dependencies: ["SwiftOmniUIJsonData"],
-            path: "lib/SwiftOmniUI.JsonData/Tests",
+            path: "lib/SwiftOmniUI/SwiftOmniUI.JsonData/Tests",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),
     ]

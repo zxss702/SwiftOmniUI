@@ -1,4 +1,4 @@
-<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
+<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under lib/SwiftOmniUI/exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
 
 # PaddingElement
 
@@ -8,7 +8,7 @@ Wears: [VisualElement](VisualElement.md)
 
 Worn by: [Button](../Button.md) · [CustomLayout](../CustomLayout.md) · [Grid](../Grid.md) · [GridRow](../GridRow.md) · [HStack](../HStack.md) · [LazyHGrid](../LazyHGrid.md) · [LazyHStack](../LazyHStack.md) · [LazyVGrid](../LazyVGrid.md) · [LazyVStack](../LazyVStack.md) · [Masked](../Masked.md) · [RadioButton](../RadioButton.md) · [ScrollView](../ScrollView.md) · [Text](../Text.md) · [TextEditor](../TextEditor.md) · [VStack](../VStack.md) · [ZStack](../ZStack.md)
 
-Declared in `lib/SwiftOmniUI/Sources/Contracts/Mixins/PaddingElementContract.swift`.
+Declared in `lib/SwiftOmniUI/Core/Sources/Contracts/Mixins/PaddingElementContract.swift`.
 
 How each of them realizes these members is on its own page.
 

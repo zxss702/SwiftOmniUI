@@ -29,7 +29,7 @@ whatever is missing.
 ## Working in VS Code
 
 VS Code is where SwiftOmniUI applications are built, run, debugged, and tested. The
-SwiftOmniUI extension in `lib/SwiftOmniUI.VSCode` chooses the host and the application
+SwiftOmniUI extension in `lib/SwiftOmniUI/SwiftOmniUI.VSCode` chooses the host and the application
 once, and everything after that - the editor's completion, the launches, and
 the suites - works as that host.
 
@@ -38,7 +38,7 @@ the suites - works as that host.
 The extension is built from the checkout. From the repository root:
 
 ```bash
-cd lib/SwiftOmniUI.VSCode
+cd lib/SwiftOmniUI/SwiftOmniUI.VSCode
 npm ci
 npm run package
 code --install-extension ../../artifacts/swiftomniui-*.vsix
@@ -91,7 +91,7 @@ The Command Palette offers the rest under **SwiftOmniUI:**
 | Clean Index | removes the language server's index and builds it again |
 | Check Toolchain | what this machine has of what its hosts need, and what to install for the rest |
 
-The extension's own README, `lib/SwiftOmniUI.VSCode/README.md`, describes each of
+The extension's own README, `lib/SwiftOmniUI/SwiftOmniUI.VSCode/README.md`, describes each of
 them in detail.
 
 ### From the command line

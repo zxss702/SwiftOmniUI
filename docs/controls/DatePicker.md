@@ -1,4 +1,4 @@
-<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
+<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under lib/SwiftOmniUI/exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
 
 # DatePicker
 
@@ -30,7 +30,7 @@ See [the dictionary](README.md) for how a mark is given.
 | GTK 4 | ✅ | 24 ✅ · 3 ☑️ · 11 – | `GtkCalendar` in a `GtkPopover` |  |
 | Web |  |  | `<input type=date>` | no host yet |
 
-Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Controls/DatePickerContract.swift`.
+Declared in `lib/SwiftOmniUI/Core/Sources/Contracts/Elements/Controls/DatePickerContract.swift`.
 
 ## DatePicker's own members
 

@@ -22,7 +22,7 @@ app code                import SwiftOmniUI        // 唯一 UI import
         Apple 真 SwiftUI            SOUI 引擎（GTK / WinUI / Android / Web）
 ```
 
-- `SwiftOmniUICore`：原 `SwiftOmniUI` target 改名而来，`lib/SwiftOmniUI/Sources`
+- `SwiftOmniUICore`：原 `SwiftOmniUI` target 改名而来，`lib/SwiftOmniUI/Core/Sources`
   路径不动。全平台编译，macOS 上继续跑 core 测试。
 - `SwiftOmniUI`：新单文件门面 target。产品名 `SwiftOmniUI` 指向它。
 - `SwiftOmniUIHost` / `Conformance` / `Foundation` / `JsonData` / `Head` / 各
@@ -36,7 +36,7 @@ app code                import SwiftOmniUI        // 唯一 UI import
   编译，但统一改指 `SwiftOmniUICore`，不依赖 `@_spi` 透传的未验证行为。
 - 字符串层面只有两处写死模块名：`App.swift` 的 `"SwiftOmniUI.Page(\(kind))"`
   节点类型名，GTK/WinUI 各一处 `SwiftOmniUI.Size` 限定名 → `SwiftOmniUICore.*`。
-  exports/marks 是 contract token，不含模块名，不受影响。
+  lib/SwiftOmniUI/exports/marks 是 contract token，不含模块名，不受影响。
 - Apple 端会链进死引擎（依赖无条件保留：Linux `host == nil` 时门面仍需三件
   依赖在场）。体积代价接受。
 - `SwiftOmniUIFoundation` / `SwiftOmniUIJsonData` 产品保留：非 Apple 端经门面
@@ -47,17 +47,17 @@ app code                import SwiftOmniUI        // 唯一 UI import
 
 Apple 已有 SwiftUI 实现的 host 实现整体删除：
 
-- `lib/SwiftOmniUI.AppKit/`、`lib/SwiftOmniUI.UIKit/`（Sources + Tests）
+- `lib/SwiftOmniUI/SwiftOmniUI.AppKit/`、`lib/SwiftOmniUI/SwiftOmniUI.UIKit/`（Sources + Tests）
 - `.scripts/AppKit/`、`.scripts/UIKit/`
-- `exports/appkit.txt`、`exports/uikit.txt`、`exports/marks/appkit/`、
-  `exports/marks/uikit/`
+- `lib/SwiftOmniUI/exports/appkit.txt`、`lib/SwiftOmniUI/exports/uikit.txt`、`lib/SwiftOmniUI/exports/marks/appkit/`、
+  `lib/SwiftOmniUI/exports/marks/uikit/`
 - `docs/hosts/appkit.md`、`docs/hosts/uikit.md`、`docs/design/platforms/appkit/`、
   `docs/design/platforms/uikit/`
 - `Package.swift`：host 数组删 `AppKit`/`UIKit`，两个 `case` 分支
-- `lib/SwiftOmniUI.Head/Sources/SwiftOmniUIHead.swift`：删 `#if APPKIT` /
+- `lib/SwiftOmniUI/SwiftOmniUI.Head/Sources/SwiftOmniUIHead.swift`：删 `#if APPKIT` /
   `#elseif UIKIT` 两支
 - `apps/Gallery/Platforms/{AppKit,UIKit}`、`apps/HelloWorld/Platforms/{AppKit,UIKit}`
-- `test-native.sh`、`new-app.sh`、`lib/SwiftOmniUI.VSCode` 的 host 列表
+- `test-native.sh`、`new-app.sh`、`lib/SwiftOmniUI/SwiftOmniUI.VSCode` 的 host 列表
 - `docs/platform-contract.md`、`docs/controls/*.md` 走既有
   `SWIFTOMNIUI_UPDATE_EXPORTS` / `SWIFTOMNIUI_UPDATE_DOCS` 流程重生成
 

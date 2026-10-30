@@ -28,7 +28,7 @@
 # The tests are built, the Windows App SDK laid beside the runner, and the run
 # skips the build. A run with SWIFTOMNIUI_UPDATE_EXPORTS=1 writes each verdict file
 # under the revision its family stands at
-# (lib/SwiftOmniUI.Conformance/revisions.txt); -Stale runs only the conformance
+# (lib/SwiftOmniUI/SwiftOmniUI.Conformance/revisions.txt); -Stale runs only the conformance
 # families whose verdicts stand at another revision, or at none - each other
 # one's process ends at once.
 # ---------------------------------------------------------------------------

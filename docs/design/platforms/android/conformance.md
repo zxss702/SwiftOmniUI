@@ -2,7 +2,7 @@
 
 How the conformance suite drives Android Views: `AndroidDriver` in the host's
 test APK, one test for each family of cases in `AndroidConformanceTests`,
-their verdicts written into the APK's files and held to `exports/marks/android`
+their verdicts written into the APK's files and held to `lib/SwiftOmniUI/exports/marks/android`
 by `test-android.sh`.
 
 ## What the driver does
@@ -77,7 +77,7 @@ its effect in another case.
 ## Running the stale families
 
 The device reads no repository, so `SWIFTOMNIUI_STALE_ONLY=1` is the script's to
-answer: it runs the families whose verdict files in `exports/marks/android`
+answer: it runs the families whose verdict files in `lib/SwiftOmniUI/exports/marks/android`
 open with another revision than `.scripts/Marks/revision.sh` gives, or with
 none, and takes only theirs off the device.
 

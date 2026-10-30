@@ -1,4 +1,4 @@
-<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
+<!-- Rendered by ControlDictionaryTests from the contracts and the verdicts each host's runs of its tests wrote under lib/SwiftOmniUI/exports/marks: SWIFTOMNIUI_UPDATE_DOCS=1 swift test --filter ControlDictionaryTests writes it again. -->
 
 # LazyVStack
 
@@ -30,7 +30,7 @@ See [the dictionary](README.md) for how a mark is given.
 | GTK 4 | ✅ | 17 ✅ · 14 – | custom `GtkWidget` driven the same |  |
 | Web |  |  | custom element driven the same | no host yet |
 
-Declared in `lib/SwiftOmniUI/Sources/Contracts/Elements/Layouts/LazyVStackContract.swift`.
+Declared in `lib/SwiftOmniUI/Core/Sources/Contracts/Elements/Layouts/LazyVStackContract.swift`.
 
 ## LazyVStack's own members
 

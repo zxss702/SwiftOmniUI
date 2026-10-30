@@ -24,7 +24,7 @@
 $ErrorActionPreference = 'Continue'
 
 $SwiftOmniUIRepository = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$SwiftOmniUIWinUIHost = Join-Path $SwiftOmniUIRepository 'lib\SwiftOmniUI.WinUI'
+$SwiftOmniUIWinUIHost = Join-Path $SwiftOmniUIRepository 'lib\SwiftOmniUI\SwiftOmniUI.WinUI'
 
 # Stable Windows App SDK aggregate release. Its components have independent
 # versions; these pins are the 2.5.1 dependency graph, with a newer stable

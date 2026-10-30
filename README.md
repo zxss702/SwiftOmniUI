@@ -112,11 +112,11 @@ Public API declarations provide the focused reference beside the code.
 ## Quick start
 
 SwiftOmniUI is developed and used in VS Code, through the SwiftOmniUI extension in
-`lib/SwiftOmniUI.VSCode`. Build and install it from the checkout (Node.js 20 or
+`lib/SwiftOmniUI/SwiftOmniUI.VSCode`. Build and install it from the checkout (Node.js 20 or
 newer):
 
 ```bash
-cd lib/SwiftOmniUI.VSCode
+cd lib/SwiftOmniUI/SwiftOmniUI.VSCode
 npm ci
 npm run package
 code --install-extension ../../artifacts/swiftomniui-*.vsix

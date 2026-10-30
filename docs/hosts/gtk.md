@@ -19,7 +19,7 @@ rather than silent. It looks as the desktop's own applications do:
 libadwaita's widgets, and the light or dark style the desktop is set to.
 
 ```text
-lib/SwiftOmniUI.GTK/
+lib/SwiftOmniUI/SwiftOmniUI.GTK/
   Sources/SwiftOmniUIGTK/        the host: its runtime, elements, registrations, layout and window
   Sources/CSwiftOmniUIGTK/       GTK's and libadwaita's headers, found by pkg-config
   Tests/                     the host's suite, run by swift test
