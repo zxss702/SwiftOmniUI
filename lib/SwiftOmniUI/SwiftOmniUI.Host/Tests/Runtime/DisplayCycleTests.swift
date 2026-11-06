@@ -8,6 +8,51 @@ import XCTest
 /// One frame of the display, in the order every runtime keeps.
 final class DisplayCycleTests: XCTestCase {
     @MainActor
+    func testAdvancingTheAnimationsReleasesTheClock() {
+        let runtime = HostRuntime.still()
+        let presenter = CountingPresenter()
+        runtime.displayCycle.presenter = presenter
+        runtime.tree.receiveProperty(mount: 1, property: .opacity,
+            standing: .number(0), target: .number(1), animation: .eased(200, .linear))
+        XCTAssertTrue(runtime.clock.held)
+        runtime.displayCycle.advanceAnimations(now: 300, reducesMotion: false)
+        XCTAssertFalse(runtime.clock.held)
+        XCTAssertEqual(presenter.walks, 1)
+    }
+
+    @MainActor
+    func testAFrameTimestampCannotMoveAnAnimationBehindThePreviousTurn() throws {
+        let runtime = HostRuntime.still()
+        let key = DescribedKey(mount: 1, property: .opacity)
+        runtime.tree.receiveProperty(mount: 1, property: .opacity,
+            standing: .number(0), target: .number(1), animation: .eased(200, .linear))
+        runtime.displayCycle.frame(now: 100)
+        runtime.displayCycle.drain(now: 130)
+        runtime.displayCycle.frame(now: 116)
+        XCTAssertEqual(try XCTUnwrap(runtime.describedMotion.presentedValue(for: key)?.number), 0.65, accuracy: 1e-9)
+        runtime.displayCycle.advanceAnimations(now: 120, reducesMotion: false)
+        XCTAssertEqual(try XCTUnwrap(runtime.describedMotion.presentedValue(for: key)?.number), 0.65, accuracy: 1e-9)
+        runtime.displayCycle.frame(now: 175)
+        XCTAssertEqual(try XCTUnwrap(runtime.describedMotion.presentedValue(for: key)?.number), 0.875, accuracy: 1e-9)
+    }
+
+    @MainActor
+    func testLayoutFeedbackKeepsTheDisplayedFramesTime() throws {
+        let runtime = HostRuntime.still()
+        let key = DescribedKey(mount: 1, property: .opacity)
+        runtime.tree.receiveProperty(mount: 1, property: .opacity,
+            standing: .number(0), target: .number(1), animation: .eased(200, .linear))
+        runtime.displayCycle.frame(now: 100)
+        let reporter = CountingPresenter()
+        reporter.report = { runtime.displayCycle.drain(now: 150) }
+        runtime.frames.follow(reporter, order: 1, reads: true)
+        runtime.frames.commitLayout()
+        XCTAssertEqual(try XCTUnwrap(runtime.describedMotion.presentedValue(for: key)?.number), 0.5, accuracy: 1e-9)
+        runtime.displayCycle.frame(now: 175)
+        XCTAssertEqual(try XCTUnwrap(runtime.describedMotion.presentedValue(for: key)?.number), 0.875, accuracy: 1e-9)
+    }
+
+    @MainActor
     func testStaticRowPropertiesDoNotPollTheFrameClock() {
         let runtime = HostRuntime.still()
         var notifications = 0
@@ -119,7 +164,9 @@ private final class HandClock: FrameClock {
 
 /// A presenter that counts the walks a frame asks of the mounted tree, with a scroller that moves while it says.
 @MainActor
-private final class CountingPresenter: FramePresenter {
+private final class CountingPresenter: FramePresenter, FrameReporter {
+    var report: () -> Void = {}
+    func reportFrame() { report() }
     var walks = 0
     var wantsFrames = false
 

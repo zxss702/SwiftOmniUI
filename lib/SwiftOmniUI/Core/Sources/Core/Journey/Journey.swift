@@ -181,11 +181,13 @@ public struct Journey<Value: Walked> {
 
             if let animation { travelling.animation = animation }
 
-            // The waiter forces the destination: a fresh journey even to where it is going.
+            // Only a move to the same destination restarts every lane. Otherwise the
+            // untouched lanes keep their own timing and completion.
+            let fresh = lanes.destination == target ? JourneyLanes<Value>.mask(of: .destination) : 0
             Renderer.shared.board(of: image).write(
                 StateImage.bytes(of: travelling.carried),
                 to: image,
-                forcing: JourneyLanes<Value>.mask(of: .destination) | JourneyLanes<Value>.mask(of: .completion))
+                forcing: fresh | JourneyLanes<Value>.mask(of: .completion))
 
             storage.noteDestination(target)
         }

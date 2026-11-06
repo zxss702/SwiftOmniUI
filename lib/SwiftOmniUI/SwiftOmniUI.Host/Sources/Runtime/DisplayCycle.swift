@@ -36,6 +36,10 @@
     /// Whether the core's last cycle said it has more to do.
     private var continues = false
 
+    /// Display timestamps and intervening turns share one nondecreasing time.
+    private var time = -Double.infinity
+    var layingOut = false
+
     /// The frame's batch: bound states' values, and moved properties per mounted element.
     private var states: [Int32: HostStateValue] = [:]
     private var properties: [UInt64: Set<Prop>] = [:]
@@ -61,6 +65,8 @@
 
     /// One frame: the user's reports, the animations, the core's cycle, one walk, a render, the hold.
     public func frame(now: Double) {
+        if !layingOut || time == -.infinity { time = max(time, now) }
+        let now = time
         presenter?.commitUserReports(now: now)
         drain(now: now)
         presenter?.renderIfNeeded()
@@ -73,6 +79,8 @@
     /// Advances the animations, runs the core's cycle, presents what moved and holds the clock.
     /// `reported` holds states the user changed, worn by every other bound control in the same walk.
     public func drain(now: Double, reported: [Int32: HostStateValue] = [:]) {
+        if !layingOut || time == -.infinity { time = max(time, now) }
+        let now = time
         states.merge(reported) { _, reported in reported }
 
         let reducesMotion = reducesMotion()
@@ -94,14 +102,18 @@
 
     /// Advances every animation to `now` and presents what moved.
     public func advanceAnimations(now: Double, reducesMotion: Bool) {
+        if !layingOut || time == -.infinity { time = max(time, now) }
+        let now = time
         follow(animator.advance(to: now, reducesMotion: reducesMotion))
         present()
+        hold()
     }
 
     /// Presents the state channels on their own, after a render attached new ones.
     public func presentStateChannels() {
         collectStateChannels()
         present()
+        hold()
     }
 
     /// Holds the frame clock while an animation, the core's cycle or a scroller still moves.

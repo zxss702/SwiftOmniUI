@@ -85,6 +85,11 @@
     /// Reports a completed native layout before it is painted, without advancing scrollers.
     public func commitLayout() {
         guard moved else { return }
+        // Layout feedback belongs to the frame being arranged, even when
+        // measurement took time. Reentrant reports retain the same scope.
+        let outer = runtime.displayCycle.layingOut
+        runtime.displayCycle.layingOut = true
+        defer { runtime.displayCycle.layingOut = outer }
         runtime.performUserTransaction { reportFrames() }
     }
 

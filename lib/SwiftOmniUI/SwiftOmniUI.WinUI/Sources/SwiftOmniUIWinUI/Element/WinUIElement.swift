@@ -199,7 +199,7 @@ final class WinUIElement: NativeElement {
             var presented: Set<Prop> = []
             for property in changed where Self.layoutInputs.contains(property) {
                 let driven = element.driven[property].map { binding in
-                    binding.mode != .in && host?.runtime.animator.animation(for: .state(binding.state)) != nil
+                    binding.mode != .in && (host?.runtime.stateChannels.isActive(state: binding.state) ?? false)
                 } ?? false
                 guard driven || host?.runtime.animator.animation(
                     for: .described(DescribedKey(mount: element.mount, property: property))) != nil else { continue }

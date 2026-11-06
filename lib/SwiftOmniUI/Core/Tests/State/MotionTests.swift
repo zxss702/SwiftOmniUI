@@ -15,6 +15,57 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class MotionTests: XCTestCase {
+    func testAnOuterFrameCarriesAChildsValueGatedLayoutAnimation() {
+        let differ = Differ()
+        let law = Animation.linear(duration: 0.2)
+        func tree(_ expanded: Bool) -> Node {
+            HStack {
+                if !expanded { Text("Recent") }
+                Text("Today").frame(width: expanded ? 400 : 200)
+            }
+            .animation(law, value: expanded)
+            .frame(width: 600, height: 300).node
+        }
+        let first = differ.reconcile(nil, with: tree(false))
+        let next = differ.reconcile(first.node, with: tree(true))
+        XCTAssertEqual(next.patch.layoutTransition?.animation, law)
+        XCTAssertEqual(next.patch.layoutTransition?.lanes, .all)
+        XCTAssertNil(next.patch.animation, "the gate is a one-update transaction")
+        let ordinary = differ.reconcile(next.node, with: tree(true))
+        XCTAssertNil(ordinary.patch.layoutTransition)
+    }
+
+    func testACarriedFrameReceivesItsChildsValueGateWithoutRebuilding() {
+        let expanded = State(wrappedValue: false)
+        let differ = Differ()
+        let law = Animation.linear(duration: 0.2)
+        let tree = VStack {
+            HStack { Text("Today").frame(width: expanded.wrappedValue ? 400 : 200) }
+                .animation(law, value: expanded.wrappedValue)
+        }.frame(width: 600, height: 300)
+        let first = differ.reconcile(nil, with: tree.node)
+        let builds = first.node.builds
+        expanded.wrappedValue = true
+        let next = differ.revisit(first.node, changed: [ObjectIdentifier(expanded.storage)])
+        XCTAssertEqual(next.node.builds, builds)
+        XCTAssertEqual(next.patch.layoutTransition?.animation, law)
+        XCTAssertEqual(next.patch.layoutTransition?.lanes, .all)
+    }
+
+    func testACarriedFramesExplicitNilKeepsAChildsGateLocal() {
+        let expanded = State(wrappedValue: false)
+        let differ = Differ()
+        let tree = VStack {
+            HStack { Text("Today").frame(width: expanded.wrappedValue ? 400 : 200) }
+                .animation(.linear(duration: 0.2), value: expanded.wrappedValue)
+        }.frame(width: 600, height: 300).animation(nil)
+        let first = differ.reconcile(nil, with: tree.node)
+        expanded.wrappedValue = true
+        let next = differ.revisit(first.node, changed: [ObjectIdentifier(expanded.storage)])
+        XCTAssertEqual(next.patch.layoutTransition?.animation, Animation.none)
+        XCTAssertEqual(next.patch.layoutTransition?.lanes, [])
+    }
+
     func testArmedNilGateOverridesTheWritesAnimationInsideItsOwnFrame() throws {
         let differ = Differ()
         func composer(_ filled: Bool) -> Node {

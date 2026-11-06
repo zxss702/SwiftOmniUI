@@ -5,8 +5,8 @@
 
 /// What an animation moves: a state's channel, a described property, or a layout's place.
 @_spi(Host) public enum AnimationTarget: Hashable, Comparable {
-    /// The channel of the state with this number.
-    case state(Int32)
+    /// One independently traveling run of lanes in the state with this number.
+    case state(Int32, run: Int)
 
     /// A property a patch described, on one mounted element.
     case described(DescribedKey)
@@ -17,7 +17,7 @@
     /// States first, then described properties, then places; each in key order.
     public static func < (left: Self, right: Self) -> Bool {
         switch (left, right) {
-        case (.state(let a), .state(let b)): return a < b
+        case (.state(let a, let one), .state(let b, let other)): return (a, one) < (b, other)
         case (.described(let a), .described(let b)): return a < b
         case (.placed(let a), .placed(let b)): return a < b
         default: return left.rank < right.rank

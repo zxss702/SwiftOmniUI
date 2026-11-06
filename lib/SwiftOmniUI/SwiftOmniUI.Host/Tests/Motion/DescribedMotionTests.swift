@@ -151,7 +151,7 @@ final class DescribedMotionTests: XCTestCase {
                 now: 0, reducesMotion: false)
         }
         let channel = RunningAnimation(from: [0], destination: [1], velocity: [0], animation: .eased(200, .linear), began: 0)
-        animator.start(channel, for: .state(1))
+        animator.start(channel, for: .state(1, run: 1))
         described.follow(animator.advance(to: 50))
 
         described.remove(mount: 1)
@@ -160,7 +160,7 @@ final class DescribedMotionTests: XCTestCase {
         XCTAssertNil(described.presentedValue(for: fading))
         XCTAssertNil(described.presentedValue(for: turning))
         XCTAssertNil(animator.animation(for: .described(fading)))
-        XCTAssertNotNil(animator.animation(for: .state(1)), "what is not the element's goes on")
+        XCTAssertNotNil(animator.animation(for: .state(1, run: 1)), "what is not the element's goes on")
 
         described.follow(animator.advance(to: 100))
         XCTAssertEqual(described.takeOutputs().map(\.key), [staying])

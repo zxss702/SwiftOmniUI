@@ -327,16 +327,19 @@ final class Differ {
             patch.customLayoutChanged = true
         }
 
-        // A layout can be carried while a descendant changes its size or joins
-        // it. The write's transaction must reach that placement as well.
-        if NodeType.saysMotion.contains(rendered.type), rendered.type != .app,
-           patch.layoutTransition == nil, let transaction, patch.children.hasChange || patch.customLayoutChanged {
+        // Retained layouts participate in a descendant's transaction or value gate
+        // without rebuilding their bodies or changing their standing animation.
+        let descendant = patch.children.last(where: { $0.layoutTransition?.animation.isNothing == false })?.layoutTransition
+        if NodeType.places.contains(rendered.type), patch.layoutTransition == nil,
+           let transaction = transaction ?? descendant.map({ Transaction(animation: $0.animation) }),
+           patch.children.hasChange || patch.customLayoutChanged {
             let plan = rendered.placementPlan
             let write = plan?.transaction(under: transaction) ?? transaction
             func law(for values: AnimationValues) -> Animation {
                 if write.disablesAnimations { return .none }
                 let resolved = (plan?.animation(for: values) ?? .inherited).resolved(against: animation)
-                if let override = write.animation, !resolved.isCustom { return override }
+                if let override = write.animation, !resolved.isCustom,
+                   plan?.animation(for: values)?.isNothing != true { return override }
                 return resolved
             }
             var lanes = AnimationLanes.all

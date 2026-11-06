@@ -696,6 +696,25 @@ extension Differ {
             reconcileChildren(of: previous, node: node, into: &patch, sizesArrive: node.childSizesArrive)
         }
 
+        // A child's value gate can start a layout animation without an ambient
+        // transaction. Rebuilt enclosing frames must carry the same placement.
+        if NodeType.places.contains(node.type), armed.isEmpty,
+           plan?.base?.isNothing != true, transacting?.disablesAnimations != true,
+           transacting?.isGeometryFeedback != true,
+           patch.layoutTransition?.animation.isNothing != false,
+           let descendant = patch.children.last(where: { $0.layoutTransition?.animation.isNothing == false })?.layoutTransition {
+            var pending = transaction ?? Transaction()
+            if pending.animation == nil { pending.animation = descendant.animation }
+            let write = plan?.transaction(under: pending) ?? pending
+            let timing = write.disablesAnimations ? Animation.none : write.animation ?? descendant.animation
+            var lanes = AnimationLanes.all
+            if plan?.animation(for: .place)?.isNothing == true { lanes.subtract(.place) }
+            if plan?.animation(for: .width)?.isNothing == true { lanes.subtract(.width) }
+            if plan?.animation(for: .height)?.isNothing == true { lanes.subtract(.height) }
+            if node.childSizesArrive { lanes.subtract([.width, .height]) }
+            patch.layoutTransition = HostLayoutMotion(animation: timing, lanes: lanes)
+        }
+
         if let source = lazySource {
             if describeAll || source.lazyRows !== previous?.lazySource?.lazyRows {
                 patch.lazyRows = source.lazyRows

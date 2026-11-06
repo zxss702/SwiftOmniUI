@@ -8,12 +8,12 @@ frame.
 
 ## One animator
 
-A value is animated by `Animator` alone. Every running animation is an
-`Animation`: where each lane began, where it is going, its starting speed, its
+A value is animated by `Animator` alone. Every running animation is a
+`RunningAnimation`: where each lane began, where it is going, its starting speed, its
 timing and when it began. An animation is pure: its position is
 `HostMotionLaw` at the time handed in, so a hand-wound clock reproduces every
 frame. One advance moves every animation in `AnimationTarget` order - states
-by number, then described properties by element and property, then layout
+by state and run number, then described properties by element and property, then layout
 places by element - so two runs of the same frame write in the same order. An
 animation that arrives leaves the animator, and with Reduce Animation every
 animation arrives at once, at its destination.
@@ -31,6 +31,20 @@ the last one lets go it goes too, but only once its animation has landed where
 it was sent, so a control described again a moment later joins it where it
 is. When the user takes the value on a two-way control, the animation stops
 where the user holds it and its waiter hears that it was cut short.
+
+Each write starts a run containing only the numeric lanes it changed. A new
+horizontal destination does not restart the vertical lane's animation. A run
+cut short answers its waiter once and continues its remaining lanes at their
+original timing; an independent run keeps its own waiter. User takeover stops
+all runs of the state. This follows StateUI's lane separation (`939e4f7d5`),
+keeping SOUI's public `Animation` and `Journey` vocabulary and velocity units.
+
+The display cycle uses one nondecreasing time for frames, turns and explicit
+animation advances (`79afcab7d`). Completed-layout reports run at the current
+frame's time (`added9ec9`), so repeated measurement cannot consume an animation
+inside one frame. Both animation-only advances and newly attached state-channel
+presentations update the clock hold (`529190d88`). Lazy prefetch remains part
+of SOUI's clock-hold decision.
 
 ## Described animation
 
@@ -106,6 +120,11 @@ produce no drawing feedback; views that also request positions retain full
 frame reporting.
 
 ## Layout animation
+
+A child's armed value gate also carries placement timing into enclosing frames,
+whether their bodies rebuild or remain retained. This timing lasts for the
+current patch only; explicit nil gates, disabled transactions and geometry
+feedback retain their existing suppression rules.
 
 `HostPatch.animation` carries standing layout configuration. A separate
 `layoutTransition` carries the current transaction or armed animation gate,

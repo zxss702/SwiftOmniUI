@@ -30,13 +30,13 @@ final class AnimatorTests: XCTestCase {
         let far = DescribedKey(mount: 2, property: .opacity)
         let animation = RunningAnimation(from: [0], destination: [1], velocity: [0], animation: .eased(200, .linear), began: 0)
 
-        for target in [AnimationTarget.described(far), .state(5), .described(near), .state(1)] {
+        for target in [AnimationTarget.described(far), .state(5, run: 1), .state(1, run: 2), .described(near), .state(1, run: 1)] {
             animator.start(animation, for: target)
         }
 
         XCTAssertEqual(
             animator.advance(to: 100).map(\.target),
-            [.state(1), .state(5), .described(near), .described(far)])
+            [.state(1, run: 1), .state(1, run: 2), .state(5, run: 1), .described(near), .described(far)])
     }
 
     /// An animation runs until it arrives, and then it is gone: the animator
@@ -46,7 +46,7 @@ final class AnimatorTests: XCTestCase {
         let animator = Animator()
         animator.start(
             RunningAnimation(from: [0], destination: [1], velocity: [0], animation: .eased(200, .linear), began: 0),
-            for: .state(1))
+            for: .state(1, run: 1))
 
         let halfway = animator.advance(to: 100)
         XCTAssertEqual(halfway.first?.value.first ?? .nan, 0.5, accuracy: 1e-9)
@@ -67,10 +67,10 @@ final class AnimatorTests: XCTestCase {
         let animator = Animator()
         animator.start(
             RunningAnimation(from: [0], destination: [1], velocity: [0], animation: .spring(milliseconds: 300), began: 0),
-            for: .state(1))
+            for: .state(1, run: 1))
         animator.start(
             RunningAnimation(from: [5, 5], destination: [9, 1], velocity: [0, 0], animation: .eased(400), began: 0),
-            for: .state(2))
+            for: .state(2, run: 1))
 
         let steps = animator.advance(to: 10, reducesMotion: true)
 
