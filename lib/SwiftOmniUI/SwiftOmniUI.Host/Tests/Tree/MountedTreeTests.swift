@@ -43,6 +43,58 @@ final class MountedTreeTests: XCTestCase {
         XCTAssertEqual(log.applied.last, "stack", "a parent is presented after its children")
     }
 
+    /// A parent re-arranges when a child's measured content changes, while a
+    /// paint-only patch remains local to that child.
+    @MainActor
+    func testAChildPatchOnlyArrangesItsParentForMeasuredChanges() {
+        let (tree, _) = Self.tree()
+        tree.apply(Self.stack("stack", ["a"]), complete: true)
+        let parent = tree.root
+
+        var text = HostPatch(id: .manual("a"), type: .text)
+        text.properties[.text] = .string("updated")
+        var sparse = HostPatch(id: .manual("stack"), type: .vStack)
+        sparse.children = .changed([text])
+        tree.apply(sparse, complete: false)
+        XCTAssertTrue(parent?.childrenNeedArranging == true)
+
+        var opacity = HostPatch(id: .manual("a"), type: .text)
+        opacity.properties[.opacity] = .number(0.5)
+        sparse.children = .changed([opacity])
+        tree.apply(sparse, complete: false)
+        XCTAssertFalse(parent?.childrenNeedArranging == true)
+
+        opacity.properties = [:]
+        opacity.clearedProperties = [.opacity]
+        sparse.children = .changed([opacity])
+        tree.apply(sparse, complete: false)
+        XCTAssertFalse(parent?.childrenNeedArranging == true)
+
+        text.properties = [:]
+        text.clearedProperties = [.text]
+        sparse.children = .changed([text])
+        tree.apply(sparse, complete: false)
+        XCTAssertTrue(parent?.childrenNeedArranging == true)
+    }
+
+    @MainActor
+    func testDescendantContentDoesNotRearrangeAnUnchangedAncestor() {
+        let (tree, _) = Self.tree()
+        var root = HostPatch(id: .manual("root"), type: .vStack)
+        root.children = .arranged([Self.stack("row", ["text"])])
+        tree.apply(root, complete: true)
+
+        var text = HostPatch(id: .manual("text"), type: .text)
+        text.properties[.text] = .string("longer words")
+        var row = HostPatch(id: .manual("row"), type: .vStack)
+        row.children = .changed([text])
+        root.children = .changed([row])
+        tree.apply(root, complete: false)
+
+        XCTAssertTrue(tree.root?.children.first?.childrenNeedArranging == true)
+        XCTAssertFalse(tree.root?.childrenNeedArranging == true)
+    }
+
     /// A sparse message naming a child the element does not hold is drift, and mounts nothing.
     @MainActor
     func testASparseMessageNamingAStrangerDrifts() {

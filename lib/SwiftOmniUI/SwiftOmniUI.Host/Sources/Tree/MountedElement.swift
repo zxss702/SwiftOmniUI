@@ -43,6 +43,9 @@ import CRT
     /// Direct child membership/order changed in this patch. A sparse descendant
     /// paint patch changes `childrenChanged`, but not a native layout's inputs.
     public private(set) var childOrderChanged = false
+    /// A direct child changed something its parent reads for measurement or
+    /// placement. A sparse paint-only patch leaves this false.
+    public private(set) var childrenNeedArranging = false
     private var departureArrangementPending = false
 
     /// A content rebuild updates mounted lazy rows; their own measurement
@@ -156,6 +159,7 @@ import CRT
     public func apply(_ patch: HostPatch) {
         guard let tree else { return }
         childOrderChanged = false
+        childrenNeedArranging = false
         // A patch re-described a departing element: its removal turns around.
         if isDeparting { revive() }
 
@@ -285,6 +289,17 @@ import CRT
                     tree.intake.drifted(
                         "a patch describes '\(childPatch.id)' as \(childPatch.type) where '\(id)' holds \(child.type)")
                 }
+                // Reuse the child already found for this patch; drawing-only
+                // updates do not change its parent's measurement or placement.
+                let ownValues = !childPatch.properties.isEmpty || !childPatch.clearedProperties.isEmpty
+                childrenNeedArranging = childrenNeedArranging || childPatch.replace
+                    || childPatch.driven != nil || childPatch.animation != nil
+                    || childPatch.layoutTransition != nil || childPatch.customLayoutChanged
+                    || childPatch.lazyContentChanged || childPatch.lazyRows != nil
+                    || NodeType.pageTypes.contains(childPatch.type) && ownValues
+                    || !children[index].native.presentsView
+                    || childPatch.properties.keys.contains { !Self.unmeasuredProperties.contains($0) }
+                    || childPatch.clearedProperties.contains { !Self.unmeasuredProperties.contains($0) }
             }
         }
 

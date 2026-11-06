@@ -247,6 +247,7 @@ final class WinUIElement: NativeElement {
         let plainLayout = view is WinUIStackView || view is WinUIZStackView || view is WinUIGridView
             || view is WinUILazyView || view is WinUIScrollView || view is WinUISingleChildView
         if !plainLayout || !wasDescribed || layoutItemsDirty || element.childOrderChanged
+            || element.childrenNeedArranging
             || changed.contains(.layoutDirection) {
             arrangeChildren()
         } else if let lazy = view as? WinUILazyView {
