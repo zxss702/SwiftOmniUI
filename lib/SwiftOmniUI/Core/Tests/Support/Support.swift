@@ -639,10 +639,7 @@ enum SourceTree {
 
         // The core's sources under their own paths; the host layer's under its module's name, `SwiftOmniUIHost/`.
         for (prefix, root) in [("", sources), ("SwiftOmniUIHost/", hostSources)] {
-            guard let walk = FileManager.default.enumerator(atPath: root.path) else {
-                throw WalkReadAlmostNothing(root: root.path, read: 0)
-            }
-            for case let name as String in walk where name.hasSuffix(".swift") {
+            for name in try files(under: root, entering: entersSources) where name.hasSuffix(".swift") {
                 let text = try String(contentsOf: root.appendingPathComponent(name), encoding: .utf8)
                 found.append((path: prefix + name.replacingOccurrences(of: "\\", with: "/"), text: text))
             }

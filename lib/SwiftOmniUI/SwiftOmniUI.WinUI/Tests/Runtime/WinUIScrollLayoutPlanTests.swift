@@ -4,6 +4,7 @@
 @_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
+import CSwiftOmniUIWinUI
 import XCTest
 
 @MainActor
@@ -51,8 +52,10 @@ final class WinUIScrollLayoutPlanTests: XCTestCase {
                 let height = min(Double(count * 28), 256)
                 host.settle {
                     guard let inner = host.views(WinUIScrollView.self).dropFirst().first else { return false }
-                    return abs(inner.scroller.laidOutFrame.height - height) < 1
+                    return swiftomniui_winui_is_attached(inner.scroller.handle)
+                        && abs(inner.scroller.laidOutFrame.height - height) < 1
                         && (count * 28 <= 256 ? inner.scroller.standing.reach.y < 1
+                                                && inner.scroller.standing.offset.y < 1
                                              : inner.scroller.standing.reach.y > 0)
                 }
                 let inner = try XCTUnwrap(host.views(WinUIScrollView.self).dropFirst().first)
@@ -63,7 +66,10 @@ final class WinUIScrollLayoutPlanTests: XCTestCase {
                 } else {
                     XCTAssertGreaterThan(inner.scroller.standing.reach.y, 0)
                     inner.scroller.move(to: Point(0, 20))
-                    host.settle { abs(inner.scroller.standing.offset.y - 20) < 1 }
+                    host.settle {
+                        abs(inner.scroller.standing.offset.y - 20) < 1
+                            && !swiftomniui_winui_scroller_jump_pending(inner.scroller.handle)
+                    }
                     XCTAssertEqual(inner.scroller.standing.offset.y, 20, accuracy: 1)
                 }
                 if count == 300 {
@@ -107,8 +113,12 @@ final class WinUIScrollLayoutPlanTests: XCTestCase {
                 for limit in [256.0, 128.0, 256.0] {
                     maximum.wrappedValue = limit
                     host.settle {
-                        host.views(WinUIScrollView.self).count == 2
-                            && abs((host.views(WinUIScrollView.self).last?.scroller.laidOutFrame.height ?? 0) - limit) < 1
+                        guard host.views(WinUIScrollView.self).count == 2,
+                              let inner = host.views(WinUIScrollView.self).last else { return false }
+                        // Measure can finish before XAML delivers Loaded. Native
+                        // input starts only after the new scroller joins the tree.
+                        return swiftomniui_winui_is_attached(inner.scroller.handle)
+                            && abs(inner.scroller.laidOutFrame.height - limit) < 1
                     }
                     let inner = try XCTUnwrap(host.views(WinUIScrollView.self).last)
                     XCTAssertEqual(inner.scroller.laidOutFrame.height, limit, accuracy: 1)
@@ -116,9 +126,20 @@ final class WinUIScrollLayoutPlanTests: XCTestCase {
                     let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).last)
                     XCTAssertLessThan(lazy.cells.built.count, 300,
                                       "the inner document must remain lazy when its viewport is measured")
+                    XCTAssertTrue(swiftomniui_winui_is_attached(inner.scroller.handle))
+                    // Input follows the new viewport's first display frame;
+                    // Loaded alone precedes ScrollPresenter's composition setup.
+                    let laidOut = host.frameClock.renderingTime
+                    host.runtime.displayCycle.hold()
+                    host.settle { host.frameClock.renderingTime != laidOut }
+                    XCTAssertNotEqual(host.frameClock.renderingTime, laidOut)
                     inner.scroller.move(to: Point(0, 140))
-                    host.settle { abs(inner.scroller.standing.offset.y - 140) < 1 }
-                    XCTAssertEqual(inner.scroller.standing.offset.y, 140, accuracy: 1)
+                    host.settle {
+                        abs(inner.scroller.standing.offset.y - 140) < 1
+                            && !swiftomniui_winui_scroller_jump_pending(inner.scroller.handle)
+                    }
+                    XCTAssertEqual(inner.scroller.standing.offset.y, 140, accuracy: 1,
+                                   "limit=\(limit), viewport=\(inner.scroller.laidOutFrame), reach=\(inner.scroller.standing.reach)")
                 }
                 expanded.wrappedValue = false
                 host.settle { host.views(WinUIScrollView.self).count == 1 }
@@ -131,6 +152,11 @@ final class WinUIScrollLayoutPlanTests: XCTestCase {
         onUIThread {
             let child = ScrollPlanMeasureProbe()
             let scroll = WinUIScrollView()
+            // WinUI creates the ScrollView's presenter when its template loads.
+            // Load the empty control before testing a new document's first Measure.
+            WinUITestHost.window.show(scroll)
+            WinUITestHost.pump()
+            WinUITestHost.window.show(nil)
             scroll.setItems([WinUILayoutItem(view: child)])
 
             scroll.prepareMeasure(width: 320)
