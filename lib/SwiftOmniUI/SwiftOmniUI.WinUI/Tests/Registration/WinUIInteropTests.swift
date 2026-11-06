@@ -204,9 +204,16 @@ final class WinUIInteropTests: XCTestCase {
                 return number * 2
             }
             let host = WinUIRenderer.running { Calling() }
+            WinUIDoorbell.install()
+            defer { CoreLink().postTurns(with: nil) }
 
             try XCTUnwrap(host.views(WinUIButtonView.self).first).invoke()
-            host.settle { host.said != "-" }
+            // Only native messages may resume the suspended performer and render
+            // its answer; manually draining the core would hide a missed post.
+            for _ in 0..<150 {
+                if host.said != "-" { break }
+                WinUITestHost.pump(0.01)
+            }
 
             XCTAssertEqual(host.said, "42")
         }

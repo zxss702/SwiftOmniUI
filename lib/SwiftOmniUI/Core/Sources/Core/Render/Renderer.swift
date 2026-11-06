@@ -185,7 +185,7 @@ public final class Renderer: @unchecked Sendable {
         }
 
         // Outside the lock: the executor's lock is never taken inside this one.
-        UIThreadExecutor.shared.poke()
+        UIThreadExecutor.shared.askForTurn()
     }
 
     /// Native text reports change preference values, not authored view inputs.
@@ -195,7 +195,7 @@ public final class Renderer: @unchecked Sendable {
             dirty = true
             textPreferencesChanged.insert(box.preferenceIdentity)
         }
-        UIThreadExecutor.shared.poke()
+        UIThreadExecutor.shared.askForTurn()
     }
 
     /// Records that a state was read. While a view is built, the view becomes
@@ -248,7 +248,7 @@ public final class Renderer: @unchecked Sendable {
         }
 
         if asked {
-            UIThreadExecutor.shared.poke()
+            UIThreadExecutor.shared.askForTurn()
         }
     }
 

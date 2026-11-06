@@ -42,14 +42,10 @@ whole tree.
 
 ## The doorbell
 
-A handler that awaits resumes on `MainActor`, whose jobs wait in SwiftOmniUI's UI
-executor until the host drains them. A thread of the host's own parks until
-the core has work, and writes an eventfd that the main looper watches; the
-looper's callback runs a turn. Nothing on that path enters the JVM.
-
-The thread is started from a nonisolated function: a closure written inside a
-`MainActor` function is `MainActor`'s, and the runtime reports it as a data
-race the moment another thread runs it.
+A handler that awaits resumes on `MainActor`. The executor directly invokes
+the post registered with `CoreLink.postTurns(with:)`, writing the eventfd the
+main looper watches. The looper callback runs the UI turn. Posting enters no
+JVM and creates no waiting thread.
 
 ## One frame
 

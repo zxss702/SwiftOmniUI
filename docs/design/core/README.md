@@ -85,8 +85,8 @@ host and never calls the core.
   no live reader and no render running? --> refused, counted in the tally
      |
      |  dirty = true; changed += storage; its name kept for debugInfo()
-     v  UIThreadExecutor.poke()
-  doorbell thread wakes, posts one turn onto the UI thread
+     v  UIThreadExecutor.askForTurn()
+  the registered host post schedules one turn onto the UI thread
      |
      v  host turn:  run jobs -> a pending cycle -> RENDER -> take acts
   Renderer.render(baseline: the generation the host holds)
@@ -141,20 +141,17 @@ host and never calls the core.
   event   HostBoundary.dispatch(id, payload)    a Task.detached or async let child
           Renderer.dispatch                      writes @State, sends an act,
           Task.immediate on MainActor            writes a board between cycles
-          -> the handler runs to its first           |  poke(), outside every lock
+          -> the handler runs to its first           |  askForTurn(), outside every lock
              await, inside the event                 v
-                                               doorbell thread (the host made it)
-  turn    HostBoundary.runJobs: MainActor's jobs  parked in waitForWork
-                                               wakes, counts the work, posts
-          a pending cycle, a render, the acts    ONE turn onto the UI thread
-                                                 and parks again
+                                               the registered host post schedules
+  turn    HostBoundary.runJobs: MainActor's jobs  ONE turn onto the UI thread
+          a pending cycle, a render, the acts
   resume  a continuation's job lands on
-          MainActor's executor -> next drain   nothing ever runs on it
+          MainActor's executor -> next drain
 ```
 
-The library never calls the host back: a resume produces its job on a pool
-thread, and entering a runtime from a thread it has never seen can deadlock the
-UI thread under a debugger. The host asks instead (concurrency.md).
+The registered post only schedules work; it never renders on the producer's
+thread. The host drains and renders on its UI thread (concurrency.md).
 
 ## Where things live
 

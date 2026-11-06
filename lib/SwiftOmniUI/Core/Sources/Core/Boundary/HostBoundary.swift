@@ -388,21 +388,16 @@
     @discardableResult
     public static func runJobs() -> Int { stateUIRunJobs() }
 
-    /// Parks the calling doorbell thread until asynchronous work arrives, and
-    /// answers how much is waiting - which can be 0, when another turn got
-    /// there first.
-    ///
-    /// Four kinds of work, each of which a handler resumed on the pool can
-    /// leave with nothing else to announce it: jobs in the executor's queue,
-    /// acts not yet taken, a tree a write left dirty, and a value waiting on
-    /// its board for a cycle - a driven write nobody reads, or a movement
-    /// `move(to:)` sent. Each wakes this thread after it lands, so the thread
-    /// cannot wake, count nothing and park again with the work behind it.
-    public static func waitForWork() -> Int {
-        UIThreadExecutor.shared.waitForWork()
-            + Renderer.shared.actCallsPending
-            + (Renderer.shared.needsRender ? 1 : 0)
-            + (Renderer.shared.cycleAwake() > 0 ? 1 : 0)
+    /// Registers a thread-safe post to the host's UI queue. The callback only
+    /// schedules a turn; the UI thread drains jobs and applies changes.
+    public static func postTurns(with post: (@Sendable () -> Void)?) {
+        UIThreadExecutor.shared.postTurns(with: post)
+    }
+
+    /// Jobs, acts, state changes or driven values waiting for a host turn.
+    public static var wantsTurn: Bool {
+        UIThreadExecutor.shared.pendingCount > 0 || Renderer.shared.actCallsPending > 0
+            || Renderer.shared.needsRender || Renderer.shared.cycleAwake() > 0
     }
 
     /// Takes the act calls queued since the previous host pump, in the order

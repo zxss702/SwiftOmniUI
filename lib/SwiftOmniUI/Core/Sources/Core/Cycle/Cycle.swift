@@ -95,7 +95,7 @@ final class CycleBoard: @unchecked Sendable {
         // A write waiting for a cycle wakes the host, outside the hold: a write from the
         // pool has nothing else to announce it.
         if waiting {
-            UIThreadExecutor.shared.poke()
+            UIThreadExecutor.shared.askForTurn()
         }
     }
 

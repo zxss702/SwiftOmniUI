@@ -165,9 +165,9 @@ application that starts one window, without building it.
 ## The doorbell
 
 A handler that awaits resumes on `MainActor`, whose jobs wait in SwiftOmniUI's UI
-executor until the host drains them. A thread of the host's own parks until
-the core has work, and posts one turn to the UI thread's `DispatcherQueue`
-through the relay; the turn runs on the UI thread among WinUI's own work.
+executor until the host drains them. `CoreLink.postTurns(with:)` registers the
+relay's thread-safe `DispatcherQueue` post. The executor invokes it directly
+when work arrives; the turn runs on the UI thread among WinUI's own work.
 What a layout pass decides - a split view's first room - waits in the doorbell
 until the pass is over. It runs at the start of either the next posted turn
 or the next composed frame, before that frame's user reports. The shared

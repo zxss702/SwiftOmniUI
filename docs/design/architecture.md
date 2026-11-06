@@ -88,8 +88,8 @@ frame, and never computes again what the core decides.
   UI thread                            MainActor: handlers, renders, the host's work
     runs jobs the core queues          UIThreadExecutor, drained by the host
                                        (CoreLink.runJobs())
-  doorbell thread                      parked in CoreLink.waitForWork();
-                                       wakes the UI thread when work arrives
+  producing thread                     calls the post registered with CoreLink;
+                                       schedules a UI turn when work arrives
   cooperative pool                     an application's own async work, off MainActor
 ```
 

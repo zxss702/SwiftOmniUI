@@ -6,16 +6,16 @@
 import Android
 import CSwiftOmniUIAndroid
 
-/// The doorbell: a thread parked until the core has work, ringing the main looper through an eventfd.
+/// The doorbell posts core work to the main looper through an eventfd.
 /// Design: docs/design/platforms/android/runtime.md#the-doorbell
 enum AndroidDoorbell {
-    /// The eventfd the doorbell's thread writes and the main looper watches.
+    /// The eventfd any posting thread writes and the main looper watches.
     nonisolated(unsafe) private static var bell: Int32 = -1
 
     /// What the main looper runs when the bell rings.
     @MainActor private static var ring: () -> Void = {}
 
-    /// Watches the bell from the main looper, running `ring` on each ring, and starts the thread.
+    /// Watches the bell from the main looper and registers its thread-safe post.
     @MainActor static func install(ring: @escaping () -> Void) {
         guard bell < 0 else { return }
 
@@ -35,18 +35,9 @@ enum AndroidDoorbell {
             return 1
         }, nil)
 
-        startThread()
-    }
-
-    /// Started from a nonisolated function: a closure written in a `@MainActor` one would be MainActor's.
-    /// Design: docs/design/platforms/android/runtime.md#the-doorbell
-    private nonisolated static func startThread() {
-        var thread: pthread_t = 0
-        pthread_create(&thread, nil, { _ in
-            CoreLink().ringForever {
-                var one: UInt64 = 1
-                _ = write(AndroidDoorbell.bell, &one, 8)
-            }
-        }, nil)
+        CoreLink().postTurns(with: { [descriptor = bell] in
+            var one: UInt64 = 1
+            _ = write(descriptor, &one, 8)
+        })
     }
 }

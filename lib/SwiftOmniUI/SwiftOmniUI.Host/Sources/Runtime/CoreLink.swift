@@ -122,8 +122,8 @@
     @discardableResult
     public func runJobs() -> Int { HostBoundary.runJobs() }
 
-    /// Parks the doorbell's thread until work arrives.
-    public func waitForWork() -> Int { HostBoundary.waitForWork() }
+    /// Registers the host's thread-safe post to its UI queue.
+    public func postTurns(with post: (@Sendable () -> Void)?) { HostBoundary.postTurns(with: post) }
 
     /// Takes the act calls queued since the previous pump.
     public func takeActCalls() -> [HostActCall] { HostBoundary.takeActCalls() }

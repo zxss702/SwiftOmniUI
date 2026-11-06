@@ -5,22 +5,12 @@
 @_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIGTK
 
-/// The doorbell: a thread parked until the core has work, posting a turn to GLib's main loop.
+/// The doorbell posts core work directly to GLib's main loop.
 /// Design: docs/design/platforms/gtk/runtime.md#the-doorbell
 enum GTKDoorbell {
-    /// Whether the thread runs.
-    @MainActor private static var installed = false
-
-    /// Starts the thread, once.
+    /// Registers the main loop's thread-safe post.
     @MainActor static func install() {
-        guard !installed else { return }
-        installed = true
-        startThread()
-    }
-
-    /// Started from a nonisolated function: a closure written in a `@MainActor` one is MainActor's.
-    private nonisolated static func startThread() {
-        _ = g_thread_new("swiftomniui-doorbell", { _ in CoreLink().ringForever { GTKDoorbell.postTurn() } }, nil)
+        CoreLink().postTurns(with: { GTKDoorbell.postTurn() })
     }
 
     /// Posts one turn to the main loop, at input's priority, so it lands before the next paint.

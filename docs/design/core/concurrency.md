@@ -43,40 +43,31 @@ runs on Swift's cooperative pool whoever calls it, so a handler awaiting one
 would come back on a pool thread with the host drawing beside it. A test holds
 every async declaration in the library to one of the two spellings.
 
-## The host is never called back
+## Posting work to the host
 
-Handing each job to a host function pointer is a trap. `resume()` produces its
-job on a cooperative-pool thread, so such a callback enters the host from a
-thread its runtime has never seen. A relay in a platform's own language - Java
-through JNI - attaches that thread on the way in, and on Android, with a
-debugger attached, the attach can deadlock the UI thread: the app freezes at
-the first `await` in a handler and stops receiving touches, while the same
-build without a debugger is fine. So nothing here calls out; the host asks,
-through `HostBoundary.runJobs()`.
+The host registers a `@Sendable` post with `HostBoundary.postTurns(with:)`.
+Jobs, state writes, queued acts, saves and driven values call that post on the
+producing thread, outside the executor and renderer locks. The post only
+schedules a turn through the toolkit's thread-safe primitive. It neither runs
+UI work nor enters Java through JNI; Android writes an eventfd watched by the
+main looper. The UI thread runs jobs through `HostBoundary.runJobs()`.
 
 ## The doorbell
 
-Work can arrive when no act is in flight at all: `Task.sleep` coming due, a task
-an author started finishing, a stream yielding. So the host parks a thread of
-its own in `HostBoundary.waitForWork()`, and that thread is
-the doorbell:
-
 ```text
-  doorbell thread (the host created it, so its runtime has always known it)
-    |  parked in UIThreadExecutor.waitForWork()
-    |  woken by: a job enqueued, a state write, an act sent, a save recorded,
-    |            a value written to a board between cycles   (poke)
+  producer: job queued / state written / act or save queued / board changed
+    |  coalesced until the next drain begins
     v
-  answers how much is waiting:
-    jobs queued + acts and saves not taken + a dirty tree + a board awake
-    |
-    v  posts ONE turn onto the UI thread, the toolkit's own thread-safe way
-  host turn on the UI thread:  run jobs -> a pending cycle -> render -> acts
+  registered post: DispatcherQueue / GLib idle / Android eventfd
+    v
+  UI-thread pump: run jobs -> a pending cycle -> render -> acts
 ```
 
-Nothing runs on the doorbell thread; it only asks. A wake is signalled at most
-once per park - the armed flag folds a thousand wakes inside one drain into
-one - and the count may be zero when another turn got there first.
+Registration posts an initial turn for work that arrived before the host was
+ready. A drain clears the posted flag before running jobs, so work produced
+during that drain can post the next turn. Reentrant drains leave the running
+drain and its pending post intact. No helper thread waits for core work.
+The standalone executor loop uses the same post to signal its own semaphore.
 
 ## Draining jobs
 
@@ -127,7 +118,7 @@ a body takes out - a continuation to resume, a handler to call - runs after
 Where the guarded state is the lock owner's own, it stands inside the lock:
 `Guarded` (Guarded.swift) holds a value that `withLock` alone reaches, as
 `inout`, so a read or a write without the lock does not compile. A board's
-book is one (cycle.md, The board): the doorbell reads it from its own thread.
+book is one (cycle.md, The board): the host reads it when deciding whether a turn has work.
 
 ## Lock order
 

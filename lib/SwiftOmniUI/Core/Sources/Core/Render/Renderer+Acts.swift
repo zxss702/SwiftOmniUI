@@ -52,7 +52,7 @@ extension Renderer {
 
         // Wakes the host outside the lock: an act sent from a plain `Task` lands no job
         // on the executor, and nothing else would tell the host it is there.
-        UIThreadExecutor.shared.poke()
+        UIThreadExecutor.shared.askForTurn()
     }
 
     /// Acts queued and not yet taken, waiting saves included - work to the doorbell.

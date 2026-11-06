@@ -90,7 +90,7 @@ public final class State<Value>: @unchecked Sendable {
     /// Design: docs/design/core/state.md#kept-state
     private func wakeForSave() {
         if storage.keep != nil {
-            UIThreadExecutor.shared.poke()
+            UIThreadExecutor.shared.askForTurn()
         }
     }
 

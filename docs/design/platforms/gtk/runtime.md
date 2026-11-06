@@ -50,15 +50,10 @@ makes - rather than by waiting for a frame.
 
 ## The doorbell
 
-A handler that awaits resumes on `MainActor`, whose jobs wait in SwiftOmniUI's UI
-executor until the host drains them. A GLib thread of the host's own parks
-until the core has work, and posts one turn to the main loop with
-`g_idle_add_full` at `G_PRIORITY_DEFAULT` - input's priority, above GTK's
-redraw - so a turn's render lands before the next frame is drawn.
-
-The thread is started from a nonisolated function: a closure written inside a
-`MainActor` function is `MainActor`'s, and the runtime reports it as a data
-race the moment another thread runs it.
+A handler that awaits resumes on `MainActor`. The executor directly invokes
+the post registered with `CoreLink.postTurns(with:)`, using `g_idle_add_full`
+at `G_PRIORITY_DEFAULT` so the UI thread runs the turn before GTK redraws.
+No GLib thread waits for work; the callback only posts, outside the queue lock.
 
 ## One frame
 

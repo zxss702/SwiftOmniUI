@@ -115,12 +115,12 @@ asking the core for another render or waiting for another frame.
 
 ## One turn
 
-A thread parked in `CoreLink.waitForWork()` wakes the UI thread whenever the
-core has work: a job on `MainActor`, a cycle, a render or an act. The turn
+The post registered with `CoreLink.postTurns(with:)` wakes the UI thread when
+the core has work: a job on `MainActor`, a cycle, a render or an act. The turn
 always runs in the same order.
 
 ```text
-  doorbell thread: CoreLink.waitForWork() returns
+  producer: the core calls the registered post
     |  posts one turn to the UI thread
     v
   pump:  run the jobs  ->  a pending cycle  ->  render  ->  acts
@@ -144,11 +144,10 @@ before what comes after it, and the turn goes round again; only then the acts.
 
 ## The doorbell
 
-The core rings when it has work a turn must take - a handler resumed off the
-UI thread, a state an engine wrote. A host parks a thread of its own on the
-core (`CoreLink.ringForever`) and posts a turn onto its UI thread each time the
-core rings: WinUI through its relay, GTK through
-GLib, Android onto its looper. The turn itself is the `Pump`'s.
+The core calls the registered thread-safe post when work arrives. WinUI posts
+through its relay, GTK uses GLib and Android writes its main looper's eventfd.
+Calls coalesce until the next executor drain begins. Only the UI thread runs
+the `Pump`; the posting thread performs no layout, rendering or Java work.
 
 ## The handlers' order
 
@@ -530,7 +529,7 @@ the lines there.
 
 A runtime calls the running core through `CoreLink` alone: a render, a cycle,
 an event, an act call and its answer, a user's report, the application's and
-the scene's reports, the kept values and the doorbell's wait. The line is the
+the scene's reports, the kept values and the doorbell's post. The line is the
 typed `HostBoundary` SPI. The lane codecs - a journey read from its
 image and written back, a placement run - are arithmetic on values the runtime
 already holds, and stay the SPI's.

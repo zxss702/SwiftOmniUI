@@ -47,11 +47,11 @@ final class UIThreadExecutor: SerialExecutor, @unchecked Sendable {
     /// Jobs waiting for the host to run them.
     private var pending: [UnownedJob] = []
 
-    /// What the host's parked thread waits on, signalled at most once per park.
+    /// The standalone executor loop waits on its own posted turn.
     private let wake = DispatchSemaphore(value: 0)
 
-    /// Whether a wake is signalled that the parked thread has not collected.
-    private var wakeArmed = false
+    private var postTurn: (@Sendable () -> Void)?
+    private var turnAsked = false
 
     /// Whether a drain is posted to the platform's main queue and has not run - for
     /// processes where something turns that queue.
@@ -69,23 +69,21 @@ final class UIThreadExecutor: SerialExecutor, @unchecked Sendable {
     /// Design: docs/design/core/concurrency.md#isolation-checks
     private var uiThread = currentThread()
 
-    /// Takes a job and wakes the host; it runs nothing, the calling thread being any
-    /// thread. The signal and the post happen outside the lock.
+    /// Takes a job and posts a host turn from the calling thread. Callbacks run
+    /// outside the queue lock and only schedule work on the host's UI thread.
     func enqueue(_ job: consuming ExecutorJob) {
         let job = UnownedJob(job)
 
-        let (signal, post): (Bool, Bool) = guarded.withLock {
+        let post: Bool = guarded.withLock {
             pending.append(job)
 
             let post = !mainQueueAsked
             mainQueueAsked = true
 
-            guard !wakeArmed else { return (false, post) }
-            wakeArmed = true
-            return (true, post)
+            return post
         }
 
-        if signal { wake.signal() }
+        askForTurn()
 
         if post {
             // A work item, not a closure: a closure on the main queue is `MainActor`'s, and
@@ -97,28 +95,23 @@ final class UIThreadExecutor: SerialExecutor, @unchecked Sendable {
         }
     }
 
-    /// Wakes the host's parked thread for work this queue cannot see - an act sent
-    /// from the pool, a state write.
-    /// Design: docs/design/core/acts.md#waking-the-host-for-an-act
-    func poke() {
-        let signal: Bool = guarded.withLock {
-            guard !wakeArmed else { return false }
-            wakeArmed = true
-            return true
+    /// Installs the host's post and schedules work that arrived before it.
+    func postTurns(with post: (@Sendable () -> Void)?) {
+        guarded.withLock {
+            postTurn = post
+            turnAsked = false
         }
-
-        if signal { wake.signal() }
+        askForTurn()
     }
 
-    /// Parks the calling thread until work lands and answers how many jobs wait -
-    /// what `HostBoundary.waitForWork` runs.
-    func waitForWork() -> Int {
-        wake.wait()
-
-        return guarded.withLock {
-            wakeArmed = false
-            return pending.count
+    /// Coalesces jobs, state writes and acts until the host begins a drain.
+    func askForTurn() {
+        let post: (@Sendable () -> Void)? = guarded.withLock {
+            guard !turnAsked, let postTurn else { return nil }
+            turnAsked = true
+            return postTurn
         }
+        post?()
     }
 
     /// Runs every waiting job on the calling thread and answers how many ran - in a
@@ -128,13 +121,12 @@ final class UIThreadExecutor: SerialExecutor, @unchecked Sendable {
         let entered: Bool = guarded.withLock {
             guard !draining else { return false }
             draining = true
+            turnAsked = false
+            uiThread = currentThread()
             return true
         }
 
         guard entered else { return 0 }
-
-        // Jobs run on this thread, so this is where MainActor stands.
-        guarded.withLock { uiThread = currentThread() }
 
         var ran = 0
 
@@ -193,8 +185,9 @@ final class UIThreadExecutor: SerialExecutor, @unchecked Sendable {
     /// Runs the UI thread's loop here until `stop()` - what an `async main` asks of
     /// `MainActor`'s executor; a host drains through `HostBoundary.runJobs` instead.
     func runTheLoop() {
+        postTurns(with: { [wake] in wake.signal() })
         while !guarded.withLock({ stopped }) {
-            _ = waitForWork()
+            wake.wait()
             drain()
         }
 
@@ -204,7 +197,7 @@ final class UIThreadExecutor: SerialExecutor, @unchecked Sendable {
     /// Makes `runTheLoop()` return after the drain it is in.
     func stopTheLoop() {
         guarded.withLock { stopped = true }
-        poke()
+        wake.signal()
     }
 }
 
