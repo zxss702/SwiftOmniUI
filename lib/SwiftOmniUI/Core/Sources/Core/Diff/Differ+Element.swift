@@ -49,7 +49,6 @@ extension Differ {
     /// element changed, or one unchanged whose empty patch its parent drops.
     ///
     /// `sizesArrive` says the layout it stands in is measured.
-    @inline(never)
     func element(
         id: ElementId,
         rendered: RenderedNode?,
@@ -57,12 +56,48 @@ extension Differ {
         forced: Bool = false,
         sizesArrive: Bool = false
     ) -> (node: RenderedNode, patch: HostPatch) {
-        var node = node
+        var pass = ElementPass(id: id, rendered: rendered, node: node, forced: forced, sizesArrive: sizesArrive)
+        let outerValues = envValues
+        let outerScene = sceneRecord
+        let outsideFocusScope = inFocusedScope
+        defer {
+            if pass.enteredScene { sceneNodes.removeLast() }
+            inFocusedScope = outsideFocusScope
+            sceneRecord = outerScene
+            bodies.removeLast(pass.entered)
+            scope.removeLast(pass.pushed)
+            envValues = outerValues
+            if pass.inspected { Inspection.leave() }
+        }
+        if expandElement(&pass), let rendered { return carry(rendered, written: pass.node) }
+        if pass.node.type == .fragment {
+            pass.node.children = pass.node.children.flatMap(\.asChildren).map { child in
+                var child = child
+                child.absorbFragmentWrites(of: pass.node, environments: false)
+                return child
+            }
+            if let rendered, rendered.type != .fragment { forget(rendered) }
+            pass.previous = rendered?.type == .fragment ? rendered : nil
+            pass.patch = HostPatch(id: id, type: .fragment)
+        } else {
+            prepareElement(&pass)
+        }
+        let children = withCustomLayoutOwner(pass.node.type == .customLayout ? id : nil) {
+            reconcileChildren(of: pass.previous, node: pass.node, into: &pass.patch,
+                              sizesArrive: pass.node.type == .fragment ? sizesArrive : pass.node.childSizesArrive)
+        }
+        return finishElement(&pass, children: children)
+    }
+
+    @inline(never)
+    private func expandElement(_ pass: inout ElementPass) -> Bool {
+        let (id, rendered, forced) = (pass.id, pass.rendered, pass.forced)
+        var node = pass.node
 
         // Whether an inspector's frame is open for this element
         // (Inspection.swift).
         var inspected = false
-        defer { if inspected { Inspection.leave() } }
+        defer { pass.inspected = inspected }
 
         var views: [(
             type: String,
@@ -91,11 +126,10 @@ extension Differ {
         // What `.environment()` provided here joins the scope before anything below
         // resolves; the count is kept for the clean walk.
         var pushed = node.environments.count
-        let outerValues = envValues
+        defer { pass.pushed = pushed }
         envValues = envValues.overlaid(with: node.environmentValues)
         let inputIsEnabled = envValues.isEnabled
         scope.append(contentsOf: node.environments)
-        defer { scope.removeLast(pushed); envValues = outerValues }
 
         // What the element holds for its life - a page's session - handed back on every
         // build (ElementSession.swift).
@@ -113,7 +147,7 @@ extension Differ {
 
         // And which views this element enters, for the containers under it.
         var entered = 0
-        defer { bodies.removeLast(entered) }
+        defer { pass.entered = entered }
 
         // The environments visible at a composed view, which a carry compares.
         // Design: docs/design/core/identity-and-diffing.md#what-a-carry-cannot-see
@@ -123,7 +157,7 @@ extension Differ {
         // composed view keeps its placeholder, a container its node with the content
         // still to run; a leaf keeps nothing.
         // Design: docs/design/core/identity-and-diffing.md#the-clean-walk
-        var placeholder = node.stateful != nil || node.producer != nil ? node : nil
+        let placeholder = node.stateful != nil || node.producer != nil ? node : nil
 
         // The node as written, which a leaf wearing a themed value keeps.
         let authored = node
@@ -133,10 +167,6 @@ extension Differ {
 
         // The frame the last body build ran under, for the container content below.
         var frame: BuildScope.Frame?
-
-        // The scene this element is in, held while it and its subtree are built.
-        let outerScene = sceneRecord
-        defer { sceneRecord = outerScene }
 
         // Unwraps nested placeholders, outermost first, until a real node comes out.
         while true {
@@ -202,7 +232,8 @@ extension Differ {
                                 stateful.viewType, .carried, element: id)
                         }
 
-                        return carry(rendered, written: node)
+                        pass.node = node
+                        return true
                     }
 
                     if Inspection.recording {
@@ -257,9 +288,7 @@ extension Differ {
         // subtree in the publishing branch: any element there may be the one
         // holding the keyboard focus, so each reports the platform's moves -
         // which is how the store knows the chain.
-        let outsideFocusScope = inFocusedScope
         inFocusedScope = inFocusedScope || !node.focusedValues.isEmpty
-        defer { inFocusedScope = outsideFocusScope }
 
         // A scene written as a node rather than a scene type - a test's own tree.
         if node.type == .scene, sceneRecord == nil, case .manual(let name) = id {
@@ -273,7 +302,7 @@ extension Differ {
         if let name = enteredScene {
             sceneNodes.append((id: name, node: node))
         }
-        defer { if enteredScene != nil { sceneNodes.removeLast() } }
+        pass.enteredScene = enteredScene != nil
 
         // The container's own content runs here, inside this element's read scope and
         // build frame: the reader of a state is the closure that read it.
@@ -322,52 +351,30 @@ extension Differ {
             readings.append(image.sample(into: into, every: asks.window, take: take))
         }
 
-        // A fragment - a `TupleView`, `Group`, `ForEach` or `EmptyView` - is
-        // transparent: it keeps no element of its own. What was written on it
-        // lands on each child, and its children stand in their parent's list as
-        // though written there; this node stays only to anchor the views above it.
-        if node.type == .fragment {
-            var grouped = node
-            grouped.children = node.children.flatMap(\.asChildren).map { child in
-                var child = child
-                child.absorbFragmentWrites(of: node, environments: false)
-                return child
-            }
+        pass.node = node
+        pass.views = views
+        pass.key = key
+        pass.builds = builds
+        pass.placeholder = placeholder
+        pass.reads = reads
+        pass.readings = readings
+        pass.session = session
+        pass.seen = seen
+        pass.within = within
+        pass.inputIsEnabled = inputIsEnabled
+        pass.lazySource = lazySource
+        pass.authored = authored
+        return false
+    }
 
-            // What stood here was a plain element: nothing of it carries over.
-            if let rendered, rendered.type != .fragment {
-                forget(rendered)
-            }
-
-            var patch = HostPatch(id: id, type: .fragment)
-            let children = reconcileChildren(
-                of: rendered?.type == .fragment ? rendered : nil,
-                node: grouped, into: &patch, sizesArrive: sizesArrive)
-
-            let result = RenderedNode(
-                id: id,
-                type: .fragment,
-                props: [:],
-                events: [:],
-                key: key,
-                views: views,
-                placeholder: placeholder,
-                view: within?.view,
-                reads: reads,
-                builds: builds,
-                provided: Array(scope.suffix(pushed)),
-                seen: seen,
-                children: children)
-            result.environmentValues = node.environmentValues
-            result.inputIsEnabled = inputIsEnabled
-            result.lazyIdentity = node.lazyIdentity
-            // Its writes and listeners fanned out into the children above; what
-            // a parent's fold reads of it is theirs alone.
-            result.preferenceValues = foldedPreferences(seeds: [], transforms: [], children: children)
-            result.session = session
-            return (result, patch)
-        }
-
+    @inline(never)
+    private func prepareElement(_ pass: inout ElementPass) {
+        let (id, rendered, sizesArrive) = (pass.id, pass.rendered, pass.sizesArrive)
+        var node = pass.node
+        let views = pass.views
+        let authored = pass.authored
+        var placeholder = pass.placeholder
+        var reads = pass.reads
         node.resolveEnabled(in: envValues)
 
         // The style is applied here, so a host receives every value already on the
@@ -701,8 +708,68 @@ extension Differ {
             patch.driven = .replace(driven.mapValues(HostStateBinding.init))
         }
 
-        let children = withCustomLayoutOwner(node.type == .customLayout ? id : nil) {
-            reconcileChildren(of: previous, node: node, into: &patch, sizesArrive: node.childSizesArrive)
+        pass.node = node
+        pass.placeholder = placeholder
+        pass.reads = reads
+        pass.visualInput = visualInput
+        pass.visualState = visualState
+        pass.canvasReads = canvasReads
+        pass.shapeReads = shapeReads
+        pass.shapeSize = shapeSize
+        pass.previous = previous
+        pass.engines = engines
+        pass.patch = patch
+        pass.armed = armed
+        pass.transacting = transacting
+        pass.tasks = tasks
+        pass.events = events
+        pass.driven = driven
+    }
+
+    @inline(never)
+    private func finishElement(_ pass: inout ElementPass, children: [RenderedNode]) -> (node: RenderedNode, patch: HostPatch) {
+        let id = pass.id
+        let node = pass.node
+        let previous = pass.previous
+        let plan = node.animation
+        let armed = pass.armed
+        let transacting = pass.transacting
+        let lazySource = pass.lazySource
+        let key = pass.key
+        let views = pass.views
+        let placeholder = pass.placeholder
+        let within = pass.within
+        var reads = pass.reads
+        let builds = pass.builds
+        let pushed = pass.pushed
+        let seen = pass.seen
+        let inputIsEnabled = pass.inputIsEnabled
+        let session = pass.session
+        var patch = pass.patch
+
+        if node.type == .fragment {
+            let result = RenderedNode(
+                id: id,
+                type: .fragment,
+                props: [:],
+                events: [:],
+                key: key,
+                views: views,
+                placeholder: placeholder,
+                view: within?.view,
+                reads: reads,
+                builds: builds,
+                provided: Array(scope.suffix(pushed)),
+                seen: seen,
+                children: children)
+            result.environmentValues = node.environmentValues
+            result.inputIsEnabled = inputIsEnabled
+            result.lazyIdentity = node.lazyIdentity
+            // Its writes and listeners fanned out into the children above; what
+            // a parent's fold reads of it is theirs alone.
+            result.preferenceValues = foldedPreferences(seeds: [], transforms: [], children: children)
+            result.session = session
+            return (result, patch)
         }
 
         // A child's value gate can start a layout animation without an ambient
@@ -791,13 +858,13 @@ extension Differ {
         let sourceReads = reads
         reads.formUnion(lazySource?.lazyRowReadings?.states ?? [])
         let drawingBodyReads = reads
-        reads.formUnion(canvasReads)
-        reads.formUnion(shapeReads)
+        reads.formUnion(pass.canvasReads)
+        reads.formUnion(pass.shapeReads)
         let result = RenderedNode(
             id: id,
             type: node.type,
             props: node.props,
-            events: events,
+            events: pass.events,
             animation: patch.animation?.animation ?? previous?.animation ?? .inherited,
             lanes: patch.animation?.lanes ?? previous?.lanes ?? .all,
             gates: node.animation?.gates.map(\.value) ?? [],
@@ -810,9 +877,9 @@ extension Differ {
             provided: Array(scope.suffix(pushed)),
             seen: seen,
             watched: node.watches.map { $0.value },
-            engines: engines,
-            driven: driven,
-            readings: readings,
+            engines: pass.engines,
+            driven: pass.driven,
+            readings: pass.readings,
             children: children
         )
         result.environmentValues = node.environmentValues
@@ -824,15 +891,15 @@ extension Differ {
         result.lazyIdentity = node.lazyIdentity
         result.lazyRequestGeneration = node.lazyRequestGeneration
         result.shapePath = node.shapePath
-        result.shapeSize = shapeSize
-        result.shapeReads = shapeReads
+        result.shapeSize = pass.shapeSize
+        result.shapeReads = pass.shapeReads
         result.canvas = node.canvas
-        result.canvasReads = canvasReads
+        result.canvasReads = pass.canvasReads
         result.drawingBodyReads = drawingBodyReads
         node.canvas?.owner = result
-        result.sizesArrive = sizesArrive
-        result.visualInput = visualInput
-        result.visualState = visualState
+        result.sizesArrive = pass.sizesArrive
+        result.visualInput = pass.visualInput
+        result.visualState = pass.visualState
         result.preferenceSeeds = node.preferenceSeeds
         result.anchorBoxes = node.anchorBoxes
         result.preferenceTransforms = node.preferenceTransforms
@@ -862,7 +929,7 @@ extension Differ {
 
         // What it runs as it leaves: this build's closures, the newest.
         result.destroying = node.destroying
-        result.tasks = tasks
+        result.tasks = pass.tasks
         result.session = session
 
         return (result, patch)
@@ -1035,5 +1102,54 @@ extension Differ {
         }
 
         return seen
+    }
+}
+
+/// Values passed between the element's stages. Preparation and completion return
+/// before the next subtree is entered, keeping temporary work off the recursive stack.
+private struct ElementPass {
+    let id: ElementId
+    let rendered: RenderedNode?
+    var node: Node
+    let forced: Bool
+    let sizesArrive: Bool
+    var inspected = false
+    var pushed = 0
+    var entered = 0
+    var enteredScene = false
+    var views: [(type: String, boxes: [(path: String, box: StateBox)], inputs: [(path: String, input: Input)])] = []
+    var key: String?
+    var builds = 0
+    var placeholder: Node?
+    var reads: Set<ObjectIdentifier> = []
+    var readings: [Sampling] = []
+    var session: AnyObject?
+    var seen: [ObjectIdentifier: ObjectIdentifier] = [:]
+    var within: BuildScope.Frame?
+    var inputIsEnabled = true
+    var lazySource: Node?
+    var authored: Node
+    var visualInput: VisualInput?
+    var visualState: String?
+    var canvasReads: Set<ObjectIdentifier> = []
+    var shapeReads: Set<ObjectIdentifier> = []
+    var shapeSize: Size?
+    var previous: RenderedNode?
+    var engines: [Int] = []
+    var patch: HostPatch
+    var armed: Set<Int> = []
+    var transacting: Transaction?
+    var tasks: [MountedTask] = []
+    var events: [Event: Int] = [:]
+    var driven: [Prop: StateEntry] = [:]
+
+    init(id: ElementId, rendered: RenderedNode?, node: Node, forced: Bool, sizesArrive: Bool) {
+        self.id = id
+        self.rendered = rendered
+        self.node = node
+        self.forced = forced
+        self.sizesArrive = sizesArrive
+        authored = node
+        patch = HostPatch(id: id, type: node.type)
     }
 }

@@ -700,6 +700,8 @@ import CRT
         values.isFrameContent = bool(.isFrameContent) ?? false
         values.isLayoutDecoration = bool(.isLayoutDecoration) ?? false
         switch type {
+        case .image:
+            if value(ImageContract.isResizable.token)?.bool == true { values.expandingAxes = .both }
         case .textField, .searchField:
             values.expandingAxes = .horizontal
         case .textEditor:

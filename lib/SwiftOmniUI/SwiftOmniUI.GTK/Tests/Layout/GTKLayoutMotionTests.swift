@@ -18,6 +18,7 @@ private struct LengtheningPage: View {
             Button("Longer").onClicked { long = true }
         }
         .animation(.eased(200, .linear))
+        .horizontalAlignment(.fill)
         .frame(width: 300)
         .horizontalAlignment(.start)
         .verticalAlignment(.start)
@@ -26,6 +27,44 @@ private struct LengtheningPage: View {
 
 /// A stack's children travel to the places a patch gives them; one that joins fades in, one hidden fades out first.
 final class GTKLayoutMotionTests: XCTestCase {
+    func testAValueGatedColumnReversesFromItsPresentedFrame() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let expanded = State(wrappedValue: false)
+            let host = GTKRenderer.running(clock: clock) {
+                HStack(spacing: 0) {
+                    Color.blue.frame(width: expanded.wrappedValue ? 400 : 200, height: 40)
+                }
+                .animation(.linear(duration: 0.2), value: expanded.wrappedValue)
+                .id("column")
+                .frame(width: 600, height: 100)
+            }
+            host.frame()
+            let child = try XCTUnwrap(host.runtime.tree.root?.first(id: .manual("column"))?.children.first)
+            let column = try XCTUnwrap(host.view(id: child.id))
+            let initialX = column.frame.x
+            expanded.wrappedValue = true
+            host.runtime.pump.turn()
+            host.frame()
+            clock.now = 100
+            host.frame()
+            XCTAssertEqual(column.frame.x, initialX - 50, accuracy: 1)
+
+            expanded.wrappedValue = false
+            host.runtime.pump.turn()
+            host.frame()
+            XCTAssertEqual(column.frame.x, initialX - 50, accuracy: 1, "retargeting must not jump to either endpoint")
+            clock.now = 200
+            host.frame()
+            XCTAssertEqual(column.frame.x, initialX - 37.5, accuracy: 1)
+            clock.now = 300
+            host.frame()
+            XCTAssertEqual(column.frame.x, initialX, accuracy: 0.5)
+            XCTAssertTrue(host.view(id: child.id) === column)
+            XCTAssertFalse(host.runtime.animator.isMoving)
+        }
+    }
+
     func testAValueGatedColumnMovesWithinItsOuterFrame() throws {
         try onUIThread {
             let clock = TestClock()
@@ -82,6 +121,7 @@ final class GTKLayoutMotionTests: XCTestCase {
     /// A vertical stack of 100 x 40 labels in `order`, travelling on a 200 ms linear law; `hidden` fade out in 100 ms.
     private static func stack(_ order: [String], hidden: Set<String> = []) -> HostPatch {
         var stack = HostPatch(id: .manual("stack"), type: .vStack)
+        stack.properties[.spacing] = .number(0)
         stack.animation = HostLayoutMotion(animation: .eased(200, .linear), lanes: .all)
         stack.children = .arranged(order.map { name in
             var row = HostPatch(id: .manual(name), type: .text)
@@ -100,19 +140,20 @@ final class GTKLayoutMotionTests: XCTestCase {
             host.apply(Self.stack(["a", "b"]))
             let moved = try XCTUnwrap(host.view(id: .manual("b")))
             host.layOut()
-            XCTAssertEqual(moved.frame.y, 40, "the first arrangement is an arrival")
+            let top = try XCTUnwrap(host.view(id: .manual("a"))).frame.y
+            XCTAssertEqual(moved.frame.y, top + 40, "the first arrangement is an arrival")
 
             host.apply(Self.stack(["b", "a"]))
             host.layOut()
-            XCTAssertEqual(moved.frame.y, 40, "a child starts from where it stood")
+            XCTAssertEqual(moved.frame.y, top + 40, "a child starts from where it stood")
 
             clock.now = 100
             host.frame()
-            XCTAssertEqual(moved.frame.y, 20, "halfway through a linear 200 ms animation")
+            XCTAssertEqual(moved.frame.y, top + 20, "halfway through a linear 200 ms animation")
 
             clock.now = 200
             host.frame()
-            XCTAssertEqual(moved.frame.y, 0, "and it lands exactly")
+            XCTAssertEqual(moved.frame.y, top, "and it lands exactly")
             XCTAssertFalse(host.runtime.animator.isMoving)
         }
     }
@@ -144,11 +185,12 @@ final class GTKLayoutMotionTests: XCTestCase {
             let host = GTKRenderer.bare(clock: TestClock(), reducesMotion: true)
             host.apply(Self.stack(["a", "b"]))
             host.layOut()
+            let top = try XCTUnwrap(host.view(id: .manual("a"))).frame.y
 
             host.apply(Self.stack(["b", "a"]))
             host.layOut()
 
-            XCTAssertEqual(try XCTUnwrap(host.view(id: .manual("b"))).frame.y, 0)
+            XCTAssertEqual(try XCTUnwrap(host.view(id: .manual("b"))).frame.y, top)
             XCTAssertFalse(host.runtime.animator.isMoving)
         }
     }
@@ -162,7 +204,8 @@ final class GTKLayoutMotionTests: XCTestCase {
             let first = try XCTUnwrap(host.view(id: .manual("first")))
             let second = try XCTUnwrap(host.view(id: .manual("second")))
             host.layOut()
-            XCTAssertEqual(second.frame.y, 40)
+            let top = first.frame.y
+            XCTAssertEqual(second.frame.y, top + 40)
 
             host.apply(Self.stack(["first", "second"], hidden: ["first"]))
             host.layOut()
@@ -171,21 +214,21 @@ final class GTKLayoutMotionTests: XCTestCase {
             clock.now = 50
             host.frame()
             XCTAssertEqual(first.drawnOpacity, 0.5, accuracy: GTKView.opacityStep)
-            XCTAssertEqual(second.frame.y, 40)
+            XCTAssertEqual(second.frame.y, top + 40)
 
             clock.now = 100
             host.frame()
             XCTAssertFalse(first.isShown, "gone when the fade landed")
             XCTAssertEqual(first.drawnOpacity, 1, accuracy: GTKView.opacityStep, "at the opacity the tree describes")
-            XCTAssertEqual(second.frame.y, 40, "the row below starts once it has gone")
+            XCTAssertEqual(second.frame.y, top + 40, "the row below starts once it has gone")
 
             clock.now = 200
             host.frame()
-            XCTAssertEqual(second.frame.y, 20, "and travels into its place")
+            XCTAssertEqual(second.frame.y, top + 30, "and travels into its place")
 
             clock.now = 300
             host.frame()
-            XCTAssertEqual(second.frame.y, 0)
+            XCTAssertEqual(second.frame.y, top + 20)
         }
     }
 

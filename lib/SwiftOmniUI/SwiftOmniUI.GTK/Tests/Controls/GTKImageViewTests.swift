@@ -102,6 +102,9 @@ final class GTKImageViewTests: XCTestCase {
                     .horizontalAlignment(.start)
                     .verticalAlignment(.start)
             }
+            let image = try XCTUnwrap(host.runtime.tree.root?.first(type: .image))
+            XCTAssertEqual(image.properties[ImageElementContract.aspect.token], .enumeration(aspect.rawValue))
+            XCTAssertEqual(image.properties[ImageContract.isResizable.token], .bool(true))
             let stack = try XCTUnwrap(host.views(GTKStackView.self).first)
             host.settle { stack.pixels(at: [(width / 2, height / 2)]) == [Self.wide] }
             return stack.pixels(at: points)

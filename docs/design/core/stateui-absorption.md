@@ -13,6 +13,16 @@ migration.
 | Independent animation runs and monotonic display time | `939e4f7d5`, `79afcab7d`, `added9ec9`, `529190d88` | Existing `f053c8132`: shared animation channels and display cycle; native backend regressions are tested separately. |
 | Measured child changes invalidate parent layout | `a90277055` | Existing measured-property classification in MountedElement; retain SOUI's lazy invalidation and arrangement caches. |
 | Numeric contract keys and declaration token reuse | `54703ef18`, `689759e63`, `b0576296c`; current KeyName | Cache deterministic numbers for Prop/Event/Act/NodeType; preserve name-based external representation and existing initializers. Keep KeyName internal. |
+| Bounded recursive diff stack | `2830b496b` | Expand and prepare before descending, then complete after children return. SOUI carries stage data in a private value type and retains its environment, scene, focus, preference and drawing scopes. Carried subtrees are revisited after the expansion frame returns as well. |
+
+The staged differ addresses a Windows Debug stack overflow reproduced by nested
+animated caption selection. A forty-level tree regression checks both the rendered
+leaf and a per-level stack budget of 24 KiB (less than 1 MiB across forty levels).
+This is a stack-use contract, not a claim about body rebuild counts or throughput.
+
+Native animation regressions use SOUI's frame wrappers and centered stack
+placement. They check uninterrupted movement and reversal from the presented
+position, including velocity continuity and preservation of the native view.
 
 ## SOUI-specific drawing correction
 

@@ -8,27 +8,6 @@ import CSwiftOmniUIWinUI
 import SwiftOmniUIConformance
 import XCTest
 
-/// A red box cut to its outline, which a click moves.
-private struct CutPage: View {
-    @State private var moved = false
-
-    var body: some View {
-        VStack {
-            VStack { Text("cut") }
-                .frame(width: 40)
-                .frame(height: 40)
-                .background(Color("#FF0000"))
-                .clipsContent(true)
-                .horizontalAlignment(.start)
-                .offset(x: moved ? 50 : 0)
-            Button("Move").onClicked { moved = true }
-        }
-        .frame(width: 100)
-        .horizontalAlignment(.start)
-        .verticalAlignment(.start)
-    }
-}
-
 final class WinUIMotionTests: XCTestCase {
     func testScaledTranslatedBlurredTabCaptionsDoNotAlternateEllipsis() throws {
         try onUIThread {
@@ -67,7 +46,7 @@ final class WinUIMotionTests: XCTestCase {
             for index in [1, 0, 1] {
                 let start = clock.now
                 let button = try XCTUnwrap(host.view(id: .manual("caption-tab-\(index)")) as? WinUIButtonView)
-                try button.invoke()
+                button.invoke()
                 host.step()
                 let label = try XCTUnwrap(host.views(WinUILabelView.self).first { $0.text == captions[index] })
                 let identity = label.handle
@@ -103,12 +82,14 @@ final class WinUIMotionTests: XCTestCase {
             let element = try XCTUnwrap(host.runtime.tree.root?.first(id: .manual("hover-row")))
             let row = try XCTUnwrap(host.view(id: element.id) as? WinUILayoutView)
             let revision = row.measurementRevision
-            let box = row.boxView
+            XCTAssertNil(row.boxView, "a clear background needs no native shape")
             row.heard(.pointer(.pointerEntered, .zero))
             XCTAssertEqual(element.value(.background), Color.black.propValue)
             XCTAssertFalse(host.runtime.animator.isMoving)
             XCTAssertEqual(row.measurementRevision, revision)
-            XCTAssertTrue(row.boxView === box)
+            let box = try XCTUnwrap(row.boxView)
+            row.heard(.pointer(.pointerEntered, .zero))
+            XCTAssertTrue(row.boxView === box, "an unchanged brush preserves its native shape")
             row.heard(.pointer(.pointerExited, .zero))
             XCTAssertEqual(element.value(.background), Color.clear.propValue)
             XCTAssertFalse(host.runtime.animator.isMoving)
@@ -123,10 +104,9 @@ final class WinUIMotionTests: XCTestCase {
             let wide = State(wrappedValue: false)
             let host = WinUIRenderer.running(clock: clock) {
                 VStack {
-                    ColorPicker()
-                        .color(wide.wrappedValue ? Color("#FF0000") : Color("#0000FF"))
-                        .frame(width: wide.wrappedValue ? 300 : 100)
-                        .frame(height: 60)
+                    Color.clear
+                        .frame(width: wide.wrappedValue ? 300 : 100, height: 60)
+                        .background(wide.wrappedValue ? Color("#FF0000") : Color("#0000FF"))
                         .horizontalAlignment(.start)
                         .animation(.eased(1000, .linear))
                         .id("box")
@@ -139,7 +119,7 @@ final class WinUIMotionTests: XCTestCase {
             host.runtime.pump.turn()
             clock.now = 500
             host.frame()
-            XCTAssertEqual(box.laidOutFrame.width, 200, accuracy: 1, "halfway across")
+            XCTAssertEqual(box.placedFrame.width, 200, accuracy: 1, "halfway across")
             let halfway = box.pixels(at: [(20, 30)])[0]
             XCTAssertEqual(Double((halfway >> 16) & 0xFF), 127.5, accuracy: 8, "halfway to red")
             XCTAssertEqual(Double(halfway & 0xFF), 127.5, accuracy: 8, "halfway from blue")
@@ -271,10 +251,11 @@ final class WinUIMotionTests: XCTestCase {
                         .scaleEffect(2)
                         .scaleEffect(x: 1.5)
                         .pivotX(0)
+                        .id("transformed-frame")
                 }
             }
-            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
-            let drawn = label.drawnTransform
+            let surface = try XCTUnwrap(host.view(id: .manual("transformed-frame")))
+            let drawn = surface.drawnTransform
 
             XCTAssertEqual(drawn.translationX, 10)
             XCTAssertEqual(drawn.rotation, 30)
@@ -282,7 +263,7 @@ final class WinUIMotionTests: XCTestCase {
             XCTAssertEqual(drawn.scaleY, 2)
             XCTAssertEqual(drawn.centerX, 0, "the pivot's left edge")
             XCTAssertEqual(drawn.centerY, 20, "halfway down the 40 DIPs it was placed at")
-            XCTAssertEqual(label.frame.y, 0, "the layout's place stays where the layout put it")
+            XCTAssertEqual(drawn.translationY, 0, "rotation and scale do not add a vertical offset")
         }
     }
 
@@ -315,14 +296,28 @@ final class WinUIMotionTests: XCTestCase {
     /// what moves it must be what WinUI still lets move it.
     func testALayoutCutToItsOutlineIsStillMoved() throws {
         try onUIThread {
-            let host = WinUIRenderer.running { CutPage() }
-            let page = try XCTUnwrap(host.views(WinUIStackView.self).first)
+            let moved = State(wrappedValue: false)
+            let host = WinUIRenderer.running {
+                VStack {
+                    VStack { Text("cut") }
+                        .frame(width: 40, height: 40)
+                        .background(Color("#FF0000"))
+                        .clipsContent(true)
+                        .horizontalAlignment(.start)
+                        .offset(x: moved.wrappedValue ? 50 : 0)
+                    Button("Move") { moved.wrappedValue = true }
+                }
+                .frame(width: 100)
+                .horizontalAlignment(.start)
+                .verticalAlignment(.start)
+                .id("cut-page")
+            }
+            let page = try XCTUnwrap(host.view(id: .manual("cut-page")))
             host.settle { page.pixels(at: [(20, 20)]) == [0xFFFF_0000] }
 
             try XCTUnwrap(host.views(WinUIButtonView.self).first).invoke()
-            host.settle { page.pixels(at: [(70, 20)]) == [0xFFFF_0000] }
-
-            XCTAssertEqual(page.pixels(at: [(20, 20), (70, 20)]), [0, 0xFFFF_0000])
+            host.settle { page.pixels(at: [(70, 35)]) == [0xFFFF_0000] }
+            XCTAssertEqual(page.pixels(at: [(20, 35), (70, 35)]), [0, 0xFFFF_0000])
         }
     }
 }

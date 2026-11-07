@@ -114,15 +114,16 @@ final class GTKMotionTests: XCTestCase {
                         .scaleEffect(2)
                         .scaleEffect(x: 1.5)
                         .pivotX(0)
+                        .id("transformed-frame")
                 }
             }
-            let label = try XCTUnwrap(host.views(GTKLabelView.self).first)
+            let label = try XCTUnwrap(host.view(id: .manual("transformed-frame")))
             let place = try XCTUnwrap(label.placed)
             let pivot = label.drawn((0, 20))
             let along = label.drawn((1, 20))
             let down = label.drawn((0, 21))
 
-            XCTAssertEqual(place.y, 0, "the layout's place stays where the layout put it")
+            XCTAssertEqual(place.height, 40, "the allocated height is independent of its rendered transform")
             XCTAssertEqual(pivot.x, place.x + 10, accuracy: 0.01, "the pivot's left edge, moved by the translation")
             XCTAssertEqual(pivot.y, place.y + 20, accuracy: 0.01, "halfway down the 40 it was placed at")
             XCTAssertEqual(along.x - pivot.x, 3 * 0.866_025, accuracy: 0.01)

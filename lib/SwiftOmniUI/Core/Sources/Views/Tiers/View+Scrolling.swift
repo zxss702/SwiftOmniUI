@@ -134,6 +134,14 @@ extension View {
         }
     }
 
+    /// Adds the supplied room to the safe region passed to this view's content.
+    public func safeAreaPadding(_ insets: EdgeInsets) -> ModifiedContent {
+        revised {
+            $0.wrapPaddedFrame()
+            $0.props[.safeAreaPadding] = insets.propValue
+        }
+    }
+
     /// Scrolls so the child `.id` names stands at `anchor`, every time `id`
     /// moves - a write of the binding scrolls the scroll view this sits on:
     ///
