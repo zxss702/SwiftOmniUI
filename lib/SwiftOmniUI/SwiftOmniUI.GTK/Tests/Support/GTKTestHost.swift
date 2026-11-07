@@ -161,6 +161,7 @@ extension GTKRenderer {
         let root = (runtime.tree.root?.native as? GTKElement)?.view
         guard GTKTestHost.window.content !== root else { return }
         GTKTestHost.window.show(root)
+        GTKTestHost.window.presentContent()
         GTKTestHost.pump()
         layOut()
     }

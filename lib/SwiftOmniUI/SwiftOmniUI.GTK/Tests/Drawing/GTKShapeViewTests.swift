@@ -148,7 +148,7 @@ final class GTKShapeViewTests: XCTestCase {
 
     /// The colours at `points` of `shape`, sized `width` by `height`, read from the layout holding it.
     private func drawn(
-        width: Double, height: Double, at points: [(Double, Double)], _ shape: @escaping @Sendable () -> any View
+        width: Double, height: Double, at points: [(Double, Double)], _ shape: @escaping @MainActor @Sendable () -> any View
     ) throws -> [UInt32] {
         try onUIThread {
             let host = GTKRenderer.running {

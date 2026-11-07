@@ -49,6 +49,7 @@ extension Differ {
     /// element changed, or one unchanged whose empty patch its parent drops.
     ///
     /// `sizesArrive` says the layout it stands in is measured.
+    @inline(never)
     func element(
         id: ElementId,
         rendered: RenderedNode?,

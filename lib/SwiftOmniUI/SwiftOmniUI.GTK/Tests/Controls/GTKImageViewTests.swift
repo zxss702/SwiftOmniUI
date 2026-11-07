@@ -98,7 +98,7 @@ final class GTKImageViewTests: XCTestCase {
     ) throws -> [UInt32] {
         try onUIThread {
             let host = GTKRenderer.running {
-                VStack { Image("test_wide.png").aspect(aspect).frame(width: width).frame(height: height) }
+                VStack { Image("test_wide.png").resizable().aspect(aspect).frame(width: width, height: height) }
                     .horizontalAlignment(.start)
                     .verticalAlignment(.start)
             }

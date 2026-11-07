@@ -22,6 +22,14 @@ import XCTest
 
         // What every drawn element and every view reports.
         check(VisualElementContract.isFocusedChanged, [.bool(true)])
+        check(ViewContract.copyRequested)
+        check(ViewContract.selectAllRequested)
+        check(ViewContract.windowPointerPressed)
+        check(ViewContract.dragScrolled, [.numbers([2, 4])])
+        check(ViewContract.drawingSizeChanged, [.numbers([100, 40])])
+        check(ViewContract.safeAreaInsetsChanged, [.numbers([10, 0, 20, 0])])
+        check(ContextMenuContract.contentRequested)
+        check(MenuButtonContract.contentRequested)
         check(ViewContract.dragLeave)
         check(ViewContract.dragOver)
         check(ViewContract.dragStarting)

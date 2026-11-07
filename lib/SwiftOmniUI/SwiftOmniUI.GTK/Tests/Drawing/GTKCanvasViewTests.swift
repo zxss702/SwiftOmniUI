@@ -116,7 +116,7 @@ final class GTKCanvasViewTests: XCTestCase {
 
     /// The colours at `points` of the canvas showing `view`, laid out.
     private func drawn(
-        at points: [(Double, Double)], _ view: @escaping @Sendable () -> any View
+        at points: [(Double, Double)], _ view: @escaping @MainActor @Sendable () -> any View
     ) throws -> [UInt32] {
         try onUIThread {
             let host = GTKRenderer.running {
