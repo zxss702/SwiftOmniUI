@@ -68,7 +68,7 @@ public struct LazyVStack: View {
     ///     }
     public init(
         alignment: HorizontalAlignment,
-        spacing: Double?,
+        spacing: Double? = nil,
         @ViewBuilder content: @escaping () -> any View
     ) {
         self.alignment = alignment
@@ -144,7 +144,7 @@ public struct LazyHStack: View {
     ///     }
     public init(
         alignment: VerticalAlignment,
-        spacing: Double?,
+        spacing: Double? = nil,
         @ViewBuilder content: @escaping () -> any View
     ) {
         self.alignment = alignment
