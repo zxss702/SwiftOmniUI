@@ -316,6 +316,11 @@
         Renderer.shared.codeObjects(for: element)?.values ?? [:]
     }
 
+    /// The custom shape's curves at its allocated size, or nil for a static Path.
+    @MainActor public static func shapePath(for element: ElementId, size: Size) -> [Double]? {
+        Renderer.shared.shapePath(for: element, size: size)
+    }
+
     /// The drawing of a closure Canvas at its allocated size, or nil for an
     /// ordinary Canvas whose commands came through its drawable property.
     @MainActor public static func canvasDrawing(for element: ElementId, size: Size) -> [DrawCommand]? {

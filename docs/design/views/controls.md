@@ -115,10 +115,13 @@ encoding and arc conversion. Hosts without SVG arcs receive cubic segments of
 a quarter turn at most.
 
 A custom `Shape` supplies `path(in:)` and needs no writable node. Its default
-adapter mounts an empty native Path, then evaluates the shape in its allocated
-local rectangle. Only size changes trigger geometry feedback; parameter and
-state updates evaluate the latest shape at the retained size. The feedback
-transaction changes drawing without changing measurement or native identity.
+adapter mounts a native Path with a Core-owned geometry closure. WinUI asks for
+its curves during geometry commitment; GTK asks during the native snapshot.
+Both evaluate the allocated local rectangle before painting, without a size
+feedback event or another Core turn. The retained allocation caches the path;
+parameter and state updates use the latest shape at that size. Drawing-only
+state changes update the path without rebuilding the view body. Arc commands
+are converted to the same cubic encoding used by ordinary native Paths.
 
 Path coordinates are local by default: offsets, margins and negative coordinates
 stay where authored. An explicit `.aspect(.fit/.fill/.stretch/.center)` opts into

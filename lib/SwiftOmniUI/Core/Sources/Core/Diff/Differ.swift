@@ -188,8 +188,10 @@ final class Differ {
             if let request = source.lazyRequestWindow { allowed.insert(request) }
             return !ownChanges.isEmpty && ownChanges.isSubset(of: allowed)
         }()
+        let drawingOnly = (rendered.canvas != nil || rendered.shapePath != nil)
+            && rendered.drawingBodyReads.isDisjoint(with: changed)
         if let placeholder = rendered.placeholder,
-            !rendered.reads.isDisjoint(with: changed), !windowOnly {
+            !rendered.reads.isDisjoint(with: changed), !windowOnly, !drawingOnly {
             return element(
                 id: rendered.id,
                 rendered: rendered,
@@ -226,12 +228,24 @@ final class Differ {
             let drawing = canvas.drawing(at: size, force: true)
             if let reads = drawing.reads {
                 rendered.canvasReads = reads
-                rendered.reads = rendered.canvasBodyReads.union(reads)
+                rendered.reads = rendered.drawingBodyReads.union(reads)
             }
             let value = drawing.commands.propValue
             if rendered.props[.drawable] != value {
                 rendered.props[.drawable] = value
                 patch.properties[.drawable] = value
+            }
+        }
+
+        if let path = rendered.shapePath, let size = rendered.shapeSize,
+           !rendered.shapeReads.isDisjoint(with: changed) {
+            let (commands, reads) = ReadScope.observed { path(size) }
+            rendered.shapeReads = reads
+            rendered.reads = rendered.drawingBodyReads.union(reads)
+            let value = commands.propValue
+            if rendered.props[PathContract.commands.token] != value {
+                rendered.props[PathContract.commands.token] = value
+                patch.properties[PathContract.commands.token] = value
             }
         }
 
@@ -420,10 +434,23 @@ final class Differ {
         let drawing = canvas.drawing(at: size)
         if let reads = drawing.reads {
             owner.canvasReads = reads
-            owner.reads = owner.canvasBodyReads.union(reads)
+            owner.reads = owner.drawingBodyReads.union(reads)
         }
         owner.props[.drawable] = drawing.commands.propValue
         return drawing.commands
+    }
+
+    /// Native allocation computes a custom shape before the first paint. The
+    /// path and its state reads become the next diff's baseline immediately.
+    func shapePath(for id: ElementId, size: Size) -> [Double]? {
+        guard let owner = codeObjects[id]?.shapeOwner, let path = owner.shapePath else { return nil }
+        if owner.shapeSize == size { return owner.props[PathContract.commands.token]?.numbers }
+        let (commands, reads) = ReadScope.observed { path(size) }
+        owner.shapeSize = size
+        owner.shapeReads = reads
+        owner.reads = owner.drawingBodyReads.union(reads)
+        owner.props[PathContract.commands.token] = commands.propValue
+        return commands
     }
 
     /// The handlers the last walk found - what left first, then the rest - taken so

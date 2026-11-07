@@ -40,6 +40,10 @@ extension Renderer {
         differ.canvasDrawing(for: id, size: size)
     }
 
+    @MainActor func shapePath(for id: ElementId, size: Size) -> [Double]? {
+        differ.shapePath(for: id, size: size)
+    }
+
     /// Starts a dispatched event's handler - the road a test exercises too.
     func start(_ handler: @escaping EventHandler) {
         // Read now: a handler that suspends keeps the payload it started with.

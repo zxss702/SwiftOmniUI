@@ -71,6 +71,13 @@ public struct Canvas: VisualElement, CanvasProperties{
         node.canvas = CanvasBox(renderer: renderer)
     }
 
+    /// Permits asynchronous presentation by the native compositor. Drawing
+    /// commands are still recorded on the UI actor during allocation, so this
+    /// hint never delays the first drawing or its state dependencies.
+    public init(rendersAsynchronously: Bool, renderer: @escaping (inout GraphicsContext, Size) -> Void) {
+        self.init(renderer: renderer)
+    }
+
     /// A finger went down, or a mouse button was pressed.
     ///
     /// The point is in the canvas's own coordinates - the same ones the drawing

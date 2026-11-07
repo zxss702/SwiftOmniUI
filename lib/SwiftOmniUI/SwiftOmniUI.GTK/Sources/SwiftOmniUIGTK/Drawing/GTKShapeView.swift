@@ -54,6 +54,11 @@ final class GTKShapeView: GTKPanelView {
     }
 
     override func draw(_ snapshot: OpaquePointer, width: Double, height: Double) {
+        if case .authored(_, let evenOdd, let aspect, let transform) = geometry,
+           let sourceElement,
+           let commands = CoreLink().shapePath(for: sourceElement.id, size: Size(width, height)) {
+            geometry = .authored(commands, evenOdd: evenOdd, aspect: aspect, transform: transform)
+        }
         let outlined = stroke != .none && strokeWidth > 0
         guard width > 0 || height > 0, let (path, evenOdd) = path(width: width, height: height, outlined: outlined)
         else { return }

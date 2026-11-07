@@ -414,6 +414,7 @@ public struct Node {
     /// A size-dependent Canvas renderer, retained in the core and pulled by
     /// the host at the control's actual allocation.
     var canvas: CanvasBox?
+    var shapePath: ((Size) -> [Double])?
 
     /// The `.layoutValue` tags this child carries for a custom `Layout`,
     /// by the key's identity; pulled by a host building `LayoutSubview`s.

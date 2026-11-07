@@ -9,11 +9,13 @@
 public struct Prop: Hashable, Comparable, Sendable, ExpressibleByStringLiteral,
     CustomStringConvertible {
     /// The property's stable SwiftOmniUI name.
-    public let name: String
+    public var name: String { key.name }
+
+    private let key: KeyName
 
     /// A property key from its name - what a member's token is made from.
     public init(_ name: String) {
-        self.name = name
+        self.key = KeyName(name)
     }
 
     /// The literal form, so a name reads plainly where a key is compared:
@@ -27,6 +29,6 @@ public struct Prop: Hashable, Comparable, Sendable, ExpressibleByStringLiteral,
 
     /// Name order - the order a message writes properties in.
     public static func < (lhs: Prop, rhs: Prop) -> Bool {
-        lhs.name < rhs.name
+        lhs.key < rhs.key
     }
 }

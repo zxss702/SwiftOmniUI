@@ -80,7 +80,7 @@ final class GTKToolbarScrollTests: XCTestCase {
                     HStack { Text("Breadcrumb") }.frame(maxWidth: .infinity).frame(height: 32).id("bar")
                 }
             }
-            let bar = try XCTUnwrap(host.runtime.tree.root?.first(id: .manual("bar"))?.gtk.view)
+            let bar = try XCTUnwrap((host.runtime.tree.root?.first(id: .manual("bar"))?.native as? GTKElement)?.view)
             let first = try XCTUnwrap(host.views(GTKLabelView.self).first { $0.text == "Row 0" })
             let barRect = try XCTUnwrap(bar.windowRect()), rowRect = try XCTUnwrap(first.windowRect())
             XCTAssertGreaterThanOrEqual(rowRect.y, barRect.y + barRect.height - 1)

@@ -9,7 +9,9 @@ import XCTest
 // A concave bubble with a cubic tail, mirrored for incoming messages.
 private struct NativeBubbleShape: Shape {
     var right: Bool
+    var observe: ((Rect) -> Void)? = nil
     func path(in rect: Rect) -> Path {
+        observe?(rect)
         let w = rect.width, h = rect.height
         func p(_ x: Double, _ y: Double) -> Point { Point(right ? x : w - x, y) }
         return Path {
@@ -37,6 +39,34 @@ private struct NativeHoleShape: Shape {
 
 final class WinUICustomShapeTests: XCTestCase {
     private static let red: UInt32 = 0xFFFF_0000
+
+    @MainActor private static var drawnRects: [Rect] = []
+
+    func testNewBubbleDrawsBeforeAnotherCoreTurn() throws {
+        try onUIThread {
+            Self.drawnRects = []
+            let visible = State(wrappedValue: false)
+            let host = WinUIRenderer.running {
+                VStack {
+                    if visible.wrappedValue {
+                        NativeBubbleShape(right: true, observe: { Self.drawnRects.append($0) })
+                            .fill(Color("#FF0000")).frame(width: 100, height: 60)
+                    }
+                    Text("message")
+                }
+            }
+            visible.wrappedValue = true
+            host.runtime.pump.turn()
+            let shape = try XCTUnwrap(host.views(WinUIPathView.self).first)
+            shape.commitGeometry(in: Rect(0, 0, 100, 60))
+            XCTAssertEqual(Self.drawnRects.last, Rect(0, 0, 100, 60),
+                           "the first native drawing must not wait for a geometry feedback turn")
+            let count = Self.drawnRects.count
+            shape.commitGeometry(in: Rect(0, 0, 100, 60))
+            XCTAssertEqual(Self.drawnRects.count, count, "an unchanged drawing reuses its path")
+        }
+    }
+
 
     func testLocalCoordinatesRetainMarginsAndNegativeCoordinatesAreDrawn() throws {
         try onUIThread {

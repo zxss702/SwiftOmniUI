@@ -12,7 +12,11 @@ public protocol ShapeProperties: ViewProperties {}
 
 extension Shape {
     public var node: Node {
-        Node.composed(self, type: ElementTypeNames.qualified(Self.self)) { SizedShape(shape: self).node }
+        Node.composed(self, type: ElementTypeNames.qualified(Self.self)) {
+            var node = Node(shape: PathContract.self)
+            node.shapePath = { size in self.path(in: Rect(0, 0, size.width, size.height)).geometry.arcsAsCubics.flatMap(\.numbers) }
+            return node
+        }
     }
 
     @_disfavoredOverload public func fill(_ value: Brush) -> ModifiedContent { revised { $0.write(ShapeContract.fill, value) } }
@@ -32,25 +36,6 @@ extension Shape {
     }
     @_disfavoredOverload public func stroke(_ style: some ShapeStyle, style strokeStyle: StrokeStyle) -> ModifiedContent {
         revised { $0.applyStrokeStyle(style.brush, strokeStyle) }
-    }
-}
-
-/// An empty native Path already occupies the final identity. Geometry feedback
-/// only changes its drawing, never the shape's measurement or its control.
-private struct SizedShape<S: Shape>: View {
-    let shape: S
-    @State private var size: Size? = nil
-
-    var body: some View {
-        let path = size.map { shape.path(in: Rect(0, 0, $0.width, $0.height)) } ?? Path()
-        path.hearing(ViewContract.frameChanged) { numbers in
-            guard let report = FrameReport(numbers) else { return }
-            let next = Size(report.frame.width, report.frame.height)
-            guard next != self.size else { return }
-            var transaction = Transaction()
-            transaction.isGeometryFeedback = true
-            withTransaction(transaction) { self.size = next }
-        }
     }
 }
 

@@ -25,9 +25,10 @@ public struct ElementEvent<Owner: Contract, Payload>: ContractMember {
     ///   - layer: which layer reports it; an application's own unless said.
     public init(_ name: String, layer: ElementLayer = .provider) {
         self.name = name
+        self.token = Event(name)
         self.layer = layer
     }
 
     /// The key the event crosses the boundary under.
-    @_spi(Host) public var token: Event { Event(name) }
+    @_spi(Host) public let token: Event
 }

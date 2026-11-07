@@ -167,6 +167,7 @@ import XCTest
         XCTAssertNotEqual(changed.node.props[.drawable], before.propValue)
         XCTAssertNotNil(changed.node.props[.drawable], "the new drawing remains host-readable")
         XCTAssertEqual(changed.node.id, first.node.id)
+        XCTAssertEqual(changed.node.builds, first.node.builds, "drawing-only state keeps the body")
 
         differ.forget(changed.node)
         XCTAssertNil(differ.canvasDrawing(for: first.node.id, size: Size(80, 44)),

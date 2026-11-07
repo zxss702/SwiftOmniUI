@@ -7,6 +7,23 @@ import XCTest
 /// The native-host contract is closed over SwiftOmniUI's built-in vocabulary even
 /// though applications remain free to declare their own contracts.
 @MainActor final class HostContractTests: XCTestCase {
+    func testNumericContractKeysKeepNamesAndDeclarationTokens() {
+        let names = ["text", "width", "View.frameChanged", "custom.??"]
+        let properties = Dictionary(uniqueKeysWithValues: names.enumerated().map { (Prop($0.element), $0.offset) })
+        for (index, name) in names.enumerated() {
+            XCTAssertEqual(properties[Prop(name)], index)
+            XCTAssertEqual(Prop(name).description, name)
+            XCTAssertEqual(Event(name), Event(stringLiteral: name))
+            XCTAssertEqual(NodeType(name), NodeType(stringLiteral: name))
+            XCTAssertEqual(Act(name), Act(stringLiteral: name))
+        }
+        XCTAssertEqual(ViewContract.frameChanged.token, Event(ViewContract.frameChanged.name))
+        XCTAssertEqual(VisualElementContract.width.token, Prop(VisualElementContract.width.name))
+        XCTAssertEqual(names.map { Prop($0) }.sorted().map(\.name),
+                       names.sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) })
+        XCTAssertEqual(KeyName("hello").number, 0xa430_d846_80aa_bd0b)
+    }
+
     func testEveryBuiltInControlPropertyAndEventHasOneOwner() throws {
         let source = try SourceTree.text(in: "Tokens.swift")
 

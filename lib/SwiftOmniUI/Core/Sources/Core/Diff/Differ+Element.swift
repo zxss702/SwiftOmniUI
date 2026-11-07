@@ -456,6 +456,14 @@ extension Differ {
             node.canvas = nil
         }
 
+        var shapeReads: Set<ObjectIdentifier> = []
+        let shapeSize = rendered?.type == node.type ? rendered?.shapeSize : nil
+        if let path = node.shapePath, let size = shapeSize {
+            let (commands, reads) = ReadScope.observed { path(size) }
+            node.props[PathContract.commands.token] = commands.propValue
+            shapeReads = reads
+        }
+
         // Properties described last render and not now are named for the host to clear.
         // Design: docs/design/core/identity-and-diffing.md#properties-no-longer-described
         let lost = (rendered?.props.keys.filter { node.props[$0] == nil } ?? []).sorted()
@@ -781,8 +789,9 @@ extension Differ {
 
         let sourceReads = reads
         reads.formUnion(lazySource?.lazyRowReadings?.states ?? [])
-        let canvasBodyReads = reads
+        let drawingBodyReads = reads
         reads.formUnion(canvasReads)
+        reads.formUnion(shapeReads)
         let result = RenderedNode(
             id: id,
             type: node.type,
@@ -813,9 +822,12 @@ extension Differ {
         result.lazySourceReads = sourceReads
         result.lazyIdentity = node.lazyIdentity
         result.lazyRequestGeneration = node.lazyRequestGeneration
+        result.shapePath = node.shapePath
+        result.shapeSize = shapeSize
+        result.shapeReads = shapeReads
         result.canvas = node.canvas
         result.canvasReads = canvasReads
-        result.canvasBodyReads = canvasBodyReads
+        result.drawingBodyReads = drawingBodyReads
         node.canvas?.owner = result
         result.sizesArrive = sizesArrive
         result.visualInput = visualInput
@@ -840,8 +852,9 @@ extension Differ {
         let childLayoutValuesChanged = customLayoutsWithChangedValues.remove(id) != nil
         let layoutObjectChanged = previous != nil && node.customLayout !== codeObjects[id]?.layout
         patch.customLayoutChanged = layoutObjectChanged || childLayoutValuesChanged
-        if node.customLayout != nil || !node.layoutValues.isEmpty || node.canvas != nil {
-            codeObjects[id] = NodeCode(layout: node.customLayout, values: node.layoutValues, canvas: node.canvas)
+        if node.customLayout != nil || !node.layoutValues.isEmpty || node.canvas != nil || node.shapePath != nil {
+            codeObjects[id] = NodeCode(layout: node.customLayout, values: node.layoutValues, canvas: node.canvas,
+                                       shapeOwner: node.shapePath == nil ? nil : result)
         } else {
             codeObjects.removeValue(forKey: id)
         }

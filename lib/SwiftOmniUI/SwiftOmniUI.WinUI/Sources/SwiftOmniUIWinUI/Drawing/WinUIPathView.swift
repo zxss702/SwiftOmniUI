@@ -83,11 +83,6 @@ final class WinUIPathView: WinUIView {
 
     /// Draws `geometry`, now and whenever the room changes.
     func draw(_ geometry: Geometry) {
-        if case .authored(let commands, _, _, _) = geometry, geometry != self.geometry {
-            var read = [0.0, 0.0, 0.0, 0.0]
-            swiftomniui_winui_path_bounds(commands, Int32(commands.count), &read)
-            bounds = Rect(x: read[0], y: read[1], width: read[2], height: read[3])
-        }
         self.geometry = geometry
         if let committedFrame { draw(in: committedFrame) }
     }
@@ -114,12 +109,22 @@ final class WinUIPathView: WinUIView {
     /// Hands WinUI the geometry for `room`, again only where the room or the geometry changed.
     private func draw(in room: Rect) {
         guard drawsInk else { return }
+        if case .authored(_, let evenOdd, let aspect, let transform) = geometry,
+           let sourceElement,
+           let commands = CoreLink().shapePath(for: sourceElement.id, size: Size(room.width, room.height)) {
+            geometry = .authored(commands, evenOdd: evenOdd, aspect: aspect, transform: transform)
+        }
         let inset: Double
         if case .authored = geometry { inset = 0 }
         else { inset = outlineWidth / 2 }
         if let drawn, drawn.geometry == geometry, drawn.width == room.width, drawn.height == room.height,
            drawn.inset == inset { return }
 
+        if drawn?.geometry != geometry, case .authored(let commands, _, _, _) = geometry {
+            var read = [0.0, 0.0, 0.0, 0.0]
+            swiftomniui_winui_path_bounds(commands, Int32(commands.count), &read)
+            bounds = Rect(x: read[0], y: read[1], width: read[2], height: read[3])
+        }
         drawn = (geometry, room.width, room.height, inset)
         let filled = LayoutSize(width: max(room.width - 2 * inset, 0), height: max(room.height - 2 * inset, 0))
         switch geometry {

@@ -5,11 +5,14 @@
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIGTK
 import XCTest
+import CSwiftOmniUIGTK
 
 // A concave bubble with a cubic tail, mirrored for incoming messages.
 private struct NativeBubbleShape: Shape {
     var right: Bool
+    var observe: ((Rect) -> Void)? = nil
     func path(in rect: Rect) -> Path {
+        observe?(rect)
         let w = rect.width, h = rect.height
         func p(_ x: Double, _ y: Double) -> Point { Point(right ? x : w - x, y) }
         return Path {
@@ -37,6 +40,38 @@ private struct NativeHoleShape: Shape {
 
 final class GTKCustomShapeTests: XCTestCase {
     private static let red: UInt32 = 0xFFFF_0000
+
+    @MainActor private static var drawnRects: [Rect] = []
+
+    func testNewBubbleDrawsBeforeAnotherCoreTurn() throws {
+        try onUIThread {
+            Self.drawnRects = []
+            let visible = State(wrappedValue: false)
+            let host = GTKRenderer.running {
+                VStack {
+                    if visible.wrappedValue {
+                        NativeBubbleShape(right: true, observe: { Self.drawnRects.append($0) })
+                            .fill(Color("#FF0000")).frame(width: 100, height: 60)
+                    }
+                    Text("message")
+                }
+            }
+            visible.wrappedValue = true
+            host.runtime.pump.turn()
+            let shape = try XCTUnwrap(host.views(GTKShapeView.self).first)
+            let snapshot = gtk_snapshot_new()!
+            shape.draw(snapshot, width: 100, height: 60)
+            if let node = gtk_snapshot_free_to_node(snapshot) { gsk_render_node_unref(node) }
+            XCTAssertEqual(Self.drawnRects.last, Rect(0, 0, 100, 60),
+                           "the first native drawing must not wait for a geometry feedback turn")
+            let count = Self.drawnRects.count
+            let repeatedSnapshot = gtk_snapshot_new()!
+            shape.draw(repeatedSnapshot, width: 100, height: 60)
+            if let node = gtk_snapshot_free_to_node(repeatedSnapshot) { gsk_render_node_unref(node) }
+            XCTAssertEqual(Self.drawnRects.count, count, "an unchanged drawing reuses its path")
+        }
+    }
+
 
     func testLocalCoordinatesRetainMarginsAndNegativeCoordinatesAreDrawn() throws {
         try onUIThread {

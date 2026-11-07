@@ -61,8 +61,11 @@ final class RenderedNode {
     /// reads. Body reads stay separate so replacing a drawing does not discard
     /// dependencies the rest of the view still owns.
     var canvas: CanvasBox?
+    var shapePath: ((Size) -> [Double])?
+    var shapeSize: Size?
+    var shapeReads: Set<ObjectIdentifier> = []
     var canvasReads: Set<ObjectIdentifier> = []
-    var canvasBodyReads: Set<ObjectIdentifier> = []
+    var drawingBodyReads: Set<ObjectIdentifier> = []
 
     /// The composed views this element was built by, outermost first: each one's
     /// type, its state boxes by path, and what it was built with.

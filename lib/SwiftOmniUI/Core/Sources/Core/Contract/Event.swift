@@ -9,11 +9,13 @@
 public struct Event: Hashable, Comparable, Sendable, ExpressibleByStringLiteral,
     CustomStringConvertible {
     /// The event's stable SwiftOmniUI name.
-    public let name: String
+    public var name: String { key.name }
+
+    private let key: KeyName
 
     /// An event from its name - what a member's token is made from.
     public init(_ name: String) {
-        self.name = name
+        self.key = KeyName(name)
     }
 
     /// The literal form, so a name reads plainly where an event is compared:
@@ -27,6 +29,6 @@ public struct Event: Hashable, Comparable, Sendable, ExpressibleByStringLiteral,
 
     /// Name order - the order a message writes handlers in.
     public static func < (lhs: Event, rhs: Event) -> Bool {
-        lhs.name < rhs.name
+        lhs.key < rhs.key
     }
 }

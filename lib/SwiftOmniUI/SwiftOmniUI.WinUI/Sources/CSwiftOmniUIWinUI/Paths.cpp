@@ -149,8 +149,8 @@ extern "C" void swiftomniui_winui_path_paint(
         shape.StrokeThickness(static_cast<float>(width));
         auto pattern = shape.StrokeDashArray();
         pattern.Clear();
-        for (int32_t index = 0; index < dashCount; ++index) pattern.Append(static_cast<float>(dashes[index]));
-        shape.StrokeDashOffset(static_cast<float>(dashOffset));
+        for (int32_t index = 0; index < dashCount; ++index) pattern.Append(static_cast<float>(dashes[index] * width));
+        shape.StrokeDashOffset(static_cast<float>(dashOffset * width));
         auto ends = cap == 1 ? composition::CompositionStrokeCap::Round
             : cap == 2 ? composition::CompositionStrokeCap::Square : composition::CompositionStrokeCap::Flat;
         shape.StrokeStartCap(ends); shape.StrokeEndCap(ends); shape.StrokeDashCap(ends);

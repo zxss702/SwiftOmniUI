@@ -104,6 +104,10 @@
         HostBoundary.canvasDrawing(for: element, size: size)
     }
 
+    @MainActor public func shapePath(for element: ElementId, size: Size) -> [Double]? {
+        HostBoundary.shapePath(for: element, size: size)
+    }
+
     /// Moves a one-lane state named by a native gesture.
     @discardableResult
     public func moveGestureValue(_ value: Double, state: Int32) -> Bool {

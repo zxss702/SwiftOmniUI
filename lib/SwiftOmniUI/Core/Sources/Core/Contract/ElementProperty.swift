@@ -45,6 +45,7 @@ public struct ElementProperty<Owner: Contract, Value: HostRepresentable>: Contra
         moves: AnimationValues = []
     ) {
         self.name = name
+        self.token = Prop(name)
         self.layer = layer
         self.travels = travels
         self.cleared = cleared
@@ -52,5 +53,5 @@ public struct ElementProperty<Owner: Contract, Value: HostRepresentable>: Contra
     }
 
     /// The key the property crosses the boundary under.
-    @_spi(Host) public var token: Prop { Prop(name) }
+    @_spi(Host) public let token: Prop
 }

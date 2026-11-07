@@ -58,7 +58,7 @@ private struct CommandsSplitPage: View {
 
 final class GTKCommandsTests: XCTestCase {
     /// Read the native popup, including its sections and submenu action states.
-    @MainActor private func menu(_ frame: GTKPageFrame) throws -> String {
+    @MainActor private static func menu(_ frame: GTKPageFrame) throws -> String {
         let button = try XCTUnwrap(frame.appMenuButton)
         let model = try XCTUnwrap(gtk_menu_button_get_menu_model(button.widget.opaque))
         let menu = try XCTUnwrap(button.menu)
@@ -75,7 +75,7 @@ final class GTKCommandsTests: XCTestCase {
             let chosen = Received<String>()
             let host = GTKRenderer.running(application: CommandsApplication(chosen: chosen))
             let frame = try XCTUnwrap(host.window?.pageFrame)
-            XCTAssertEqual(try menu(frame), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(frame), "设置;-;开始页;工具[帮助]")
 
             let button = try XCTUnwrap(frame.appMenuButton)
             XCTAssertNotEqual(gtk_widget_activate_action_variant(button.widget, GTKMenu.actionGroup + ".e0", nil), 0)
@@ -102,7 +102,7 @@ final class GTKCommandsTests: XCTestCase {
             let navigation = try XCTUnwrap(host.views(GTKNavigationView.self).first)
             let sidebar = try XCTUnwrap(split.sidebarFrame)
             let detail = try XCTUnwrap(navigation.frames.last)
-            XCTAssertEqual(try menu(sidebar), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(sidebar), "设置;-;开始页;工具[帮助]")
             XCTAssertNil(detail.appMenuButton)
             XCTAssertNil(host.window?.pageFrame)
 
@@ -110,11 +110,11 @@ final class GTKCommandsTests: XCTestCase {
             toggle.click()
             XCTAssertFalse(split.isPresented)
             XCTAssertNil(sidebar.appMenuButton)
-            XCTAssertEqual(try menu(detail), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(detail), "设置;-;开始页;工具[帮助]")
 
             toggle.click()
             XCTAssertTrue(split.isPresented)
-            XCTAssertEqual(try menu(sidebar), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(sidebar), "设置;-;开始页;工具[帮助]")
             XCTAssertNil(detail.appMenuButton)
         }
     }
@@ -135,21 +135,21 @@ final class GTKCommandsTests: XCTestCase {
             let sidebar = try XCTUnwrap(split.sidebarFrame)
             let content = try XCTUnwrap(split.contentFrame)
             let detail = try XCTUnwrap(split.detailFrame)
-            XCTAssertEqual(try menu(sidebar), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(sidebar), "设置;-;开始页;工具[帮助]")
             XCTAssertNil(content.appMenuButton)
             XCTAssertNil(detail.appMenuButton)
 
             visibility.wrappedValue = .doubleColumn
             host.runtime.pump.turn()
             XCTAssertNil(sidebar.appMenuButton)
-            XCTAssertEqual(try menu(content), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(content), "设置;-;开始页;工具[帮助]")
             XCTAssertNil(detail.appMenuButton)
 
             visibility.wrappedValue = .detailOnly
             host.runtime.pump.turn()
             XCTAssertNil(sidebar.appMenuButton)
             XCTAssertNil(content.appMenuButton)
-            XCTAssertEqual(try menu(detail), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(detail), "设置;-;开始页;工具[帮助]")
         }
     }
 
@@ -165,16 +165,16 @@ final class GTKCommandsTests: XCTestCase {
             }))
             let navigation = try XCTUnwrap(host.views(GTKNavigationView.self).first)
             let root = try XCTUnwrap(navigation.frames.first)
-            XCTAssertEqual(try menu(root), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(root), "设置;-;开始页;工具[帮助]")
 
             path.wrappedValue = [1]
             host.runtime.pump.turn()
             XCTAssertNil(root.appMenuButton)
-            XCTAssertEqual(try menu(XCTUnwrap(navigation.frames.last)), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(XCTUnwrap(navigation.frames.last)), "设置;-;开始页;工具[帮助]")
 
             XCTAssertTrue(host.goBack())
             XCTAssertTrue(navigation.frames.first === root)
-            XCTAssertEqual(try menu(root), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(root), "设置;-;开始页;工具[帮助]")
         }
     }
 
@@ -191,12 +191,12 @@ final class GTKCommandsTests: XCTestCase {
             let tabs = try XCTUnwrap(host.views(GTKTabbedView.self).first)
             let frame = try XCTUnwrap(host.window?.pageFrame)
             let button = try XCTUnwrap(frame.appMenuButton)
-            XCTAssertEqual(try menu(frame), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(frame), "设置;-;开始页;工具[帮助]")
             for index in [1, 0, 1, 0] {
                 tabs.selectByUser(index)
                 host.runtime.pump.turn()
                 XCTAssertTrue(frame.appMenuButton === button)
-                XCTAssertEqual(try menu(frame), "设置;-;开始页;工具[帮助]")
+                XCTAssertEqual(try Self.menu(frame), "设置;-;开始页;工具[帮助]")
                 XCTAssertTrue(host.views(GTKNavigationView.self).flatMap(\.frames).allSatisfy { $0.appMenuButton == nil })
             }
         }
@@ -218,7 +218,7 @@ final class GTKCommandsTests: XCTestCase {
             identity.wrappedValue = "second"
             help.wrappedValue = "新帮助"
             host.runtime.pump.turn()
-            XCTAssertEqual(try menu(frame), "设置;-;开始页;工具[新帮助]")
+            XCTAssertEqual(try Self.menu(frame), "设置;-;开始页;工具[新帮助]")
             _ = gtk_widget_activate_action_variant(button.widget, GTKMenu.actionGroup + ".e0", nil)
             XCTAssertEqual(chosen.values, ["first", "second"])
         }
@@ -229,7 +229,7 @@ final class GTKCommandsTests: XCTestCase {
             let visible = State(wrappedValue: true)
             let host = GTKRenderer.running(application: CommandsApplication(showsCommands: { visible.wrappedValue }))
             let frame = try XCTUnwrap(host.window?.pageFrame)
-            XCTAssertEqual(try menu(frame), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(frame), "设置;-;开始页;工具[帮助]")
 
             visible.wrappedValue = false
             host.runtime.pump.turn()
@@ -237,7 +237,7 @@ final class GTKCommandsTests: XCTestCase {
 
             visible.wrappedValue = true
             host.runtime.pump.turn()
-            XCTAssertEqual(try menu(frame), "设置;-;开始页;工具[帮助]")
+            XCTAssertEqual(try Self.menu(frame), "设置;-;开始页;工具[帮助]")
         }
     }
 }

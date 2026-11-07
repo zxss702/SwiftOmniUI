@@ -35,37 +35,66 @@ private struct NotchedShape: Shape {
         renders.fire(id, with: [.numbers([x, 0, width, height, x, 0, 0, 0, width, height])])
     }
 
-    func testOnlyActualSizeBuildsGeometryAndKeepsTheNativePathIdentity() throws {
-        let probe = ShapeProbe(), renders = Renders()
+    func testFirstAllocationDrawsWithoutGeometryFeedbackAndRetainsThePath() throws {
+        let probe = ShapeProbe(), differ = Differ()
         func tree(_ depth: Double = 5) -> Node { NotchedShape(depth: depth, probe: probe).fill(.red).node }
-        let first = renders.render(tree())
-        XCTAssertEqual(first.type, PathContract.nodeType)
-        XCTAssertEqual(first.props[PathContract.commands.token], .numbers([]))
+        let first = differ.reconcile(nil, with: tree())
+        XCTAssertEqual(first.node.type, PathContract.nodeType)
+        XCTAssertNil(first.node.events[ViewContract.frameChanged.token])
         XCTAssertTrue(probe.rectangles.isEmpty)
-        let event = try XCTUnwrap(first.events?[ViewContract.frameChanged.token])
-        report(event, renders, width: 100, height: 50)
-        let second = renders.render(tree(), changed: Renderer.shared.pendingChanges)
-        XCTAssertEqual(first.id, second.id)
+        let original = try XCTUnwrap(differ.shapePath(for: first.node.id, size: Size(100, 50)))
+        XCTAssertFalse(original.isEmpty)
+        XCTAssertEqual(first.node.props[PathContract.commands.token], original.propValue)
         XCTAssertEqual(probe.rectangles, [Rect(0, 0, 100, 50)])
-        let original = try XCTUnwrap(second.props[PathContract.commands.token]?.numbers)
-        Renderer.shared.clearInvalidation()
-
-        // Changing scroll position/origin is not a shape geometry change.
-        report(event, renders, width: 100, height: 50, x: 30)
         XCTAssertTrue(Renderer.shared.pendingChanges.isEmpty)
-        report(event, renders, width: 100, height: 50)
-        XCTAssertTrue(Renderer.shared.pendingChanges.isEmpty)
-        XCTAssertEqual(probe.rectangles.count, 1)
 
-        let parameter = renders.render(tree(20))
-        XCTAssertEqual(parameter.id, first.id)
-        XCTAssertNotEqual(parameter.props[PathContract.commands.token]?.numbers, original)
-        XCTAssertEqual(probe.rectangles.last, Rect(0, 0, 100, 50))
-        report(event, renders, width: 140, height: 70)
-        let resized = renders.render(tree(20), changed: Renderer.shared.pendingChanges)
-        XCTAssertEqual(resized.id, first.id)
+        _ = differ.shapePath(for: first.node.id, size: Size(100, 50))
+        XCTAssertEqual(probe.rectangles.count, 1, "unchanged allocation reuses the path")
+        let parameter = differ.reconcile(first.node, with: tree(20))
+        XCTAssertEqual(parameter.node.id, first.node.id)
+        XCTAssertNotEqual(parameter.node.props[PathContract.commands.token]?.numbers, original)
+        _ = differ.shapePath(for: parameter.node.id, size: Size(140, 70))
         XCTAssertEqual(probe.rectangles.last, Rect(0, 0, 140, 70))
+        XCTAssertTrue(Renderer.shared.pendingChanges.isEmpty)
+        differ.forget(parameter.node)
+        XCTAssertNil(differ.shapePath(for: first.node.id, size: Size(140, 70)))
+    }
+
+    func testPathStateChangesUpdateOnlyTheDrawing() throws {
+        struct InsetShape: Shape {
+            let inset: State<Double>
+            func path(in rect: Rect) -> Path {
+                Path(Rect(inset.wrappedValue, 0, rect.width - inset.wrappedValue, rect.height))
+            }
+        }
+        let inset = State(wrappedValue: 5.0), unrelated = State(wrappedValue: false)
+        let differ = Differ()
+        let first = differ.reconcile(nil, with: InsetShape(inset: inset).fill(.red).node)
+        let original = try XCTUnwrap(differ.shapePath(for: first.node.id, size: Size(100, 50)))
+        unrelated.wrappedValue = true
+        let unchanged = differ.revisit(first.node, changed: Renderer.shared.pendingChanges)
+        XCTAssertTrue(unchanged.patch.properties.isEmpty)
         Renderer.shared.clearInvalidation()
+        inset.wrappedValue = 20
+        let updated = differ.revisit(unchanged.node, changed: Renderer.shared.pendingChanges)
+        XCTAssertNotEqual(updated.node.props[PathContract.commands.token]?.numbers, original)
+        XCTAssertNotNil(updated.patch.properties[PathContract.commands.token])
+        XCTAssertEqual(updated.node.id, first.node.id)
+        XCTAssertFalse(updated.patch.replace)
+        XCTAssertEqual(updated.node.builds, first.node.builds, "path-only state does not rebuild the view body")
+        Renderer.shared.clearInvalidation()
+    }
+
+    func testAllocatedEllipseUsesTheNativeCurveEncoding() throws {
+        struct Oval: Shape {
+            func path(in rect: Rect) -> Path { Path(ellipseIn: rect) }
+        }
+        let differ = Differ()
+        let first = differ.reconcile(nil, with: Oval().node)
+        let commands = try XCTUnwrap(differ.shapePath(for: first.node.id, size: Size(100, 50)))
+        let expected = Path(ellipseIn: Rect(0, 0, 100, 50)).geometry.arcsAsCubics.flatMap(\.numbers)
+        XCTAssertEqual(commands, expected)
+        XCTAssertFalse(commands.isEmpty)
     }
 
     func testCustomShapeInheritsTheWholeBrushAndExplicitFillWins() throws {

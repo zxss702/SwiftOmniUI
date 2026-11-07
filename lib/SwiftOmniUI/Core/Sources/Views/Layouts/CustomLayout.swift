@@ -279,6 +279,7 @@ struct NodeCode {
 
     /// A Canvas renderer the host asks for at its allocated size.
     var canvas: CanvasBox?
+    weak var shapeOwner: RenderedNode?
 
     /// Tags need no serialization. Compare their values before deciding whether
     /// the nearest custom container needs a new native arrangement.

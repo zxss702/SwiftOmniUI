@@ -26,6 +26,38 @@ private struct LengtheningPage: View {
 
 /// A stack's children travel to the places a patch gives them; one that joins fades in, one hidden fades out first.
 final class GTKLayoutMotionTests: XCTestCase {
+    func testAValueGatedColumnMovesWithinItsOuterFrame() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let expanded = State(wrappedValue: false)
+            let host = GTKRenderer.running(clock: clock) {
+                HStack(spacing: 0) {
+                    Color.blue.frame(width: expanded.wrappedValue ? 400 : 200, height: 40)
+                }
+                .animation(.linear(duration: 0.2), value: expanded.wrappedValue)
+                .id("column")
+                .frame(width: 600, height: 100)
+            }
+            host.frame()
+            let child = try XCTUnwrap(host.runtime.tree.root?.first(id: .manual("column"))?.children.first)
+            let column = try XCTUnwrap(host.view(id: child.id))
+            let before = column.frame
+            expanded.wrappedValue = true
+            host.runtime.pump.turn()
+            host.frame()
+            XCTAssertEqual(column.frame.x, before.x, accuracy: 0.5)
+            clock.now = 100
+            host.frame()
+            let halfway = column.frame
+            clock.now = 200
+            host.frame()
+            XCTAssertNotEqual(before.x, column.frame.x)
+            XCTAssertEqual(halfway.x, (before.x + column.frame.x) / 2, accuracy: 1)
+            XCTAssertTrue(host.view(id: child.id) === column)
+        }
+    }
+
+
     /// A label whose width travels lays its words out at the width it is bound for: they keep the one line they fit
     /// there, never breaking at the widths its place passes through.
     func testALabelsWordsStandAtTheWidthItTravelsTo() throws {

@@ -177,3 +177,14 @@ the name's length in single-character edits (at least two). An application
 event the host does not raise can be described the same way. These descriptions
 are returned as values without writing output. No description is available
 while the host has said nothing.
+
+## A key is a number
+
+`Prop`, `Event`, `Act` and `NodeType` retain their existing names and initializer
+spellings. Internally, `KeyName` caches the name's deterministic 64-bit FNV-1a
+number. Equality and dictionary hashing use that number; ordering uses the
+name's UTF-8 bytes, as in current StateUI. A process-wide registry rejects a
+collision between different names instead of silently merging their contracts.
+`ElementProperty`, `ElementEvent` and `ElementAct` construct their tokens once
+at declaration, rather than reconstructing keys on every access. `KeyName` is
+internal; none of this adds a new application-facing API.

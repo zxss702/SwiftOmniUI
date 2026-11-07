@@ -16,11 +16,13 @@ public struct Act: Hashable, Sendable, ExpressibleByStringLiteral,
     CustomStringConvertible {
     /// The act's name - the library's own, or the application's registered
     /// one.
-    public let name: String
+    public var name: String { key.name }
+
+    private let key: KeyName
 
     /// An act from its name - what a member's token is made from.
     public init(_ name: String) {
-        self.name = name
+        self.key = KeyName(name)
     }
 
     /// The literal form, so a name reads plainly where an act is compared:

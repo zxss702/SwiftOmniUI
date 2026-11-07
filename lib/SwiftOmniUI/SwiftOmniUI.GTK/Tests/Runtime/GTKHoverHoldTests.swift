@@ -60,6 +60,7 @@ private struct HoverCardPage: View {
 /// in a popup is what the pointer is on, so it hears the pointer's own exits, and a popup opened from inside a card
 /// stands over the card's own views as well.
 /// Design: docs/design/platforms/gtk/input.md#a-popup-over-the-pointer
+@MainActor
 final class GTKHoverHoldTests: XCTestCase {
     /// The page under a menu the test opened - the row's own hover to read, and the menu to close.
     @MainActor
@@ -80,7 +81,7 @@ final class GTKHoverHoldTests: XCTestCase {
     /// opened as the user opens one, and the exit GTK told the row held - with the pointer's own place answered as one
     /// that is still on the row, or one that is past it.
     @MainActor
-    private func withARowUnderAMenu(
+    private static func withARowUnderAMenu(
         pointerStillOnTheRow: Bool, _ body: @MainActor (RowUnderAMenu) throws -> Void
     ) throws {
         defer { GTKHoverHold.pointerPlace = GTKHoverHold.livePointerPlace }
@@ -114,7 +115,7 @@ final class GTKHoverHoldTests: XCTestCase {
     /// left, so the view keeps what it has.
     func testTheHoverStaysWhenTheMenuGoesWithThePointerStillOnTheRow() throws {
         try onUIThread {
-            try withARowUnderAMenu(pointerStillOnTheRow: true) { page in
+            try Self.withARowUnderAMenu(pointerStillOnTheRow: true) { page in
                 page.closeTheMenu()
                 page.host.step()
                 XCTAssertTrue(page.hovered.wrappedValue, "the pointer is still on the row")
@@ -126,7 +127,7 @@ final class GTKHoverHoldTests: XCTestCase {
     /// The menu going with the pointer away from the row hands it the exit it was owed.
     func testTheHoverGoesWhenTheMenuGoesWithThePointerAway() throws {
         try onUIThread {
-            try withARowUnderAMenu(pointerStillOnTheRow: false) { page in
+            try Self.withARowUnderAMenu(pointerStillOnTheRow: false) { page in
                 page.closeTheMenu()
                 page.host.step()
                 XCTAssertFalse(page.hovered.wrappedValue, "the pointer is past the row")
@@ -139,7 +140,7 @@ final class GTKHoverHoldTests: XCTestCase {
     /// when the menu goes.
     func testARowThatLeftTheTreeWhileTheMenuStoodIsLetGoOf() throws {
         try onUIThread {
-            try withARowUnderAMenu(pointerStillOnTheRow: false) { page in
+            try Self.withARowUnderAMenu(pointerStillOnTheRow: false) { page in
                 page.row.detach()
                 XCTAssertEqual(GTKHoverHold.holding, 0, "a view that left is owed nothing")
                 page.closeTheMenu()
@@ -152,7 +153,7 @@ final class GTKHoverHoldTests: XCTestCase {
     /// either, so nothing is owed it when the menu goes.
     func testThePointerComingBackDropsWhatWasWithheld() throws {
         try onUIThread {
-            try withARowUnderAMenu(pointerStillOnTheRow: false) { page in
+            try Self.withARowUnderAMenu(pointerStillOnTheRow: false) { page in
                 page.row.heard(.pointer(.pointerEntered, .zero))
                 XCTAssertEqual(GTKHoverHold.holding, 0, "the pointer is on the view again")
                 XCTAssertTrue(page.hovered.wrappedValue)
