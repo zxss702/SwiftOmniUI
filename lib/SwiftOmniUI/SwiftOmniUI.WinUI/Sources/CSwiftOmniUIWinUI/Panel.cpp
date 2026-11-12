@@ -159,8 +159,16 @@ namespace {
             }
             if (items.GetAt(index) == held[index]) continue;
             uint32_t previous;
-            if (items.IndexOf(held[index], previous)) items.RemoveAt(previous);
-            else if (owner) detachFromForeignPanel(owner, held[index]);
+            if (items.IndexOf(held[index], previous)) {
+                // Reorder neighbors around a retained input. Removing its
+                // ancestor from Children unloads the native focus scope.
+                if (holdsFocus(held[index])) {
+                    while (previous-- > index) items.RemoveAt(index);
+                    continue;
+                }
+                items.RemoveAt(previous);
+            }
+            if (owner) detachFromForeignPanel(owner, held[index]);
             items.InsertAt(index, held[index]);
         }
     }
@@ -537,6 +545,10 @@ extern "C" void swiftomniui_winui_panel_set_children(
         held.reserve(count);
         for (int32_t index = 0; index < count; ++index) held.push_back(as<xaml::UIElement>(children[index]));
         if (sameChildren(items, held)) return;
+        xaml::UIElement focused{ nullptr };
+        for (auto const &child : held) {
+            if (holdsFocus(child)) { focused = child; break; }
+        }
         // A lazy window usually changes at its edges. Keep the intersecting
         // UIElements attached, preserving their native state and composition.
         // Only inserted elements can belong to another panel. Querying native
@@ -545,6 +557,7 @@ extern "C" void swiftomniui_winui_panel_set_children(
             removeUnused(items, held);
             insertInOrder(items, held, owner);
         }
+        if (focused) focused.Focus(xaml::FocusState::Programmatic);
         acrylicStructureChanged(owner);
     } catch (...) {
         report("holding a panel's children");

@@ -15,6 +15,18 @@ extension GTKView {
     /// place travels.
     /// Design: docs/design/platforms/gtk/layout.md#a-place-between-passes
     func layout(_ place: Rect) {
+        var place = place
+        if var frozen = departureFrame {
+            var ancestor = sourceElement?.parent
+            while let element = ancestor {
+                if let view = element.gtk.view {
+                    frozen.x -= view.placedFrame.x
+                    frozen.y -= view.placedFrame.y
+                }
+                ancestor = element.parent
+            }
+            place = frozen
+        }
         if nativeSafeBarOwner == nil, let placingLayout {
             safeAreaContext = placingLayout.context(for: self, at: place)
                 .ignoring(sourceElement?.ignoresSafeArea)

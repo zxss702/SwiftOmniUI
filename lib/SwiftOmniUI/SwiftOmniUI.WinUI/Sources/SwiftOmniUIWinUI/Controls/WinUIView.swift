@@ -252,6 +252,7 @@ class WinUIView {
 
     /// Where the view was last placed, in DIPs of its parent; nil before its first place.
     private(set) var placed: Rect?
+    var departureFrame: Rect?
 
     /// Geometry committed with the native allocation, distinct from the next
     /// presentation sample waiting for its parent's Arrange.
@@ -671,6 +672,18 @@ class WinUIView {
     /// the layout for one. Its size is its words' room while its place travels.
     /// Design: docs/design/platforms/winui/layout.md#a-place-between-passes
     func layout(_ place: Rect) {
+        var place = place
+        if var frozen = departureFrame {
+            var ancestor = sourceElement?.parent
+            while let element = ancestor {
+                if let view = element.winUI.view {
+                    frozen.x -= view.placedFrame.x
+                    frozen.y -= view.placedFrame.y
+                }
+                ancestor = element.parent
+            }
+            place = frozen
+        }
         let moved = placed != place
         if nativeSafeBarOwner == nil { placed = place }
         if Self.arranging > 0 {

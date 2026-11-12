@@ -94,6 +94,22 @@ final class GTKElement: NativeElement {
     }
 
     func departureChanged() {
+        if let view {
+            if element.isDeparting {
+                var frame = view.placedFrame
+                var ancestor = element.parent
+                while let parent = ancestor {
+                    if let view = parent.gtk.view {
+                        frame.x += view.placedFrame.x
+                        frame.y += view.placedFrame.y
+                    }
+                    ancestor = parent.parent
+                }
+                view.departureFrame = frame
+            } else {
+                view.departureFrame = nil
+            }
+        }
         func update(_ node: MountedElement, departing: Bool) {
             let ignores = departing || node.isDeparting
             node.gtk.view?.setIgnoresInput(ignores || node.value(.ignoresInput)?.bool == true)

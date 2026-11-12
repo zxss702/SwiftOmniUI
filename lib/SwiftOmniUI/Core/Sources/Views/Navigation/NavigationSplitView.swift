@@ -54,6 +54,24 @@ public struct NavigationSplitView: VisualElement, PageElement, PageArrangement {
     /// The node this page describes.
     public var node: Node
 
+    /// A sidebar and detail whose visibility follows the supplied binding.
+    public init(
+        columnVisibility: Binding<NavigationSplitViewVisibility>,
+        sidebar: () -> any Page,
+        detail: () -> any Page
+    ) {
+        node = Node(contract: NavigationSplitViewContract.self, children: [
+            Self.identified(Node.page(sidebar()), as: Self.sidebarIdentity),
+            Self.identified(Node.page(detail()), as: Self.detailIdentity),
+        ])
+        node.write(NavigationSplitViewContract.columnVisibility, columnVisibility.wrappedValue)
+        node.addHandler(NavigationSplitViewContract.columnVisibilityChanged.token) {
+            guard let visibility = NavigationSplitViewVisibility(EventBuffer.current.value()),
+                  visibility != columnVisibility.wrappedValue else { return }
+            columnVisibility.wrappedValue = visibility
+        }
+    }
+
     /// The node, as every element answers it.
 
     /// A sidebar beside `detail`, shown when `isSidebarVisible` says so.

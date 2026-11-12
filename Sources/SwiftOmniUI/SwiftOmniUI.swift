@@ -9,9 +9,9 @@
 // module, never this facade - on Apple platforms this file answers SwiftUI
 // instead.
 
+@_exported import Foundation
 #if canImport(SwiftUI)
 @_exported import SwiftUI
-@_exported import Foundation
 #else
 // The engine, its host-facing SPI included: `@_spi(Host) import SwiftOmniUI`
 // in application heads keeps resolving what it resolved before the split.

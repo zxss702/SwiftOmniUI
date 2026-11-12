@@ -5,10 +5,256 @@
 @_spi(Host) @testable import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
 import SwiftOmniUIConformance
+import CSwiftOmniUIWinUI
 import XCTest
 
 /// A stack's children travel to the places a patch gives them; one that joins fades in, one hidden fades out first.
 final class WinUILayoutMotionTests: XCTestCase {
+    func testLazyStackKeepsFlattenedBodyRowsInSeparateVerticalSlots() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(room: WinUITestHost.wideRoom) {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(0..<3) { index in
+                            Text("message \(index)").id("message-\(index)")
+                                .padding(16)
+                                .background { GeometryReader { _ in Color.white } }
+                                .padding(.leading, 32)
+                                .overlay(alignment: .bottomLeading) { Color.blue.frame(width: 32, height: 32) }
+                                .padding(.trailing, 24)
+                        }
+                    }
+                }
+            }
+            host.frame()
+            let labels = try (0..<3).map { try XCTUnwrap(host.view(id: .manual("message-\($0)"))) }
+            for index in 0..<2 {
+                XCTAssertLessThan(labels[index].origin.y + labels[index].laidOutFrame.height,
+                                  labels[index + 1].origin.y,
+                                  "frames \(labels.map { ($0.origin.y, $0.laidOutFrame.height) })")
+            }
+        }
+    }
+
+    func testLazyStackKeepsDirectLayeredBodyMessagesInSeparateSlots() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(room: WinUITestHost.wideRoom) {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        Text("one").padding(16).background { GeometryReader { _ in Color.white } }
+                        Text("two").padding(16).background { GeometryReader { _ in Color.white } }
+                        Text("three").padding(16).background { GeometryReader { _ in Color.white } }
+                    }
+                }
+            }
+            host.frame()
+            let texts = host.views(WinUITextView.self)
+            XCTAssertGreaterThanOrEqual(texts.count, 3)
+            for index in 0..<2 {
+                XCTAssertLessThan(texts[index].origin.y + texts[index].laidOutFrame.height,
+                                  texts[index + 1].origin.y,
+                                  "frames \(texts.map { ($0.origin.y, $0.laidOutFrame.height) })")
+            }
+        }
+    }
+
+    func testAStackSiblingFollowsTheAnimatedInsertionBeforeItsFinalPosition() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let shown = State(wrappedValue: false)
+            let host = WinUIRenderer.running(clock: clock) {
+                HStack(spacing: 0) {
+                    if shown.wrappedValue { Text("Recent").frame(width: 160, height: 80).transition(.offset(x: -160)) }
+                    Text("Editor").frame(width: 400, height: 80).id("editor")
+                }.animation(.eased(200, .linear), value: shown.wrappedValue)
+            }
+            host.frame()
+            let editor = try XCTUnwrap(host.view(id: .manual("editor")))
+            let before = editor.origin.x
+            shown.wrappedValue = true
+            host.step(); host.frame()
+            XCTAssertEqual(editor.origin.x, before, accuracy: 1)
+            clock.now = 100
+            host.frame()
+            XCTAssertEqual(editor.origin.x, before + 40, accuracy: 2)
+            clock.now = 200
+            host.frame()
+            XCTAssertEqual(editor.origin.x, before + 80, accuracy: 2)
+        }
+    }
+
+    func testWelcomeEditorSpringSettlesWithoutAnotherLayoutJump() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let words = State(wrappedValue: "")
+            let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
+                HStack(spacing: 0) {
+                    if words.wrappedValue.isEmpty {
+                        Text("Recent").frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .transition(.blur.combined(with: .offset(x: -272)))
+                    }
+                    VStack(spacing: 12) {
+                        if words.wrappedValue.isEmpty {
+                            Color.blue.frame(width: 196, height: 196)
+                                .transition(.blur.combined(with: .scale(scale: 0.98)))
+                            Text("今天从哪里开始？").font(.system(size: 32))
+                                .transition(.blur.combined(with: .scale(scale: 0.98)))
+                            Text("Actions").frame(height: 48)
+                                .transition(.blur.combined(with: .scale(scale: 0.98)))
+                        } else {
+                            VStack(spacing: 16) {
+                                Text("神衍·智能").font(.system(size: 24))
+                                Text("今天干什么？").font(.system(size: 32))
+                            }.padding(.bottom, 32)
+                                .transition(.blur.combined(with: .scale(scale: 0.98)))
+                        }
+                        HStack(alignment: .bottom, spacing: 0) {
+                            TextEditor(text: words.projectedValue)
+                                .scrollContentBackground(.hidden)
+                                .background(alignment: .topLeading) {
+                                    if words.wrappedValue.isEmpty {
+                                        Text("Start a conversation").padding(.top, 1).padding(.leading, 4)
+                                    }
+                                }
+                                .safeAreaPadding(.vertical, 12)
+                                .safeAreaPadding(.leading, 12)
+                                .frame(height: words.wrappedValue.isEmpty ? 44 : 128)
+                            Button("Send") {}.frame(width: 44, height: 44)
+                        }
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 22)).id("input")
+                    }
+                    .padding(.horizontal, 48)
+                    .frame(width: words.wrappedValue.isEmpty ? 448 : 640)
+                    .ignoresSafeArea()
+                    .frame(maxHeight: .infinity)
+                }.animation(.snappy, value: words.wrappedValue.isEmpty)
+            }
+            host.frame()
+            let input = try XCTUnwrap(host.view(id: .manual("input")))
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            for _ in 0..<4 { host.step(); host.frame() }
+            XCTAssertTrue(swiftomniui_winui_focus(editor.handle, true))
+            for (turn, text) in ["hello", "", "again"].enumerated() {
+                editor.type(text)
+                XCTAssertTrue(swiftomniui_winui_focused(editor.handle), "after text input \(text.debugDescription)")
+                host.step()
+                XCTAssertTrue(swiftomniui_winui_focused(editor.handle), "after render \(text.debugDescription)")
+                var previous = input.origin
+                var previousEditor = editor.origin
+                var firstUnfocusedSample: Int?
+                for sample in 0...90 {
+                    clock.now = Double(turn * 1600) + Double(sample) * 1000 / 60
+                    host.frame()
+                    if sample >= 60 {
+                        XCTAssertEqual(input.origin.x, previous.x, accuracy: 0.5)
+                        XCTAssertEqual(input.origin.y, previous.y, accuracy: 0.5)
+                        XCTAssertEqual(editor.origin.y, previousEditor.y, accuracy: 0.5)
+                    }
+                    previous = input.origin
+                    previousEditor = editor.origin
+                    host.step()
+                    host.layOut()
+                    if firstUnfocusedSample == nil, !swiftomniui_winui_focused(editor.handle) {
+                        firstUnfocusedSample = sample
+                    }
+                    XCTAssertTrue(host.views(WinUITextEditorView.self).first === editor)
+                    let settledInput = input.origin
+                    let settledEditor = editor.origin
+                    host.layOut()
+                    XCTAssertEqual(input.origin.x, settledInput.x, accuracy: 0.5)
+                    XCTAssertEqual(input.origin.y, settledInput.y, accuracy: 0.5)
+                    XCTAssertEqual(editor.origin.x, settledEditor.x, accuracy: 0.5)
+                    XCTAssertEqual(editor.origin.y, settledEditor.y, accuracy: 0.5,
+                                   "native allocation repeated at sample \(sample), text \(text.debugDescription)")
+                }
+                XCTAssertEqual(editor.text, text)
+                XCTAssertNil(firstUnfocusedSample, "focus survives the structural transition for \(text.debugDescription)")
+            }
+        }
+    }
+
+    func testWelcomeInputKeepsItsPositionAtTheStartOfTheLayoutChange() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let words = State(wrappedValue: "")
+            let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
+                HStack(spacing: 0) {
+                    if words.wrappedValue.isEmpty {
+                        Text("Recent").frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .transition(.opacity.combined(with: .offset(x: -272)))
+                            .id("recent")
+                    }
+                    VStack(spacing: 12) {
+                        if words.wrappedValue.isEmpty {
+                            Text("Welcome").frame(height: 196).transition(.opacity).id("welcome")
+                        } else {
+                            Text("Start typing").frame(height: 80).transition(.opacity)
+                        }
+                        HStack(alignment: .bottom, spacing: 0) {
+                            TextEditor(words.projectedValue)
+                                .frame(height: words.wrappedValue.isEmpty ? 44 : 128)
+                            Button("Send") {}.frame(width: 44, height: 44)
+                        }
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 22))
+                        .id("input")
+                    }
+                    .padding(.horizontal, 48)
+                    .frame(width: words.wrappedValue.isEmpty ? 448 : 640)
+                    .frame(maxHeight: .infinity)
+                }
+                .animation(.linear(duration: 0.2), value: words.wrappedValue.isEmpty)
+            }
+            host.frame()
+            let input = try XCTUnwrap(host.view(id: .manual("input")))
+            let recent = try XCTUnwrap(host.view(id: .manual("recent")))
+            let welcome = try XCTUnwrap(host.view(id: .manual("welcome")))
+            let welcomeOrigin = welcome.origin
+            let departingFrame = recent.placedFrame
+            let before = input.origin
+            words.wrappedValue = "a"
+            host.step()
+            host.frame()
+            XCTAssertTrue(host.view(id: .manual("input")) === input)
+            XCTAssertEqual(input.origin.x, before.x, accuracy: 1)
+            XCTAssertEqual(input.origin.y, before.y, accuracy: 1)
+            XCTAssertEqual(recent.placedFrame, departingFrame)
+            for time in stride(from: 10.0, through: 90.0, by: 10) {
+                clock.now = time
+                host.frame()
+                XCTAssertEqual(welcome.origin.x, welcomeOrigin.x, accuracy: 1)
+                XCTAssertEqual(welcome.origin.y, welcomeOrigin.y, accuracy: 1)
+            }
+            clock.now = 100
+            host.frame()
+            let middle = input.origin
+            XCTAssertEqual(recent.placedFrame, departingFrame)
+            clock.now = 200
+            host.frame()
+            XCTAssertNotEqual(input.origin, before)
+            XCTAssertEqual(middle.x, (before.x + input.origin.x) / 2, accuracy: 2)
+            XCTAssertEqual(middle.y, (before.y + input.origin.y) / 2, accuracy: 2)
+            let settled = input.origin
+            for time in stride(from: 210.0, through: 300.0, by: 10) {
+                clock.now = time
+                host.step()
+                host.frame()
+                XCTAssertEqual(input.origin.x, settled.x, accuracy: 1)
+                XCTAssertEqual(input.origin.y, settled.y, accuracy: 1)
+            }
+            words.wrappedValue = ""
+            let expandedOrigin = input.origin
+            host.step()
+            host.frame()
+            XCTAssertEqual(input.origin.x, expandedOrigin.x, accuracy: 1)
+            XCTAssertEqual(input.origin.y, expandedOrigin.y, accuracy: 1)
+            clock.now = 500
+            host.frame()
+            XCTAssertEqual(input.origin.x, before.x, accuracy: 1)
+            XCTAssertEqual(input.origin.y, before.y, accuracy: 1)
+            XCTAssertTrue(host.view(id: .manual("input")) === input)
+        }
+    }
+
     func testAValueGatedColumnReversesFromItsPresentedFrame() throws {
         try onUIThread {
             let clock = TestClock()

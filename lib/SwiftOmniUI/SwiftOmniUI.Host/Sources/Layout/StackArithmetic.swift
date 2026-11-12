@@ -206,7 +206,9 @@
                 || (axis == .vertical ? values.scrollAxes == .vertical : values.scrollAxes == .horizontal)
             let expands = values.expandingAxes == .both
                 || (axis == .vertical ? values.expandingAxes == .vertical : values.expandingAxes == .horizontal)
-            return items[index].isShown && stated == nil && (values.flex != nil || scrolls || expands)
+            let bounded = axis == .horizontal ? values.maximumWidth != nil : values.maximumHeight != nil
+            return items[index].isShown && stated == nil
+                && (values.flex != nil || bounded || scrolls || expands)
         }
         let flexibleIndices = Set(flexible)
         var extents = items.indices.map { index -> Double in

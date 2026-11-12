@@ -35,6 +35,15 @@ final class GTKScrollView: GTKLayoutView {
 
     /// The offset the tree writes, kept for the first layout where it comes before it.
     private var writtenOffset = WrittenScrollOffset()
+    var positionRequest: ScrollPositionRequest? {
+        didSet {
+            readerLazy?.readerTarget = nil
+            readerLazy = nil
+        }
+    }
+    private weak var readerLazy: GTKLazyView?
+    private var appliedPositionRevision: String?
+
 
     /// Content and indicators resolve the same remaining region. These are
     /// arithmetic values; native margin writes are committed after layout.
@@ -61,7 +70,7 @@ final class GTKScrollView: GTKLayoutView {
     /// The content: one child, or several stacked down.
     @discardableResult
     override func setItems(_ items: [GTKLayoutItem]) -> Bool {
-        if items.count > 1 { wraps = true }
+        wraps = items.count > 1
 
         var changed = false
         if wraps {
@@ -91,11 +100,16 @@ final class GTKScrollView: GTKLayoutView {
     func apply(
         orientation: Axis, padding: EdgeInsets, verticalBar: ScrollIndicatorVisibility,
         horizontalBar: ScrollIndicatorVisibility, defaultAnchor: UnitPoint?, offset: Point?
+        , position: ScrollPositionRequest? = nil
     ) {
         if orientation != self.orientation || verticalBar != bars.vertical || horizontalBar != bars.horizontal {
             self.orientation = orientation
             bars = (verticalBar, horizontalBar)
             configure()
+        }
+        if let position, position.revision != appliedPositionRevision {
+            appliedPositionRevision = position.revision
+            positionRequest = position
         }
         writtenPadding = padding
         let resolvedPadding = SafeAreaArithmetic.physicalInsets(padding, direction: direction) + barsInsets
@@ -158,15 +172,63 @@ final class GTKScrollView: GTKLayoutView {
     override func arrange(in bounds: Rect) {
         let viewport = resolve(in: bounds)
         scroller.layout(viewport)
+        if positionRequest != nil {
+            GTKDoorbell.afterLayout { [weak self] in self?.resolvePositionRequest() }
+        }
         // Initial offsets/anchors wait for the resolved document extent.
         guard document.padding == document.layoutPadding else { return }
         if let target = writtenOffset.laidOutNow() {
             move(to: target)
         } else if let defaultAnchor, !anchoredOnce {
-            anchoredOnce = true
             let reach = scroller.standing.reach
+            guard !(defaultAnchor.y == 1 && reach.y <= 0) else { return }
+            anchoredOnce = true
             move(to: Point(x: defaultAnchor.x * reach.x, y: defaultAnchor.y * reach.y))
         }
+    }
+
+    func resolvePositionRequest() {
+        guard let request = positionRequest, document.padding == document.layoutPadding else { return }
+        if let id = request.id {
+            guard let root = sourceElement else { return }
+            func destination(in element: MountedElement) -> GTKView? {
+                if let lazy = (element.native as? GTKElement)?.view as? GTKLazyView,
+                   let identity = element.lazyRows?.identity(forScrollID: id)
+                    ?? (lazy.cells.position(of: id) != nil ? id : nil) {
+                    readerLazy = lazy
+                    lazy.readerTarget = identity
+                    lazy.tellWindow(lazy.span ?? 0..<0)
+                    return lazy.cells.requestedItemsAreCurrent && !lazy.cells.needsMeasurement
+                        ? lazy.mounted[identity]?.view : nil
+                }
+                if element.id == .manual(id), let view = (element.native as? GTKElement)?.view { return view }
+                for child in element.children {
+                    if (child.native as? GTKElement)?.view is GTKScrollView { continue }
+                    if let view = destination(in: child) { return view }
+                }
+                return nil
+            }
+            guard let descendant = destination(in: root), descendant.placed != nil else { return }
+            scroll(toDescendant: descendant.widget, anchorX: request.anchor?.x, anchorY: request.anchor?.y)
+            positionRequest = nil
+            return
+        }
+        let standing = scroller.standing
+        if request.edge == .bottom && standing.reach.y <= 0 {
+            return
+        }
+        var target = standing.offset
+        if let x = request.x { target.x = x }
+        if let y = request.y { target.y = y }
+        switch request.edge {
+        case .top: target.y = 0
+        case .bottom: target.y = standing.reach.y
+        case .leading: target.x = direction == .rightToLeft ? standing.reach.x : 0
+        case .trailing: target.x = direction == .rightToLeft ? 0 : standing.reach.x
+        case nil: break
+        }
+        positionRequest = nil
+        move(to: target)
     }
 
     // MARK: - The user's movement
@@ -184,6 +246,7 @@ final class GTKScrollView: GTKLayoutView {
     /// The user took hold of the scroller, or let go of it and left it to throw on.
     private func scrollerHeld(_ holding: Bool) {
         if holding {
+            positionRequest = nil
             movement.holdBegan()
         } else {
             movement.holdEnded(rests: false)

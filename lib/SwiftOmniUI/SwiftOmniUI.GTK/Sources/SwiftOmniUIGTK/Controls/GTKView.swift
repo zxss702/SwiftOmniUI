@@ -118,6 +118,7 @@ class GTKView {
 
     /// Where the view was last placed in its parent; nil before its first place.
     var placed: Rect?
+    var departureFrame: Rect?
 
     /// How the view's own properties move, turn and scale it.
     var transform = HostDrawingTransform.identity

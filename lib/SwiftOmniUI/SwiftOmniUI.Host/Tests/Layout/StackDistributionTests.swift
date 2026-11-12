@@ -191,6 +191,17 @@ final class StackDistributionTests: XCTestCase {
         XCTAssertEqual(arranged.map { $0?.x }, [20, 40])
     }
 
+    func testAFrameMaximumAcceptsTheRemainingStackRoom() {
+        var recent = StackChild(width: 180, height: 20)
+        recent.values.maximumWidth = .infinity
+        let start = StackChild(width: 448, height: 20)
+
+        let arranged = places([recent, start], length: 900)
+
+        XCTAssertEqual(arranged.map { $0?.width }, [452, 448])
+        XCTAssertEqual(arranged.map { $0?.x }, [0, 452])
+    }
+
     func testSpacerMinimumWinsAContradictingMaximum() {
         var spacer = StackChild(width: 0, height: 0)
         spacer.values.flex = 40

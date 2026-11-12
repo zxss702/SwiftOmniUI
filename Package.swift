@@ -116,7 +116,7 @@ if selectedHost != "Android" && selectedHost != "Web" {
         ),
         .testTarget(
             name: "SwiftOmniUIFoundationTests",
-            dependencies: ["SwiftOmniUIFoundation"],
+            dependencies: ["SwiftOmniUIFoundation", "SwiftOmniUI"],
             path: "lib/SwiftOmniUI/SwiftOmniUI.Foundation/Tests",
             swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]
         ),

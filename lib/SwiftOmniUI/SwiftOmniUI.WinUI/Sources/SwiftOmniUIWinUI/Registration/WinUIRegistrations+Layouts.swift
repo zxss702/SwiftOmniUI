@@ -124,6 +124,7 @@ extension WinUIRegistrations {
                 ScrollViewContract.horizontalScrollIndicators, ScrollViewContract.scrollOffset,
                 ScrollViewContract.defaultScrollAnchor, ScrollViewContract.scrollBounceBehavior,
                 ScrollViewContract.scrollBounceAxes,
+                ScrollViewContract.positionRequest,
                 PaddingElementContract.contentPadding,
             ]) { view, values in
                 view.apply(
@@ -134,7 +135,8 @@ extension WinUIRegistrations {
                     defaultAnchor: values[ScrollViewContract.defaultScrollAnchor],
                     offset: values.changed(ScrollViewContract.scrollOffset) ? values[ScrollViewContract.scrollOffset] : nil,
                     bounce: values[ScrollViewContract.scrollBounceBehavior] ?? .automatic,
-                    bounceAxes: values[ScrollViewContract.scrollBounceAxes] ?? [.vertical, .horizontal])
+                    bounceAxes: values[ScrollViewContract.scrollBounceAxes] ?? [.vertical, .horizontal],
+                    position: values[ScrollViewContract.positionRequest])
             }
             scroll.applies([
                 VisualElementContract.background,

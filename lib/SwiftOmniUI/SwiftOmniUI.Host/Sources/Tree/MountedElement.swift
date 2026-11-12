@@ -347,6 +347,9 @@ import CRT
             return
         }
         let before = children
+        let departingRooms = Dictionary(uniqueKeysWithValues: before.compactMap { child in
+            child.native.departingRoom.map { (child.id, $0) }
+        })
         let previous = Dictionary(uniqueKeysWithValues: children.map { ($0.id, $0) })
 
         var arranged = patches.map { patch in
@@ -374,7 +377,7 @@ import CRT
             } else {
                 recycling = false
             }
-            if !recycling, child.isDeparting || child.depart(room: child.native.departingRoom, under: placementTransition, closed: { [weak self] in
+            if !recycling, child.isDeparting || child.depart(room: departingRooms[child.id], under: placementTransition, closed: { [weak self] in
                 self?.departed(child)
             }) { arranged.append(child) }
         }

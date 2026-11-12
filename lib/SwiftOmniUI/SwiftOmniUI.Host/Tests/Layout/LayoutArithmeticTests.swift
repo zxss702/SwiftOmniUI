@@ -8,6 +8,16 @@ import XCTest
 /// The layout arithmetic every Swift host places its children with.
 final class LayoutArithmeticTests: XCTestCase {
     @MainActor
+    func testExpandingBackgroundDoesNotExpandShortMessage() {
+        let message = Child(width: 80, height: 20)
+        var background = Child(width: 0, height: 0)
+        background.values.isLayoutDecoration = true
+        background.values.expandingAxes = .both
+        XCTAssertEqual(ZStackArithmetic.size(of: [background, message], padding: EdgeInsets(0), width: 600),
+                       LayoutSize(width: 80, height: 20))
+    }
+
+    @MainActor
     func testHorizontalScrollerFillsItsViewportInsideMargins() {
         var scroll = Child(width: 0, height: 56)
         scroll.values.scrollAxes = .horizontal

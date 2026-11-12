@@ -2,6 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension View {
+    /// Positions the scroll view by an edge, a content offset, or a child ID.
+    public func scrollPosition(_ position: Binding<ScrollPosition>, anchor: UnitPoint? = nil) -> ModifiedContent {
+        let request = position.wrappedValue.request(anchor: anchor)
+        return revised { node in
+            func positionScrollView(_ node: inout Node) {
+                node.materialize()
+                if node.type == ScrollViewContract.nodeType {
+                    if let request { node.write(ScrollViewContract.positionRequest, request) }
+                    if request?.edge == .bottom { node.write(ScrollViewContract.defaultScrollAnchor, .bottom) }
+                    if request?.edge == .top { node.write(ScrollViewContract.defaultScrollAnchor, .top) }
+                    for event in [ScrollViewContract.scrollXChanged.token, ScrollViewContract.scrollYChanged.token] {
+                        node.addHandler(event) { position.wrappedValue.userScrolled() }
+                    }
+                    return
+                }
+                for index in node.children.indices { positionScrollView(&node.children[index]) }
+            }
+            positionScrollView(&node)
+        }
+    }
+
     /// Whether a scroll view inside answers the hand - a scroller that takes
     /// none hands its gesture to whatever lies under it:
     ///

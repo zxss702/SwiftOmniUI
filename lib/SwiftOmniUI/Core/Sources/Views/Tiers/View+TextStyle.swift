@@ -74,9 +74,9 @@ extension View {
 
     /// Extra space between the lines of every text inside - the container
     /// spelling of `Text`'s `.lineSpacing`.
-    @_spi(Host) public func lineSpacing(_ value: Double?) -> ModifiedContent {
+    @_disfavoredOverload
+    public func lineSpacing(_ value: Double) -> ModifiedContent {
         revised { node in
-            guard let value else { return }
             node.writeInherited(LineHeightElementContract.lineSpacing, value)
         }
     }

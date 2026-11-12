@@ -97,7 +97,7 @@ extension PlacedView {
         guard said, !lanes.isEmpty, let law = law(of: animation)
         else { return Arrangement(framesRead: framesRead) }
 
-        return Arrangement(law: law, lanes: resized || framesRead ? [] : lanes,
+        return Arrangement(law: law, lanes: framesRead || (resized && !said) ? [] : lanes,
                            fades: true, framesRead: framesRead)
     }
 

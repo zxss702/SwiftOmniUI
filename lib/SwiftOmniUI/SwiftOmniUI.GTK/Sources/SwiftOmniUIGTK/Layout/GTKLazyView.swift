@@ -23,6 +23,7 @@ class GTKLazyView: GTKTravellingLayout {
 
     /// The children mounted now, by identity.
     private(set) var mounted: [String: GTKLayoutItem] = [:]
+    var readerTarget: String?
 
     /// The scroller whose window the run answers, and the ear it hears it by.
     private weak var watching: GTKScrollView?
@@ -195,6 +196,7 @@ class GTKLazyView: GTKTravellingLayout {
                 }
             }
             self.tellWindow(self.span ?? 0..<0)
+            self.watching?.resolvePositionRequest()
         }
     }
 
@@ -372,7 +374,12 @@ final class GTKLazyStackView: GTKLazyView {
     }
 
     override func tellWindow(_ span: Range<Double>) {
-        cells.show(span, keeping: travellingIdentities, prefetch: false)
+        let target = readerTarget.flatMap { identity -> Range<Double>? in
+            guard let place = cells.position(of: identity) else { return nil }
+            let start = cells.offset(of: place)
+            return start..<(start + max(1, cells.extents.extent(of: identity)))
+        }
+        cells.show(span, realize: target, keeping: travellingIdentities, prefetch: false)
     }
 }
 
@@ -539,7 +546,14 @@ final class GTKLazyGridView: GTKLazyView {
     }
 
     override func tellWindow(_ span: Range<Double>) {
-        cells.show(span, perRun: perRun, grid: true,
+        let target = readerTarget.flatMap { identity -> Range<Double>? in
+            guard let place = cells.position(of: identity) else { return nil }
+            let count = (cells.orderedIdentities.count + perRun - 1) / perRun
+            let run = place / perRun
+            let start = cells.runs.offset(of: run, count: count)
+            return start..<(start + max(1, cells.runs.extent(of: run)))
+        }
+        cells.show(span, perRun: perRun, grid: true, realize: target,
                    keeping: travellingIdentities, prefetch: false)
     }
 }

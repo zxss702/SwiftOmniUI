@@ -42,6 +42,9 @@ final class GTKScrollDocument: GTKLayoutView {
             item, padding: layoutPadding, orientation: orientation,
             in: LayoutSize(width: bounds.width, height: bounds.height))
         item.view.layout(arranged.place)
+        if scrollView?.positionRequest != nil {
+            GTKDoorbell.afterLayout { [weak self] in self?.scrollView?.resolvePositionRequest() }
+        }
     }
     override func context(for child: GTKView, at place: Rect) -> SafeAreaContext {
         // The document's margins consumed the viewport's contributions.

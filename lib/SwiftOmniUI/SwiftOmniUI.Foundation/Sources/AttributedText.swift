@@ -49,9 +49,15 @@ public enum ForegroundColorAttribute: AttributedStringKey {
     public typealias Value = Color
     public static let name = "SwiftOmniUI.ForegroundColor"
 }
+/// The same run-background attribute spelling used by SwiftUI's text.
+public enum BackgroundColorAttribute: AttributedStringKey {
+    public typealias Value = Color
+    public static let name = "SwiftOmniUI.BackgroundColor"
+}
 public extension AttributeScopes {
     struct SwiftOmniUIAttributes: AttributeScope {
         public let foregroundColor: ForegroundColorAttribute
+        public let backgroundColor: BackgroundColorAttribute
     }
     var swiftOmniUI: SwiftOmniUIAttributes.Type { SwiftOmniUIAttributes.self }
 }
@@ -96,6 +102,7 @@ extension TextSpan {
         }
 
         if let color = run.attributes[ForegroundColorAttribute.self] { span = span.foregroundStyle(color) }
+        if let color = run.attributes[BackgroundColorAttribute.self] { span = span.background(color) }
         return span
     }
 }

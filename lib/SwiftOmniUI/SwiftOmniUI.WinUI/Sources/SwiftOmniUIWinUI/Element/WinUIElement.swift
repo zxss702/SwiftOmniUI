@@ -49,11 +49,13 @@ final class WinUIElement: NativeElement {
     ])
 
     private static func geometryLanes(affectedBy properties: Set<Prop>) -> AnimationLanes {
+        // Size samples own dimensions. Structural layout can move the same
+        // branch independently, so it must retain its placement journey.
         var lanes: AnimationLanes = []
         for property in properties where layoutInputs.contains(property) {
             switch property {
-            case .height, .minimumHeight, .maximumHeight: lanes.formUnion([.y, .height])
-            default: lanes.formUnion(.all)
+            case .height, .minimumHeight, .maximumHeight: lanes.insert(.height)
+            default: lanes.formUnion([.width, .height])
             }
         }
         return lanes
@@ -277,6 +279,22 @@ final class WinUIElement: NativeElement {
     }
 
     func departureChanged() {
+        if let view {
+            if element.isDeparting {
+                var frame = view.placedFrame
+                var ancestor = element.parent
+                while let parent = ancestor {
+                    if let view = parent.winUI.view {
+                        frame.x += view.placedFrame.x
+                        frame.y += view.placedFrame.y
+                    }
+                    ancestor = parent.parent
+                }
+                view.departureFrame = frame
+            } else {
+                view.departureFrame = nil
+            }
+        }
         layoutItemChanged()
         if element.isDeparting, element.transition?.removal.blur != nil {
             view?.prepareBlur()

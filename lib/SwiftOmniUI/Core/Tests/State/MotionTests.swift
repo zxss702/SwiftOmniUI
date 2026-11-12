@@ -15,6 +15,26 @@ import XCTest
 @_spi(Host) @testable import SwiftOmniUICore
 
 @MainActor final class MotionTests: XCTestCase {
+    func testValueGateAnimatesDescendantSizesWithoutLeakingToSiblings() throws {
+        let differ = Differ()
+        let law = Animation.linear(duration: 0.2)
+        func tree(_ expanded: Bool) -> Node {
+            VStack {
+                HStack {
+                    Text("Editor").frame(width: expanded ? 640 : 448).id("editor")
+                }.animation(law, value: expanded)
+                Text("Outside").frame(width: expanded ? 100 : 50).id("outside")
+            }.node
+        }
+        let first = differ.reconcile(nil, with: tree(false))
+        let next = differ.reconcile(first.node, with: tree(true))
+        let editor = try XCTUnwrap(next.patch.subtree.first { $0.id == .manual("editor") })
+        let outside = try XCTUnwrap(next.patch.subtree.first { $0.id == .manual("outside") })
+        XCTAssertEqual(editor.transitions[.width]?.animation, law)
+        XCTAssertNil(outside.transitions[.width])
+        XCTAssertNil(differ.transaction)
+    }
+
     func testAnOuterFrameCarriesAChildsValueGatedLayoutAnimation() {
         let differ = Differ()
         let law = Animation.linear(duration: 0.2)

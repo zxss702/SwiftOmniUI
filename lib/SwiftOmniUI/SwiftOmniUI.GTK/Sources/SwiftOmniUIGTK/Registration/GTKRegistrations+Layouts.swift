@@ -140,6 +140,7 @@ extension GTKRegistrations {
                 ScrollViewContract.orientation, ScrollViewContract.verticalScrollIndicators,
                 ScrollViewContract.horizontalScrollIndicators, ScrollViewContract.scrollOffset,
                 ScrollViewContract.defaultScrollAnchor,
+                ScrollViewContract.positionRequest,
                 PaddingElementContract.contentPadding,
             ]) { view, values in
                 view.apply(
@@ -148,7 +149,8 @@ extension GTKRegistrations {
                     verticalBar: values[ScrollViewContract.verticalScrollIndicators] ?? .automatic,
                     horizontalBar: values[ScrollViewContract.horizontalScrollIndicators] ?? .automatic,
                     defaultAnchor: values[ScrollViewContract.defaultScrollAnchor],
-                    offset: values.changed(ScrollViewContract.scrollOffset) ? values[ScrollViewContract.scrollOffset] : nil)
+                    offset: values.changed(ScrollViewContract.scrollOffset) ? values[ScrollViewContract.scrollOffset] : nil,
+                    position: values[ScrollViewContract.positionRequest])
             }
             scroll.applies([
                 VisualElementContract.background,

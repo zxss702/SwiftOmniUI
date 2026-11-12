@@ -114,6 +114,42 @@ final class DepartureTests: XCTestCase {
             .number(60), "half its 200 ms slide by its room across")
     }
 
+    /// The removal phase measures the room before a surviving sibling's patch
+    /// can trigger a new native arrangement.
+    func testAMoveUsesTheRoomBeforeTheSiblingPatchArranges() {
+        let clock = WoundClock()
+        let natives = Natives()
+        let runtime = HostRuntime(
+            clock: clock, reducesMotion: { false }, makeNative: { _ in natives.make() }, log: { _ in })
+        runtime.layoutMotion.applicationMotion = .eased(200, .linear)
+
+        var departing = HostPatch(id: .manual("a"), type: .text)
+        departing.properties[.transition] = AnyTransition.move(edge: .trailing).propValue
+        var staying = HostPatch(id: .manual("b"), type: .text)
+        staying.properties[.text] = .string("before")
+        var initial = HostPatch(id: .manual("stack"), type: .vStack)
+        initial.children = .arranged([departing, staying])
+        runtime.tree.apply(initial, complete: true)
+
+        let child = runtime.tree.root!.children[0]
+        natives.views[1].room = Rect(x: 0, y: 0, width: 120, height: 20)
+        natives.onApplied = { changed in
+            if changed.contains(.text) { natives.views[1].room = Rect(x: 0, y: 0, width: 30, height: 20) }
+        }
+        var update = HostPatch(id: .manual("stack"), type: .vStack)
+        var updatedStaying = HostPatch(id: .manual("b"), type: .text)
+        updatedStaying.properties[.text] = .string("after")
+        update.children = .arranged([updatedStaying])
+        runtime.tree.apply(update, complete: false)
+
+        clock.time = 100
+        runtime.displayCycle.frame(now: 100)
+        XCTAssertEqual(
+            runtime.tree.presentedPropertyValue(
+                mount: child.mount, property: .translationX),
+            .number(60))
+    }
+
     /// An element described with a transition fades in by its insertion phase,
     /// not by the plain opacity crossing.
     func testAnInsertionRidesItsPhaseValuesIn() throws {
@@ -184,8 +220,12 @@ final class DepartureTests: XCTestCase {
 @MainActor
 private final class Natives {
     private(set) var last: TransitionNative?
+    var views: [TransitionNative] = []
+    var onApplied: ((Set<Prop>) -> Void)?
     func make() -> any NativeElement {
         let view = TransitionNative()
+        view.onApplied = { [weak self] changed in self?.onApplied?(changed) }
+        views.append(view)
         last = view
         return view
     }
@@ -197,12 +237,13 @@ private final class Natives {
 private final class TransitionNative: NativeElement {
     let presentsView = true
     var room: Rect?
+    var onApplied: ((Set<Prop>) -> Void)?
     var departingRoom: Rect? { room }
     func standingValue(_ property: Prop) -> HostValue? { nil }
     func animates(_ property: Prop) -> Bool {
         property == .blur || TransitionSurface.presentsDrawing(property)
     }
-    func applied(changed: Set<Prop>, wasDescribed: Bool) {}
+    func applied(changed: Set<Prop>, wasDescribed: Bool) { onApplied?(changed) }
     func presentFrame(_ changed: Set<Prop>) {}
     func arrangeChildren() {}
     func leave() {}

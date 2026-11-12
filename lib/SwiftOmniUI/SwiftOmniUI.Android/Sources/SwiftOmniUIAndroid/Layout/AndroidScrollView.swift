@@ -64,7 +64,7 @@ final class AndroidScrollView: AndroidLayoutView {
     /// The content: one child, or several stacked down.
     @discardableResult
     override func setItems(_ items: [AndroidLayoutItem]) -> Bool {
-        if items.count > 1 { wraps = true }
+        wraps = items.count > 1
 
         var changed = false
         if wraps {

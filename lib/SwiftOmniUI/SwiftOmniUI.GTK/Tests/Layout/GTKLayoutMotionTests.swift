@@ -27,6 +27,48 @@ private struct LengtheningPage: View {
 
 /// A stack's children travel to the places a patch gives them; one that joins fades in, one hidden fades out first.
 final class GTKLayoutMotionTests: XCTestCase {
+    func testDepartingWelcomeKeepsItsWindowPositionWhileItsParentReflows() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let expanded = State(wrappedValue: false)
+            let host = GTKRenderer.running(clock: clock) {
+                HStack(spacing: 0) {
+                    if !expanded.wrappedValue {
+                        Text("Recent").frame(width: 160, height: 300).transition(.opacity)
+                    }
+                    VStack(spacing: 12) {
+                        if !expanded.wrappedValue {
+                            Text("Welcome").frame(height: 100).transition(.opacity).id("welcome")
+                        }
+                        TextEditor().frame(height: expanded.wrappedValue ? 128 : 44)
+                    }
+                    .frame(width: expanded.wrappedValue ? 400 : 240)
+                    .frame(maxHeight: .infinity)
+                }
+                .animation(.linear(duration: 0.2), value: expanded.wrappedValue)
+            }
+            host.frame()
+            let view = try XCTUnwrap(host.view(id: .manual("welcome")))
+            let window = try XCTUnwrap(host.window)
+            var zero = graphene_point_t(x: 0, y: 0)
+            var before = graphene_point_t()
+            XCTAssertNotEqual(gtk_widget_compute_point(view.widget, window.widget, &zero, &before), 0)
+            expanded.wrappedValue = true
+            host.step()
+            for time in stride(from: 0.0, through: 190.0, by: 10) {
+                clock.now = time
+                host.frame()
+                var position = graphene_point_t()
+                XCTAssertNotEqual(gtk_widget_compute_point(view.widget, window.widget, &zero, &position), 0)
+                XCTAssertEqual(position.x, before.x, accuracy: 1)
+                XCTAssertEqual(position.y, before.y, accuracy: 1)
+            }
+            clock.now = 200
+            host.frame()
+            XCTAssertNil(host.view(id: .manual("welcome")))
+        }
+    }
+
     func testAValueGatedColumnReversesFromItsPresentedFrame() throws {
         try onUIThread {
             let clock = TestClock()

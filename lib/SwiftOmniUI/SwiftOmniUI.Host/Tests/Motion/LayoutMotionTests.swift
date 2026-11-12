@@ -448,9 +448,22 @@ final class LayoutMotionTests: XCTestCase {
         layout.arrange([(moved, 1, Self.row(0, x: 350))], width: 400, patched: false)
         XCTAssertEqual(moved.placedFrame, Self.row(0, x: 350), "the child follows the room exactly")
 
-        layout.arrange([(moved, 1, Self.row(0, x: 150))], width: 200)
+        layout.arrange([(moved, 1, Self.row(0, x: 150))], width: 200, patched: false)
         XCTAssertEqual(moved.placedFrame, Self.row(0, x: 150), "its width is its parent's to say, patch or not")
         XCTAssertFalse(layout.animator.isMoving, "a resize starts no animation")
+    }
+
+    func testAStatePatchKeepsPlacementMotionWhenTheLayoutRoomChanges() throws {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Self.row(0, x: 80))], width: 200)
+        layout.arrange([(moved, 1, Self.row(0, x: 40))], width: 400)
+        layout.frame(at: 100)
+        XCTAssertEqual(moved.placedFrame.x, 60, accuracy: 1e-9)
+        XCTAssertTrue(layout.animator.isMoving)
+        layout.frame(at: 200)
+        XCTAssertEqual(moved.placedFrame.x, 40, accuracy: 1e-9)
+        XCTAssertFalse(layout.animator.isMoving)
     }
 
     /// Where a frame under a layout is read, every child arrives: each frame of an animation would hand what reads

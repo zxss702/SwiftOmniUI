@@ -98,6 +98,14 @@ made just before it would otherwise say it stands at zero.
 
 ## Scrolling
 
+`scrollPosition(_:, anchor:)` carries a `ScrollPosition` request through the
+Host SPI. An edge or offset resolves after native layout, against the current
+scroll reach; a repeated request has a fresh revision even when its edge is
+unchanged. ID requests retain an offscreen lazy target until its real row is
+laid out. Requests are consumed, rather than pinning subsequent content changes
+to the same destination. User movement clears the binding's destination and
+sets `isPositionedByUser`; native echoes of program writes do not do so.
+
 A ScrollView is a SwiftOmniUI layout holding GTK's `GtkScrolledWindow`, which
 holds the document the core's scroll arithmetic lays out - never smaller than
 the viewport, and several children stacked down. GTK puts the document in a

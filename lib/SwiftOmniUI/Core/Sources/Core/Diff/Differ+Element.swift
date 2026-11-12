@@ -83,7 +83,17 @@ extension Differ {
             prepareElement(&pass)
         }
         let children = withCustomLayoutOwner(pass.node.type == .customLayout ? id : nil) {
-            reconcileChildren(of: pass.previous, node: pass.node, into: &pass.patch,
+            // A value gate changes this subtree's transaction for this update,
+            // including descendants whose own dimensions changed.
+            let outside = transaction
+            defer { transaction = outside }
+            transaction = pass.transacting ?? transaction
+            if !pass.armed.isEmpty, transaction?.disablesAnimations != true {
+                var inherited = transaction ?? Transaction()
+                inherited.animation = pass.node.animation?.animation(for: .all, armed: pass.armed)?.resolved(against: animation)
+                transaction = inherited
+            }
+            return reconcileChildren(of: pass.previous, node: pass.node, into: &pass.patch,
                               sizesArrive: pass.node.type == .fragment ? sizesArrive : pass.node.childSizesArrive)
         }
         return finishElement(&pass, children: children)

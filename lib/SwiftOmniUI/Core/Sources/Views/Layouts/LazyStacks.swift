@@ -530,7 +530,7 @@ struct LazyHStackElement: StackBase {
                     } else {
                         prepare(&child, place)
                     }
-                    if child.type != .fragment { child.props[.lazyRowStack] = rowStack }
+                    child.props[.lazyRowStack] = rowStack
                     // A fragment is retained by the differ even though only
                     // its children mount. Its identity must survive window shifts too.
                     if child.id == nil { child.id = identity }

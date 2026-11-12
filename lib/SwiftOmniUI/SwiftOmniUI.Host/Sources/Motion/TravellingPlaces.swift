@@ -82,8 +82,6 @@
         }
 
         var stated: AnimationLanes = []
-        if values.width != nil { stated.insert(.width) }
-        if values.height != nil { stated.insert(.height) }
         // A filling background/overlay gets its extent from this allocation.
         // Its parent already presents that geometry; a second placement-size
         // journey leaves the decoration behind the content's current bounds.

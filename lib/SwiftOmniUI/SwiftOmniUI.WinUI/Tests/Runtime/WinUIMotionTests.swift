@@ -9,6 +9,36 @@ import SwiftOmniUIConformance
 import XCTest
 
 final class WinUIMotionTests: XCTestCase {
+    func testTextEditorBackgroundKeepsTheEditorsAnimatedFrame() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let expanded = State(wrappedValue: false)
+            let host = WinUIRenderer.running(clock: clock) {
+                VStack {
+                    TextEditor()
+                        .frame(width: 320, height: expanded.wrappedValue ? 128 : 44)
+                        .background(Color.black, in: RoundedRectangle(cornerRadius: 12))
+                        .animation(.eased(200, .linear), value: expanded.wrappedValue)
+                        .id("editor")
+                }
+            }
+            let editor = try XCTUnwrap(host.view(id: .manual("editor")))
+            let background = try XCTUnwrap(host.views(WinUIPathView.self).first)
+            XCTAssertEqual(editor.placedFrame.height, 44, accuracy: 0.5)
+            XCTAssertEqual(background.placedFrame.height, 44, accuracy: 0.5)
+
+            expanded.wrappedValue = true
+            host.runtime.pump.turn()
+            host.frame()
+            clock.now = 100
+            host.frame()
+
+            XCTAssertEqual(editor.placedFrame.height, 86, accuracy: 1)
+            XCTAssertEqual(background.placedFrame.height, editor.placedFrame.height, accuracy: 1)
+            XCTAssertTrue(host.view(id: .manual("editor")) === editor)
+        }
+    }
+
     func testScaledTranslatedBlurredTabCaptionsDoNotAlternateEllipsis() throws {
         try onUIThread {
             let clock = TestClock()

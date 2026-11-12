@@ -71,6 +71,16 @@ final class WinUIScrollView: WinUILayoutView {
 
     /// The offset the tree writes, kept for the first layout where it comes before it.
     private var writtenOffset = WrittenScrollOffset()
+    var positionRequest: ScrollPositionRequest? {
+        didSet {
+            finishReaderDestination()
+            if positionRequest == nil {
+                swiftomniui_winui_scroller_watch_layout(scroller.handle, number, nil)
+            }
+        }
+    }
+    private var appliedPositionRevision: String?
+
 
     /// Content and indicators resolve the same remaining region. These are
     /// arithmetic values; native margin writes are committed after layout.
@@ -100,7 +110,7 @@ final class WinUIScrollView: WinUILayoutView {
     /// The content: one child, or several stacked down.
     @discardableResult
     override func setItems(_ items: [WinUILayoutItem]) -> Bool {
-        if items.count > 1 { wraps = true }
+        wraps = items.count > 1
 
         var changed = false
         if wraps {
@@ -142,7 +152,7 @@ final class WinUIScrollView: WinUILayoutView {
     func apply(
         orientation: Axis, padding: EdgeInsets, verticalBar: ScrollIndicatorVisibility,
         horizontalBar: ScrollIndicatorVisibility, defaultAnchor: UnitPoint?, offset: Point?,
-        bounce: ScrollBounceBehavior, bounceAxes: Axis.Set
+        bounce: ScrollBounceBehavior, bounceAxes: Axis.Set, position: ScrollPositionRequest? = nil
     ) {
         let mode: Int32 = bounce == .basedOnSize ? 2 : 1
         modes = (
@@ -156,6 +166,10 @@ final class WinUIScrollView: WinUILayoutView {
             configure()
         } else {
             scroller.setModes(vertical: modes.vertical, horizontal: modes.horizontal)
+        }
+        if let position, position.revision != appliedPositionRevision {
+            appliedPositionRevision = position.revision
+            positionRequest = position
         }
         writtenPadding = padding
         let resolvedPadding = SafeAreaArithmetic.physicalInsets(padding, direction: direction) + barsInsets
@@ -242,14 +256,49 @@ final class WinUIScrollView: WinUILayoutView {
     override func arrange(in bounds: Rect) {
         for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
         // Initial offsets/anchors wait for the resolved document extent.
+        if positionRequest != nil {
+            swiftomniui_winui_scroller_watch_layout(scroller.handle, number) { number in
+                MainActor.assumeIsolated {
+                    (WinUIView.find(number) as? WinUIScrollView)?.resolvePositionRequest()
+                }
+            }
+        }
         guard document.padding == document.layoutPadding else { return }
         if let target = writtenOffset.laidOutNow() {
             move(to: target)
         } else if let defaultAnchor, !anchoredOnce {
-            anchoredOnce = true
             let reach = scroller.standing.reach
+            guard !(defaultAnchor.y == 1 && reach.y <= 0) else { return }
+            anchoredOnce = true
             move(to: Point(x: defaultAnchor.x * reach.x, y: defaultAnchor.y * reach.y))
         }
+    }
+
+    private func resolvePositionRequest() {
+        guard let request = positionRequest, document.padding == document.layoutPadding else { return }
+        if let id = request.id {
+            guard let root = sourceElement else { return }
+            positionRequest = nil
+            scroll(to: id, in: root, anchorX: request.anchor?.x, anchorY: request.anchor?.y)
+            return
+        }
+        let standing = scroller.standing
+        if request.edge == .bottom && standing.reach.y <= 0 {
+            positionRequest = nil
+            return
+        }
+        var target = standing.offset
+        if let x = request.x { target.x = x }
+        if let y = request.y { target.y = y }
+        switch request.edge {
+        case .top: target.y = 0
+        case .bottom: target.y = standing.reach.y
+        case .leading: target.x = direction == .rightToLeft ? standing.reach.x : 0
+        case .trailing: target.x = direction == .rightToLeft ? 0 : standing.reach.x
+        case nil: break
+        }
+        positionRequest = nil
+        move(to: target)
     }
 
     // MARK: - The user's movement
@@ -282,6 +331,7 @@ final class WinUIScrollView: WinUILayoutView {
         lazyInterval = Point(0, 0)
         lazyObservationLead = Point(0, 0)
         if holding {
+            positionRequest = nil
             finishReaderDestination()
             programTarget = nil
             movement.holdBegan()
@@ -369,6 +419,7 @@ final class WinUIScrollView: WinUILayoutView {
     }
 
     override func detach() {
+        positionRequest = nil
         finishReaderDestination()
         detached = true
         pendingInsets = nil
