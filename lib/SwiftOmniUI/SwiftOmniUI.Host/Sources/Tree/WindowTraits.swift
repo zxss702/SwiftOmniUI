@@ -20,6 +20,18 @@
     /// Whether the window floats over the application's other windows: it says so, and the application is in front.
     public var floatsOnTop: Bool
 
+    /// Whether the window stands above every application's windows, whatever application is in front.
+    public var alwaysOnTop: Bool
+
+    /// Whether the user's presses pass through the window, and it never takes the keyboard's focus.
+    public var ignoresMouseEvents: Bool
+
+    /// Whether the window stays out of what the system captures.
+    public var excludesFromCapture: Bool
+
+    /// Whether the window is only its content: no frame of its own, no material under it.
+    public var isTransparent: Bool
+
     /// How the window settles its size against its content, where said - `WindowResizability`'s number.
     public var resizability: Int32?
 
@@ -30,6 +42,10 @@
         isMinimizable = window.value(.isMinimizable)?.bool
         isTranslucent = window.value(.isTranslucent)?.bool == true
         floatsOnTop = lifecycle.floats(window)
+        alwaysOnTop = window.value(.alwaysOnTop)?.bool == true
+        ignoresMouseEvents = window.value(.ignoresMouseEvents)?.bool == true
+        excludesFromCapture = window.value(.excludesFromCapture)?.bool == true
+        isTransparent = window.value(.isTransparent)?.bool == true
         resizability = window.value(.resizability)?.enumeration
     }
 }

@@ -102,6 +102,10 @@ struct SceneElement: Element {
             window.describe(WindowSceneContract.windowValue, opened.text)
             window.write(WindowSceneContract.hidesWhenInactive, group.hides)
             window.write(WindowSceneContract.floatsOnTop, group.floats)
+            window.write(WindowSceneContract.alwaysOnTop, group.staysOnTop)
+            window.write(WindowSceneContract.ignoresMouseEvents, group.ignoresMouse)
+            window.write(WindowSceneContract.excludesFromCapture, group.excludesCapture)
+            window.write(WindowSceneContract.isTransparent, group.transparent)
             if let resizability = own?.windowResizability ?? group.resizability ?? windows.resizability {
                 window.write(WindowSceneContract.resizability, resizability)
             }

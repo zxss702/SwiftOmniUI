@@ -21,6 +21,16 @@ public enum WindowSceneContract: ElementContract {
     /// The window is going.
     public static let destroying = ElementEvent<Self, Void>("destroying", layer: .adaptive)
 
+    /// Whether the window stands above every application's windows, whatever
+    /// application is in front.
+    public static let alwaysOnTop = ElementProperty<Self, Bool>(
+        "alwaysOnTop", layer: .adaptive, cleared: false)
+
+    /// Whether the window stays out of what the system captures: a screenshot
+    /// or recording sees through it to what stands behind.
+    public static let excludesFromCapture = ElementProperty<Self, Bool>(
+        "excludesFromCapture", layer: .adaptive, cleared: false)
+
     /// Whether the window floats above the application's other windows.
     public static let floatsOnTop = ElementProperty<Self, Bool>(
         "floatsOnTop", layer: .adaptive, cleared: false)
@@ -33,6 +43,11 @@ public enum WindowSceneContract: ElementContract {
     public static let hidesWhenInactive = ElementProperty<Self, Bool>(
         "hidesWhenInactive", layer: .adaptive, cleared: false)
 
+    /// Whether the user's presses pass through the window to what stands
+    /// behind it, and the window never takes the keyboard's focus.
+    public static let ignoresMouseEvents = ElementProperty<Self, Bool>(
+        "ignoresMouseEvents", layer: .adaptive, cleared: false)
+
     /// Whether the user can make the window fill the screen.
     public static let isMaximizable = ElementProperty<Self, Bool>("isMaximizable", layer: .adaptive)
 
@@ -41,6 +56,12 @@ public enum WindowSceneContract: ElementContract {
 
     /// Whether the window's material shows through it.
     public static let isTranslucent = ElementProperty<Self, Bool>("isTranslucent", layer: .adaptive)
+
+    /// Whether the window is only its content: no frame of its own and no
+    /// material under it - what its pages leave uncovered shows the desktop
+    /// exactly, unblurred.
+    public static let isTransparent = ElementProperty<Self, Bool>(
+        "isTransparent", layer: .adaptive, cleared: false)
 
     /// The most height the window takes, in device units.
     public static let maximumHeight = ElementProperty<Self, Double>(
@@ -74,6 +95,20 @@ public enum WindowSceneContract: ElementContract {
     /// The window came back from out of sight.
     public static let resumed = ElementEvent<Self, Void>("resumed", layer: .adaptive)
 
+    /// Where the window stands over the whole desktop, and how big it is
+    /// there, in device pixels - counted from the desktop's own corner.
+    ///
+    ///     window.screenFrame = Rect(0, 0, 3840, 2160)
+    ///
+    /// What the four requests above cannot say: they count a place from the
+    /// work area of the screen the window stands on, so they leave the
+    /// system's own bars uncovered and reach no other screen, and they count
+    /// in DIPs, which over a desktop of screens that differ are no one
+    /// screen's. This asks for the desktop exactly as the platform counts it,
+    /// and a window with no frame of its own is then the size it is placed
+    /// at. `nil` leaves the window under those four.
+    public static let screenFrame = ElementProperty<Self, Rect>("screenFrame", layer: .native)
+
     /// The window went out of sight.
     public static let stopped = ElementEvent<Self, Void>("stopped", layer: .adaptive)
 
@@ -103,8 +138,9 @@ public enum WindowSceneContract: ElementContract {
 
     /// The element's own members.
     public static let members: [any ContractMember] = [
-        allowsRestoration, activated, created, deactivated, destroying, floatsOnTop, height, hidesWhenInactive, isMaximizable,
-        isMinimizable, isTranslucent, maximumHeight, maximumWidth, minimumHeight, minimumWidth, modalPopped,
-        resizability, resumed, stopped, title, width, windowType, windowValue, x, y, defaultPosition,
+        allowsRestoration, activated, alwaysOnTop, created, deactivated, destroying, excludesFromCapture, floatsOnTop,
+        height, hidesWhenInactive, ignoresMouseEvents, isMaximizable,
+        isMinimizable, isTranslucent, isTransparent, maximumHeight, maximumWidth, minimumHeight, minimumWidth, modalPopped,
+        resizability, resumed, screenFrame, stopped, title, width, windowType, windowValue, x, y, defaultPosition,
     ]
 }

@@ -42,8 +42,9 @@ extension WinUIDriver {
         throw cannot
     }
 
-    /// A window's: the name the system shows, its place and size, their bounds, its buttons, its backdrop, whether it
-    /// floats and stands shown, and the kind and value the host keeps it by for the next start.
+    /// A window's: the name the system shows, its place and size, the rectangle of the desktop it covers, their
+    /// bounds, its buttons, its backdrop, whether it floats and stands shown, and the kind and value the host keeps it
+    /// by for the next start.
     private func windowHolds(_ name: String, _ element: MountedElement) throws -> HostValue? {
         let window = try window(of: element)
         if name == "windowType" || name == "windowValue" {
@@ -55,6 +56,11 @@ extension WinUIDriver {
             var bytes = [CChar](repeating: 0, count: Int(length) + 1)
             _ = swiftomniui_winui_window_system_title(window.handle, &bytes, Int32(bytes.count))
             return .string(String(decoding: bytes.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self))
+        }
+        if name == "screenFrame" {
+            var rect = [Double](repeating: 0, count: 4)
+            swiftomniui_winui_window_screen_frame(window.handle, &rect)
+            return .numbers(rect.map { $0.rounded() })
         }
         let names = [
             "x", "y", "width", "height", "minimumWidth", "minimumHeight", "maximumWidth", "maximumHeight",

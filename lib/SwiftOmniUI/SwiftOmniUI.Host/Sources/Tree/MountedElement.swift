@@ -945,6 +945,7 @@ import CRT
 
     private static let booleanProperties: Set<Prop> = [
         .allowDrop, .hidesWhenInactive, .canDrag, .floatsOnTop, .growsWithText, .ignoresInput,
+        .alwaysOnTop, .ignoresMouseEvents, .excludesFromCapture, .isTransparent,
         .isAnimating, .clipsContent, .isDestructive,
         .isEnabled, .isMaximizable, .isMinimizable, .isTranslucent,
         .isOpen, .isPassword, .isSidebarVisible, .isReadOnly,

@@ -221,6 +221,12 @@ is set as the whole window's, the content's asked for plus the frame around
 it as it stands: `ResizeClient` would add the title bar's height again, which
 the content already covers.
 
+A window the desktop places exactly - one covering a screen - is placed by
+that rectangle alone, in the pixels WinUI takes: no work area is added to its
+place and no DPI converts its size. It is placed last, since what stands above
+works in DIPs from a work area, and the traits that take the window's frame
+away, so that the whole window is its content, stand by then.
+
 The bounds are the presenter's preferred least and greatest size. The
 XAML title bar's row height is read from its native template resources,
 using the same compact/expanded selection as `TitleBar::UpdateHeight`.
@@ -239,6 +245,17 @@ presenter's too - its maximize and minimize buttons, a button left unsaid
 being WinUI's own, which lets the user press it, and its standing on top of
 other windows for one that floats - and the backdrop: a translucent window's
 is acrylic, and any other window's Mica, made again only where it turns.
+
+An overlay's traits reach past the presenter. Standing above every
+application's windows is `IsAlwaysOnTop` whether or not this one is in front;
+presses passing through it are `WS_EX_TRANSPARENT` with `WS_EX_NOACTIVATE` and
+`WS_EX_TOOLWINDOW`, which leave it out of the switchers already, so it is not
+told to stay out of them twice; and staying out of what the system captures is
+`SetWindowDisplayAffinity`. A window only its content keeps no frame and no
+title bar, and no material at all - the backdrop goes, and the root's
+background with it, so the desktop shows through its pages' own alpha exactly.
+Such a window is shown without being activated, since it is not one the user
+works in.
 
 ## The application's phase
 

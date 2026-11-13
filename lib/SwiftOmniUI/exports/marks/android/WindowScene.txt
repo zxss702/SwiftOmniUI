@@ -2,21 +2,26 @@
 ModalStack: cannot goBack on WindowScene - Android's driver has no path for it yet
 WindowScene: ✅
 WindowScene.activated: ✅
+WindowScene.alwaysOnTop: not realized
 WindowScene.created: ✅
 WindowScene.deactivated: 🔌 switchAway on WindowScene: the host told the activity's phase, no activity moved
 WindowScene.destroying: 🔌 close on WindowScene: the host told the activity's phase, no activity moved
+WindowScene.excludesFromCapture: not realized
 WindowScene.floatsOnTop: not realized
 WindowScene.height: not realized
 WindowScene.hidesWhenInactive: not realized
+WindowScene.ignoresMouseEvents: not realized
 WindowScene.isMaximizable: not realized
 WindowScene.isMinimizable: not realized
 WindowScene.isTranslucent: not realized
+WindowScene.isTransparent: not realized
 WindowScene.maximumHeight: not realized
 WindowScene.maximumWidth: not realized
 WindowScene.minimumHeight: not realized
 WindowScene.minimumWidth: not realized
 WindowScene.modalPopped: cannot goBack on WindowScene - Android's driver has no path for it yet
 WindowScene.resumed: 🔌 minimize on WindowScene: the host told the activity's phase, no activity moved
+WindowScene.screenFrame: not realized
 WindowScene.stopped: 🔌 minimize on WindowScene: the host told the activity's phase, no activity moved
 WindowScene.title: cannot read title of WindowScene - Android's driver has no path for it yet
 WindowScene.width: not realized

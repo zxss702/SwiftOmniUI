@@ -33,7 +33,8 @@ final class WinUIWindowLayoutTests: XCTestCase {
             swiftomniui_winui_window_frame(window.handle, &frame)
             XCTAssertEqual(frame[10], 0, "ordinary windows start with Mica, not Desktop Acrylic")
             for translucent in [false, true, false] {
-                swiftomniui_winui_window_set_traits(window.handle, true, true, true, translucent, false)
+                swiftomniui_winui_window_set_traits(window.handle, true, true, true, translucent, false,
+                                                    false, false, false, false)
                 swiftomniui_winui_window_frame(window.handle, &frame)
                 XCTAssertEqual(frame[10], translucent ? 1 : 0,
                                "only explicitly translucent windows opt into Desktop Acrylic")

@@ -44,6 +44,18 @@ public struct WindowGroup {
     /// Whether its windows float above the application's other windows.
     var floats = false
 
+    /// Whether its windows stand above every application's windows.
+    var staysOnTop = false
+
+    /// Whether the user's presses pass through its windows.
+    var ignoresMouse = false
+
+    /// Whether its windows stay out of what the system captures.
+    var excludesCapture = false
+
+    /// Whether its windows are only their content: no frame, no material.
+    var transparent = false
+
     /// How its windows settle their size against their content; nil for the
     /// platform's ordinary sizing.
     var resizability: WindowResizability? = nil
@@ -130,6 +142,54 @@ public struct WindowGroup {
     @_spi(Host) public func floatsOnTop(_ floats: Bool) -> WindowGroup {
         var copy = self
         copy.floats = floats
+        return copy
+    }
+
+    /// Whether the group's windows stand above every application's windows,
+    /// whatever application is in front - an overlay that stays in sight
+    /// while the user works elsewhere. A host without native window levels
+    /// leaves their order to the platform.
+    ///
+    ///     WindowGroup(.overlay) { OverlayWindow() }
+    ///         .alwaysOnTop(true)
+    @_spi(Host) public func alwaysOnTop(_ staysOnTop: Bool) -> WindowGroup {
+        var copy = self
+        copy.staysOnTop = staysOnTop
+        return copy
+    }
+
+    /// Whether the user's presses pass through the group's windows to what
+    /// stands behind them, and the windows never take the keyboard's focus -
+    /// an overlay the user works through, not with.
+    ///
+    ///     WindowGroup(.overlay) { OverlayWindow() }
+    ///         .ignoresMouseEvents(true)
+    @_spi(Host) public func ignoresMouseEvents(_ ignores: Bool) -> WindowGroup {
+        var copy = self
+        copy.ignoresMouse = ignores
+        return copy
+    }
+
+    /// Whether the group's windows stay out of what the system captures: a
+    /// screenshot or recording sees through them to what stands behind.
+    ///
+    ///     WindowGroup(.overlay) { OverlayWindow() }
+    ///         .excludesFromCapture(true)
+    @_spi(Host) public func excludesFromCapture(_ excludes: Bool) -> WindowGroup {
+        var copy = self
+        copy.excludesCapture = excludes
+        return copy
+    }
+
+    /// Whether the group's windows are only their content: no frame of their
+    /// own and no material under them - what their pages leave uncovered
+    /// shows the desktop exactly, unblurred.
+    ///
+    ///     WindowGroup(.overlay) { OverlayWindow() }
+    ///         .isTransparent(true)
+    @_spi(Host) public func isTransparent(_ transparent: Bool) -> WindowGroup {
+        var copy = self
+        copy.transparent = transparent
         return copy
     }
 

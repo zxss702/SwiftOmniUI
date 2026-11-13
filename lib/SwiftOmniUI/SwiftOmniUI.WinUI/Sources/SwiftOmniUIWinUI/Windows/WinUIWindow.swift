@@ -170,6 +170,16 @@ final class WinUIWindow {
         swiftomniui_winui_window_set_frame(handle, requests.map { $0 != nil }, requests.map { $0 ?? 0 })
     }
 
+    /// Places the window over the desktop exactly, as `screenFrame` asks: in physical pixels from the desktop's own
+    /// corner, so it covers the screen it names whatever the system's bars take from it and whatever that screen's
+    /// scale is. Said alone - a place and a size of the desktop are one request, and the window has no frame of its
+    /// own to add to the size.
+    /// Design: docs/design/platforms/winui/runtime.md#a-windows-frame
+    func placeOnScreen(_ screenFrame: Rect) {
+        swiftomniui_winui_window_set_screen_frame(
+            handle, [screenFrame.x, screenFrame.y, screenFrame.width, screenFrame.height])
+    }
+
     /// Places the window by the anchor `position` names, as `.defaultPosition` asks - only where it has not been
     /// shown: where the user moved it, it stays.
     func place(_ position: [Double]) {
@@ -233,7 +243,8 @@ final class WinUIWindow {
         let sizedByContent = isResizable.map { !$0 } ?? (traits.resizability == WindowResizability.contentSize.rawValue)
         swiftomniui_winui_window_set_traits(
             handle, traits.isMaximizable ?? !sizedByContent, traits.isMinimizable ?? !sizedByContent,
-            !sizedByContent, traits.isTranslucent, traits.floatsOnTop)
+            !sizedByContent, traits.isTranslucent, traits.floatsOnTop,
+            traits.alwaysOnTop, traits.ignoresMouseEvents, traits.excludesFromCapture, traits.isTransparent)
     }
 
     /// Shows `view` as the window's content - the first one activates the window, unless its scene hides it.

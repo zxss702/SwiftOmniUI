@@ -50,6 +50,9 @@ final class WinUIWindowController {
         if asked.x == nil, asked.y == nil, let anchor = element.value(.defaultPosition)?.numbers {
             window.place(anchor)
         }
+        // A window the desktop places exactly is placed last: what stands above works in DIPs from a work area, which
+        // is not the desktop's own count, and the traits that take its frame away stand by now.
+        if let screenFrame = changes.screenFrame { window.placeOnScreen(screenFrame) }
         let split = presentation.arrangement?.visibleSplitView?.winUI.view as? WinUISplitView
         window.prepareFirstPresentation(split: split)
         window.presentContent()

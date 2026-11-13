@@ -492,6 +492,11 @@ extern "C" void swiftomniui_winui_window_activate(SwiftOmniUIObjectRef handle) {
         if (auto presenter = app.Presenter().try_as<windowing::OverlappedPresenter>(); presenter && minimized(app)) {
             presenter.Restore();
         }
+        // A window the user works through is shown without taking focus: it stands shown, never activated.
+        if (GetWindowLongPtrW(reinterpret_cast<HWND>(app.Id().Value), GWL_EXSTYLE) & WS_EX_NOACTIVATE) {
+            app.Show(false);
+            return;
+        }
         app.Show();
         window.Activate();
         // XAML activation alone can leave an existing window behind another process. A redirected launch's
@@ -594,6 +599,21 @@ extern "C" void swiftomniui_winui_window_set_frame(SwiftOmniUIObjectRef handle, 
     }
 }
 
+extern "C" void swiftomniui_winui_window_set_screen_frame(SwiftOmniUIObjectRef handle, double const *rect) {
+    try {
+        auto app = borrow<xaml::Window>(handle).AppWindow();
+        auto pixels = [&](int index) { return static_cast<int32_t>(std::lround(rect[index])); };
+        // The rectangle is the desktop's own and already in pixels: no work area to add, no DIPs to convert, and a
+        // window with no frame of its own is the size it is placed at.
+        auto size = winrt::Windows::Graphics::SizeInt32{pixels(2), pixels(3)};
+        auto at = winrt::Windows::Graphics::PointInt32{pixels(0), pixels(1)};
+        if (app.Size() != size) app.Resize(size);
+        if (app.Position() != at) app.Move(at);
+    } catch (...) {
+        report("placing a window over the desktop");
+    }
+}
+
 extern "C" void swiftomniui_winui_window_set_anchor(SwiftOmniUIObjectRef handle, double const *anchor) {
     try {
         auto window = borrow<xaml::Window>(handle);
@@ -640,27 +660,53 @@ extern "C" void swiftomniui_winui_window_set_limits(SwiftOmniUIObjectRef handle,
 }
 
 extern "C" void swiftomniui_winui_window_set_traits(
-    SwiftOmniUIObjectRef handle, bool maximizable, bool minimizable, bool resizable, bool translucent, bool floats
+    SwiftOmniUIObjectRef handle, bool maximizable, bool minimizable, bool resizable, bool translucent, bool floats,
+    bool alwaysOnTop, bool ignoresMouse, bool excludesCapture, bool transparent
 ) {
     try {
         auto window = borrow<xaml::Window>(handle);
-        if (auto presenter = window.AppWindow().Presenter().try_as<windowing::OverlappedPresenter>()) {
+        auto app = window.AppWindow();
+        if (auto presenter = app.Presenter().try_as<windowing::OverlappedPresenter>()) {
             if (presenter.IsMaximizable() != maximizable) presenter.IsMaximizable(maximizable);
             if (presenter.IsMinimizable() != minimizable) presenter.IsMinimizable(minimizable);
             if (presenter.IsResizable() != resizable) presenter.IsResizable(resizable);
-            if (presenter.IsAlwaysOnTop() != floats) presenter.IsAlwaysOnTop(floats);
+            auto onTop = floats || alwaysOnTop;
+            if (presenter.IsAlwaysOnTop() != onTop) presenter.IsAlwaysOnTop(onTop);
+            // A transparent window is only its content: the frame and the caption go with the material.
+            if (presenter.HasBorder() != !transparent || presenter.HasTitleBar() != !transparent)
+                presenter.SetBorderAndTitleBar(!transparent, !transparent);
         }
+        auto hwnd = reinterpret_cast<HWND>(app.Id().Value);
+        // Presses pass through a window the user works past: it never takes focus and stands out of the switchers.
+        constexpr LONG_PTR throughStyle = WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
+        auto extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        auto wanted = ignoresMouse ? (extended | throughStyle) : (extended & ~throughStyle);
+        if (wanted != extended) {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, wanted);
+            SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        // What the system captures sees through a window kept out of it.
+        DWORD affinity = 0;
+        GetWindowDisplayAffinity(hwnd, &affinity);
+        auto wantedAffinity = excludesCapture ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE;
+        if (affinity != wantedAffinity) SetWindowDisplayAffinity(hwnd, wantedAffinity);
         // Ordinary windows use the system Mica foundation. An explicit
         // translucency request retains the native Desktop Acrylic option.
+        // A transparent window keeps no material at all: its pages' own alpha shows the desktop exactly.
         auto previousBackdrop = window.SystemBackdrop();
-        if (translucent) {
+        if (transparent) {
+            if (window.SystemBackdrop()) window.SystemBackdrop(nullptr);
+        } else if (translucent) {
             if (!window.SystemBackdrop().try_as<xaml::Media::DesktopAcrylicBackdrop>())
                 window.SystemBackdrop(xaml::Media::DesktopAcrylicBackdrop());
         } else if (!window.SystemBackdrop().try_as<xaml::Media::MicaBackdrop>()) {
             window.SystemBackdrop(xaml::Media::MicaBackdrop());
         }
-        setAcrylicWindowBackdrop(root(window), window.SystemBackdrop());
-        if (previousBackdrop != window.SystemBackdrop()) refreshWindowMaterial(root(window));
+        auto grid = root(window);
+        if (transparent && grid.Background()) grid.Background(nullptr);
+        setAcrylicWindowBackdrop(grid, window.SystemBackdrop());
+        if (previousBackdrop != window.SystemBackdrop()) refreshWindowMaterial(grid);
     } catch (...) {
         report("setting what a window is");
     }
@@ -717,6 +763,21 @@ extern "C" void swiftomniui_winui_window_frame(SwiftOmniUIObjectRef handle, doub
         values[12] = app.IsVisible() ? 1 : 0;
     } catch (...) {
         report("reading a window's frame");
+    }
+}
+
+extern "C" void swiftomniui_winui_window_screen_frame(SwiftOmniUIObjectRef handle, double *rect) {
+    try {
+        auto app = borrow<xaml::Window>(handle).AppWindow();
+        // The desktop's own count: no work area taken off the place, no DIPs converted back from the size.
+        auto at = app.Position();
+        auto size = app.Size();
+        rect[0] = at.X;
+        rect[1] = at.Y;
+        rect[2] = size.Width;
+        rect[3] = size.Height;
+    } catch (...) {
+        report("reading a window's place over the desktop");
     }
 }
 

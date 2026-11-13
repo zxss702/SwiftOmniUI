@@ -329,6 +329,12 @@ bool swiftomniui_winui_window_belongs_to(SwiftOmniUIObjectRef window, SwiftOmniU
 /// area and the width and height of its content, in DIPs.
 void swiftomniui_winui_window_set_frame(SwiftOmniUIObjectRef window, bool const *has, double const *values);
 
+/// Places the window over the desktop exactly: `rect` is x, y, width and height in physical pixels, counted from the
+/// desktop's own corner - no work area added and no DIPs converted, so it covers the screen it names whatever the
+/// system's bars take from it and whatever that screen's scale is. The window is the size it is placed at, having no
+/// frame of its own to add.
+void swiftomniui_winui_window_set_screen_frame(SwiftOmniUIObjectRef window, double const *rect);
+
 /// Places the window by an anchor: the point `anchor` fractions across and down it lands at the point the same
 /// fractions across and down the screen's work area - `.center` of both, the window centered.
 void swiftomniui_winui_window_set_anchor(SwiftOmniUIObjectRef window, double const *anchor);
@@ -343,12 +349,20 @@ double swiftomniui_winui_window_title_bar_height(SwiftOmniUIObjectRef window);
 /// What the window is: whether the user may maximize, minimize and resize it,
 /// and whether it floats over the application's other windows. Acrylic is the
 /// default backdrop; the retained translucency hint no longer selects Mica.
+/// `alwaysOnTop` stands it over every application's windows whatever is in front; `ignoresMouse` passes the user's
+/// presses through it and keeps it from taking focus; `excludesCapture` keeps it out of screenshots and recordings;
+/// `transparent` makes it only its content - no frame, no material, the desktop showing through unblurred.
 void swiftomniui_winui_window_set_traits(SwiftOmniUIObjectRef window, bool maximizable, bool minimizable, bool resizable,
-                                     bool translucent, bool floats);
+                                     bool translucent, bool floats, bool alwaysOnTop, bool ignoresMouse,
+                                     bool excludesCapture, bool transparent);
 
 /// What a test reads of a window, into 13 values: x, y, width, height, the four limits in the order they are set,
 /// maximizable, minimizable, translucent, floating and shown as 1 or 0.
 void swiftomniui_winui_window_frame(SwiftOmniUIObjectRef window, double *values);
+
+/// The rectangle of the desktop the window covers, into 4 values: x, y, width and height in physical pixels, counted
+/// from the desktop's own corner. What a test reads of a window the desktop placed.
+void swiftomniui_winui_window_screen_frame(SwiftOmniUIObjectRef window, double *rect);
 
 /// The client width and height in DIPs, without reading the window's position, limits or traits.
 void swiftomniui_winui_window_client_size(SwiftOmniUIObjectRef window, double *size);

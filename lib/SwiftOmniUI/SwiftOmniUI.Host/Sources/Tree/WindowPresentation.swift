@@ -23,6 +23,10 @@
         /// The place and size the tree changed, each alone; nil where it changed none.
         public var frame: WindowFrame?
 
+        /// The rectangle of the desktop the window covers, in device pixels, where that changed - said alone, since
+        /// a place and a size of the desktop are one request, not four.
+        public var screenFrame: Rect?
+
         /// The least and greatest size, where they changed - the first time whatever they are.
         public var bounds: WindowBounds?
 
@@ -48,6 +52,7 @@
     public private(set) var overlay: MountedElement?
     private weak var created: MountedElement?
     private var requested = WindowFrame()
+    private var screenFrame: Rect?
     private var bounds: WindowBounds?
     private var traits: WindowTraits?
     private var hidden: Bool?
@@ -86,6 +91,11 @@
         let frame = requested.changes(since: self.requested)
         self.requested = requested
         if !frame.isEmpty { changes.frame = frame }
+        let screenFrame = window.value(.screenFrame).flatMap(Rect.init(propValue:))
+        if screenFrame != self.screenFrame {
+            changes.screenFrame = screenFrame
+            self.screenFrame = screenFrame
+        }
         let bounds = WindowBounds(of: window)
         if bounds != self.bounds {
             changes.bounds = bounds

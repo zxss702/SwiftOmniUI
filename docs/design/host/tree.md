@@ -125,6 +125,11 @@ A window's place and size are four requests in DIPs, each alone
 says nothing, so the window stays where the user put it or sized it. A place
 is counted from the corner of the work area of the screen the window stands
 on; a size that is not a finite number of at least nothing asks for none.
+A window that covers a screen exactly - one standing over what the user works
+at - asks instead for a rectangle of the desktop in device pixels, said alone
+where it changes (`screenFrame`): those four count from a work area, so they
+leave the system's own bars uncovered and reach no other screen, and in DIPs
+they are no one screen's over a desktop of screens that differ.
 Its bounds (`WindowBounds`) are said the first time and where they change:
 nil leaves the toolkit's own, and a greatest size below the least is the
 least. The host turns each into its toolkit's units and calls.
@@ -134,8 +139,12 @@ least. The host turns each into its toolkit's units and calls.
 What a window is - whether the user may maximize and minimize it, whether the
 desktop shows through it, and whether it floats over the application's other
 windows now, which it does only while the application is in front - is said
-the first time and where it changes (`WindowTraits`). A button the element
-says nothing of is the toolkit's own; the rest are false until said.
+the first time and where it changes (`WindowTraits`). An overlay's window
+says more of itself the same way: that it stands above every application's
+windows whatever is in front, that the user's presses pass through it, that
+what the system captures sees through it, and that it is only its content -
+no frame of its own, no material under it. A button the element says nothing
+of is the toolkit's own; the rest are false until said.
 
 ## The windows a tree holds
 

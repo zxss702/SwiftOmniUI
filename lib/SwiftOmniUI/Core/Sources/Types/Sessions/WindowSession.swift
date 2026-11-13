@@ -68,6 +68,21 @@ public final class WindowSession {
     /// A smaller value than `minimumHeight` is treated as `minimumHeight`.
     @State public var maximumHeight: Double? = nil
 
+    /// The rectangle of the whole desktop the window is to cover, in device
+    /// pixels, counted from the desktop's own corner - the way a platform
+    /// counts it, not the way the four requests above do.
+    ///
+    ///     window.screenFrame = Rect(display.x, display.y, display.width, display.height)
+    ///
+    /// Those count a place from the work area of the screen the window stands
+    /// on, so they leave the system's bars uncovered and reach no other
+    /// screen, and they count in DIPs, which over a desktop of screens that
+    /// differ are no one screen's. A window that covers a screen exactly -
+    /// one that stands over what the user works at - asks this way, and is
+    /// then the size it is placed at, having no frame of its own to add.
+    /// `nil` leaves the window under those four.
+    @State public var screenFrame: Rect? = nil
+
     /// Whether the user may maximize the window through the platform's own
     /// ways of doing so, where the platform lets an application say.
     @State public var isMaximizable: Bool? = nil
@@ -209,6 +224,7 @@ public final class WindowSession {
         props.describe(WindowSceneContract.minimumHeight, minimumHeight)
         props.describe(WindowSceneContract.maximumWidth, maximumWidth)
         props.describe(WindowSceneContract.maximumHeight, maximumHeight)
+        props.describe(WindowSceneContract.screenFrame, screenFrame)
 
         return props
     }

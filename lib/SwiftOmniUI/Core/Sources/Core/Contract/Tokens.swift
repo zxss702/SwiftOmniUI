@@ -102,11 +102,14 @@ extension NodeType {
     static let accessibilityTraits = VisualElementContract.accessibilityTraits.token
     static let address = PinContract.address.token
     static let allowDrop = ViewContract.allowDrop.token
+    static let alwaysOnTop = WindowSceneContract.alwaysOnTop.token
     static let baselineOffset = TextElementContract.baselineOffset.token
     static let area = ViewContract.area.token
+    static let ignoresMouseEvents = WindowSceneContract.ignoresMouseEvents.token
     static let ignoresSafeArea = LayoutContract.ignoresSafeArea.token
     static let barForegroundColor = NavigationStackContract.barForegroundColor.token
     static let endReachedWithin = ListContract.endReachedWithin.token
+    static let excludesFromCapture = WindowSceneContract.excludesFromCapture.token
     static let hidesWhenInactive = WindowSceneContract.hidesWhenInactive.token
     static let isAccessibilityHidden = VisualElementContract.isAccessibilityHidden.token
     static let items = ListContract.items.token
@@ -219,6 +222,7 @@ extension NodeType {
     static let isMaximizable = WindowSceneContract.isMaximizable.token
     static let isMinimizable = WindowSceneContract.isMinimizable.token
     static let isTranslucent = WindowSceneContract.isTranslucent.token
+    static let isTransparent = WindowSceneContract.isTransparent.token
     static let isOpen = DatePickerContract.isOpen.token
     static let isPassword = TextFieldContract.isPassword.token
     static let isSidebarVisible = NavigationSplitViewContract.isSidebarVisible.token
@@ -359,6 +363,7 @@ extension NodeType {
     static let windowType = WindowSceneContract.windowType.token
     static let windowValue = WindowSceneContract.windowValue.token
     static let defaultPosition = WindowSceneContract.defaultPosition.token
+    static let screenFrame = WindowSceneContract.screenFrame.token
     static let x = WindowSceneContract.x.token
     static let x1 = LineContract.x1.token
     static let x2 = LineContract.x2.token

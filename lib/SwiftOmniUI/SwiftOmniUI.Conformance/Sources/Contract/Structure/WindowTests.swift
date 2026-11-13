@@ -88,6 +88,9 @@
             holds(WindowSceneContract.isMaximizable, false, then: true) { $0.isMaximizable = $1 },
             holds(WindowSceneContract.isMinimizable, false, then: true) { $0.isMinimizable = $1 },
             holds(WindowSceneContract.isTranslucent, true, then: false) { $0.isTranslucent = $1 },
+            holds(WindowSceneContract.screenFrame, Rect(0, 0, 1920, 1080), then: Rect(1920, 0, 2560, 1440)) {
+                $0.screenFrame = $1
+            },
             ConformanceCase("aWindowAScenesGroupOpensIsOfItsKindForItsValue", proves: [
                 Covered(WindowSceneContract.windowType), Covered(WindowSceneContract.windowValue),
             ]) { s in
