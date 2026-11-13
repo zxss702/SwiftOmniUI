@@ -91,12 +91,15 @@ public struct PicturePixels: Equatable, Sendable {
     /// answers, asked of every bundle since this file cannot name the module's own.
     private static func image(named name: String) -> CGImage? {
         for bundle in bundles() {
-            for file in files(for: name) {
-                if let image = bundle.image(forResource: file),
-                   let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                    return cgImage
-                }
-            }
+            let url = bundle.url(forResource: name, withExtension: "png")
+            ?? bundle.url(forResource: name, withExtension: "svg")
+            ?? bundle.url(forResource: name, withExtension: "pdf")
+            guard
+                let url,
+                let image = NSImage(contentsOf: url),
+                let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+                    else { continue }
+            return cgImage
         }
         return nil
     }
