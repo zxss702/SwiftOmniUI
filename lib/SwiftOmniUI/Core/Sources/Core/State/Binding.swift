@@ -34,6 +34,7 @@ public struct Binding<Value> {
     // Design: docs/design/core/state.md#bindings
     let lender: AnyObject?
     let lent: AnyHashable?
+    private let overridesTransaction: Bool
 
     /// A binding to state somebody else owns. `$counter` is the ordinary way to
     /// get one.
@@ -42,6 +43,7 @@ public struct Binding<Value> {
         write = { state.wrappedValue = $0 }
         lender = state.lender
         lent = nil
+        overridesTransaction = false
     }
 
     /// A binding over a storage no box holds - a conversion's derived side: a read
@@ -69,6 +71,7 @@ public struct Binding<Value> {
         }
         lender = storage
         lent = nil
+        overridesTransaction = false
     }
 
     /// The one the property subscripts use, with who the value came from.
@@ -76,12 +79,14 @@ public struct Binding<Value> {
         read: @escaping () -> Value,
         write: @escaping (Value) -> Void,
         lender: AnyObject?,
-        lent: AnyHashable?
+        lent: AnyHashable?,
+        overridesTransaction: Bool = false
     ) {
         self.read = read
         self.write = write
         self.lender = lender
         self.lent = lent
+        self.overridesTransaction = overridesTransaction
     }
 
     /// A binding to something this library does not own: read it with `get`, write
@@ -96,6 +101,7 @@ public struct Binding<Value> {
         write = set
         lender = nil
         lent = nil
+        overridesTransaction = false
     }
 
     /// The value this borrows. Writing goes straight to the owner, and asks
@@ -187,7 +193,7 @@ extension Binding {
     /// The storage this binding borrows, where it is a whole `@State`'s; nothing for
     /// a part of a state or a binding made from closures.
     var described: State<Value>.Storage? {
-        lent == nil ? lender as? State<Value>.Storage : nil
+        !overridesTransaction && lent == nil ? lender as? State<Value>.Storage : nil
     }
 
     /// The value as it stands, without recording a read - what the machinery of a
@@ -258,7 +264,8 @@ extension Binding {
             read: read,
             write: { value in withTransaction(transaction) { write(value) } },
             lender: lender,
-            lent: lent)
+            lent: lent,
+            overridesTransaction: true)
     }
 
     /// A copy of this binding whose writes animate under `animation`.

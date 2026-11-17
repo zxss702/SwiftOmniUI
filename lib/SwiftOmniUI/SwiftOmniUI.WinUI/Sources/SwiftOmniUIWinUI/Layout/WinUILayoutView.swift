@@ -754,6 +754,7 @@ class WinUILayoutView: WinUIView {
             nativeArrangePending = false
             WinUILayoutUpdates.beganNativeArrange(self)
             allocatedBounds = bounds
+            let room = activeArrangementRoom(in: bounds)
             let previousHeight = measurementHeight
             measurementHeight = bounds.height
             let previousPlan = activeLayoutPlan
@@ -762,21 +763,43 @@ class WinUILayoutView: WinUIView {
                 // Final bounds can differ from Measure, including one physical
                 // pixel of native Grid rounding. Prepare descendants' slots
                 // without replacing any SOUI panel's native measure result.
-                activeLayoutPlan = prepareLayoutPlan(in: bounds, for: .allocation)
+                activeLayoutPlan = prepareLayoutPlan(in: room, for: .allocation)
                 lastSizingWidth = bounds.width
                 lastSizingHeight = bounds.height
                 hasSizing = true
             }
             boxView?.layout(backgroundBounds(in: bounds))
             writeCut(width: width, height: height)
-            arrange(in: bounds)
+            arrange(in: room)
             holdDeparting()
         }
     }
 
+    /// The size this layout is bound for while its own place travels. Its children keep this destination room;
+    /// the native box still travels through the presentation frames.
+    private(set) var arrangementRoom: LayoutSize?
+
+    var shouldArrangeInDestinationRoom: Bool { false }
+
+    func activeArrangementRoom(in bounds: Rect) -> Rect {
+        guard let destination = arrangementRoom else { return bounds }
+        if abs(destination.width - bounds.width) <= 0.5 && abs(destination.height - bounds.height) <= 0.5 {
+            return bounds
+        }
+        if shouldArrangeInDestinationRoom {
+            return Rect(x: 0, y: 0, width: destination.width, height: destination.height)
+        }
+        arrangementRoom = nil
+        return bounds
+    }
+
+    override func travels(to destination: Rect?) {
+        arrangementRoom = destination.map { LayoutSize(width: $0.width, height: $0.height) }
+    }
+
     /// Stands every child riding its removal transition where it last stood: it takes no room, but WinUI
     /// arranges each child it draws in every pass, and its transition draws over that place.
-    private func holdDeparting() {
+    func holdDeparting() {
         for item in items where item.departing { item.view.layout(item.view.placedFrame) }
     }
 

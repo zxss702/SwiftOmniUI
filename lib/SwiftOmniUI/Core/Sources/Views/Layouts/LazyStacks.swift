@@ -35,7 +35,7 @@ enum LazyWindowRequest {
 /// whole length at once. Each child names itself the way its writer named
 /// it - a `ForEach` item's identity, an `.id()`, else the place it was
 /// written at - and only a mounted child holds a view or a state.
-public struct LazyVStack: View {
+public struct LazyVStack: View, FragmentDistributionBarrier {
     /// What the stack shows, as the builder described it.
     private let content: () -> any View
 
@@ -112,7 +112,7 @@ public struct LazyVStack: View {
 ///     ScrollView(.horizontal) {
 ///         LazyHStack(spacing: 12) { … }
 ///     }
-public struct LazyHStack: View {
+public struct LazyHStack: View, FragmentDistributionBarrier {
     /// What the stack shows, as the builder described it.
     private let content: () -> any View
 

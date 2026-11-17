@@ -35,6 +35,11 @@ final class GTKScrollDocument: GTKLayoutView {
         return scrolls ? natural : 0
     }
 
+    var contentPlacedSize: (width: Double, height: Double) {
+        guard let place = items.first?.view.placed else { return (0, 0) }
+        return (place.width, place.height)
+    }
+
     override func arrange(in bounds: Rect) {
         guard let item = items.first, item.isShown else { return }
 
@@ -42,6 +47,7 @@ final class GTKScrollDocument: GTKLayoutView {
             item, padding: layoutPadding, orientation: orientation,
             in: LayoutSize(width: bounds.width, height: bounds.height))
         item.view.layout(arranged.place)
+        scrollView?.onGeometryChanged?()
         if scrollView?.positionRequest != nil {
             GTKDoorbell.afterLayout { [weak self] in self?.scrollView?.resolvePositionRequest() }
         }

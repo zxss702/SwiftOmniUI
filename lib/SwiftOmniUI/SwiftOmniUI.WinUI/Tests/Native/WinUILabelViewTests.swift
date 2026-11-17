@@ -146,7 +146,7 @@ final class WinUILabelViewTests: XCTestCase {
             var reads: Set<Prop> = []
             let values = ElementValues<TextContract>(changed: [foreground], reading: { key in
                 reads.insert(key)
-                return key == foreground ? Brush.solidColor(Color("#FF0000")).propValue : nil
+                return key == foreground ? Color("#FF0000").propValue : nil
             })
 
             WinUIRegistrations.applyText(label, values)

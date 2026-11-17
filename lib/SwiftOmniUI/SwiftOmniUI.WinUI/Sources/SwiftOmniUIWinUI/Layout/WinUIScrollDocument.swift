@@ -46,9 +46,15 @@ final class WinUIScrollDocument: WinUILayoutView {
         return [NativeProposal(view: item.view, place: arranged.place)]
     }
 
+    var contentPlacedSize: (width: Double, height: Double) {
+        guard let place = items.first?.view.placed else { return (0, 0) }
+        return (place.width, place.height)
+    }
+
     /// Its own size is the document's: never smaller than the viewport, which the scroller sees to.
     override func arrange(in bounds: Rect) {
         for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
+        scrollView?.onGeometryChanged?()
     }
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
         // The document's margins consumed the viewport's contributions.

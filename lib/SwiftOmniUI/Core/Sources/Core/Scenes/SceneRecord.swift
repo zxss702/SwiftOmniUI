@@ -228,25 +228,25 @@ final class SceneRecord: @unchecked Sendable {
         handledActivation = activation
         activationWindowKey = nil
 
-        let needsWindow = !mainIsOpen && self.windows.isEmpty
+        let needsWindow = !_mainIsOpen.storage.value && _windows.storage.value.isEmpty
         if usesMain {
             // Legacy unnamed main windows anchor their restored secondary windows.
             // Named SwiftUI-style Windows use independent groups and do not take this path.
-            if activating || needsWindow || windows.launchBehavior == .automatic { mainIsOpen = true }
-            if mainIsOpen { activationWindowKey = SceneElement.mainKey }
+            if activating || needsWindow || windows.launchBehavior == .automatic { _mainIsOpen.storage.value = true }
+            if _mainIsOpen.storage.value { activationWindowKey = SceneElement.mainKey }
         } else if let named {
             if (activating || needsWindow),
-                !self.windows.contains(where: { $0.type == named.type && $0.value == nil }) {
+                !_windows.storage.value.contains(where: { $0.type == named.type && $0.value == nil }) {
                 // The initial window is allowed even on a host that cannot open
                 // additional windows. Explicit openWindow still checks that capability.
-                self.windows.append(OpenedWindow(
+                _windows.storage.value.append(OpenedWindow(
                     type: named.type, serial: nextSerial(), value: nil, text: nil,
                     singleton: declared[named.type]?.isSingleton == true))
             }
-            activationWindowKey = self.windows.first(where: { $0.type == named.type && $0.value == nil })?.key
+            activationWindowKey = _windows.storage.value.first(where: { $0.type == named.type && $0.value == nil })?.key
         }
         if activationWindowKey == nil, !activating {
-            activationWindowKey = mainIsOpen ? SceneElement.mainKey : self.windows.first?.key
+            activationWindowKey = _mainIsOpen.storage.value ? SceneElement.mainKey : _windows.storage.value.first?.key
         }
     }
 

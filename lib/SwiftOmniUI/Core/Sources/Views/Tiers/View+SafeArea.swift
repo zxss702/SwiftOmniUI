@@ -84,6 +84,7 @@ private struct SafeAreaInsetContent<Base: View, Bar: View>: View {
         let inset = bar
         let content = base
         var stack = ZStack()
+        stack.node.wrapsFragmentChildren = true
         stack.node.write(StackBaseContract.spacing, spacing)
         stack.node.props[.safeAreaInsetEdge] = edge.propValue
         stack.node.producer = {

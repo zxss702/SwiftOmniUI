@@ -89,7 +89,7 @@ extension GTKElement {
     /// Puts the changed properties on the widget - a patch's or a frame's, the program's write either way: its
     /// registration's first, then what every element takes.
     /// Design: docs/design/host/patches.md#program-write
-    func applyProperties(changed: Set<Prop>) {
+    func applyProperties(changed: Set<Prop>, followingPresentation: Bool = false) {
         guard let view else {
             if !changed.isDisjoint(with: MountedElement.arrangedProperties) { parent?.invalidateMeasurements() }
             return
@@ -152,15 +152,16 @@ extension GTKElement {
         if own.contains(.allowDrop) || view.drop != nil { configureDropTarget(for: view) }
 
         if !changed.subtracting(element.ownPlacementRun).isSubset(of: MountedElement.unmeasuredProperties) {
-            invalidateMeasurements()
+            invalidateMeasurements(followingPresentation: followingPresentation)
         }
     }
 
     /// Forgets the sizes kept by this element's layout and every one above it, and asks GTK to measure again.
-    func invalidateMeasurements() {
+    func invalidateMeasurements(followingPresentation: Bool = false) {
         var invalidated: Set<ObjectIdentifier> = []
         func invalidate(_ view: GTKView?) {
             guard let view, invalidated.insert(ObjectIdentifier(view)).inserted else { return }
+            if followingPresentation { (view as? GTKTravellingLayout)?.followsPresentationFrame() }
             (view as? GTKLayoutView)?.forgetMeasurements()
             view.invalidateMeasure()
         }
@@ -189,6 +190,10 @@ extension GTKElement {
     private func follow(_ scroll: GTKScrollView) {
         scroll.onOffsetChanged = { [weak self] old, new in self?.scrolled(from: old, to: new) }
         scroll.onScrollStopped = { [weak self] in self?.send(.scrollStopped, []) }
+        scroll.onGeometryChanged = { [weak self] in
+            guard let self, self.element.events[.scrollGeometryChanged] != nil else { return }
+            self.host?.runtime.frames.laidOut()
+        }
         scroll.onFramesWanted = { [weak self, weak scroll] in
             if let scroll { self?.host?.runtime.frames.serve(scroll, order: scroll.number) }
         }

@@ -152,6 +152,7 @@ extension WinUIRegistrations {
                     shape: values[BorderElementContract.shape]?.propValue,
                     clips: values[BorderElementContract.shape] != nil)
             }
+            scroll.raises(ScrollViewContract.scrollGeometryChanged)
             scroll.raises(ScrollViewContract.scrollXChanged)
             scroll.raises(ScrollViewContract.scrollYChanged)
             scroll.raises(ScrollViewContract.scrollStopped)

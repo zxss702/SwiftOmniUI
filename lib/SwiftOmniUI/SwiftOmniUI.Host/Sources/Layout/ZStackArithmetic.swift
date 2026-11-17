@@ -25,17 +25,20 @@
     }
 
     /// Where each child stands in `room`, within `padding`, in order; nil for a hidden one. Right to left,
-    /// turned about the room's middle.
+    /// turned about the room's middle. When `decorationRoom` is provided, layout decorations stand in it instead.
     @MainActor
     public static func places<Child: LayoutChild>(
-        of items: [Child], in room: Rect, padding: EdgeInsets, direction: LayoutDirection
+        of items: [Child], in room: Rect, decorationRoom: Rect? = nil, padding: EdgeInsets, direction: LayoutDirection
     ) -> [Rect?] {
         let content = room.inset(padding)
+        let decorationContent = (decorationRoom ?? room).inset(padding)
         return items.map { item in
             guard item.isShown else { return nil }
-            let area = rectangle(of: item.values.area, in: content)
+            let isDecoration = item.values.isLayoutDecoration
+            let box = isDecoration ? (decorationRoom ?? room) : room
+            let area = rectangle(of: item.values.area, in: isDecoration ? decorationContent : content)
             let place = SingleChildArithmetic.place(of: item, in: area, padding: EdgeInsets(0), direction: .leftToRight)
-            return direction.places(place, in: room)
+            return direction.places(place, in: box)
         }
     }
 

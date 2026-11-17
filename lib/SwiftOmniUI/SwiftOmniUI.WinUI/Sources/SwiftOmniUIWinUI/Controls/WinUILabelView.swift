@@ -125,7 +125,11 @@ final class WinUILabelView: WinUITextView {
     private static func onlyRunPaintChanged(from previous: [TextRun]?, to next: [TextRun]?) -> Bool {
         guard let previous, let next, previous.count == next.count else { return false }
         return zip(previous, next).allSatisfy { before, after in
-            guard before.text == after.text, before.image == after.image else { return false }
+            guard before.text == after.text,
+                  before.image == nil,
+                  after.image == nil,
+                  (before.look.baselineOffset ?? 0) == 0,
+                  (after.look.baselineOffset ?? 0) == 0 else { return false }
             var old = before.look, new = after.look
             old.color = nil; new.color = nil
             old.background = nil; new.background = nil

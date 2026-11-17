@@ -88,9 +88,11 @@ extension View {
                 top: edges.contains(.top) ? answer : .all,
                 right: edges.contains(.trailing) ? answer : .all,
                 bottom: edges.contains(.bottom) ? answer : .all)
-        return revised {
-            $0.wrapPaddedFrame()
-            $0.write(LayoutContract.ignoresSafeArea, edges)
+        return revised { node in
+            node = node.mappingLayoutLeaves {
+                $0.wrapPaddedFrame()
+                $0.write(LayoutContract.ignoresSafeArea, edges)
+            }
         }
     }
 }

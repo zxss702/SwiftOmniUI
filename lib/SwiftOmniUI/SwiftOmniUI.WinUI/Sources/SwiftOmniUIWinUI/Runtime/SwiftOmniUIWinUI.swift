@@ -140,7 +140,7 @@ enum WinUICallbacks {
                     scroller.onScrolled?(Point(x: x, y: y))
                     scroller.ears.removeAll { $0.owner == nil }
                     for ear in scroller.ears { ear.moved() }
-                    WinUIRenderer.shared?.runtime.frames.laidOut()
+                    WinUIRenderer.shared?.runtime.frames.scrolled()
                 }
             },
             scrollPreparing: { view, x, y, correlation in
@@ -158,7 +158,7 @@ enum WinUICallbacks {
                     scroller.ears.removeAll { $0.owner == nil }
                     for ear in scroller.ears { ear.moved() }
                     scroller.onScrolled?(Point(x: x, y: y))
-                    WinUIRenderer.shared?.runtime.frames.laidOut()
+                    WinUIRenderer.shared?.runtime.frames.scrolled()
                 }
             },
             held: { view, holding in

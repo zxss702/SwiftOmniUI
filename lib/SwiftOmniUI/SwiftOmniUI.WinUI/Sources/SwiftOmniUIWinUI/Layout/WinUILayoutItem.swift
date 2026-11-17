@@ -23,6 +23,9 @@ struct WinUILayoutItem: LayoutChild {
     /// The element id a child's `.layoutValue` tags ride under; nil for a view no element presents.
     var codeId: ElementId?
 
+    /// Shared `.matchedGeometryEffect` identifier (`ns<serial>:<id>`), if any.
+    var matchedGeometry: String?
+
     /// Fades the view in as it joins a standing layout; nil for a view that simply appears.
     var fadeIn: ((Animation, Rect) -> Void)?
 

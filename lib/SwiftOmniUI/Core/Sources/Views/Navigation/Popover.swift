@@ -20,7 +20,8 @@ struct Popover<Content: View>: View {
          @ViewBuilder content: @escaping () -> Content) {
         self.content = content
         var node = Node(contract: PopoverContract.self)
-        node.producer = { isPresented.wrappedValue ? content().node.asChildren : [] }
+        node.wrapsFragmentChildren = true
+        node.producer = { isPresented.wrappedValue ? [content().node] : [] }
         node.props[.arrowEdge] = arrowEdge.propValue
         node.drivePlain(PopoverContract.isOpen, by: isPresented)
         node.environmentValues[keyPath: \.dismiss] = DismissAction { [isPresented] in
@@ -43,7 +44,7 @@ extension Popover: PropertyContainer {
         return modified {
             $0.driven[.isOpen] = nil
             $0.write(PopoverContract.isOpen, value)
-            $0.producer = { value ? content().node.asChildren : [] }
+            $0.producer = { value ? [content().node] : [] }
         }
     }
 
@@ -52,7 +53,7 @@ extension Popover: PropertyContainer {
         let content = content
         return modified {
             $0.drivePlain(PopoverContract.isOpen, by: binding)
-            $0.producer = { binding.wrappedValue ? content().node.asChildren : [] }
+            $0.producer = { binding.wrappedValue ? [content().node] : [] }
             $0.environmentValues[keyPath: \.dismiss] = DismissAction { binding.wrappedValue = false }
             $0.events[.dismissed] = { binding.wrappedValue = false }
         }

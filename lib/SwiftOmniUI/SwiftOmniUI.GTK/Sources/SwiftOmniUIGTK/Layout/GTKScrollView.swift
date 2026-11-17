@@ -18,6 +18,9 @@ final class GTKScrollView: GTKLayoutView {
     /// Asks for the display's frames: the scroller moves, or has something to say.
     var onFramesWanted: (() -> Void)?
 
+    /// Says the scroller's layout, content size, insets, or offset may have changed.
+    var onGeometryChanged: (() -> Void)?
+
     private(set) var orientation = Axis.vertical
 
     /// Where the scroller stands, as it last said.
@@ -236,6 +239,7 @@ final class GTKScrollView: GTKLayoutView {
     /// The scroller's view changed: the user's move, joined to the moves before it until the display's next frame;
     /// the program's own move is its write's echo.
     private func scrolled(to standing: Point) {
+        onGeometryChanged?()
         guard !ProgramWrite.isWriting, standing != offset else { return }
 
         let previous = offset
@@ -272,6 +276,7 @@ final class GTKScrollView: GTKLayoutView {
         super.detach()
         onOffsetChanged = nil
         onScrollStopped = nil
+        onGeometryChanged = nil
         onFramesWanted = nil
         scroller.detach()
     }
@@ -319,6 +324,19 @@ final class GTKScrollView: GTKLayoutView {
         return start < now ? start : start + length - room
     }
 
+    var scrollGeometryNumbers: [Double] {
+        let standing = scroller.standing.offset
+        let content = document.contentPlacedSize
+        let insets = document.layoutPadding
+        let container = scroller.placed
+        return [
+            standing.x, standing.y,
+            content.width, content.height,
+            insets.top, insets.left, insets.bottom, insets.right,
+            container?.width ?? 0, container?.height ?? 0,
+        ]
+    }
+
     /// Moves the scroller to `target`, kept within what it reaches, as the program's move.
     private func move(to target: Point) {
         let standing = scroller.standing
@@ -327,5 +345,6 @@ final class GTKScrollView: GTKLayoutView {
         guard ScrollArithmetic.differs(kept, standing.offset) else { return }
 
         ProgramWrite.perform { scroller.move(to: kept) }
+        onGeometryChanged?()
     }
 }

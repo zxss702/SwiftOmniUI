@@ -39,6 +39,8 @@ class GTKLazyView: GTKTravellingLayout {
 
     /// A window change under way asks the run again once, not per notice.
     private var retellQueued = false
+    private var lastAcknowledgedGeneration = 0
+    var pendingDepartingShift = Point.zero
 
     var travellingIdentities: Set<String> {
         if cells.animatesChanges { return Set(mounted.keys) }
@@ -58,7 +60,7 @@ class GTKLazyView: GTKTravellingLayout {
         guard cells.animatesChanges else { return true }
         // Nowhere to ask means nothing arrives: an unasked run keeps no row back for good.
         guard cells.element?.handler(.realizedChanged) != nil else { return true }
-        guard cells.requestedItemsAreCurrent else {
+        guard cells.requestedItemsAreCurrent, !cells.needsMeasurement else {
             retell()
             return false
         }
@@ -80,29 +82,55 @@ class GTKLazyView: GTKTravellingLayout {
     /// holds its children by a window mounts the rows of a data change in a later patch, which
     /// names no timing of its own. The first ready arrangement takes the kept motion, so none
     /// outlives the change it belongs to.
-    func beginArrangementOfRows(width: Double) {
-        let ready = canArrangeRows()
-        let motion = ready ? takeArrivalMotion() : nil
+    func beginArrangementOfRows(width: Double) -> Bool {
+        guard canArrangeRows() else { return false }
+        let motion = takeArrivalMotion()
         if cells.animatesChanges, let motion { places.animation = motion }
-        places.begin(width: width, animating: cells.animatesChanges && ready,
+        places.begin(width: width, animating: cells.animatesChanges,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
-                                         axis == .vertical ? cells.anchorShift : 0), refining: true)
-        if ready { cells.animatesChanges = false }
-        cells.anchorShift = 0
+                                         axis == .vertical ? cells.anchorShift : 0), refining: true,
+                     followingPresentation: takePresentationFrame(), presentedLanes: takePresentedLanes(),
+                     presentedItems: takePresentedItems())
+        pendingDepartingShift = Point(axis == .horizontal ? cells.anchorShift : 0,
+                                      axis == .vertical ? cells.anchorShift : 0)
+        return true
+    }
+
+    override func holdDeparting() {
+        let shift = pendingDepartingShift
+        pendingDepartingShift = .zero
+        for item in mounted.values where item.departing {
+            var frame = item.view.placedFrame
+            if shift != .zero {
+                frame.x += shift.x
+                frame.y += shift.y
+            }
+            item.view.layout(frame)
+        }
     }
 
     init(axis: StackArithmetic.Axis, cells: LazyCells) {
         self.axis = axis
         self.cells = cells
         super.init()
+        cells.prefetchReady = { [weak self] in
+            guard let self else { return false }
+            return !self.cells.animatesChanges
+        }
     }
 
     /// The mounted children, held by identity.
     func setItems(_ items: [(identity: String, item: GTKLayoutItem)]) {
+        let generation = cells.element?.lazyRequestGeneration ?? 0
+        let requestAcknowledged = generation != lastAcknowledgedGeneration
+        lastAcknowledgedGeneration = generation
         let now = Dictionary(items.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
         guard now.keys != mounted.keys || now.contains(where: {
             mounted[$0.key]?.arranges(like: $0.value) != true
-        }) else { return }
+        }) else {
+            if requestAcknowledged && cells.animatesChanges { invalidateMeasurements() }
+            return
+        }
         for (identity, previous) in mounted {
             if now[identity]?.view !== previous.view || now[identity]?.values != previous.values {
                 measured.removeValue(forKey: identity)
@@ -217,7 +245,7 @@ class GTKLazyView: GTKTravellingLayout {
     }
 
     private func windowMoved() {
-        if GTKView.allocating == 0, !geometryChanged, anchorTarget == nil {
+        if GTKView.allocating == 0, !geometryChanged, anchorTarget == nil, !retellQueued {
             tellWindow(span ?? 0..<0)
         }
         retell()
@@ -231,20 +259,24 @@ class GTKLazyView: GTKTravellingLayout {
     }
 
     /// GTK asks the run's measure again where its places moved.
-    override func measure(across: Bool, forSize: Int32) -> Double {
+    func revalidateMeasurements(across: Bool, forSize: Int32) {
         // GTK can invalidate an intrinsic size without a core patch (native input,
-        // font or CSS changes). Revalidate the retained proposals through GTK's
-        // requisition cache when GTK asks for measurement, never on allocation-only
-        // animation ticks. In particular, do not turn a parent resize into a
-        // blanket loss of every row's arithmetic cache.
+        // font or CSS changes). Revalidate cached rows here instead of dropping all
+        // cached measurements; unchanged sizes update revision without counting again.
         for (identity, item) in mounted where !item.departing {
             guard let cached = measured[identity] else { continue }
             let size = item.size(offered: cached.proposal)
-            if size != cached.size || cached.revision != item.view.measurementRevision {
+            if size != cached.size {
                 measured[identity] = (cached.proposal, size, item.view.measurementRevision)
                 cells.measurements += 1
+            } else if cached.revision != item.view.measurementRevision {
+                measured[identity] = (cached.proposal, size, item.view.measurementRevision)
             }
         }
+    }
+
+    override func measure(across: Bool, forSize: Int32) -> Double {
+        revalidateMeasurements(across: across, forSize: forSize)
         retell()
         return super.measure(across: across, forSize: forSize)
     }
@@ -260,6 +292,9 @@ class GTKLazyView: GTKTravellingLayout {
 
 /// A lazy stack: one child a place.
 final class GTKLazyStackView: GTKLazyView {
+    private var arrangedExtentsRevision = -1
+    private var arrangedTotal = -1.0
+
     /// The room between two children.
     var spacing: Double? {
         didSet { cells.extents.spacing = spacing; if spacing != oldValue { invalidateMeasurements() } }
@@ -276,6 +311,47 @@ final class GTKLazyStackView: GTKLazyView {
         }
     }
 
+    private func measureMountedRows(across: Double, forceRevalidate: Bool) {
+        for (identity, item) in mounted where !item.departing && cells.position(of: identity) != nil {
+            let margin = item.values.margin
+            let proposal: Double? = axis == .vertical ? max(0, across - margin.left - margin.right) : nil
+            let cached = measured[identity]
+            let size: LayoutSize
+            if !forceRevalidate, let cached, cached.proposal == proposal,
+               cached.revision == item.view.measurementRevision {
+                size = cached.size
+            } else {
+                size = item.size(offered: proposal)
+                measured[identity] = (proposal, size, item.view.measurementRevision)
+                if cached?.size != size || cached?.proposal != proposal {
+                    cells.measurements += 1
+                }
+            }
+            let extent = axis == .vertical
+                ? size.height + margin.top + margin.bottom
+                : size.width + margin.left + margin.right
+            cells.extents.measure(identity, extent: extent)
+        }
+        if axis == .horizontal {
+            naturalAcross = mounted.compactMap { identity, item -> Double? in
+                guard !item.departing, let size = measured[identity]?.size else { return nil }
+                return size.height + item.values.margin.top + item.values.margin.bottom
+            }.max() ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
+        }
+    }
+
+    override func measure(width: Double?, height: Double?) -> LayoutSize {
+        if (axis == .vertical && (width ?? 0) > 0) || axis == .horizontal {
+            let before = cells.extents.revision
+            let across = max(0, (width ?? 0) - padding.left - padding.right)
+            measureMountedRows(across: across, forceRevalidate: false)
+            if cells.extents.revision != before {
+                measurements.invalidate()
+            }
+        }
+        return super.measure(width: width, height: height)
+    }
+
     /// As wide as offered and as long as the run measures.
     override func contentSize(width: Double?) -> LayoutSize {
         let total = cells.total
@@ -284,53 +360,61 @@ final class GTKLazyStackView: GTKLazyView {
             : LayoutSize(width: total, height: naturalAcross + padding.top + padding.bottom)
     }
 
+    override func revalidateMeasurements(across: Bool, forSize: Int32) {
+        let measureNew = (axis == .vertical && !across && forSize > 0) || axis == .horizontal
+        let before = cells.extents.revision
+        if measureNew {
+            let cross = max(0, Double(forSize) - padding.left - padding.right)
+            measureMountedRows(across: cross, forceRevalidate: true)
+        } else {
+            for (identity, item) in mounted where !item.departing && cells.position(of: identity) != nil {
+                guard let cached = measured[identity] else { continue }
+                let margin = item.values.margin
+                let size = item.size(offered: cached.proposal)
+                if size != cached.size {
+                    measured[identity] = (cached.proposal, size, item.view.measurementRevision)
+                    cells.measurements += 1
+                    let extent = axis == .vertical
+                        ? size.height + margin.top + margin.bottom
+                        : size.width + margin.left + margin.right
+                    cells.extents.measure(identity, extent: extent)
+                } else if cached.revision != item.view.measurementRevision {
+                    measured[identity] = (cached.proposal, size, item.view.measurementRevision)
+                }
+            }
+        }
+        if cells.extents.revision != before {
+            measurements.invalidate()
+        }
+    }
+
     /// Every mounted child measures, is stood at its offset, and the window
     /// re-asks what the tree builds.
     override func arrange(in bounds: Rect) {
         let across = max(0, axis == .vertical
             ? bounds.width - padding.left - padding.right
             : bounds.height - padding.top - padding.bottom)
-        let revision = cells.extents.revision
         if measuredAcross != across {
             // Offscreen sizes remain estimates of the scroll extent. Mounted rows
             // validate their proposal below; a width change must not first replace
             // the whole document with 44-point rows and then grow/shrink it again.
             measuredAcross = across
         }
-        for (identity, item) in mounted {
-            guard !item.departing, cells.position(of: identity) != nil else { continue }
-            let margin = item.values.margin
-            let proposal: Double? = axis == .vertical
-                ? max(0, across - margin.left - margin.right) : nil
-            let size: LayoutSize
-            if let cached = measured[identity], cached.proposal == proposal,
-               cached.revision == item.view.measurementRevision {
-                size = cached.size
-            } else {
-                size = item.size(offered: proposal)
-                measured[identity] = (proposal, size, item.view.measurementRevision)
-                cells.measurements += 1
-            }
-            let extent = axis == .vertical
-                ? size.height + margin.top + margin.bottom
-                : size.width + margin.left + margin.right
-            cells.extents.measure(identity, extent: extent)
-        }
-        let cross = mounted.compactMap { identity, item -> Double? in
-            guard !item.departing, let size = measured[identity]?.size else { return nil }
-            return size.height + item.values.margin.top + item.values.margin.bottom
-        }.max() ?? (cells.orderedIdentities.isEmpty ? 0 : 44)
-        if axis == .horizontal, naturalAcross != cross {
-            naturalAcross = cross
+        let previousCross = naturalAcross
+        measureMountedRows(across: across, forceRevalidate: false)
+        if axis == .horizontal, naturalAcross != previousCross {
             invalidateMeasurements()
         }
         if let origin = cells.correctedOrigin() { anchorTarget = origin }
-        beginArrangementOfRows(width: axis == .vertical ? bounds.width : bounds.height)
-        if cells.extents.revision != revision {
+        let ready = beginArrangementOfRows(width: axis == .vertical ? bounds.width : bounds.height)
+        if cells.extents.revision != arrangedExtentsRevision || cells.total != arrangedTotal {
             measurements.invalidate()
             geometryChanged = true
+            arrangedExtentsRevision = cells.extents.revision
+            arrangedTotal = cells.total
         }
         for (identity, item) in mounted {
+            guard !item.departing else { continue }
             let margin = item.values.margin
             guard let place = cells.position(of: identity), let size = measured[identity]?.size else { continue }
             let extent = cells.extents.extent(of: identity)
@@ -367,10 +451,25 @@ final class GTKLazyStackView: GTKLazyView {
                 frame = Rect(x: run + margin.left, y: y,
                              width: extent - margin.left - margin.right, height: height)
             }
+            let targetPlace = direction.places(frame, in: bounds)
+            guard ready else {
+                item.view.layout(item.view.placed ?? targetPlace)
+                continue
+            }
             var placed = item
-            if cells.animatesChanges || cells.inserting.remove(identity) == nil { placed.fadeIn = nil }
-            self.place(placed, at: direction.places(frame, in: bounds))
+            let inserted = cells.inserting.contains(identity)
+            if !inserted { placed.fadeIn = nil }
+            var arrivedFrom: Rect?
+            if cells.animatesChanges, !inserted,
+               let delta = cells.previousDisplacementDelta(for: identity) {
+                var origin = frame
+                if axis == .vertical { origin.y += delta }
+                else { origin.x += delta }
+                arrivedFrom = direction.places(origin, in: bounds)
+            }
+            self.place(placed, at: targetPlace, arrivedFrom: arrivedFrom)
         }
+        if ready { cells.consumeAnimationChange() }
     }
 
     override func tellWindow(_ span: Range<Double>) {
@@ -379,7 +478,9 @@ final class GTKLazyStackView: GTKLazyView {
             let start = cells.offset(of: place)
             return start..<(start + max(1, cells.extents.extent(of: identity)))
         }
-        cells.show(span, realize: target, keeping: travellingIdentities, prefetch: false)
+        let margin = max(0, span.upperBound - span.lowerBound) * 0.5
+        let realize = target ?? (span.isEmpty ? nil : (span.lowerBound - margin)..<(span.upperBound + margin))
+        cells.show(span, realize: realize, keeping: travellingIdentities, prefetch: false)
     }
 }
 
@@ -469,14 +570,17 @@ final class GTKLazyGridView: GTKLazyView {
             let margin = item.values.margin
             let proposal: Double? = axis == .vertical
                 ? max(0, widths[track] - margin.left - margin.right) : nil
+            let cached = measured[identity]
             let size: LayoutSize
-            if let cached = measured[identity], cached.proposal == proposal,
+            if let cached, cached.proposal == proposal,
                cached.revision == item.view.measurementRevision {
                 size = cached.size
             } else {
                 size = item.size(offered: proposal)
                 measured[identity] = (proposal, size, item.view.measurementRevision)
-                cells.measurements += 1
+                if cached?.size != size || cached?.proposal != proposal {
+                    cells.measurements += 1
+                }
             }
             let extent = axis == .vertical
                 ? size.height + margin.top + margin.bottom
@@ -485,7 +589,7 @@ final class GTKLazyGridView: GTKLazyView {
         }
         for (run, extent) in runExtents { cells.runs.measure(run, extent: extent) }
         if let origin = cells.correctedOrigin(perRun: perRun, grid: true) { anchorTarget = origin }
-        beginArrangementOfRows(width: axis == .vertical ? bounds.width : bounds.height)
+        let ready = beginArrangementOfRows(width: axis == .vertical ? bounds.width : bounds.height)
         if cells.runs.revision != revision {
             measurements.invalidate()
             geometryChanged = true
@@ -501,10 +605,10 @@ final class GTKLazyGridView: GTKLazyView {
         }
 
         for (identity, item) in mounted {
-            guard let place = cells.position(of: identity) else { continue }
+            guard !item.departing, let place = cells.position(of: identity),
+                  let size = measured[identity]?.size else { continue }
             let run = place / widths.count, track = place % widths.count
             let margin = item.values.margin
-            let size = measured[identity]!.size
             let origin = cells.runs.offset(of: run, count: runCount)
             let runExtent = cells.runs.extent(of: run)
             let frame: Rect
@@ -539,10 +643,25 @@ final class GTKLazyGridView: GTKLazyView {
                 frame = Rect(x: origin + margin.left, y: y,
                              width: runExtent - margin.left - margin.right, height: height)
             }
+            let targetPlace = direction.places(frame, in: bounds)
+            guard ready else {
+                item.view.layout(item.view.placed ?? targetPlace)
+                continue
+            }
             var placed = item
-            if cells.animatesChanges || cells.inserting.remove(identity) == nil { placed.fadeIn = nil }
-            self.place(placed, at: direction.places(frame, in: bounds))
+            let inserted = cells.inserting.contains(identity)
+            if !inserted { placed.fadeIn = nil }
+            var arrivedFrom: Rect?
+            if cells.animatesChanges, !inserted,
+               let delta = cells.previousDisplacementDelta(for: identity, perRun: perRun, grid: true) {
+                var origin = frame
+                if axis == .vertical { origin.y += delta }
+                else { origin.x += delta }
+                arrivedFrom = direction.places(origin, in: bounds)
+            }
+            self.place(placed, at: targetPlace, arrivedFrom: arrivedFrom)
         }
+        if ready { cells.consumeAnimationChange() }
     }
 
     override func tellWindow(_ span: Range<Double>) {
@@ -553,7 +672,9 @@ final class GTKLazyGridView: GTKLazyView {
             let start = cells.runs.offset(of: run, count: count)
             return start..<(start + max(1, cells.runs.extent(of: run)))
         }
-        cells.show(span, perRun: perRun, grid: true, realize: target,
+        let margin = max(0, span.upperBound - span.lowerBound) * 0.5
+        let realize = target ?? (span.isEmpty ? nil : (span.lowerBound - margin)..<(span.upperBound + margin))
+        cells.show(span, perRun: perRun, grid: true, realize: realize,
                    keeping: travellingIdentities, prefetch: false)
     }
 }

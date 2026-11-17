@@ -26,6 +26,9 @@ final class WinUIItemsView: WinUILayoutView {
 
     /// Whether the list left the tree: what WinUI still says is heard by nobody.
     private var released = false
+    private var barsInsets = EdgeInsets(0)
+    private var pendingInsets: EdgeInsets?
+    private var commitPending = false
 
     /// Whether the animation of a scroll the tree asks for is left out.
     private let reducesMotion: () -> Bool
@@ -129,10 +132,45 @@ final class WinUIItemsView: WinUILayoutView {
 
     override var hasNativeProposals: Bool { true }
 
-    /// The list is a viewport. Prepare the current allocation in Measure,
-    /// including its very first frame, rather than its previous placed size.
+    /// The list is a viewport spanning safe-area bars; its item repeater reserves their insets.
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
-        [NativeProposal(view: list, place: Rect(0, 0, width ?? size.width, size.height))]
+        let viewport = resolve(in: Rect(0, 0, width ?? size.width, size.height))
+        return [NativeProposal(view: list, place: viewport)]
+    }
+
+    override func restoreLayoutContext(in bounds: Rect, proposals: [NativeProposal]) {
+        _ = resolve(in: bounds)
+    }
+
+    override func backgroundBounds(in bounds: Rect) -> Rect {
+        let orientation: Axis = shape.isAcross ? .horizontal : .vertical
+        return box.clips ? bounds : layoutSafeArea(in: bounds).viewport(in: bounds, axes: orientation)
+    }
+
+    override func safeAreaChanged() {
+        if let context = safeAreaContext { _ = resolve(in: context.layout) }
+        super.safeAreaChanged()
+    }
+
+    private func resolve(in bounds: Rect) -> Rect {
+        let orientation: Axis = shape.isAcross ? .horizontal : .vertical
+        let context = layoutSafeArea(in: bounds)
+        let viewport = box.clips ? bounds : context.viewport(in: bounds, axes: orientation)
+        let insets = SafeAreaContext.insets(of: context.safe, in: viewport)
+        if barsInsets != insets { pendingInsets = insets }
+        barsInsets = insets
+        if pendingInsets != nil, !commitPending {
+            commitPending = true
+            WinUIDoorbell.afterPass { [weak self] in
+                guard let self else { return }
+                self.commitPending = false
+                guard !self.released, let insets = self.pendingInsets else { return }
+                self.pendingInsets = nil
+                swiftomniui_winui_set_padding(
+                    self.list.handle, 8 + insets.left, 8 + insets.top, 8 + insets.right, 8 + insets.bottom)
+            }
+        }
+        return viewport
     }
 
     override func arrange(in bounds: Rect) {
@@ -198,6 +236,7 @@ final class WinUIItemsView: WinUILayoutView {
     override func detach() {
         super.detach()
         released = true
+        pendingInsets = nil
         swiftomniui_winui_items_release(list.handle)
         made.removeAll()
     }

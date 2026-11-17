@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Pawe? Krzywdzi?ski and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+import Foundation
 @_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
@@ -8,8 +9,8 @@ import SwiftOmniUIConformance
 import XCTest
 
 final class WinUIScrollPositionTests: XCTestCase {
-    func testScrollPositionModifierScopesToTheScrollViewWithTheModifier() throws {
-        try onUIThread {
+    func testScrollPositionModifierScopesToTheScrollViewWithTheModifier() {
+        onUIThread {
             let position = State(wrappedValue: ScrollPosition(edge: .bottom))
             let host = WinUIRenderer.running(reducesMotion: true) {
                 ScrollView { Text("content").frame(height: 1000) }
@@ -18,6 +19,61 @@ final class WinUIScrollPositionTests: XCTestCase {
             }
             XCTAssertEqual(host.views(WinUIScrollView.self).count, 1)
             XCTAssertFalse(position.wrappedValue.isPositionedByUser)
+        }
+    }
+
+    func testOnScrollGeometryChangeReportsContainerSizeAndContentUpdates() {
+        onUIThread {
+            let clock = TestClock()
+            var reportedWidths: [(CGFloat, CGFloat)] = []
+            var reportedOffsets: [(CGFloat, CGFloat)] = []
+            let width = State(wrappedValue: 240.0)
+            let position = State(wrappedValue: ScrollPosition())
+            let host = WinUIRenderer.running(clock: clock, reducesMotion: true) {
+                VStack {
+                    Button("Wider").onClicked { width.wrappedValue = 320 }
+                    Button("Scroll").onClicked { position.wrappedValue.scrollTo(x: 120) }
+                    ScrollView(.horizontal) {
+                        Text("wide content").frame(width: 800, height: 40)
+                    }
+                    .scrollPosition(position.projectedValue)
+                    .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                        geometry.containerSize.width
+                    } action: { old, new in
+                        reportedWidths.append((old, new))
+                    }
+                    .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                        geometry.contentOffset.x
+                    } action: { old, new in
+                        reportedOffsets.append((old, new))
+                    }
+                    .frame(width: width.wrappedValue, height: 80)
+                }
+            }
+
+            clock.now += 16
+            host.frame()
+            XCTAssertEqual(reportedWidths.count, 1)
+            XCTAssertEqual(reportedWidths.first?.0 ?? -1, 0, accuracy: 0.5)
+            XCTAssertEqual(reportedWidths.first?.1 ?? -1, 240, accuracy: 0.5)
+
+            let buttons = host.views(WinUIButtonView.self)
+            buttons[0].invoke()
+            clock.now += 16
+            host.frame()
+            XCTAssertEqual(reportedWidths.count, 2)
+            XCTAssertEqual(reportedWidths.last?.0 ?? -1, 240, accuracy: 0.5)
+            XCTAssertEqual(reportedWidths.last?.1 ?? -1, 320, accuracy: 0.5)
+
+            buttons[1].invoke()
+            for _ in 0..<20 {
+                WinUITestHost.pump(0.01)
+                clock.now += 16
+                host.frame()
+                if (reportedOffsets.last?.1 ?? 0) >= 119 { break }
+            }
+            XCTAssertEqual(reportedOffsets.last?.0 ?? -1, 0, accuracy: 0.5)
+            XCTAssertEqual(reportedOffsets.last?.1 ?? -1, 120, accuracy: 0.5)
         }
     }
 }

@@ -8,6 +8,7 @@
 
 #include "Relay.h"
 
+#include <dwrite_3.h>
 #include <algorithm>
 #include <cmath>
 #include <cwchar>
@@ -582,6 +583,7 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
         namespace documents = winrt::Microsoft::UI::Xaml::Documents;
         using winrt::Windows::UI::Text::TextDecorations;
         auto block = labelWords(handle);
+        borrow<controls::Border>(handle).Resources().Insert(winrt::box_value(L"SwiftOmniUIHasRuns"), winrt::box_value(count > 0));
         bool needsRich = false;
         for (int32_t i = 0; i < count; ++i)
             needsRich = needsRich || runs[i].imagePixelWidth > 0 || (runs[i].image && *runs[i].image) || runs[i].baseline != 0;
@@ -977,6 +979,369 @@ extern "C" int32_t swiftomniui_winui_text_character_geometry(
     return readCharacterGeometry(handle, rectangles, capacity, lineCount, true);
 }
 
+static winrt::com_ptr<IDWriteFactory> dwriteWordsFactory() {
+    static auto factory = [] {
+        winrt::com_ptr<IDWriteFactory> result;
+        winrt::check_hresult(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+            reinterpret_cast<IUnknown **>(result.put())));
+        return result;
+    }();
+    return factory;
+}
+
+namespace {
+    struct DWriteInlineMetricsObject final : IDWriteInlineObject {
+        DWRITE_INLINE_OBJECT_METRICS metrics{};
+        ULONG refCount = 1;
+        explicit DWriteInlineMetricsObject(double w, double h, double baseline)
+            : metrics{static_cast<FLOAT>(w), static_cast<FLOAT>(h), static_cast<FLOAT>(baseline), FALSE} {}
+        HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **object) noexcept override {
+            if (!object) return E_POINTER;
+            if (riid == __uuidof(IUnknown) || riid == __uuidof(IDWriteInlineObject)) {
+                *object = static_cast<IDWriteInlineObject *>(this);
+                AddRef();
+                return S_OK;
+            }
+            *object = nullptr;
+            return E_NOINTERFACE;
+        }
+        ULONG STDMETHODCALLTYPE AddRef() noexcept override { return ++refCount; }
+        ULONG STDMETHODCALLTYPE Release() noexcept override {
+            auto remaining = --refCount;
+            if (remaining == 0) delete this;
+            return remaining;
+        }
+        HRESULT STDMETHODCALLTYPE Draw(void *, IDWriteTextRenderer *, FLOAT, FLOAT, BOOL, BOOL, IUnknown *) noexcept override {
+            return S_OK;
+        }
+        HRESULT STDMETHODCALLTYPE GetMetrics(DWRITE_INLINE_OBJECT_METRICS *out) noexcept override {
+            if (!out) return E_POINTER;
+            *out = metrics;
+            return S_OK;
+        }
+        HRESULT STDMETHODCALLTYPE GetOverhangMetrics(DWRITE_OVERHANG_METRICS *out) noexcept override {
+            if (!out) return E_POINTER;
+            *out = {};
+            return S_OK;
+        }
+        HRESULT STDMETHODCALLTYPE GetBreakConditions(DWRITE_BREAK_CONDITION *before, DWRITE_BREAK_CONDITION *after) noexcept override {
+            if (before) *before = DWRITE_BREAK_CONDITION_NEUTRAL;
+            if (after) *after = DWRITE_BREAK_CONDITION_NEUTRAL;
+            return S_OK;
+        }
+    };
+
+    std::wstring resolveDWriteFamily(std::wstring const &source, IDWriteFontCollection *collection) {
+        std::wstring result;
+        size_t pos = 0;
+        while (pos <= source.size()) {
+            auto comma = source.find(L',', pos);
+            auto part = source.substr(pos, comma == std::wstring::npos ? std::wstring::npos : comma - pos);
+            while (!part.empty() && std::iswspace(part.front())) part.erase(part.begin());
+            while (!part.empty() && std::iswspace(part.back())) part.pop_back();
+            auto hash = part.find_last_of(L'#');
+            if (hash != std::wstring::npos) part = part.substr(hash + 1);
+            if (!part.empty() && _wcsicmp(part.c_str(), L"XamlAutoFontFamily") != 0) {
+                UINT32 index = 0; BOOL exists = FALSE;
+                if (collection && SUCCEEDED(collection->FindFamilyName(part.c_str(), &index, &exists)) && exists)
+                    return part;
+                if (result.empty()) result = part;
+            }
+            if (comma == std::wstring::npos) break;
+            pos = comma + 1;
+        }
+        if (result.empty()) {
+            UINT32 index = 0; BOOL exists = FALSE;
+            if (collection && SUCCEEDED(collection->FindFamilyName(L"Segoe UI Variable Text", &index, &exists)) && exists)
+                return L"Segoe UI Variable Text";
+            return L"Segoe UI";
+        }
+        return result;
+    }
+
+    DWRITE_FONT_STYLE dwriteStyle(winrt::Windows::UI::Text::FontStyle style) {
+        switch (style) {
+        case winrt::Windows::UI::Text::FontStyle::Italic: return DWRITE_FONT_STYLE_ITALIC;
+        case winrt::Windows::UI::Text::FontStyle::Oblique: return DWRITE_FONT_STYLE_OBLIQUE;
+        default: return DWRITE_FONT_STYLE_NORMAL;
+        }
+    }
+
+    DWRITE_FONT_STRETCH dwriteStretch(winrt::Windows::UI::Text::FontStretch stretch) {
+        auto v = static_cast<int32_t>(stretch);
+        return (v >= 0 && v <= 9) ? static_cast<DWRITE_FONT_STRETCH>(v) : DWRITE_FONT_STRETCH_NORMAL;
+    }
+}
+
+static int32_t readInlineRunGeometry(
+    controls::TextBlock const &block, controls::RichTextBlock const &rich, xaml::UIElement const &visual,
+    xaml::UIElement const &coordinates, double *rectangles, int32_t capacity, int32_t *lineCount
+) {
+    auto visualFe = visual.try_as<xaml::FrameworkElement>();
+    auto availW = visualFe ? visualFe.ActualWidth() : 0.0;
+    auto availH = visualFe ? visualFe.ActualHeight() : 0.0;
+    auto coordFe = coordinates.try_as<xaml::FrameworkElement>();
+    auto coordSize = coordinates.ActualSize();
+    if (availW <= 0 || availH <= 0 || coordSize.x <= 0 || coordSize.y <= 0
+        || (coordFe && (std::abs(coordSize.x - coordFe.ActualWidth()) > 0.5
+                        || std::abs(coordSize.y - coordFe.ActualHeight()) > 0.5)))
+        return 0;
+
+    auto pad = rich ? rich.Padding() : block.Padding();
+    auto layoutW = std::max(availW, static_cast<double>(coordSize.x));
+    auto layoutH = std::max(availH, static_cast<double>(coordSize.y));
+    // Add 0.5 DIP rounding tolerance so XAML/float32 quantization on an intrinsic-width
+    // box never splits the final glyph of a single line onto a spurious extra DirectWrite line.
+    auto contentW = static_cast<FLOAT>(std::max(0.0, layoutW - pad.Left - pad.Right)) + 0.5f;
+    auto contentH = static_cast<FLOAT>(std::max(0.0, layoutH - pad.Top - pad.Bottom));
+
+    struct SpanAttr {
+        UINT32 start = 0, length = 0;
+        std::wstring family;
+        FLOAT size = 0;
+        DWRITE_FONT_WEIGHT weight = DWRITE_FONT_WEIGHT_NORMAL;
+        DWRITE_FONT_STYLE style = DWRITE_FONT_STYLE_NORMAL;
+        DWRITE_FONT_STRETCH stretch = DWRITE_FONT_STRETCH_NORMAL;
+        int32_t spacing = 0;
+        double inlineW = 0, inlineH = 0, inlineBaseline = 0;
+        controls::TextBlock inlineText{nullptr};
+    };
+
+    std::wstring fullText;
+    std::vector<SpanAttr> attrs;
+    std::function<void(documents::Inline const &)> collect = [&](documents::Inline const &inlineValue) {
+        if (auto run = inlineValue.try_as<documents::Run>()) {
+            auto w = run.Text();
+            if (w.empty()) return;
+            SpanAttr attr;
+            attr.start = static_cast<UINT32>(fullText.size());
+            attr.length = static_cast<UINT32>(w.size());
+            attr.family = run.ReadLocalValue(documents::TextElement::FontFamilyProperty()) == xaml::DependencyProperty::UnsetValue()
+                ? L"" : run.FontFamily().Source().c_str();
+            attr.size = static_cast<FLOAT>(run.FontSize());
+            attr.weight = static_cast<DWRITE_FONT_WEIGHT>(std::clamp<int32_t>(run.FontWeight().Weight, 1, 999));
+            attr.style = dwriteStyle(run.FontStyle());
+            attr.stretch = dwriteStretch(run.FontStretch());
+            attr.spacing = run.CharacterSpacing();
+            fullText.append(w.c_str(), w.size());
+            attrs.push_back(std::move(attr));
+        } else if (auto span = inlineValue.try_as<documents::Span>()) {
+            for (auto const &child : span.Inlines()) collect(child);
+        } else if (auto holder = inlineValue.try_as<documents::InlineUIContainer>()) {
+            auto content = inlineContent(holder);
+            SpanAttr attr;
+            attr.start = static_cast<UINT32>(fullText.size());
+            attr.length = 1;
+            if (auto child = content.try_as<controls::TextBlock>()) {
+                attr.inlineW = child.ActualWidth();
+                attr.inlineH = child.ActualHeight();
+                attr.inlineBaseline = child.BaselineOffset();
+                attr.inlineText = child;
+            } else if (content) {
+                attr.inlineW = content.ActualWidth();
+                attr.inlineH = content.ActualHeight();
+                attr.inlineBaseline = attr.inlineH;
+                if (auto p = holder.Child().try_as<controls::RichTextBlock>()) attr.inlineBaseline = p.BaselineOffset();
+            }
+            fullText.push_back(L'\uFFFC');
+            attrs.push_back(std::move(attr));
+        } else if (inlineValue.try_as<documents::LineBreak>()) {
+            fullText.push_back(L'\n');
+        } else {
+            fullText.push_back(L'\uFFFC');
+        }
+    };
+
+    if (rich) {
+        for (auto const &v : rich.Blocks())
+            if (auto p = v.try_as<documents::Paragraph>())
+                for (auto const &iv : p.Inlines()) collect(iv);
+    } else if (block.Inlines().Size() > 0) {
+        for (auto const &iv : block.Inlines()) collect(iv);
+    } else {
+        auto w = block.Text();
+        fullText.assign(w.c_str(), w.size());
+    }
+
+    auto factory = dwriteWordsFactory();
+    winrt::com_ptr<IDWriteFontCollection> collection;
+    winrt::check_hresult(factory->GetSystemFontCollection(collection.put(), FALSE));
+
+    auto unset = xaml::DependencyProperty::UnsetValue();
+    std::wstring blockFamilySource = block.ReadLocalValue(controls::TextBlock::FontFamilyProperty()) == unset
+        ? L"" : std::wstring(block.FontFamily().Source().c_str());
+    auto baseFamily = resolveDWriteFamily(blockFamilySource, collection.get());
+    auto baseSize = static_cast<FLOAT>(std::max(0.01, block.FontSize()));
+    auto baseWeight = static_cast<DWRITE_FONT_WEIGHT>(std::clamp<int32_t>(block.FontWeight().Weight, 1, 999));
+    auto lang = block.Language();
+
+    winrt::com_ptr<IDWriteTextFormat> format;
+    if (blockFamilySource.empty()) {
+        winrt::com_ptr<IDWriteFactory6> factory6;
+        if (SUCCEEDED(factory->QueryInterface(__uuidof(IDWriteFactory6), factory6.put_void()))) {
+            DWRITE_FONT_AXIS_VALUE axes[] = {
+                {DWRITE_FONT_AXIS_TAG_WEIGHT, static_cast<FLOAT>(baseWeight)},
+                {DWRITE_FONT_AXIS_TAG_ITALIC, block.FontStyle() == winrt::Windows::UI::Text::FontStyle::Normal ? 0.0f : 1.0f},
+            };
+            winrt::com_ptr<IDWriteTextFormat3> format3;
+            if (SUCCEEDED(factory6->CreateTextFormat(
+                    L"Segoe UI Variable", nullptr, axes, ARRAYSIZE(axes), baseSize,
+                    lang.empty() ? L"" : lang.c_str(), format3.put()))) {
+                format3->SetAutomaticFontAxes(DWRITE_AUTOMATIC_FONT_AXES_OPTICAL_SIZE);
+                format3->QueryInterface(__uuidof(IDWriteTextFormat), format.put_void());
+            }
+        }
+    }
+    if (!format) {
+        winrt::check_hresult(factory->CreateTextFormat(
+            baseFamily.c_str(), nullptr, baseWeight, dwriteStyle(block.FontStyle()),
+            dwriteStretch(block.FontStretch()), baseSize, lang.empty() ? L"" : lang.c_str(), format.put()));
+        winrt::com_ptr<IDWriteTextFormat3> format3;
+        if (SUCCEEDED(format->QueryInterface(__uuidof(IDWriteTextFormat3), format3.put_void())))
+            format3->SetAutomaticFontAxes(DWRITE_AUTOMATIC_FONT_AXES_OPTICAL_SIZE);
+    }
+
+    auto wrapping = rich ? rich.TextWrapping() : block.TextWrapping();
+    format->SetWordWrapping(wrapping == xaml::TextWrapping::NoWrap ? DWRITE_WORD_WRAPPING_NO_WRAP
+        : wrapping == xaml::TextWrapping::WrapWholeWords ? DWRITE_WORD_WRAPPING_WHOLE_WORD
+        : DWRITE_WORD_WRAPPING_WRAP);
+
+    auto align = rich ? rich.TextAlignment() : block.TextAlignment();
+    format->SetTextAlignment(align == xaml::TextAlignment::Center ? DWRITE_TEXT_ALIGNMENT_CENTER
+        : align == xaml::TextAlignment::Right ? DWRITE_TEXT_ALIGNMENT_TRAILING
+        : align == xaml::TextAlignment::Justify ? DWRITE_TEXT_ALIGNMENT_JUSTIFIED
+        : DWRITE_TEXT_ALIGNMENT_LEADING);
+
+    if (block.FlowDirection() == xaml::FlowDirection::RightToLeft)
+        format->SetReadingDirection(DWRITE_READING_DIRECTION_RIGHT_TO_LEFT);
+
+    winrt::com_ptr<IDWriteTextLayout> layout;
+    winrt::check_hresult(factory->CreateTextLayout(
+        fullText.c_str(), static_cast<UINT32>(fullText.size()), format.get(), contentW, contentH, layout.put()));
+
+    winrt::com_ptr<IDWriteTextLayout1> layout1;
+    layout->QueryInterface(__uuidof(IDWriteTextLayout1), layout1.put_void());
+    if (layout1 && block.CharacterSpacing() != 0) {
+        auto trailing = static_cast<FLOAT>(block.CharacterSpacing() * baseSize / 1000.0);
+        layout1->SetCharacterSpacing(0.0f, trailing, 0.0f, {0, static_cast<UINT32>(fullText.size())});
+    }
+
+    for (auto const &attr : attrs) {
+        DWRITE_TEXT_RANGE range{attr.start, attr.length};
+        if (attr.inlineW > 0 || attr.inlineH > 0) {
+            winrt::com_ptr<IDWriteInlineObject> inlineObj;
+            inlineObj.attach(new DWriteInlineMetricsObject(attr.inlineW, attr.inlineH, attr.inlineBaseline));
+            layout->SetInlineObject(inlineObj.get(), range);
+            continue;
+        }
+        if (!attr.family.empty()) {
+            auto fam = resolveDWriteFamily(attr.family, collection.get());
+            if (!fam.empty()) layout->SetFontFamilyName(fam.c_str(), range);
+        }
+        if (attr.size > 0) layout->SetFontSize(attr.size, range);
+        layout->SetFontWeight(attr.weight, range);
+        layout->SetFontStyle(attr.style, range);
+        layout->SetFontStretch(attr.stretch, range);
+        if (layout1 && attr.spacing != 0) {
+            auto s = attr.size > 0 ? attr.size : baseSize;
+            layout1->SetCharacterSpacing(0.0f, static_cast<FLOAT>(attr.spacing * s / 1000.0), 0.0f, range);
+        }
+    }
+
+    UINT32 dwLineCount = 0;
+    layout->GetLineMetrics(nullptr, 0, &dwLineCount);
+    std::vector<DWRITE_LINE_METRICS> lines(dwLineCount);
+    if (dwLineCount > 0) winrt::check_hresult(layout->GetLineMetrics(lines.data(), dwLineCount, &dwLineCount));
+    if (lineCount) *lineCount = static_cast<int32_t>(std::max<UINT32>(1, dwLineCount));
+
+    auto advance = rich ? rich.LineHeight() : block.LineHeight();
+    if (availW > coordSize.x + 1.0 || availH > coordSize.y + 1.0) return 0;
+    if (dwLineCount > 1 && contentW > 0 && dwLineCount > 0 && contentH <= lines[0].height * 1.5f) {
+        layout->SetMaxWidth(contentW + 2.0f);
+        UINT32 widenedLines = 0;
+        layout->GetLineMetrics(nullptr, 0, &widenedLines);
+        DWRITE_TEXT_METRICS tm{};
+        if (widenedLines == 1 && SUCCEEDED(layout->GetMetrics(&tm)) && tm.widthIncludingTrailingWhitespace <= contentW + 2.0f) {
+            dwLineCount = widenedLines;
+            lines.resize(dwLineCount);
+            if (dwLineCount > 0) winrt::check_hresult(layout->GetLineMetrics(lines.data(), dwLineCount, &dwLineCount));
+            if (lineCount) *lineCount = static_cast<int32_t>(std::max<UINT32>(1, dwLineCount));
+        } else {
+            layout->SetMaxWidth(contentW);
+        }
+    }
+    std::vector<double> lineYOffset(dwLineCount, 0.0);
+    if (advance > 0 && dwLineCount > 1) {
+        double extra = 0.0;
+        for (UINT32 k = 1; k < dwLineCount; ++k) {
+            extra += std::max(0.0, advance - static_cast<double>(lines[k - 1].height));
+            lineYOffset[k] = extra;
+        }
+    }
+
+    auto transform = visual.TransformToVisual(coordinates);
+    int32_t outCount = 0;
+    UINT32 curLine = 0;
+    UINT32 curLineEnd = dwLineCount > 0 ? lines[0].length : static_cast<UINT32>(fullText.size());
+    size_t attrIdx = 0;
+
+    for (UINT32 pos = 0; pos < static_cast<UINT32>(fullText.size()) && outCount < capacity; ++pos) {
+        while (curLine + 1 < dwLineCount && pos >= curLineEnd) {
+            ++curLine;
+            curLineEnd += lines[curLine].length;
+        }
+        while (attrIdx < attrs.size() && pos >= attrs[attrIdx].start + attrs[attrIdx].length) ++attrIdx;
+
+        FLOAT px0 = 0, py0 = 0, px1 = 0, py1 = 0;
+        DWRITE_HIT_TEST_METRICS m0{}, m1{};
+        winrt::check_hresult(layout->HitTestTextPosition(pos, FALSE, &px0, &py0, &m0));
+        winrt::check_hresult(layout->HitTestTextPosition(pos, TRUE, &px1, &py1, &m1));
+
+        double x = m0.left;
+        double w = (m0.length <= 1) ? std::abs(static_cast<double>(px1) - static_cast<double>(px0)) : m0.width;
+        if (pos > m0.textPosition) {
+            x = m0.left + m0.width;
+            w = 0.0;
+        }
+        double y = static_cast<double>(m0.top) + (curLine < lineYOffset.size() ? lineYOffset[curLine] : 0.0);
+        double h = static_cast<double>(m0.height);
+
+        if (attrIdx < attrs.size() && attrs[attrIdx].inlineText && pos == attrs[attrIdx].start) {
+            auto child = attrs[attrIdx].inlineText;
+            auto cw = child.Text();
+            auto cx = pad.Left + x;
+            auto cy = pad.Top + y;
+            auto cpos = child.ContentStart();
+            for (size_t ci = 0; ci < cw.size() && outCount < capacity; ++ci) {
+                auto cr = cpos ? cpos.GetCharacterRect(documents::LogicalDirection::Forward) : winrt::Windows::Foundation::Rect{};
+                auto cnext = cpos ? cpos.GetPositionAtOffset(1, documents::LogicalDirection::Forward) : nullptr;
+                if (cnext) {
+                    auto ce = cnext.GetCharacterRect(documents::LogicalDirection::Backward);
+                    if (cr.Height > 0 && ce.Height > 0 && std::abs(cr.Y - ce.Y) < 0.5f) {
+                        auto cleft = std::min(cr.X, ce.X);
+                        cr.Width = std::abs(ce.X - cr.X); cr.X = cleft;
+                    }
+                }
+                auto rect = transform.TransformBounds({
+                    static_cast<float>(cx + cr.X), static_cast<float>(cy + cr.Y), cr.Width, cr.Height});
+                rectangles[outCount * 4] = rect.X; rectangles[outCount * 4 + 1] = rect.Y;
+                rectangles[outCount * 4 + 2] = rect.Width; rectangles[outCount * 4 + 3] = rect.Height;
+                ++outCount;
+                cpos = cnext;
+            }
+            continue;
+        }
+
+        auto rect = transform.TransformBounds({
+            static_cast<float>(pad.Left + x), static_cast<float>(pad.Top + y),
+            static_cast<float>(w), static_cast<float>(h)});
+        rectangles[outCount * 4] = rect.X; rectangles[outCount * 4 + 1] = rect.Y;
+        rectangles[outCount * 4 + 2] = rect.Width; rectangles[outCount * 4 + 3] = rect.Height;
+        ++outCount;
+    }
+    return outCount;
+}
+
 static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity,
                                      int32_t *lineCount, bool reuseLeadingCarets) {
     if (lineCount) *lineCount = 0;
@@ -1079,47 +1444,10 @@ static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectan
         auto metricsFor = [&](controls::TextBlock const &owner, documents::Run const &run = nullptr) {
             return advance > 0 ? naturalWordsMetrics(owner, run) : NaturalWordsMetrics{};
         };
-        if (!rich && block.Inlines().Size() == 0) {
-            auto words = block.Text();
-            append(block.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(block));
-        } else {
-            std::function<void(documents::Inline const &)> visit = [&](documents::Inline const &inlineValue) {
-                if (auto run = inlineValue.try_as<documents::Run>()) {
-                    auto words = run.Text();
-                    append(run.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(block, run));
-                } else if (auto span = inlineValue.try_as<documents::Span>()) {
-                    for (auto const &child : span.Inlines()) visit(child);
-                } else if (auto holder = inlineValue.try_as<documents::InlineUIContainer>()) {
-                    auto content = inlineContent(holder);
-                    if (auto child = content.try_as<controls::TextBlock>()) {
-                        auto words = child.Text();
-                        append(child.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(child),
-                               child, holder.ContentStart());
-                    } else if (content && at < capacity) {
-                        auto height = content.ActualHeight();
-                        auto baseline = height;
-                        if (auto paragraph = holder.Child().try_as<controls::RichTextBlock>()) baseline = paragraph.BaselineOffset();
-                        auto row = rowAt(holder.ContentStart().GetCharacterRect(documents::LogicalDirection::Forward),
-                                         {height, baseline});
-                        auto rect = content.TransformToVisual(visual).TransformBounds(
-                            {0, 0, static_cast<float>(content.ActualWidth()), static_cast<float>(height)});
-                        glyphs.push_back({rect, row, true}); ++at;
-                    } else if (at < capacity) {
-                        append(inlineValue.ContentStart(), L"\uFFFC", metricsFor(block));
-                    }
-                } else if (inlineValue.try_as<documents::LineBreak>()) {
-                    append(inlineValue.ContentStart(), L"\n", metricsFor(block));
-                } else {
-                    append(inlineValue.ContentStart(), L"\uFFFC", metricsFor(block));
-                }
-            };
-            if (rich) {
-                for (auto const &value : rich.Blocks()) if (auto paragraph = value.try_as<documents::Paragraph>())
-                    for (auto const &inlineValue : paragraph.Inlines()) visit(inlineValue);
-            } else {
-                for (auto const &inlineValue : block.Inlines()) visit(inlineValue);
-            }
-        }
+        if (rich || block.Inlines().Size() > 0 || !block.Text().empty())
+            return readInlineRunGeometry(block, rich, visual, coordinates, rectangles, capacity, lineCount);
+        auto words = block.Text();
+        append(block.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(block));
         if (!valid || (at > 0 && rows.empty())) return 0; // Native Arrange has not supplied visible positions.
         if (lineCount) *lineCount = static_cast<int32_t>(std::max<size_t>(1, rows.size()));
         NaturalWordsMetrics defaults{};

@@ -149,17 +149,21 @@ extension View {
         if edges.contains(.top) { insets.top = inset }
         if edges.contains(.trailing) { insets.right = inset }
         if edges.contains(.bottom) { insets.bottom = inset }
-        return revised {
-            $0.wrapPaddedFrame()
-            $0.props[.safeAreaPadding] = insets.propValue
+        return revised { node in
+            node = node.mappingLayoutLeaves {
+                $0.wrapPaddedFrame()
+                $0.props[.safeAreaPadding] = insets.propValue
+            }
         }
     }
 
     /// Adds the supplied room to the safe region passed to this view's content.
     public func safeAreaPadding(_ insets: EdgeInsets) -> ModifiedContent {
-        revised {
-            $0.wrapPaddedFrame()
-            $0.props[.safeAreaPadding] = insets.propValue
+        revised { node in
+            node = node.mappingLayoutLeaves {
+                $0.wrapPaddedFrame()
+                $0.props[.safeAreaPadding] = insets.propValue
+            }
         }
     }
 
@@ -189,5 +193,46 @@ extension View {
                 let (x, y) = (anchor?.x, anchor?.y)
                 Task { try? await aim.call(ScrollViewContract.scrollToDescendant, name, x, y) }
             }
+    }
+
+    /// Runs `action` with a value computed from the enclosed scroll view's
+    /// geometry when that value changes.
+    public func onScrollGeometryChange<T: Equatable>(
+        for type: T.Type,
+        of transform: @escaping (ScrollGeometry) -> T,
+        action: @escaping (_ oldValue: T, _ newValue: T) -> Void
+    ) -> ModifiedContent {
+        revised { node in
+            func attach(_ node: inout Node) {
+                node.materialize()
+                if node.type == ScrollViewContract.nodeType {
+                    node.addHandler(.scrollGeometryChanged) {
+                        guard let numbers = MemberValues.carried(
+                            EventBuffer.current, by: "scrollGeometryChanged", as: [Double].self)
+                        else { return }
+                        let previous: ScrollGeometry
+                        let current: ScrollGeometry
+                        if numbers.count == 20,
+                           let oldGeometry = ScrollGeometry(numbers: Array(numbers[0..<10])),
+                           let newGeometry = ScrollGeometry(numbers: Array(numbers[10..<20])) {
+                            previous = oldGeometry
+                            current = newGeometry
+                        } else if let newGeometry = ScrollGeometry(numbers: numbers) {
+                            previous = ScrollGeometry()
+                            current = newGeometry
+                        } else {
+                            return
+                        }
+                        let oldValue = transform(previous)
+                        let newValue = transform(current)
+                        guard oldValue != newValue else { return }
+                        action(oldValue, newValue)
+                    }
+                    return
+                }
+                for index in node.children.indices { attach(&node.children[index]) }
+            }
+            attach(&node)
+        }
     }
 }

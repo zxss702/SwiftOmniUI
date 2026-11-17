@@ -39,6 +39,7 @@
     /// that window must not allocate transition bookkeeping or animate later
     /// merely because the user scrolled to them.
     private var insertionPredecessor: HostLazySource?
+    private var changePredecessor: (source: HostLazySource, extents: LazyExtents, runs: LazyRunExtents, perRun: Int)?
     private var prefetchPlan: (demand: Range<Double>, target: Range<Double>, perRun: Int, grid: Bool)?
     private var prefetchInvalidated = false
     private var lastPerRun = 1
@@ -140,8 +141,20 @@
                         }
                     } else { animatesChanges = true }
                 }
+                if changePredecessor == nil, wasKnown, let source {
+                    changePredecessor = (source, extents, runs, lastPerRun)
+                }
                 insertionPredecessor = wasKnown ? (insertionPredecessor ?? source) : nil
                 inserting = inserting.filter { next.position(of: $0) != nil }
+                if wasKnown, follows, let previous = source,
+                   case .replace(_, let after) = next.edit, after.count <= 128 {
+                    for index in after {
+                        let identity = next.sequence[index]
+                        if previous.position(of: identity) == nil {
+                            inserting.insert(identity)
+                        }
+                    }
+                }
                 extents.adopt(next)
                 source = next
                 positions = [:]
@@ -152,6 +165,7 @@
                 window = nil
                 needsMeasurement = false
             } else {
+                changePredecessor = nil
                 insertionPredecessor = nil
                 // Direct host SPI users can still provide the .items property.
                 let now = element.value(.items)?.strings ?? []
@@ -252,15 +266,19 @@
             ? runs.places(in: span, overscan: 0, count: runCount)
             : extents.places(in: span, overscan: 0, in: identities)
         if !shown.isEmpty, anchor == nil || moved {
-            let place = shown.lowerBound * perRun
-            let origin = grid
-                ? runs.offset(of: shown.lowerBound, count: (identities.count + perRun - 1) / perRun)
-                : extents.offset(of: place, in: identities)
-            let total = grid
-                ? runs.total(count: (identities.count + perRun - 1) / perRun)
-                : extents.total(in: identities)
-            anchor = (identities[place], place, span.lowerBound - origin, span.lowerBound,
-                      span.upperBound - span.lowerBound, span.lowerBound > 0 && abs(span.upperBound - total) < 1)
+            if span.lowerBound > 0 {
+                let place = shown.lowerBound * perRun
+                let origin = grid
+                    ? runs.offset(of: shown.lowerBound, count: (identities.count + perRun - 1) / perRun)
+                    : extents.offset(of: place, in: identities)
+                let total = grid
+                    ? runs.total(count: (identities.count + perRun - 1) / perRun)
+                    : extents.total(in: identities)
+                anchor = (identities[place], place, span.lowerBound - origin, span.lowerBound,
+                          span.upperBound - span.lowerBound, span.lowerBound > 0 && abs(span.upperBound - total) < 1)
+            } else {
+                anchor = nil
+            }
         }
         guard let element else { return }
         var lower = min(identities.count, max(0, wanted.lowerBound - 1) * perRun)
@@ -554,6 +572,40 @@
         onRowsRequested?()
         let generation = nextRequestGeneration(for: element)
         element.send(.realizedChanged, [.strings(Array(identities)), .number(Double(generation))], in: runtime)
+    }
+
+    /// Run-axis delta between a surviving row's pre-change offset and its current
+    /// offset (compensated for `anchorShift`) so newly materialized suffix rows
+    /// travel alongside already-mounted siblings.
+    public func previousDisplacementDelta(for identity: String, perRun: Int = 1, grid: Bool = false) -> Double? {
+        guard var previous = changePredecessor,
+              let newPlace = position(of: identity),
+              let oldPlace = previous.source.position(of: identity) else { return nil }
+        let oldOrigin: Double
+        let newOrigin: Double
+        if grid {
+            let oldPerRun = max(1, previous.perRun)
+            let newPerRun = max(1, perRun)
+            let oldCount = (previous.source.sequence.count + oldPerRun - 1) / oldPerRun
+            let newCount = (orderedIdentities.count + newPerRun - 1) / newPerRun
+            oldOrigin = previous.runs.offset(of: oldPlace / oldPerRun, count: oldCount)
+            newOrigin = runs.offset(of: newPlace / newPerRun, count: newCount)
+        } else {
+            oldOrigin = previous.extents.offset(of: oldPlace, in: previous.source.sequence)
+            newOrigin = extents.offset(of: newPlace, in: orderedIdentities)
+        }
+        changePredecessor = previous
+        let delta = oldOrigin - newOrigin + anchorShift
+        return abs(delta) > 0.5 ? delta : nil
+    }
+
+    /// Commits a ready arrangement's change bookkeeping so unmeasured intermediate passes
+    /// do not drop transitions or displacement history prematurely.
+    public func consumeAnimationChange() {
+        animatesChanges = false
+        anchorShift = 0
+        inserting.removeAll(keepingCapacity: true)
+        changePredecessor = nil
     }
 
 }

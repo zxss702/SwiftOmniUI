@@ -31,6 +31,35 @@ final class GTKElement: NativeElement {
 
     // MARK: - The element's tree, read through its mounted element
 
+    private static let layoutInputs = MountedElement.arrangedProperties.union([
+        .flex, .isFrameContent, .isLayoutDecoration, .orientation,
+        .horizontalAlignmentDefault, .verticalAlignmentDefault,
+        .layoutPriority, .horizontalGuide, .verticalGuide,
+    ])
+
+    private static func geometryLanes(affectedBy properties: Set<Prop>) -> AnimationLanes {
+        var lanes: AnimationLanes = []
+        for property in properties where layoutInputs.contains(property) {
+            switch property {
+            case .height, .minimumHeight, .maximumHeight: lanes.insert(.height)
+            default: lanes.formUnion([.width, .height])
+            }
+        }
+        return lanes
+    }
+
+    private func notifyLayoutMotion(followingPresentation: Bool = false, presentedLanes: AnimationLanes = []) {
+        (view as? GTKTravellingLayout)?.followsPresentationFrame(lanes: presentedLanes, sample: followingPresentation)
+        var branch = view != nil ? element.mount : layoutItem?.mount
+        var owner = parent
+        while let each = owner {
+            (each.view as? GTKTravellingLayout)?.followsPresentationFrame(
+                lanes: presentedLanes, sample: followingPresentation, item: branch)
+            if each.view != nil { branch = each.element.mount }
+            owner = each.parent
+        }
+    }
+
     var type: NodeType { element.type }
     var parent: GTKElement? { element.parent?.gtk }
     var children: [GTKElement] { element.children.map(\.gtk) }
@@ -55,6 +84,19 @@ final class GTKElement: NativeElement {
     }
 
     func applied(changed: Set<Prop>, wasDescribed: Bool) {
+        if !wasDescribed || element.childOrderChanged || !changed.isDisjoint(with: Self.layoutInputs) {
+            var presented: Set<Prop> = []
+            for property in changed where Self.layoutInputs.contains(property) {
+                let driven = element.driven[property].map { binding in
+                    binding.mode != .in && (host?.runtime.stateChannels.isActive(state: binding.state) ?? false)
+                } ?? false
+                guard driven || host?.runtime.animator.animation(
+                    for: .described(DescribedKey(mount: element.mount, property: property))) != nil else { continue }
+                presented.insert(property)
+            }
+            let lanes = Self.geometryLanes(affectedBy: presented)
+            if !lanes.isEmpty { notifyLayoutMotion(presentedLanes: lanes) }
+        }
         if wasDescribed, changed.contains(.isVisible) { crossVisibility() }
         applyProperties(changed: changed)
         view?.refreshNativeSafeBarDrawing()
@@ -90,7 +132,10 @@ final class GTKElement: NativeElement {
     }
 
     func presentFrame(_ changed: Set<Prop>) {
-        applyProperties(changed: changed)
+        if !changed.isDisjoint(with: Self.layoutInputs) {
+            notifyLayoutMotion(followingPresentation: true, presentedLanes: Self.geometryLanes(affectedBy: changed))
+        }
+        applyProperties(changed: changed, followingPresentation: true)
     }
 
     func departureChanged() {

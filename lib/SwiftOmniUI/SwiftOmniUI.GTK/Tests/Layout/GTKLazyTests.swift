@@ -252,7 +252,10 @@ final class GTKLazyTests: XCTestCase {
 
                 withAnimation(.eased(200, .linear)) { rows.wrappedValue.insert(-1, at: 0) }
                 // The source patch is here; the window it asks for has not been answered.
-                _ = host.runtime.core.runJobs()
+                let rendered = host.runtime.core.render(baseline: host.runtime.intake.baseline)
+                _ = host.runtime.intake.take(rendered.root, generation: rendered.generation) {
+                    host.runtime.tree.apply($0, complete: rendered.complete)
+                }
                 let inserted = lazy.cells.orderedIdentities[0]
                 XCTAssertTrue(lazy.cells.animatesChanges, "the change waits for the rows it added")
                 XCTAssertFalse(lazy.cells.requestedItemsAreCurrent, "and the tree has not answered the window")
@@ -417,6 +420,54 @@ final class GTKLazyTests: XCTestCase {
                 XCTAssertEqual(retained.placedFrame.y, target, accuracy: 1)
                 XCTAssertLessThan(builds.numbers.count, 80, "only the viewport and its overscan are built")
             }
+        }
+    }
+
+    func testCollapseBlurTransitionKeepsDepartingArrangedAndMovesSuffixRows() throws {
+        try onUIThread {
+            let expanded = Array(0..<2) + Array(1_000..<1_025) + Array(2..<60)
+            let collapsed = Array(0..<60)
+            let rows = State(wrappedValue: expanded)
+            let clock = TestClock()
+            let host = GTKRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            Text("File \(number)")
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                        }
+                        .transition(.blur.combined(with: .offset(y: -48)))
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(GTKLazyView.self).first)
+            let departingIdentity = lazy.cells.orderedIdentities[2]
+            let suffixIdentity = lazy.cells.orderedIdentities[30]
+            let preCollapseY = lazy.cells.offset(of: 30)
+            XCTAssertNil(lazy.mounted[suffixIdentity], "suffix row 5 must start unmounted outside the expanded window")
+            let departingItem = try XCTUnwrap(lazy.mounted[departingIdentity])
+
+            let began = clock.now
+            withAnimation(.eased(200, .linear)) { rows.wrappedValue = collapsed }
+            for _ in 0..<12 { host.step(); host.frame() }
+
+            XCTAssertTrue(lazy.mounted[departingIdentity]?.departing == true)
+            let suffixView = try XCTUnwrap(lazy.mounted[suffixIdentity]?.view)
+
+            clock.now = began + 100
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(departingItem.view.drawnOpacity, 0.5, accuracy: 0.05)
+            XCTAssertGreaterThan(departingItem.view.laidOutFrame.width, 0)
+            XCTAssertEqual(departingItem.view.laidOutFrame.height, 28, accuracy: 1)
+            XCTAssertEqual(suffixView.placedFrame.y, (preCollapseY + 140) / 2, accuracy: 2,
+                           "newly materialized suffix row must travel from its pre-collapse position to 140")
+
+            clock.now = began + 200
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertEqual(suffixView.placedFrame.y, 140, accuracy: 1)
         }
     }
 

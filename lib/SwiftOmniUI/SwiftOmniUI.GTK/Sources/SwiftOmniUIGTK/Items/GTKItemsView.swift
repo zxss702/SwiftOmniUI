@@ -34,6 +34,10 @@ final class GTKItemsView: GTKLayoutView {
 
     /// Inside the scroller: the native list owns this room, not its viewport.
     private let contentPadding = EdgeInsets(8)
+    private var barsInsets = EdgeInsets(0)
+    private var pendingInsets: EdgeInsets?
+    private var commitPending = false
+    private var paddingClass: String?
 
     /// Every cell set up, by its list item.
     private(set) var made: [OpaquePointer: GTKItemCell] = [:]
@@ -141,7 +145,9 @@ final class GTKItemsView: GTKLayoutView {
         }
         selection = chosen
         listenToChoice()
-        gtk_widget_add_css_class(made, GTKStyleSheet.padding(contentPadding))
+        let paddingCss = GTKStyleSheet.padding(contentPadding + barsInsets)
+        gtk_widget_add_css_class(made, paddingCss)
+        paddingClass = paddingCss
         gtk_scrolled_window_set_child(scroller.widget.opaque, made)
         list = made
         styleList()
@@ -214,7 +220,8 @@ final class GTKItemsView: GTKLayoutView {
     /// Stands each entry as the host layer places it (`ItemsPlacement`): a grid's columns from the width it is given,
     /// and each bound cell's room.
     private func place() {
-        let contentWidth = max(0, width - contentPadding.left - contentPadding.right)
+        let padding = contentPadding + barsInsets
+        let contentWidth = max(0, width - padding.left - padding.right)
         let placement = ItemsPlacement(cells.entries, layout: shape, width: contentWidth, spanning: false)
         guard placement != self.placement else { return }
         self.placement = placement
@@ -295,13 +302,55 @@ final class GTKItemsView: GTKLayoutView {
         LayoutSize(width: width ?? 0, height: 0)
     }
 
-    /// Stands the scrolled window over the whole room; a grid's columns follow the width.
-    override func arrange(in bounds: Rect) {
-        if bounds.width != width {
-            width = bounds.width
+    override func backgroundBounds(in bounds: Rect) -> Rect {
+        let orientation: Axis = shape.isAcross ? .horizontal : .vertical
+        return box.clips ? bounds : layoutSafeArea(in: bounds).viewport(in: bounds, axes: orientation)
+    }
+
+    override func safeAreaChanged() {
+        if let context = safeAreaContext { _ = resolve(in: context.layout) }
+    }
+
+    private func resolve(in bounds: Rect) -> Rect {
+        let orientation: Axis = shape.isAcross ? .horizontal : .vertical
+        let context = layoutSafeArea(in: bounds)
+        let viewport = box.clips ? bounds : context.viewport(in: bounds, axes: orientation)
+        let insets = SafeAreaContext.insets(of: context.safe, in: viewport)
+        if barsInsets != insets {
+            barsInsets = insets
+            pendingInsets = insets
             place()
         }
-        scroller.layout(bounds)
+        if pendingInsets != nil, !commitPending {
+            commitPending = true
+            GTKDoorbell.afterLayout { [weak self] in
+                guard let self else { return }
+                self.commitPending = false
+                guard !self.released, let insets = self.pendingInsets else { return }
+                self.pendingInsets = nil
+                self.applyPadding(insets)
+            }
+        }
+        return viewport
+    }
+
+    private func applyPadding(_ insets: EdgeInsets) {
+        guard let list else { return }
+        let next = GTKStyleSheet.padding(contentPadding + insets)
+        guard next != paddingClass else { return }
+        if let current = paddingClass { gtk_widget_remove_css_class(list, current) }
+        gtk_widget_add_css_class(list, next)
+        paddingClass = next
+    }
+
+    /// Stands the scrolled window over the whole room; a grid's columns follow the width.
+    override func arrange(in bounds: Rect) {
+        let viewport = resolve(in: bounds)
+        if viewport.width != width {
+            width = viewport.width
+            place()
+        }
+        scroller.layout(viewport)
     }
 
     // MARK: - What the list says
@@ -451,6 +500,7 @@ final class GTKItemsView: GTKLayoutView {
     override func detach() {
         super.detach()
         released = true
+        pendingInsets = nil
         waiting = []
         gtk_scrolled_window_set_child(scroller.widget.opaque, nil)
         list = nil

@@ -140,14 +140,33 @@ extension View {
     /// view draws of its own too.
     public func clipShape(_ shape: some Shape, style: FillStyle = FillStyle()) -> ModifiedContent {
         if let fixed = shape as? any PrimitiveShape {
-            var wrapper = Node(contract: ZStackContract.self)
-            let content = node
-            wrapper.producer = { content.asChildren }
-            wrapper.write(BorderElementContract.shape, fixed.outline)
-            wrapper.write(LayoutContract.clipsContent, true)
-            return ModifiedContent(node: wrapper)
+            return ModifiedContent(node: node.mappingLayoutLeaves { leaf in
+                var content = leaf
+                let leafId = content.id
+                let leafKey = content.key
+                content.id = nil
+                content.key = nil
+                var wrapper = Node(contract: ZStackContract.self)
+                wrapper.fragmentContentIndex = 0
+                wrapper.id = leafId
+                wrapper.key = leafKey
+                wrapper.children = [content]
+                wrapper.write(BorderElementContract.shape, fixed.outline)
+                wrapper.write(LayoutContract.clipsContent, true)
+                leaf = wrapper
+            })
         }
-        return ModifiedContent(node: SizedPathShape(content: self, shape: shape, style: style, role: .clip).node)
+        return ModifiedContent(node: node.mappingLayoutLeaves { leaf in
+            var content = leaf
+            let leafId = content.id
+            let leafKey = content.key
+            content.id = nil
+            content.key = nil
+            var wrapped = SizedPathShape(content: ModifiedContent(node: content), shape: shape, style: style, role: .clip).node
+            wrapped.id = leafId
+            wrapped.key = leafKey
+            leaf = wrapped
+        })
     }
 
     /// Cuts the view to its own bounds - a `.clipShape` by the bounds'
@@ -176,14 +195,33 @@ extension View {
     /// the view was given answers.
     public func contentShape(_ shape: some Shape, eoFill: Bool = false) -> ModifiedContent {
         if let fixed = shape as? any PrimitiveShape {
-            var wrapper = Node(contract: ZStackContract.self)
-            let content = node
-            wrapper.producer = { content.asChildren }
-            wrapper.write(LayoutContract.hitShape, fixed.outline)
-            return ModifiedContent(node: wrapper)
+            return ModifiedContent(node: node.mappingLayoutLeaves { leaf in
+                var content = leaf
+                let leafId = content.id
+                let leafKey = content.key
+                content.id = nil
+                content.key = nil
+                var wrapper = Node(contract: ZStackContract.self)
+                wrapper.fragmentContentIndex = 0
+                wrapper.id = leafId
+                wrapper.key = leafKey
+                wrapper.children = [content]
+                wrapper.write(LayoutContract.hitShape, fixed.outline)
+                leaf = wrapper
+            })
         }
-        return ModifiedContent(node: SizedPathShape(
-            content: self, shape: shape, style: FillStyle(eoFill: eoFill, antialiased: true), role: .interaction).node)
+        let style = FillStyle(eoFill: eoFill, antialiased: true)
+        return ModifiedContent(node: node.mappingLayoutLeaves { leaf in
+            var content = leaf
+            let leafId = content.id
+            let leafKey = content.key
+            content.id = nil
+            content.key = nil
+            var wrapped = SizedPathShape(content: ModifiedContent(node: content), shape: shape, style: style, role: .interaction).node
+            wrapped.id = leafId
+            wrapped.key = leafKey
+            leaf = wrapped
+        })
     }
 
     /// Draws the view only where `mask`'s alpha allows: where the mask paints
@@ -214,7 +252,8 @@ extension View {
         // expands to several siblings. All mask layers contribute their alpha.
         var source = Node(contract: ZStackContract.self)
         source.key = "content"
-        source.producer = { content.asChildren }
+        source.wrapsFragmentChildren = true
+        source.producer = { [content] }
         var alpha = Node(contract: ZStackContract.self)
         alpha.key = "mask"
         alpha.props[.isLayoutDecoration] = true.propValue

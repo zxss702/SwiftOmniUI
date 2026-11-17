@@ -198,6 +198,14 @@ public final class Renderer: @unchecked Sendable {
         UIThreadExecutor.shared.askForTurn()
     }
 
+    func setNeedsAnchorPreferenceRender(for box: AnchorBox) {
+        guarded.withLock {
+            dirty = true
+            textPreferencesChanged.insert(box.identity)
+        }
+        UIThreadExecutor.shared.askForTurn()
+    }
+
     /// Records that a state was read. While a view is built, the view becomes
     /// its reader; anywhere else it costs nearly nothing.
     ///

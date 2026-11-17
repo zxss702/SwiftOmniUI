@@ -36,6 +36,7 @@ class WinUIView {
     private var inheritedBlur = 0.0
     private var writtenBlur = 0.0
     private var blurCommitPending = false
+    private var pendingBlurPresenter = false
 
     /// The number the relay's callbacks name this view by.
     let number: Int64
@@ -371,11 +372,18 @@ class WinUIView {
     func prepareBlur() {
         guard blurPresenter == nil, !isDetached else { return }
         guard Self.arranging == 0, Self.measuring == 0 else {
+            pendingBlurPresenter = true
             scheduleBlurCommit()
             return
         }
+        pendingBlurPresenter = false
         blurPresenter = swiftomniui_winui_blur_make(nativeAllocation ?? handle)
-        if blurPresenter != nil { nativeParentChanged() }
+        if let blurPresenter {
+            nativeParentChanged()
+            if let frame = placed {
+                swiftomniui_winui_arrange(blurPresenter, frame.x, frame.y, frame.width, frame.height)
+            }
+        }
     }
 
     func setBlur(_ radius: Double) {
@@ -393,6 +401,10 @@ class WinUIView {
             guard let self else { return }
             self.blurCommitPending = false
             guard !self.isDetached else { return }
+            if self.pendingBlurPresenter {
+                self.pendingBlurPresenter = false
+                self.prepareBlur()
+            }
             self.writeBlur()
         }
     }
@@ -795,6 +807,7 @@ class WinUIView {
     /// to query XAML, whose internal offsets Swift does not own.
     func reportingLayoutOffset(relativeTo parent: WinUILayoutView) -> (point: Point, cached: Bool)? {
         let ownsLayout = self is WinUILabelView || self is WinUIImageView || self is WinUIPathView
+            || self is WinUICustomLayoutView
             || (self as? WinUILayoutView)?.retainsArithmeticOnNativeMeasure == true
         guard ownsLayout, let placed, let committedFrame,
               nativeAllocation == nil, blurPresenter == nil,
@@ -856,6 +869,64 @@ class WinUIView {
     }
 
     /// Where WinUI laid the element out in its parent, in DIPs.
+    private struct LayoutReportFrameCache {
+        let layoutGeneration: UInt64
+        let hierarchyRevision: Int
+        let measurementRevision: Int
+        let layoutContextRevision: Int
+        let placed: Rect?
+        let frame: Rect?
+    }
+    private var reportFrameCache: LayoutReportFrameCache?
+
+    func laidOutFrame(forLayoutGeneration generation: UInt64) -> Rect {
+        if isLayoutOnly { return committedFrame ?? placed ?? Rect(0, 0, 0, 0) }
+        if Self.measuring == 0, Self.arranging == 0, !isDetached,
+           let cached = reportFrameCache,
+           cached.layoutGeneration == generation,
+           cached.hierarchyRevision == hierarchyRevision,
+           cached.measurementRevision == measurementRevision,
+           cached.layoutContextRevision == layoutContextRevision,
+           cached.placed == placed,
+           let frame = cached.frame {
+            return frame
+        }
+        let frame = laidOutFrame
+        if Self.measuring == 0, Self.arranging == 0, !isDetached {
+            reportFrameCache = LayoutReportFrameCache(
+                layoutGeneration: generation, hierarchyRevision: hierarchyRevision,
+                measurementRevision: measurementRevision, layoutContextRevision: layoutContextRevision,
+                placed: placed, frame: frame)
+        }
+        return frame
+    }
+
+    func isAttached(forLayoutGeneration generation: UInt64) -> Bool {
+        if Self.measuring == 0, Self.arranging == 0, !isDetached,
+           let cached = reportFrameCache,
+           cached.layoutGeneration == generation,
+           cached.hierarchyRevision == hierarchyRevision,
+           cached.measurementRevision == measurementRevision,
+           cached.layoutContextRevision == layoutContextRevision,
+           cached.placed == placed {
+            return true
+        }
+        let attached = isAttached
+        if attached, Self.measuring == 0, Self.arranging == 0, !isDetached {
+            let existing = reportFrameCache
+            let sameStamp = existing?.layoutGeneration == generation
+                && existing?.hierarchyRevision == hierarchyRevision
+                && existing?.measurementRevision == measurementRevision
+                && existing?.layoutContextRevision == layoutContextRevision
+                && existing?.placed == placed
+            reportFrameCache = LayoutReportFrameCache(
+                layoutGeneration: generation, hierarchyRevision: hierarchyRevision,
+                measurementRevision: measurementRevision, layoutContextRevision: layoutContextRevision,
+                placed: placed, frame: sameStamp ? existing?.frame : nil)
+        }
+        return attached
+    }
+
     var laidOutFrame: Rect {
         if isLayoutOnly { return committedFrame ?? placed ?? Rect(0, 0, 0, 0) }
         var frame = [0.0, 0.0, 0.0, 0.0]
@@ -1077,6 +1148,7 @@ final class WinUIFrameReportCache {
     private var unsupported: Set<Int64> = []
     private var documentOrigins: [Int64: Point] = [:]
     private var transformedDocuments: Set<Int64> = []
+    private var safeAreas: [UInt64: Rect] = [:]
 
     func documentCoordinates(of view: WinUIView, generation: UInt64) -> Coordinates? {
         if self.generation != generation {
@@ -1084,9 +1156,25 @@ final class WinUIFrameReportCache {
             unsupported.removeAll(keepingCapacity: true)
             documentOrigins.removeAll(keepingCapacity: true)
             transformedDocuments.removeAll(keepingCapacity: true)
+            safeAreas.removeAll(keepingCapacity: true)
             self.generation = generation
         }
         return read(view)
+    }
+
+    func safeArea(of element: MountedElement, in host: WinUIRenderer, generation: UInt64) -> Rect {
+        if self.generation != generation {
+            coordinates.removeAll(keepingCapacity: true)
+            unsupported.removeAll(keepingCapacity: true)
+            documentOrigins.removeAll(keepingCapacity: true)
+            transformedDocuments.removeAll(keepingCapacity: true)
+            safeAreas.removeAll(keepingCapacity: true)
+            self.generation = generation
+        }
+        if let cached = safeAreas[element.mount] { return cached }
+        let area = host.safeArea(of: element)
+        safeAreas[element.mount] = area
+        return area
     }
 
     func rootOrigin(of coordinates: Coordinates) -> Point? {

@@ -220,6 +220,7 @@ extern "C" void swiftomniui_winui_text_set_text(SwiftOmniUIObjectRef handle, cha
         if (richWords(handle)) {
             auto border = borrow<controls::Border>(handle); border.Child(block); border.Tag(nullptr);
         }
+        borrow<controls::Border>(handle).Resources().Remove(winrt::box_value(L"SwiftOmniUIHasRuns"));
         block.TextHighlighters().Clear();
         block.Text(text(utf8));
     } catch (...) {

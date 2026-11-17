@@ -9,7 +9,7 @@ extension LineHeightElement {
     /// The height of a line, as a MULTIPLE of the font's own - 1.5 for half
     /// again. Said nothing about, the font's own height stands.
     @_spi(Host) public func lineHeight(_ value: Double) -> Modified {
-        setValue(LineHeightElementContract.lineHeight, value)
+        modified { $0.writeOrInherit(LineHeightElementContract.lineHeight, value) }
     }
 
     /// Extra space between every pair of lines, in device units - the SwiftUI
@@ -17,7 +17,7 @@ extension LineHeightElement {
     ///
     ///     Text(lyrics).lineSpacing(8)
     public func lineSpacing(_ value: Double) -> Modified {
-        setValue(LineHeightElementContract.lineSpacing, value)
+        modified { $0.writeOrInherit(LineHeightElementContract.lineSpacing, value) }
     }
 }
 

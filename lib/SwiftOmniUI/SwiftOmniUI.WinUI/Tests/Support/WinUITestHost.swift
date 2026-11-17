@@ -191,13 +191,13 @@ extension WinUIView {
 
     /// The opacity WinUI draws the element at.
     var drawnOpacity: Double {
-        swiftomniui_winui_opacity(handle)
+        swiftomniui_winui_opacity(presentationHandle)
     }
 
     /// The tip WinUI draws the element with, as a 4x4 matrix; nil where it has none.
     var drawnTip: HostMatrix? {
         var numbers = [Double](repeating: 0, count: 16)
-        guard swiftomniui_winui_projection(handle, &numbers) else { return nil }
+        guard swiftomniui_winui_projection(presentationHandle, &numbers) else { return nil }
         var tip = HostMatrix.identity
         (tip.m11, tip.m12, tip.m13, tip.m14) = (numbers[0], numbers[1], numbers[2], numbers[3])
         (tip.m21, tip.m22, tip.m23, tip.m24) = (numbers[4], numbers[5], numbers[6], numbers[7])
@@ -210,7 +210,7 @@ extension WinUIView {
     var drawnTransform: (translationX: Double, translationY: Double, rotation: Double,
                          scaleX: Double, scaleY: Double, centerX: Double, centerY: Double) {
         var values = [Double](repeating: 0, count: 7)
-        swiftomniui_winui_transform(handle, &values)
+        swiftomniui_winui_transform(presentationHandle, &values)
         return (values[0], values[1], values[2], values[3], values[4], values[5], values[6])
     }
 }

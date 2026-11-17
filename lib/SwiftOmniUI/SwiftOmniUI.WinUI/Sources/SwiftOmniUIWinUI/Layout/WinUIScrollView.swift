@@ -18,6 +18,9 @@ final class WinUIScrollView: WinUILayoutView {
     /// Asks for the display's frames: the scroller moves, or has something to say.
     var onFramesWanted: (() -> Void)?
 
+    /// Says the scroller's layout, content size, insets, or offset may have changed.
+    var onGeometryChanged: (() -> Void)?
+
     private(set) var orientation = Axis.vertical
 
     /// Where the scroller stands, in DIPs, as it last said.
@@ -309,6 +312,7 @@ final class WinUIScrollView: WinUILayoutView {
         guard standing != offset else { return }
         let previous = offset
         offset = standing
+        onGeometryChanged?()
 
         if let target = programTarget {
             programTarget = nil
@@ -426,6 +430,7 @@ final class WinUIScrollView: WinUILayoutView {
         super.detach()
         onOffsetChanged = nil
         onScrollStopped = nil
+        onGeometryChanged = nil
         onFramesWanted = nil
         scroller.detach()
     }
@@ -537,6 +542,19 @@ final class WinUIScrollView: WinUILayoutView {
         move(to: Point(x: place[0], y: place[1]))
     }
 
+    var scrollGeometryNumbers: [Double] {
+        let standing = scroller.standing.offset
+        let content = document.contentPlacedSize
+        let insets = document.layoutPadding
+        let container = scroller.placed
+        return [
+            standing.x, standing.y,
+            content.width, content.height,
+            insets.top, insets.left, insets.bottom, insets.right,
+            container?.width ?? 0, container?.height ?? 0,
+        ]
+    }
+
     /// Moves the scroller to `target`, kept within what it reaches, as the program's move; one already there is
     /// left alone, as the scroller would say nothing of it.
     private func move(to target: Point) {
@@ -549,5 +567,6 @@ final class WinUIScrollView: WinUILayoutView {
 
         programTarget = kept
         scroller.move(to: kept)
+        onGeometryChanged?()
     }
 }

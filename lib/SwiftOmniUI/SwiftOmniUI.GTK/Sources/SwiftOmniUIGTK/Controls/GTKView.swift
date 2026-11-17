@@ -28,7 +28,14 @@ class GTKView {
     /// Logical ancestry survives native toolbar hosting.
     weak var sourceElement: MountedElement?
     var safeAreaContext: SafeAreaContext? {
-        didSet { if safeAreaContext != oldValue { safeAreaChanged() } }
+        didSet {
+            guard safeAreaContext != oldValue else { return }
+            if let current = safeAreaContext,
+               (oldValue?.resizedLayout(to: current.layout) ?? SafeAreaContext(bounds: current.layout)) == current {
+                return
+            }
+            safeAreaChanged()
+        }
     }
     var rootSafeAreaContext: ((Rect) -> SafeAreaContext)?
 
@@ -108,8 +115,10 @@ class GTKView {
     }
 
     func layoutSafeArea(in bounds: Rect) -> SafeAreaContext {
-        (safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds))
-            .ignoring(sourceElement?.ignoresSafeArea)
+        let context = safeAreaContext ?? rootSafeAreaContext?(bounds) ?? SafeAreaContext(bounds: bounds)
+        // The inherited regions belong to the last allocation. Measurement
+        // probes and animation frames may already use a different proposal.
+        return context.resizedLayout(to: bounds).ignoring(sourceElement?.ignoresSafeArea)
     }
 
     /// Resolve arithmetic when a parent places this view, before native

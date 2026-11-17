@@ -284,6 +284,17 @@ public struct Node {
     /// A fixed frame owns view modifiers while its content keeps control members.
     var isFrameWrapper = false
 
+    /// Child slot index of a distributing modifier wrapper (`0` for frame/clip/overlay,
+    /// `1` for background, `nil` when the container does not distribute over fragments).
+    var fragmentContentIndex: Int?
+
+    /// Single-slot containers wrap multi-child (or decorated) `.fragment` children in an implicit stack.
+    var wrapsFragmentChildren = false
+
+    /// A composed container (such as a lazy stack or grid) that must keep its own element boundary
+    /// when enclosing wrappers probe for `.fragment` children.
+    var stopsFragmentDistribution = false
+
     /// The container's content, run when the differ describes this element; nil once
     /// run.
     /// Design: docs/design/core/identity-and-diffing.md#containers-run-their-own-content
@@ -390,6 +401,9 @@ public struct Node {
     /// preserves their storage when the authored value is rebuilt.
     var anchorBoxes: [AnchorBox] = []
 
+    /// Tap handlers registered on this node paired with their required tap counts.
+    var tapGestures: [(count: Int, explicit: Bool, handler: EventHandler)] = []
+
     /// The `.onPreferenceChange` listeners this node carries, in written
     /// order; the differ fires each whose key's folded answer moved.
     var preferenceObservers: [PreferenceObserver] = []
@@ -486,6 +500,46 @@ public struct Node {
         children: [Node] = []
     ) {
         self.init(type: Declaration.nodeType, id: id, children: children)
+    }
+
+    mutating func addTapGesture(count: Int?, _ handler: @escaping EventHandler) {
+        tapGestures.append((max(1, count ?? 1), count != nil, handler))
+        applyTapGestures()
+    }
+
+    mutating func mergeTapGestures(_ inherited: [(count: Int, explicit: Bool, handler: EventHandler)]) {
+        tapGestures.append(contentsOf: inherited)
+        applyTapGestures()
+    }
+
+    private mutating func applyTapGestures() {
+        guard !tapGestures.isEmpty else { return }
+        let entries = tapGestures
+        let distinct = Set(entries.map(\.count))
+        if distinct.count <= 1, let only = distinct.first {
+            if only != 1 || entries.contains(where: \.explicit) || props[.tapCount] != nil {
+                write(ViewContract.tapCount, only)
+            }
+        } else {
+            write(ViewContract.tapCount, 1)
+        }
+        events[.tapGesture] = {
+            let run = Int(EventBuffer.current.first?.number ?? 1)
+            let target: Int?
+            if distinct.count <= 1 {
+                target = distinct.first
+            } else if run <= 0 {
+                target = distinct.min()
+            } else if distinct.contains(run) {
+                target = run
+            } else {
+                target = distinct.filter { run % $0 == 0 }.max()
+            }
+            guard let target else { return }
+            for entry in entries where entry.count == target {
+                try await entry.handler()
+            }
+        }
     }
 }
 

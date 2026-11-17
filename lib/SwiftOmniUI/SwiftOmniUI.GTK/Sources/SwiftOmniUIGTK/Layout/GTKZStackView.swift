@@ -63,7 +63,7 @@ class GTKZStackView: GTKTravellingLayout {
             return apply(placements)
         }
 
-        beginArrangement(width: bounds.width)
+        beginArrangement(in: bounds)
         for item in items where item.view.nativeSafeBarOwner == nil { item.view.setPlacedDrawing(nil, opacity: 1) }
         insetContext = nil
         insetBase = nil
@@ -96,7 +96,11 @@ class GTKZStackView: GTKTravellingLayout {
             return
         }
         let room = Rect(x: 0, y: 0, width: bounds.width, height: bounds.height)
-        let places = ZStackArithmetic.places(of: items, in: room, padding: padding, direction: direction)
+        let decorationRoom: Rect? =
+            abs(bounds.width - allocatedBounds.width) > 0.5 || abs(bounds.height - allocatedBounds.height) > 0.5
+            ? allocatedBounds : nil
+        let places = ZStackArithmetic.places(
+            of: items, in: room, decorationRoom: decorationRoom, padding: padding, direction: direction)
         for (item, place) in zip(items, places) {
             if let place { self.place(item, at: place) }
         }
@@ -118,7 +122,8 @@ class GTKZStackView: GTKTravellingLayout {
     override func context(for child: GTKView, at place: Rect) -> SafeAreaContext {
         if sourceElement?.safeAreaInsetEdge != nil {
             if insetBase === child, let insetContext {
-                return insetContext.child(in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
+                return insetContext.resizedLayout(to: contextBounds).child(
+                    in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
             }
             // The inset's content receives the incoming edge proposal, not its
             // own contribution, so GeometryReader inside a bar cannot loop.

@@ -45,10 +45,16 @@ enum GTKTestHost {
     /// in a frame's layout. A window a test opens may stand behind another, where the desktop draws it no frames,
     /// so a test lays out without waiting for one.
     static func layOut(_ window: GTKWidget) {
-        guard let surface = gtk_native_get_surface(window.opaque) else { return pump(0.05) }
+        var surface = gtk_native_get_surface(window.opaque)
+        for _ in 0..<25 where gtk_widget_get_mapped(window) == 0 || surface == nil
+            || gdk_surface_get_width(surface) <= 1 || gdk_surface_get_height(surface) <= 1 {
+            pump(0.01)
+            surface = gtk_native_get_surface(window.opaque)
+        }
+        guard let surface else { return }
         let width = gdk_surface_get_width(surface)
         let height = gdk_surface_get_height(surface)
-        guard width > 0, height > 0 else { return pump(0.05) }
+        guard width > 0, height > 0 else { return }
 
         var values = [GValue](repeating: GValue(), count: 3)
         g_value_init(&values[0], gdk_surface_get_type())

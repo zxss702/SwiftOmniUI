@@ -18,6 +18,31 @@ class GTKTravellingLayout: GTKLayoutView {
     /// The arrangement that can place those rows is the one that must spend it, so it stands
     /// here in between.
     private var arrivalMotion: HostLayoutMotion?
+    var onConsumeTransition: (() -> Void)?
+    private var pendingPresentationFrame = false
+    private var pendingPresentedLanes: AnimationLanes = []
+    private var pendingPresentedItems: [UInt64: AnimationLanes] = [:]
+
+    func followsPresentationFrame(lanes: AnimationLanes = [], sample: Bool = true, item: UInt64? = nil) {
+        pendingPresentationFrame = pendingPresentationFrame || sample
+        if let item { pendingPresentedItems[item, default: []].formUnion(lanes) }
+        else { pendingPresentedLanes.formUnion(lanes) }
+    }
+
+    func takePresentedItems() -> [UInt64: AnimationLanes] {
+        defer { pendingPresentedItems.removeAll(keepingCapacity: true) }
+        return pendingPresentedItems
+    }
+
+    func takePresentedLanes() -> AnimationLanes {
+        defer { pendingPresentedLanes = [] }
+        return pendingPresentedLanes
+    }
+
+    func takePresentationFrame() -> Bool {
+        defer { pendingPresentationFrame = false }
+        return pendingPresentationFrame
+    }
 
     /// Keeps the motion a patch named. A patch that names none leaves the last one standing:
     /// the arrangement that will place the change is the one that spends it.
@@ -32,12 +57,22 @@ class GTKTravellingLayout: GTKLayoutView {
         return arrivalMotion
     }
 
-    func beginArrangement(width: Double) {
-        places.begin(width: width)
+    override var shouldArrangeInDestinationRoom: Bool {
+        places.willAnimate(arrivalMotion: arrivalMotion)
+            || items.contains { !$0.departing && $0.mount != 0 && (places.layoutMotion?.isTravelling(mount: $0.mount) ?? false) }
+    }
+
+    func beginArrangement(in bounds: Rect) {
+        onConsumeTransition?()
+        if let motion = takeArrivalMotion() { places.animation = motion }
+        places.begin(width: bounds.width, refining: true, height: bounds.height,
+                     followingPresentation: takePresentationFrame(), presentedLanes: takePresentedLanes(),
+                     presentedItems: takePresentedItems())
     }
 
     /// Stands `item` at `place`, or on its way there.
-    func place(_ item: GTKLayoutItem, at place: Rect) {
-        places.place(item.view, mount: item.mount, at: place, values: item.values, fadeIn: item.fadeIn)
+    func place(_ item: GTKLayoutItem, at place: Rect, arrivedFrom: Rect? = nil) {
+        places.place(item.view, mount: item.mount, at: place, values: item.values,
+                     fadeIn: item.fadeIn, arrivedFrom: arrivedFrom)
     }
 }

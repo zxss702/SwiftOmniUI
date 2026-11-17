@@ -37,6 +37,15 @@
         patched = true
     }
 
+    /// Whether a patch has queued an animating layout transition for the next arrangement.
+    public func willAnimate(arrivalMotion: HostLayoutMotion? = nil) -> Bool {
+        let resolved = arrivalMotion ?? animation
+        guard patched, arrangedWidth != nil, !framesRead,
+              !(resolved?.lanes.isEmpty ?? false),
+              layoutMotion?.law(of: resolved) != nil else { return false }
+        return true
+    }
+
     /// Starts an arrangement `width` wide, deciding once for every child how it is placed: what a patch said
     /// travels, what a new width gave arrives - as does everything while a frame under it is read.
     /// `anchorOffset` compensates a changed viewport origin without moving any layout destination.

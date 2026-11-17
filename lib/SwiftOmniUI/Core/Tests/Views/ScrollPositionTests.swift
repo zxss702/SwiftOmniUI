@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Foundation
-import SwiftOmniUICore
+@_spi(Host) @testable import SwiftOmniUICore
 import XCTest
 
 final class ScrollPositionTests: XCTestCase {
@@ -39,6 +39,27 @@ final class ScrollPositionTests: XCTestCase {
         position.scrollTo(id: "row")
         XCTAssertNil(position.point)
         XCTAssertEqual(position.viewID(type: String.self), "row")
+    }
+
+    @MainActor
+    func testScrollGeometryComputesBoundsVisibleRectAndAttachesHandler() {
+        var insets = EdgeInsets(0)
+        insets.top = 10
+        insets.left = 8
+        insets.bottom = 12
+        insets.right = 4
+        let geometry = ScrollGeometry(
+            contentOffset: CGPoint(x: 20, y: 30),
+            contentSize: CGSize(width: 400, height: 600),
+            contentInsets: insets,
+            containerSize: CGSize(width: 240, height: 180)
+        )
+        XCTAssertEqual(geometry.visibleRect, CGRect(x: 20, y: 30, width: 240, height: 180))
+        XCTAssertEqual(geometry.bounds, CGRect(x: -8, y: -10, width: 412, height: 622))
+
+        let view = ScrollView(.horizontal) { Text("item") }
+            .onScrollGeometryChange(for: Double.self) { $0.containerSize.width } action: { _, _ in }
+        XCTAssertNotNil(view.node.events[ScrollViewContract.scrollGeometryChanged.token])
     }
 }
 

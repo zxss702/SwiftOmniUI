@@ -20,7 +20,7 @@
 /// is left, and an `.adaptive` one stands for as many as fit - the host
 /// counts them for the room it has, and asks for the cells of the rows in
 /// view.
-public struct LazyVGrid: View {
+public struct LazyVGrid: View, FragmentDistributionBarrier {
     /// What the grid shows, as the builder described it.
     private let content: () -> any View
 
@@ -133,7 +133,7 @@ public struct LazyVGrid: View {
 ///     ScrollView(.horizontal) {
 ///         LazyHGrid(rows: [GridItem(.fixed(80)), GridItem(.fixed(80))]) { … }
 ///     }
-public struct LazyHGrid: View {
+public struct LazyHGrid: View, FragmentDistributionBarrier {
     /// What the grid shows, as the builder described it.
     private let content: () -> any View
 

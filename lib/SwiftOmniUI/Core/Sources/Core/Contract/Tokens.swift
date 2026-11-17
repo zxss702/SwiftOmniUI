@@ -435,6 +435,7 @@ extension NodeType {
     static let processTerminated = WebViewContract.processTerminated.token
     static let released = ButtonContract.released.token
     static let resumed = WindowSceneContract.resumed.token
+    static let scrollGeometryChanged = ScrollViewContract.scrollGeometryChanged.token
     static let scrollStopped = ScrollViewContract.scrollStopped.token
     static let scrollXChanged = ScrollViewContract.scrollXChanged.token
     static let scrollYChanged = ScrollViewContract.scrollYChanged.token

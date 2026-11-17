@@ -67,7 +67,7 @@ final class GTKGridView: GTKTravellingLayout {
     }
 
     override func arrange(in bounds: Rect) {
-        beginArrangement(width: bounds.width)
+        beginArrangement(in: bounds)
         let context = layoutSafeArea(in: bounds)
         if let element = sourceElement, element.isSafeAreaBoundary, let item = items.first(where: { !$0.departing }) {
             let next = context.padding(SafeAreaArithmetic.physicalInsets(element.safeAreaPadding ?? EdgeInsets(0), direction: direction))
@@ -95,7 +95,7 @@ final class GTKGridView: GTKTravellingLayout {
         }
     }
     override func context(for child: GTKView, at place: Rect) -> SafeAreaContext {
-        let context = layoutSafeArea(in: allocatedBounds)
+        let context = layoutSafeArea(in: contextBounds)
             .padding(SafeAreaArithmetic.physicalInsets(sourceElement?.safeAreaPadding ?? EdgeInsets(0), direction: direction))
         return context.child(in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
     }

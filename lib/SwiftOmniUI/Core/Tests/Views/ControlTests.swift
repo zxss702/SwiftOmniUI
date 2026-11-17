@@ -1584,6 +1584,26 @@ private struct ControlCase {
         XCTAssertEqual(clock, ClockTime(hour: 9, minute: 30))
     }
 
+    func testTransactionBindingOnTwoWayControlDeliversAnimationInsteadOfHostChannel() throws {
+        struct Probe: View {
+            @State var text = ""
+            var body: some View {
+                VStack {
+                    TextEditor(text: $text.transaction(Transaction(animation: .snappy))).id("editor")
+                    Text("box").frame(height: text.isEmpty ? 40 : 120).id("box")
+                }
+            }
+        }
+        let renders = Renders()
+        defer { Renderer.shared.clearInvalidation() }
+        let first = renders.render(Probe().node)
+        let editor = try XCTUnwrap(first.child("editor"))
+        XCTAssertNil(editor.driven, "transaction binding must take the described event path")
+        renders.fire(handler(editor, "textChanged"), with: [.string("hello")])
+        _ = Renderer.shared.renderHost(baseline: 0)
+        XCTAssertEqual(Renderer.shared.differ.transaction?.animation, .snappy)
+    }
+
     /// A value the PLATFORM moves - the scroller's offset, which the platform
     /// keeps read-only - comes back into the state as the host's own write: the host
     /// writes the image by the number the state was issued, and the state reads

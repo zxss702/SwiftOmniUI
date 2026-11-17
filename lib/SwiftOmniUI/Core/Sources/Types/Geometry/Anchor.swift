@@ -19,6 +19,10 @@ public struct Anchor<Value>: Sendable {
     /// The frame source the anchor watches.
     let box: AnchorBox
 
+    /// The box's generation when this anchor value was read, so preference
+    /// watches and equality checks see when a watched frame arrives or moves.
+    let version: Int
+
     /// How the watched frame becomes `Value`, given the resolving view's own
     /// frame in window coordinates.
     let read: @Sendable (Rect, Rect) -> Value
@@ -26,14 +30,15 @@ public struct Anchor<Value>: Sendable {
     /// An anchor over `box` reading through `read`.
     init(box: AnchorBox, read: @escaping @Sendable (Rect, Rect) -> Value) {
         self.box = box
+        self.version = box.version
         self.read = read
     }
 }
 
 extension Anchor: Equatable {
-    /// Two anchors agree when they watch the same element.
+    /// Two anchors agree when they watch the same element at the same frame generation.
     public static func == (one: Anchor, other: Anchor) -> Bool {
-        one.box.identity == other.box.identity
+        one.box.identity == other.box.identity && one.version == other.version
     }
 }
 
@@ -61,20 +66,37 @@ final class AnchorBox: @unchecked Sendable {
     private final class Storage {
         var frame: Rect?
         var document: FrameReport.Document?
+        var version = 0
     }
     private var storage = Storage()
 
     var identity: ObjectIdentifier { ObjectIdentifier(storage) }
+    var version: Int { storage.version }
 
     /// The last frame the host reported, in window coordinates.
     var frame: Rect? {
         get { storage.frame }
-        set { storage.frame = newValue; storage.document = nil }
+        set {
+            let changed = storage.frame != newValue || storage.document != nil
+            storage.frame = newValue
+            storage.document = nil
+            if changed { storage.version &+= 1 }
+        }
     }
 
-    func update(_ report: FrameReport) {
+    @discardableResult
+    func update(_ report: FrameReport) -> Bool {
+        let unchanged: Bool
+        if let existing = storage.document, let incoming = report.document, existing.identity == incoming.identity {
+            unchanged = existing.frame == incoming.frame
+        } else {
+            unchanged = storage.frame == report.global && storage.document == report.document
+        }
         storage.frame = report.global
         storage.document = report.document
+        guard !unchanged else { return false }
+        storage.version &+= 1
+        return true
     }
 
     func resolve<Value>(against report: FrameReport, read: (Rect, Rect) -> Value) -> Value {

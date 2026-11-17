@@ -82,7 +82,7 @@ final class GTKCustomLayoutView: GTKTravellingLayout {
 
     override func arrange(in bounds: Rect) {
         guard let arrangement else { return }
-        beginArrangement(width: bounds.width)
+        beginArrangement(in: bounds)
         let room = Rect(
             x: bounds.x + padding.left, y: bounds.y + padding.top,
             width: max(0, bounds.width - padding.left - padding.right),

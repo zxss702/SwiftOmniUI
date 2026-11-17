@@ -54,9 +54,13 @@ extension Differ {
         rendered: RenderedNode?,
         node: Node,
         forced: Bool = false,
-        sizesArrive: Bool = false
+        sizesArrive: Bool = false,
+        wrapFragmentChildren: Bool = false,
+        from start: Int = 0
     ) -> (node: RenderedNode, patch: HostPatch) {
-        var pass = ElementPass(id: id, rendered: rendered, node: node, forced: forced, sizesArrive: sizesArrive)
+        var pass = ElementPass(
+            id: id, rendered: rendered, node: node, forced: forced,
+            sizesArrive: sizesArrive, wrapFragmentChildren: wrapFragmentChildren, start: start)
         let outerValues = envValues
         let outerScene = sceneRecord
         let outsideFocusScope = inFocusedScope
@@ -70,15 +74,24 @@ extension Differ {
             if pass.inspected { Inspection.leave() }
         }
         if expandElement(&pass), let rendered { return carry(rendered, written: pass.node) }
+        distributeToFragmentIfNeeded(&pass)
         if pass.node.type == .fragment {
-            pass.node.children = pass.node.children.flatMap(\.asChildren).map { child in
-                var child = child
-                child.absorbFragmentWrites(of: pass.node, environments: false)
-                return child
+            let expanded = pass.node.children.flatMap(\.asChildren)
+            if pass.wrapFragmentChildren,
+               expanded.count != 1 || pass.node.props[.isLayoutDecoration] != nil {
+                pass.node.type = .vStack
+                pass.node.children = expanded
+                prepareElement(&pass)
+            } else {
+                pass.node.children = expanded.map { child in
+                    var child = child
+                    child.absorbFragmentWrites(of: pass.node, environments: false)
+                    return child
+                }
+                if let rendered, rendered.type != .fragment { forget(rendered) }
+                pass.previous = rendered?.type == .fragment ? rendered : nil
+                pass.patch = HostPatch(id: id, type: .fragment)
             }
-            if let rendered, rendered.type != .fragment { forget(rendered) }
-            pass.previous = rendered?.type == .fragment ? rendered : nil
-            pass.patch = HostPatch(id: id, type: .fragment)
         } else {
             prepareElement(&pass)
         }
@@ -94,7 +107,10 @@ extension Differ {
                 transaction = inherited
             }
             return reconcileChildren(of: pass.previous, node: pass.node, into: &pass.patch,
-                              sizesArrive: pass.node.type == .fragment ? sizesArrive : pass.node.childSizesArrive)
+                              sizesArrive: pass.node.type == .fragment ? sizesArrive : pass.node.childSizesArrive,
+                              wrapFragmentChildren: pass.node.type == .fragment
+                                  ? pass.wrapFragmentChildren
+                                  : (pass.node.wrapsFragmentChildren || pass.node.isFrameWrapper))
         }
         return finishElement(&pass, children: children)
     }
@@ -112,7 +128,9 @@ extension Differ {
         var views: [(
             type: String,
             boxes: [(path: String, box: StateBox)],
-            inputs: [(path: String, input: Input)])] = []
+            inputs: [(path: String, input: Input)],
+            placeholder: Node,
+            reads: Set<ObjectIdentifier>)] = []
 
         // How many times this element has been described, this time included.
         let builds = (rendered?.builds ?? 0) + 1
@@ -138,7 +156,7 @@ extension Differ {
         var pushed = node.environments.count
         defer { pass.pushed = pushed }
         envValues = envValues.overlaid(with: node.environmentValues)
-        let inputIsEnabled = envValues.isEnabled
+        var inputIsEnabled = envValues.isEnabled
         scope.append(contentsOf: node.environments)
 
         // What the element holds for its life - a page's session - handed back on every
@@ -177,6 +195,12 @@ extension Differ {
 
         // The frame the last body build ran under, for the container content below.
         var frame: BuildScope.Frame?
+
+        if pass.start > 0, let rendered, pass.start < rendered.views.count {
+            node = standOutside(
+                rendered, through: pass.start, pass: &pass, views: &views, seen: &seen,
+                inputIsEnabled: &inputIsEnabled, reads: &reads, pushed: &pushed, session: &session)
+        }
 
         // Unwraps nested placeholders, outermost first, until a real node comes out.
         while true {
@@ -217,7 +241,8 @@ extension Differ {
                 }
 
                 views.append((
-                    type: stateful.viewType, boxes: stateful.boxes, inputs: stateful.inputs))
+                    type: stateful.viewType, boxes: stateful.boxes, inputs: stateful.inputs,
+                    placeholder: node, reads: []))
 
                 // Slots resolve against everything provided so far, before the body builds.
                 stateful.resolve(from: scope, under: envValues)
@@ -231,27 +256,38 @@ extension Differ {
                     if let rendered = rendered, !forced, !describeAll, !stylesMoved,
                         let kept = rendered.views.first,
                         kept.type == stateful.viewType,
-                        rendered.reads.isDisjoint(with: changed),
                         rendered.seen == seen,
                         rendered.inputIsEnabled == inputIsEnabled,
                         let wrote = rendered.placeholder,
                         sameWriting(node, as: wrote),
                         Input.same(stateful.inputs, kept.inputs) {
-                        if Inspection.recording {
-                            inspected = Inspection.enter(
-                                stateful.viewType, .carried, element: id)
+                        if rendered.reads.isDisjoint(with: changed) {
+                            if Inspection.recording {
+                                inspected = Inspection.enter(
+                                    stateful.viewType, .carried, element: id)
+                            }
+
+                            pass.node = node
+                            return true
                         }
 
-                        pass.node = node
-                        return true
+                        // What moved was read by a view inside alone: the walk goes on from it.
+                        let start = Self.start(of: rendered, changed: changed)
+                        if start > 0, start < rendered.views.count {
+                            node = standOutside(
+                                rendered, through: start, pass: &pass, views: &views, seen: &seen,
+                                inputIsEnabled: &inputIsEnabled, reads: &reads, pushed: &pushed,
+                                session: &session)
+                            continue
+                        }
                     }
+                }
 
-                    if Inspection.recording {
-                        inspected = Inspection.enter(
-                            stateful.viewType,
-                            .built(reason(stateful, node: node, rendered: rendered, seen: seen)),
-                            element: id)
-                    }
+                if step == pass.builtFrom, Inspection.recording {
+                    inspected = Inspection.enter(
+                        stateful.viewType,
+                        .built(reason(stateful, node: node, rendered: rendered, seen: seen)),
+                        element: id)
                 }
 
                 let built = BuildScope.Frame(
@@ -266,9 +302,12 @@ extension Differ {
                 bodies.append(stateful.viewType)
                 entered += 1
 
-                node = ReadScope.observed(into: &reads) {
+                var read: Set<ObjectIdentifier> = []
+                node = ReadScope.observed(into: &read) {
                     BuildScope.within(built) { stateful.expand(over: node) }
                 }
+                reads.formUnion(read)
+                views[step].reads = read
                 pushed += node.environments.count
                 envValues = envValues.overlaid(with: node.environmentValues)
                 scope.append(contentsOf: node.environments)
@@ -335,6 +374,12 @@ extension Differ {
             let shallow = { () -> Node in
                 var made = node
                 made.materialize()
+                if made.type == .fragment, made.children.count > 1, made.lazyIdentity != nil,
+                   let row = made.props.removeValue(forKey: .lazyRowStack)?.numbers,
+                   let axis = row.first {
+                    made.type = axis == 0 ? .vStack : .hStack
+                    if row.count > 1 { made.write(StackBaseContract.spacing, row[1]) }
+                }
                 return made
             }
 
@@ -375,6 +420,237 @@ extension Differ {
         pass.lazySource = lazySource
         pass.authored = authored
         return false
+    }
+
+    /// Which of `rendered`'s views a walk for `changed` builds from: the outermost whose own body read what moved; the
+    /// innermost, where none did - the content a container runs, the values it wears.
+    /// Design: docs/design/core/identity-and-diffing.md#the-clean-walk
+    static func start(of rendered: RenderedNode, changed: Set<ObjectIdentifier>) -> Int {
+        rendered.views.firstIndex { !$0.reads.isDisjoint(with: changed) } ?? max(rendered.views.count - 1, 0)
+    }
+
+    /// The views of `rendered` outside its view `start` standing as they were built - their state, what they read,
+    /// and the environments they provided: the node the walk goes on from, the one holding that view.
+    /// Design: docs/design/core/identity-and-diffing.md#the-clean-walk
+    private func standOutside(
+        _ rendered: RenderedNode,
+        through start: Int,
+        pass: inout ElementPass,
+        views: inout [(
+            type: String,
+            boxes: [(path: String, box: StateBox)],
+            inputs: [(path: String, input: Input)],
+            placeholder: Node,
+            reads: Set<ObjectIdentifier>)],
+        seen: inout [ObjectIdentifier: ObjectIdentifier],
+        inputIsEnabled: inout Bool,
+        reads: inout Set<ObjectIdentifier>,
+        pushed: inout Int,
+        session: inout AnyObject?
+    ) -> Node {
+        views = Array(rendered.views.prefix(start))
+        seen = rendered.seen
+        inputIsEnabled = rendered.inputIsEnabled
+        pass.builtFrom = start
+        reads = []
+        for view in views {
+            reads.formUnion(view.reads)
+            if let record = view.placeholder.stateful?.scene, sceneRecord == nil { sceneRecord = record }
+        }
+        for view in rendered.views[1...start] {
+            pushed += view.placeholder.environments.count
+            envValues = envValues.overlaid(with: view.placeholder.environmentValues)
+            scope.append(contentsOf: view.placeholder.environments)
+            if let request = view.placeholder.session {
+                let object = rendered.session ?? request.make()
+                request.object = object
+                session = session ?? object
+                scope.append((key: request.type, object: object))
+                pushed += 1
+            }
+        }
+        return rendered.views[start].placeholder
+    }
+
+    /// Distributes enclosing modifier wrappers (`padding`, `frame`, `background`,
+    /// `overlay`, `clipShape`, ...) onto every child when their content — after
+    /// expanding any intervening composed views — evaluates to a `.fragment`.
+    private func distributeToFragmentIfNeeded(_ pass: inout ElementPass) {
+        let seeded = pass.builtFrom > 0
+            ? (pass.rendered?.distributedWrappers.filter { $0.beforeView <= pass.builtFrom } ?? [])
+            : []
+        guard pass.node.fragmentContentIndex != nil || !seeded.isEmpty else { return }
+
+        let savedEnv = envValues
+        let savedPushed = pass.pushed
+        let outerId = pass.authored.id
+        let outerKey = pass.authored.key
+        let outerLazyIdentity = pass.authored.lazyIdentity
+        let outerLazyRowStack = pass.authored.props[.lazyRowStack]?.numbers
+        var shells = seeded
+        var current = pass.node
+        var accumulatedEnv = pass.node.environmentValues
+
+        while true {
+            if let index = current.fragmentContentIndex,
+               current.children.indices.contains(index) {
+                var shell = current
+                shell.props.removeValue(forKey: .lazyRowStack)
+                shells.append((beforeView: pass.views.count, node: shell))
+                scope.append(contentsOf: current.environments)
+                pass.pushed += current.environments.count
+                envValues = envValues.overlaid(with: current.environmentValues)
+                accumulatedEnv = accumulatedEnv.overlaid(with: current.environmentValues)
+                if current.props[.isEnabled]?.bool == false { envValues.isEnabled = false }
+                current = current.children[index]
+                continue
+            }
+            if current.stateful != nil, !current.stopsFragmentDistribution {
+                let offset = pass.views.count
+                let slice: RenderedNode? = pass.rendered.flatMap { previous in
+                    guard previous.views.count > offset else { return nil }
+                    let kept = RenderedNode(
+                        id: previous.id,
+                        type: previous.type,
+                        props: previous.props,
+                        events: previous.events,
+                        key: previous.key,
+                        views: Array(previous.views.dropFirst(offset)),
+                        placeholder: nil,
+                        view: previous.view,
+                        reads: [],
+                        builds: previous.builds,
+                        provided: previous.provided,
+                        seen: previous.seen,
+                        children: [])
+                    kept.inputIsEnabled = previous.inputIsEnabled
+                    kept.session = previous.session
+                    return kept
+                }
+                var subPass = ElementPass(
+                    id: pass.id,
+                    rendered: slice,
+                    node: current,
+                    forced: true,
+                    sizesArrive: pass.sizesArrive,
+                    wrapFragmentChildren: pass.wrapFragmentChildren,
+                    start: 0)
+                subPass.seen = pass.seen
+                subPass.inputIsEnabled = pass.inputIsEnabled
+                subPass.session = pass.session
+                _ = expandElement(&subPass)
+                pass.views.append(contentsOf: subPass.views)
+                pass.pushed += subPass.pushed
+                pass.entered += subPass.entered
+                if subPass.enteredScene {
+                    if pass.enteredScene { sceneNodes.removeLast() }
+                    else { pass.enteredScene = true }
+                }
+                if subPass.inspected {
+                    if pass.inspected { Inspection.leave() }
+                    else { pass.inspected = true }
+                }
+                pass.reads.formUnion(subPass.reads)
+                // Both counts derive from the same previous build count: summing them
+                // doubled the counter on every re-render until it overflowed.
+                pass.builds = max(pass.builds, subPass.builds)
+                pass.seen = subPass.seen
+                pass.inputIsEnabled = subPass.inputIsEnabled
+                pass.session = pass.session ?? subPass.session
+                if pass.within == nil { pass.within = subPass.within }
+                accumulatedEnv = accumulatedEnv.overlaid(with: subPass.node.environmentValues)
+                current = subPass.node
+                continue
+            }
+            break
+        }
+
+        guard current.type == .fragment else {
+            if pass.views.isEmpty && seeded.isEmpty {
+                scope.removeLast(pass.pushed - savedPushed)
+                pass.pushed = savedPushed
+                envValues = savedEnv
+                return
+            }
+            var rebuilt = Self.wrapLeaf(current, in: shells)
+            rebuilt.id = outerId
+            rebuilt.key = outerKey
+            rebuilt.lazyIdentity = outerLazyIdentity
+            rebuilt.environmentValues = accumulatedEnv
+            pass.node = rebuilt
+            if rebuilt.lazyWindow == nil { pass.lazySource = nil }
+            pass.key = outerKey
+            pass.placeholder = pass.placeholder ?? pass.authored
+            pass.distributedWrappers = shells
+            pass.patch = HostPatch(id: pass.id, type: pass.node.type)
+            return
+        }
+
+        let wrapped = Self.expandedFragmentLeaves(of: current).map { Self.wrapLeaf($0, in: shells) }
+
+        if let stack = outerLazyRowStack, !stack.isEmpty, outerLazyIdentity != nil, wrapped.count > 1 {
+            var row = Node(type: stack[0] == 1 ? .hStack : .vStack, children: wrapped)
+            if stack.count > 1 { row.write(StackBaseContract.spacing, stack[1]) }
+            row.id = outerId
+            row.key = outerKey
+            row.lazyIdentity = outerLazyIdentity
+            row.environmentValues = accumulatedEnv
+            pass.node = row
+            prepareElement(&pass)
+        } else {
+            var fragment = Node(type: .fragment, children: wrapped)
+            fragment.id = outerId
+            fragment.key = outerKey
+            fragment.lazyIdentity = outerLazyIdentity
+            fragment.environmentValues = accumulatedEnv
+            pass.node = fragment
+        }
+        pass.key = outerKey
+        pass.placeholder = pass.placeholder ?? pass.authored
+        pass.distributedWrappers = shells
+        pass.patch = HostPatch(id: pass.id, type: pass.node.type)
+    }
+
+    private static func expandedFragmentLeaves(of fragment: Node) -> [Node] {
+        var materialized = fragment
+        materialized.materialize()
+        return materialized.children.flatMap(\.asChildren).flatMap { rawChild -> [Node] in
+            var dressed = rawChild
+            for (property, member) in materialized.inheritedMembers {
+                dressed.inherit(property, member: member)
+            }
+            dressed.absorbFragmentWrites(of: materialized)
+            if dressed.type == .fragment {
+                return expandedFragmentLeaves(of: dressed)
+            }
+            return [dressed]
+        }
+    }
+
+    private static func wrapLeaf(_ leaf: Node, in shells: [(beforeView: Int, node: Node)]) -> Node {
+        let leafId = leaf.id
+        let leafKey = leaf.key
+        let leafLazy = leaf.lazyIdentity
+        var wrapped = leaf
+        wrapped.id = nil
+        wrapped.key = nil
+        for (_, shell) in shells.reversed() {
+            var node = shell
+            node.id = nil
+            node.key = nil
+            node.lazyIdentity = nil
+            if let index = node.fragmentContentIndex, node.children.indices.contains(index) {
+                node.children[index] = wrapped
+                for (property, member) in node.inheritedMembers {
+                    node.children[index].inherit(property, member: member)
+                }
+            }
+            wrapped = node
+        }
+        wrapped.id = leafId
+        wrapped.key = leafKey
+        wrapped.lazyIdentity = leafLazy
+        return wrapped
     }
 
     @inline(never)
@@ -420,7 +696,10 @@ extension Differ {
                     EventBuffer.current, by: "textFrameChanged", as: [Double].self),
                     let report = FrameReport(numbers)
                 else { return }
-                anchorBox.update(report)
+                if anchorBox.update(report) {
+                    box.version &+= 1
+                    Renderer.shared.setNeedsTextPreferenceRender(for: box)
+                }
             }
             node.preferenceSeeds.append(PreferenceSeed(
                 box: PreferenceKeyBox(Text.LayoutKey.self), lazy: { [box, anchorBox] in
@@ -548,10 +827,10 @@ extension Differ {
             if transacting?.disablesAnimations == true { return .none }
             if transacting?.isGeometryFeedback == true, !values.isDisjoint(with: .size) { return .none }
 
-            let resolved = (plan?.animation(for: values, armed: armed) ?? .inherited)
-                .resolved(against: standing)
+            let selected = plan?.animation(for: values, armed: armed) ?? .inherited
+            let resolved = selected.resolved(against: standing)
 
-            if !armed.isEmpty { return resolved }
+            if !armed.isEmpty, !selected.isInherited { return resolved }
             if let override = transacting?.animation, !resolved.isCustom { return override }
 
             return resolved
@@ -775,6 +1054,8 @@ extension Differ {
             result.environmentValues = node.environmentValues
             result.inputIsEnabled = inputIsEnabled
             result.lazyIdentity = node.lazyIdentity
+            result.wrapFragmentChildren = pass.wrapFragmentChildren
+            result.distributedWrappers = pass.distributedWrappers
             // Its writes and listeners fanned out into the children above; what
             // a parent's fold reads of it is theirs alone.
             result.preferenceValues = foldedPreferences(seeds: [], transforms: [], children: children)
@@ -900,6 +1181,7 @@ extension Differ {
         result.lazySourceReads = sourceReads
         result.lazyIdentity = node.lazyIdentity
         result.lazyRequestGeneration = node.lazyRequestGeneration
+        result.distributedWrappers = pass.distributedWrappers
         result.shapePath = node.shapePath
         result.shapeSize = pass.shapeSize
         result.shapeReads = pass.shapeReads
@@ -908,6 +1190,7 @@ extension Differ {
         result.drawingBodyReads = drawingBodyReads
         node.canvas?.owner = result
         result.sizesArrive = pass.sizesArrive
+        result.wrapFragmentChildren = pass.wrapFragmentChildren
         result.visualInput = pass.visualInput
         result.visualState = pass.visualState
         result.preferenceSeeds = node.preferenceSeeds
@@ -1123,11 +1406,19 @@ private struct ElementPass {
     var node: Node
     let forced: Bool
     let sizesArrive: Bool
+    let wrapFragmentChildren: Bool
+    let start: Int
+    var builtFrom: Int
     var inspected = false
     var pushed = 0
     var entered = 0
     var enteredScene = false
-    var views: [(type: String, boxes: [(path: String, box: StateBox)], inputs: [(path: String, input: Input)])] = []
+    var views: [(
+        type: String,
+        boxes: [(path: String, box: StateBox)],
+        inputs: [(path: String, input: Input)],
+        placeholder: Node,
+        reads: Set<ObjectIdentifier>)] = []
     var key: String?
     var builds = 0
     var placeholder: Node?
@@ -1152,13 +1443,20 @@ private struct ElementPass {
     var tasks: [MountedTask] = []
     var events: [Event: Int] = [:]
     var driven: [Prop: StateEntry] = [:]
+    var distributedWrappers: [(beforeView: Int, node: Node)] = []
 
-    init(id: ElementId, rendered: RenderedNode?, node: Node, forced: Bool, sizesArrive: Bool) {
+    init(
+        id: ElementId, rendered: RenderedNode?, node: Node, forced: Bool,
+        sizesArrive: Bool, wrapFragmentChildren: Bool, start: Int
+    ) {
         self.id = id
         self.rendered = rendered
         self.node = node
         self.forced = forced
         self.sizesArrive = sizesArrive
+        self.wrapFragmentChildren = wrapFragmentChildren
+        self.start = start
+        builtFrom = start
         authored = node
         patch = HostPatch(id: id, type: node.type)
     }

@@ -14,7 +14,9 @@ extension View {
     ///
     /// The whole view answers, not a button inside it.
     public func onTapGesture(_ handler: @escaping EventHandler) -> ModifiedContent {
-        hearing(ViewContract.tapGesture, handler)
+        revised {
+            $0.addTapGesture(count: nil, handler)
+        }
     }
 
     /// The same, for a double tap or more: `count` taps in a row.
@@ -25,8 +27,7 @@ extension View {
         _ handler: @escaping EventHandler
     ) -> ModifiedContent {
         revised {
-            $0.write(ViewContract.tapCount, count)
-            $0.addHandler(ViewContract.tapGesture.token, handler)
+            $0.addTapGesture(count: count, handler)
         }
     }
 

@@ -19,6 +19,7 @@
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
+#include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Windows.UI.Xaml.Interop.h>
 
 using namespace swiftomniui;
@@ -26,6 +27,7 @@ using winrt::Windows::Foundation::Size;
 namespace peers = winrt::Microsoft::UI::Xaml::Automation::Peers;
 namespace provider = winrt::Microsoft::UI::Xaml::Automation::Provider;
 namespace composition = winrt::Microsoft::UI::Composition;
+namespace input = winrt::Microsoft::UI::Xaml::Input;
 using winrt::Windows::Foundation::Rect;
 
 namespace {
@@ -545,10 +547,10 @@ extern "C" void swiftomniui_winui_panel_set_children(
         held.reserve(count);
         for (int32_t index = 0; index < count; ++index) held.push_back(as<xaml::UIElement>(children[index]));
         if (sameChildren(items, held)) return;
-        xaml::UIElement focused{ nullptr };
-        for (auto const &child : held) {
-            if (holdsFocus(child)) { focused = child; break; }
-        }
+        auto root = owner.XamlRoot();
+        auto focused = root
+            ? input::FocusManager::GetFocusedElement(root).try_as<xaml::UIElement>()
+            : nullptr;
         // A lazy window usually changes at its edges. Keep the intersecting
         // UIElements attached, preserving their native state and composition.
         // Only inserted elements can belong to another panel. Querying native

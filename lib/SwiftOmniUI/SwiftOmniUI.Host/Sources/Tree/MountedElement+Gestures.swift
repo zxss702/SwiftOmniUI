@@ -30,7 +30,7 @@ extension MountedElement {
         switch input {
         case .tap(let run):
             let count = max(1, Int(number(.tapCount) ?? 1))
-            if run == 0 || run % count == 0 { send(.tapGesture, [], in: runtime) }
+            if run == 0 || run % count == 0 { send(.tapGesture, [.number(Double(run))], in: runtime) }
         case .pointer(let event, let point):
             let said: [HostValue] = event == .pointerEntered || event == .pointerExited ? [] : [.numbers([point.x, point.y])]
             send(event, said, in: runtime)

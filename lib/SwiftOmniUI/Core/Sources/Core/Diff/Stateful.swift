@@ -466,7 +466,11 @@ extension Node {
             node.animation = AnimationPlan.merged(node.animation, under: written.animation)
 
             for (name, handler) in written.events.sorted(by: { $0.key < $1.key }) {
+                if name == .tapGesture, !written.tapGestures.isEmpty { continue }
                 node.addHandler(name, handler)
+            }
+            if !written.tapGestures.isEmpty {
+                node.mergeTapGestures(written.tapGestures)
             }
 
             // Its own watches first, then what was written on it - one order every render.
@@ -502,7 +506,11 @@ extension Node {
             child.animation = AnimationPlan.merged(child.animation, under: written.animation)
 
             for (name, handler) in written.events.sorted(by: { $0.key < $1.key }) {
+                if name == .tapGesture, !written.tapGestures.isEmpty { continue }
                 child.addHandler(name, handler)
+            }
+            if !written.tapGestures.isEmpty {
+                child.mergeTapGestures(written.tapGestures)
             }
 
             child.watches += written.watches
@@ -625,7 +633,11 @@ extension Node {
         animation = AnimationPlan.merged(animation, under: fragment.animation)
 
         for (name, handler) in fragment.events.sorted(by: { $0.key < $1.key }) {
+            if name == .tapGesture, !fragment.tapGestures.isEmpty { continue }
             addHandler(name, handler)
+        }
+        if !fragment.tapGestures.isEmpty {
+            mergeTapGestures(fragment.tapGestures)
         }
 
         watches += fragment.watches

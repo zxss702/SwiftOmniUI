@@ -180,18 +180,57 @@ class GTKLayoutView: GTKPanelView {
         return measurements.size(offering: offered) { contentSize(width: offered) }.height
     }
 
+    private(set) var arrangementRoom: LayoutSize?
+
+    var shouldArrangeInDestinationRoom: Bool { false }
+
+    var contextBounds: Rect {
+        guard let placed else { return allocatedBounds }
+        return Rect(
+            x: 0,
+            y: 0,
+            width: abs(allocatedBounds.width - placed.width) <= 0.51 ? placed.width : allocatedBounds.width,
+            height: abs(allocatedBounds.height - placed.height) <= 0.51 ? placed.height : allocatedBounds.height
+        )
+    }
+
+    func activeArrangementRoom(in bounds: Rect) -> Rect {
+        guard let destination = arrangementRoom else { return bounds }
+        if abs(destination.width - bounds.width) <= 0.5 && abs(destination.height - bounds.height) <= 0.5 {
+            return bounds
+        }
+        if shouldArrangeInDestinationRoom {
+            return Rect(0, 0, destination.width, destination.height)
+        }
+        arrangementRoom = nil
+        return bounds
+    }
+
+    override func travels(to destination: Rect?) {
+        arrangementRoom = destination.map { LayoutSize(width: $0.width, height: $0.height) }
+    }
+
     /// Answers GTK's allocation: places every child in `width` by `height`, inside the allocation.
     override func allocate(width: Double, height: Double) {
         GTKView.allocating += 1
         defer { GTKView.allocating -= 1 }
         allocatedBounds = Rect(0, 0, width, height)
-        arrange(in: Rect(x: 0, y: 0, width: width, height: height))
+        let room = activeArrangementRoom(in: allocatedBounds)
+        arrange(in: room)
         holdDeparting()
+    }
+
+    override func safeAreaChanged() {
+        super.safeAreaChanged()
+        forgetMeasurements()
+        if GTKView.allocating > 0 || allocatedBounds.width > 0 || allocatedBounds.height > 0 {
+            gtk_widget_queue_allocate(widget)
+        }
     }
 
     /// Stands every child riding its removal transition where it last stood: it takes no room, but GTK
     /// allocates each child it draws in every allocation, and its transition draws over that place.
-    private func holdDeparting() {
+    func holdDeparting() {
         for item in items where item.departing { item.view.layout(item.view.placedFrame) }
     }
 
@@ -205,7 +244,7 @@ class GTKLayoutView: GTKPanelView {
     /// Context inherited by a placed child. Special modifiers override this;
     /// ordinary overlays only inherit the region and reserve no space.
     func context(for child: GTKView, at place: Rect) -> SafeAreaContext {
-        layoutSafeArea(in: allocatedBounds).child(
+        layoutSafeArea(in: contextBounds).child(
             in: place, preservingOutsets: child.sourceElement?.observesSafeArea == true)
     }
 

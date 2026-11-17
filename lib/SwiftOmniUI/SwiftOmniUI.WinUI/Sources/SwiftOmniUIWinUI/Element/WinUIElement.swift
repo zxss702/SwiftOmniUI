@@ -268,7 +268,9 @@ final class WinUIElement: NativeElement {
             declared = owner.element.parent?.enclosing(type: .contextMenu)
         }
         refreshContextMenu()
-        if let view { host?.runtime.frames.follow(self, order: view.number, reads: readsFrame) }
+        if let view {
+            host?.runtime.frames.follow(self, order: view.number, reads: readsFrame)
+        }
     }
 
     func presentFrame(_ changed: Set<Prop>) {
@@ -278,9 +280,26 @@ final class WinUIElement: NativeElement {
         applyProperties(changed: changed, followingPresentation: true)
     }
 
+    private func recordMatchedGeometrySourceIfNeeded() {
+        guard !hasLeftTree,
+              let key = element.value(.matchedGeometry)?.string,
+              element.value(.matchedGeometrySource)?.bool != false,
+              let view, let layoutMotion = host?.runtime.layoutMotion else { return }
+        let windowOrigin = view.origin
+        let placed = view.placedFrame
+        let actual = view.laidOutFrame
+        let frame = Rect(
+            x: windowOrigin.x,
+            y: windowOrigin.y,
+            width: placed.width > 0 ? placed.width : actual.width,
+            height: placed.height > 0 ? placed.height : actual.height)
+        _ = layoutMotion.recordMatchedGeometrySource(frame, for: key)
+    }
+
     func departureChanged() {
         if let view {
             if element.isDeparting {
+                recordMatchedGeometrySourceIfNeeded()
                 var frame = view.placedFrame
                 var ancestor = element.parent
                 while let parent = ancestor {
@@ -306,6 +325,7 @@ final class WinUIElement: NativeElement {
         // MountedElement leaves parents before descendants. Only the root of
         // a removed subtree can change the surviving layout; descendants still
         // release their callbacks but must not enqueue those dead ancestors.
+        if !element.isDeparting { recordMatchedGeometrySourceIfNeeded() }
         if parent?.hasLeftTree != true { layoutItemChanged() }
         hasLeftTree = true
         if let view { host?.runtime.frames.follow(self, order: view.number, reads: false) }

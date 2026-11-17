@@ -73,17 +73,18 @@
                             max(0, frame.height + outsets.top + outsets.bottom))
         let used = preservingOutsets ? EdgeInsets(0) : outsets
         let proposal = preservingOutsets ? extended : frame
-        // A region covering an entire child axis has zero unsafe contribution
-        // there. Keep that axis exactly equal to the child's proposal instead
-        // of retaining distant parent endpoints whose cancellation changes on
-        // resize. Preserve actual unsafe edges, including offscreen regions.
+        // Clip any overlapping axis to `proposal` so parent extent outside the
+        // child never leaks `-frame.origin` into `.safeAreaPadding` on an ULP
+        // shortfall, while preserving completely disjoint offscreen regions.
         func localRegion(_ region: Rect) -> Rect {
-            let across = region.x <= proposal.x && region.x + region.width >= proposal.x + proposal.width
-            let down = region.y <= proposal.y && region.y + region.height >= proposal.y + proposal.height
-            return Rect((across ? proposal.x : region.x) - frame.x,
-                        (down ? proposal.y : region.y) - frame.y,
-                        across ? proposal.width : region.width,
-                        down ? proposal.height : region.height)
+            let xClipped = Self.intersection(region, Rect(proposal.x, region.y, proposal.width, region.height))
+            let yClipped = Self.intersection(region, Rect(region.x, proposal.y, region.width, proposal.height))
+            let overlapX = region.x + region.width > proposal.x && proposal.x + proposal.width > region.x
+            let overlapY = region.y + region.height > proposal.y && proposal.y + proposal.height > region.y
+            return Rect((overlapX ? xClipped.x : region.x) - frame.x,
+                        (overlapY ? yClipped.y : region.y) - frame.y,
+                        overlapX ? xClipped.width : region.width,
+                        overlapY ? yClipped.height : region.height)
         }
         return Self(bounds: local(proposal),
                     layout: Rect(0, 0, frame.width, frame.height),
@@ -202,14 +203,14 @@ extension MountedElement {
     /// accepts the safe allocation while observing the remaining contributions.
     public var preservesSafeAreaProposal: Bool {
         if isGeometryReader { return false }
-        if isSafeAreaBoundary || type == .scrollView { return true }
+        if isSafeAreaBoundary || type == .scrollView || type == .list { return true }
         return safeAreaForwardedChild?.preservesSafeAreaProposal == true
     }
 
     /// Transparent wrappers, including unpadded single-child stacks, forward
     /// the safe-area environment. Ordinary content placed safely consumes it.
     public var observesSafeArea: Bool {
-        if isSafeAreaBoundary || isGeometryReader || type == .scrollView { return true }
+        if isSafeAreaBoundary || isGeometryReader || type == .scrollView || type == .list { return true }
         return safeAreaForwardedChild?.observesSafeArea == true
     }
 

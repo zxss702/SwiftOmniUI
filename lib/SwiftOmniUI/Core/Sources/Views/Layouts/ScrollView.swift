@@ -96,7 +96,8 @@ public struct ScrollView: VisualElement, PaddingElement, BorderElement, ScrollVi
     /// when the differ reaches the scroller.
     public init(@ViewBuilder content: @escaping () -> any View) {
         node = Node(contract: ScrollViewContract.self)
-        node.producer = { content().node.asChildren }
+        node.wrapsFragmentChildren = true
+        node.producer = { [content().node] }
     }
 
     /// A scroller along `axes` - `.horizontal`, `.vertical` or both - around

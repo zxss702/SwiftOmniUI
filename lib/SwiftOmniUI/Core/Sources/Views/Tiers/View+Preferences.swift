@@ -65,13 +65,13 @@ extension View {
         transform: @escaping (Anchor<A>) -> K.Value
     ) -> ModifiedContent {
         let box = AnchorBox()
-        let anchor: Anchor<A>
+        let read: @Sendable (Rect, Rect) -> A
 
         switch value.kind {
         case .bounds:
             // `.bounds` is the only source kind; the read makes a `Rect`, and
             // `A` is `Rect` wherever this case runs - the cast holds.
-            anchor = Anchor<A>(box: box) { frame, reader in
+            read = { frame, reader in
                 // swiftlint:disable:next force_cast
                 Rect(frame.x - reader.x, frame.y - reader.y, frame.width, frame.height) as! A
             }
@@ -81,14 +81,17 @@ extension View {
             // The host's own frame reports keep the anchor's answer current.
             node.anchorBoxes.append(box)
             node.addHandler(.frameChanged) {
-                guard let numbers = MemberValues.carried(
-                    EventBuffer.current, by: "frameChanged", as: [Double].self),
-                    let report = FrameReport(numbers)
-                else { return }
-                box.update(report)
+                let raw = EventBuffer.current
+                let numbers = MemberValues.carried(raw, by: "frameChanged", as: [Double].self)
+                let report = numbers.flatMap { FrameReport($0) }
+                guard let report else { return }
+                let changed = box.update(report)
+                if changed {
+                    Renderer.shared.setNeedsAnchorPreferenceRender(for: box)
+                }
             }
             node.preferenceSeeds.append(PreferenceSeed(
-                box: PreferenceKeyBox(K.self), value: transform(anchor)))
+                box: PreferenceKeyBox(K.self), lazy: { [box] in transform(Anchor<A>(box: box, read: read)) }))
         }
     }
 
@@ -159,7 +162,7 @@ extension View {
 /// observer that writes the folded answer into a state the layer reads, so
 /// the layer builds again whenever the answer moves - as `GeometryReader`
 /// rebuilds from its frame reports.
-private struct PreferenceBacked<K: PreferenceKey, Base: View, Content: View>: View {
+private struct PreferenceBacked<K: PreferenceKey, Base: View, Content: View>: View, FragmentDistributionBarrier {
     /// The last folded answer, `K.defaultValue` until the first fold lands.
     @State private var value: K.Value
 
@@ -185,13 +188,12 @@ private struct PreferenceBacked<K: PreferenceKey, Base: View, Content: View>: Vi
 
     var body: some View {
         let heard = base.onPreferenceChange(K.self) { value = $0 }
-        return Group {
-            if over {
-                heard.overlay { PreferenceLayer<K, Content>(value: $value, transform: transform) }
-            } else {
-                heard.background { PreferenceLayer<K, Content>(value: $value, transform: transform) }
-            }
-        }
+        return Layered(
+            base: heard,
+            layer: PreferenceLayer<K, Content>(value: $value, transform: transform),
+            alignment: .center,
+            over: over,
+            distributesFragments: false)
     }
 }
 

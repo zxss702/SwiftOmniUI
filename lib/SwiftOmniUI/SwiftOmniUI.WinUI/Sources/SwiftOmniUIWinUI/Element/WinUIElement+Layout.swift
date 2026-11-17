@@ -102,6 +102,7 @@ extension WinUIElement {
             // What a departing element passes up departs with it.
             guard var item = children.lazy.compactMap(\.layoutItem).first else { return nil }
             if element.isDeparting { item.departing = true; item.isShown = false }
+            if item.matchedGeometry == nil { item.matchedGeometry = element.value(.matchedGeometry)?.string }
             return item
         }
 
@@ -110,6 +111,7 @@ extension WinUIElement {
         item.element = element
         item.mount = element.mount
         item.codeId = element.id
+        item.matchedGeometry = element.value(.matchedGeometry)?.string
         item.departing = element.isDeparting
         if fadesIn {
             item.fadeIn = { [weak self] animation, room in self?.fadeIn(under: animation, room: room) }

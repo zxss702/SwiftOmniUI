@@ -14,8 +14,10 @@ extension WinUIElement: FrameReporter {
 
     /// Says where the element stands, where that changed (`MountedElement.reportFrame`).
     func reportFrame() {
-        guard let host, let view, view.isAttached else { return }
-        let frame = view.laidOutFrame
+        guard let host, let view else { return }
+        let layoutGeneration = host.runtime.frames.layoutGeneration
+        guard view.isAttached(forLayoutGeneration: layoutGeneration) else { return }
+        let frame = view.laidOutFrame(forLayoutGeneration: layoutGeneration)
         // Retained navigation pages have no current layout. Their temporary
         // empty attachment must not replace a reader's last real proposal.
         if element.isGeometryReader, frame.width <= 0 || frame.height <= 0 { return }
@@ -29,12 +31,18 @@ extension WinUIElement: FrameReporter {
         let named = element.handler(.namedFramesChanged) == nil ? [] : element.namedSpaceFrames { ancestor in
             guard let ancestorView = (ancestor.native as? WinUIElement)?.view else { return nil }
             let origin = ancestorView.origin
-            let frame = ancestorView.laidOutFrame
+            let frame = ancestorView.laidOutFrame(forLayoutGeneration: layoutGeneration)
             return Rect(x: origin.x, y: origin.y, width: frame.width, height: frame.height)
         }
+        if let scroll = view as? WinUIScrollView, element.events[.scrollGeometryChanged] != nil {
+            element.reportScrollGeometry(scroll.scrollGeometryNumbers, in: host.runtime)
+        }
+        let reportGeneration = host.runtime.frames.reportGeneration
         element.reportFrame(
-            view.frameReport(safeArea: host.safeArea(of: element), frame: frame,
-                             cache: host.frameReportCache, generation: host.runtime.frames.reportGeneration),
+            view.frameReport(
+                safeArea: host.frameReportCache.safeArea(of: element, in: host, generation: reportGeneration),
+                frame: frame,
+                cache: host.frameReportCache, generation: reportGeneration),
             named: named, in: host.runtime,
             geometryInsets: view.safeAreaContext?.insets)
     }

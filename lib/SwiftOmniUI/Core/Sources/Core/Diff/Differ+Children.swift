@@ -15,7 +15,8 @@ extension Differ {
         node: Node,
         into patch: inout HostPatch,
         sizesArrive: Bool,
-        keepingLazyRows: Bool = false
+        keepingLazyRows: Bool = false,
+        wrapFragmentChildren: Bool = false
     ) -> [RenderedNode] {
         let rendered = previous?.children ?? []
 
@@ -85,7 +86,8 @@ extension Differ {
                 // while still visiting any state changes inside its subtree.
                 revisit(match, walking: false)
             } else {
-                element(id: id, rendered: match, node: childNode, sizesArrive: sizesArrive)
+                element(id: id, rendered: match, node: childNode,
+                        sizesArrive: sizesArrive, wrapFragmentChildren: wrapFragmentChildren)
             }
 
             // A fragment anchors its subtree here but mounts no element of its

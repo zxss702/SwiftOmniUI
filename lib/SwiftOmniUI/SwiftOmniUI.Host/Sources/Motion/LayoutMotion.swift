@@ -70,12 +70,43 @@ extension PlacedView {
     private let now: () -> Double
     private let reducesMotion: () -> Bool
     private var seats: [UInt64: Seat] = [:]
+    private var matchedGeometrySources: [String: (frame: Rect, serial: UInt64)] = [:]
+    private var matchedGeometrySerial: UInt64 = 0
 
     /// The application's animation, which a layout that says nothing of its own animates under.
     public var applicationMotion: Animation = .none
 
     /// Called when an animation starts, so the frame clock is held while it runs.
     public var onStart: () -> Void = {}
+
+    /// Whether this element already owns a placement seat.
+    public func hasSeat(for mount: UInt64) -> Bool {
+        seats[mount] != nil
+    }
+
+    /// Records the window-coordinate frame of a departing/leaving matched-geometry source
+    /// so an incoming view in the same turn can fly from its visual origin.
+    @discardableResult
+    public func recordMatchedGeometrySource(_ frame: Rect, for key: String) -> UInt64 {
+        matchedGeometrySerial &+= 1
+        let serial = matchedGeometrySerial
+        if Self.isReal(frame) {
+            matchedGeometrySources[key] = (frame, serial)
+        }
+        return serial
+    }
+
+    /// Returns the recorded window-coordinate source frame and its serial for `key`, if any.
+    public func matchedGeometrySource(for key: String) -> (frame: Rect, serial: UInt64)? {
+        matchedGeometrySources[key]
+    }
+
+    /// Clears a recorded matched-geometry source when `serial` still matches (after layout settles).
+    public func clearMatchedGeometrySource(for key: String, serial: UInt64) {
+        if matchedGeometrySources[key]?.serial == serial {
+            matchedGeometrySources.removeValue(forKey: key)
+        }
+    }
 
     /// Whether this mounted row still has a presentation journey to finish.
     public func isTravelling(mount: UInt64) -> Bool {

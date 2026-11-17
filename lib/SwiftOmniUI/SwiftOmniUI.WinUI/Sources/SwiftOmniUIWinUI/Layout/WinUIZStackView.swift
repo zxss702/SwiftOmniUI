@@ -131,6 +131,8 @@ class WinUIZStackView: WinUITravellingLayout {
         beginArrangement(in: bounds)
         for item in items where item.view.nativeSafeBarOwner == nil { item.view.setPlacedDrawing(nil, opacity: 1) }
         let byView = Dictionary(uniqueKeysWithValues: items.map { ($0.view.number, $0) })
+        let useAllocatedDecorations = abs(bounds.width - allocatedBounds.width) > 0.5
+            || abs(bounds.height - allocatedBounds.height) > 0.5
         for proposal in preparedLayoutPlan(in: bounds) {
             if let background = safeAreaBackground, proposal.view === background {
                 background.setPlacedDrawing(nil, opacity: 1)
@@ -138,7 +140,14 @@ class WinUIZStackView: WinUITravellingLayout {
                 continue
             }
             guard let view = proposal.view, let item = byView[view.number] else { continue }
-            let place = proposal.place
+            let place: Rect
+            if useAllocatedDecorations, item.values.isLayoutDecoration,
+               let decorated = ZStackArithmetic.places(
+                of: [item], in: allocatedBounds, padding: padding, direction: direction).first ?? nil {
+                place = decorated
+            } else {
+                place = proposal.place
+            }
             if item.view.nativeSafeBarOwner != nil, item.view !== insetBase,
                sourceElement?.safeAreaInsetEdge != nil {
                 item.view.recordSafeBarPlace(place, context: SafeAreaContext(bounds: Rect(0, 0, place.width, place.height)))

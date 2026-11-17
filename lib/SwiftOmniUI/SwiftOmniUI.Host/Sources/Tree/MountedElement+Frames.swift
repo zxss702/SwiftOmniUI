@@ -48,6 +48,7 @@ extension MountedElement {
     public var readsOwnFrame: Bool {
         driven[.frame] != nil || events[.frameChanged] != nil
             || events[.namedFramesChanged] != nil || events[.safeAreaInsetsChanged] != nil
+            || events[.scrollGeometryChanged] != nil
             || events[.textFrameChanged] != nil || events[.drawingSizeChanged] != nil
     }
 
@@ -55,7 +56,8 @@ extension MountedElement {
     public var readsOnlyDrawingSize: Bool {
         events[.drawingSizeChanged] != nil && driven[.frame] == nil
             && events[.frameChanged] == nil && events[.namedFramesChanged] == nil
-            && events[.safeAreaInsetsChanged] == nil && events[.textFrameChanged] == nil
+            && events[.safeAreaInsetsChanged] == nil && events[.scrollGeometryChanged] == nil
+            && events[.textFrameChanged] == nil
     }
 
     /// Commits a changed local allocation size, leaving full coordinate reports untouched.
@@ -63,6 +65,17 @@ extension MountedElement {
         guard size != reportedDrawingSize, let handler = handler(.drawingSizeChanged) else { return }
         reportedDrawingSize = size
         runtime.dispatch(handler, payload: [.numbers([size.width, size.height])])
+    }
+
+    /// Reports changed scroll geometry, carrying both previous and current 10-number tuples once established.
+    public func reportScrollGeometry(_ numbers: [Double], in runtime: HostRuntime) {
+        guard numbers.count == 10, numbers != reportedScrollGeometry,
+              let handler = handler(.scrollGeometryChanged)
+        else { return }
+        let previous = reportedScrollGeometry
+        reportedScrollGeometry = numbers
+        let payload = previous.count == 10 ? previous + numbers : numbers
+        runtime.dispatch(handler, payload: [.numbers(payload)])
     }
 
     /// Says where the element stands - `numbers`, a frame report's ten, and the named spaces enclosing it -

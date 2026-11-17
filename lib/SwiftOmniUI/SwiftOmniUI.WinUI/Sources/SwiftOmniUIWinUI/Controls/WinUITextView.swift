@@ -119,6 +119,8 @@ class WinUITextView: WinUIView {
         WinUIDoorbell.afterMetadata {
             let labels = Self.pendingTextLayouts
             Self.pendingTextLayouts = []
+            WinUIRenderer.shared?.runtime.frames.laidOut()
+            WinUIRenderer.shared?.runtime.frames.commitLayout()
             TextLayoutBatch(labels).advance()
         }
     }
@@ -154,7 +156,11 @@ class WinUITextView: WinUIView {
                 break
             }
             if index < labels.count {
-                WinUIDoorbell.afterMetadata { self.advance() }
+                WinUIDoorbell.afterMetadata {
+                    WinUIRenderer.shared?.runtime.frames.laidOut()
+                    WinUIRenderer.shared?.runtime.frames.commitLayout()
+                    self.advance()
+                }
                 return
             }
             let publish = {

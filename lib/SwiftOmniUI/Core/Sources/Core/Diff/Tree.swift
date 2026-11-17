@@ -68,12 +68,15 @@ final class RenderedNode {
     var drawingBodyReads: Set<ObjectIdentifier> = []
 
     /// The composed views this element was built by, outermost first: each one's
-    /// type, its state boxes by path, and what it was built with.
+    /// type, its state boxes by path, what it was built with, the placeholder node
+    /// that held it, and what its own body read.
     /// Design: docs/design/core/identity-and-diffing.md#state-survives-a-rebuild
     var views: [(
         type: String,
         boxes: [(path: String, box: StateBox)],
-        inputs: [(path: String, input: Input)])]
+        inputs: [(path: String, input: Input)],
+        placeholder: Node,
+        reads: Set<ObjectIdentifier>)]
 
     /// What stood in for this element's subtree, kept so the clean walk can build it
     /// again without the parent; nil for a leaf.
@@ -147,7 +150,13 @@ final class RenderedNode {
     /// which rebuilds the folded answers from them and its children.
     var preferenceSeeds: [PreferenceSeed] = []
 
-    var anchorBoxes: [AnchorBox] = []
+    var anchorBoxes: [AnchorBox] = [] {
+        didSet {
+            let before = Set(oldValue.map(\.identity))
+            let after = Set(anchorBoxes.map(\.identity))
+            Renderer.shared.index(self, adding: after.subtracting(before), removing: before.subtracting(after))
+        }
+    }
 
     /// The `.transformPreference` rewrites of this element's offer, same
     /// keeping.
@@ -186,6 +195,12 @@ final class RenderedNode {
     /// Whether its sizes arrive at once because its layout is measured - kept for
     /// the clean walk.
     var sizesArrive = false
+
+    /// Whether a single-slot parent wraps `.fragment` children in an implicit stack.
+    var wrapFragmentChildren = false
+
+    /// Distributing wrappers peeled outside each view expansion when distributing to a fragment.
+    var distributedWrappers: [(beforeView: Int, node: Node)] = []
 
     /// The properties driven to a state, as the host was told them.
     var driven: [Prop: StateEntry] = [:]
@@ -231,7 +246,9 @@ final class RenderedNode {
         views: [(
             type: String,
             boxes: [(path: String, box: StateBox)],
-            inputs: [(path: String, input: Input)])] = [],
+            inputs: [(path: String, input: Input)],
+            placeholder: Node,
+            reads: Set<ObjectIdentifier>)] = [],
         placeholder: Node? = nil,
         view: String? = nil,
         reads: Set<ObjectIdentifier> = [],
@@ -279,6 +296,7 @@ final class RenderedNode {
 
     deinit {
         if let textLayoutBox { Renderer.shared.unindex(self, reading: [textLayoutBox.preferenceIdentity]) }
+        if !anchorBoxes.isEmpty { Renderer.shared.unindex(self, reading: Set(anchorBoxes.map(\.identity))) }
         if !reads.isEmpty {
             Renderer.shared.unreading(reads)
             Renderer.shared.unindex(self, reading: reads)

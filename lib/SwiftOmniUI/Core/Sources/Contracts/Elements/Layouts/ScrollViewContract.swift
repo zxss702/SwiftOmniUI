@@ -53,6 +53,9 @@ public enum ScrollViewContract: ElementContract {
     @_spi(Host) public static let positionRequest = ElementProperty<Self, ScrollPositionRequest>(
         "scrollPositionRequest", layer: .native, travels: false)
 
+    @_spi(Host) public static let scrollGeometryChanged = ElementEvent<Self, [Double]>(
+        "scrollGeometryChanged", layer: .native)
+
     /// The scroller came to rest.
     public static let scrollStopped = ElementEvent<Self, Void>("scrollStopped", layer: .native)
 
@@ -74,7 +77,7 @@ public enum ScrollViewContract: ElementContract {
     /// The element's own members.
     public static let members: [any ContractMember] = [
         defaultScrollAnchor, horizontalScrollIndicators, isScrollDisabled, orientation, scrollBounceAxes,
-        scrollBounceBehavior, scrollOffset, scrollStopped, scrollTargetBehavior, scrollToDescendant,
-        scrollXChanged, scrollYChanged, verticalScrollIndicators, positionRequest,
+        scrollBounceBehavior, scrollGeometryChanged, scrollOffset, scrollStopped, scrollTargetBehavior,
+        scrollToDescendant, scrollXChanged, scrollYChanged, verticalScrollIndicators, positionRequest,
     ]
 }

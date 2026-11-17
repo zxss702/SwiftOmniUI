@@ -92,30 +92,55 @@ public struct Layered<Base: View, Content: View>: View {
     /// `layer` over `base`; under it where false.
     let over: Bool
 
+    /// Whether fragment distribution crosses this layer into `base`.
+    var distributesFragments: Bool = true
+
     /// The two as a ZStack - `alignment` the layer's alone: the base keeps the
     /// room it fills where `.overlay(alignment: .bottom)` stands its layer at
     /// the bottom without dragging the base along. The default tokens carry
     /// it, so a layer naming its own alignment - a shape's `.fill` among
     /// them - keeps it through expansion.
     public var body: some View {
-        var layer = layer.node
-        layer.props[.isLayoutDecoration] = true.propValue
-        if layer.props[.horizontalAlignment] == nil
-            && layer.props[.horizontalAlignmentDefault] == nil {
-            layer.props[.horizontalAlignmentDefault] = alignment.horizontal.axis.propValue
+        var layerNode = layer.node
+        layerNode.props[.isLayoutDecoration] = true.propValue
+        if layerNode.props[.horizontalAlignment] == nil
+            && layerNode.props[.horizontalAlignmentDefault] == nil {
+            layerNode.props[.horizontalAlignmentDefault] = alignment.horizontal.axis.propValue
         }
-        if layer.props[.verticalAlignment] == nil
-            && layer.props[.verticalAlignmentDefault] == nil {
-            layer.props[.verticalAlignmentDefault] = alignment.vertical.axis.propValue
+        if layerNode.props[.verticalAlignment] == nil
+            && layerNode.props[.verticalAlignmentDefault] == nil {
+            layerNode.props[.verticalAlignmentDefault] = alignment.vertical.axis.propValue
         }
-        return ZStack {
-            if over {
-                base
-                layer
-            } else {
-                layer
-                base
+        let isOver = over
+        let contentIndex = isOver ? 0 : 1
+        let node: Node
+        if distributesFragments {
+            node = base.node.mappingLayoutLeaves { leaf in
+                var baseLeaf = leaf
+                let leafId = baseLeaf.id
+                let leafKey = baseLeaf.key
+                baseLeaf.id = nil
+                baseLeaf.key = nil
+                var wrapper = Node(contract: ZStackContract.self)
+                wrapper.fragmentContentIndex = contentIndex
+                wrapper.id = leafId
+                wrapper.key = leafKey
+                wrapper.children = isOver ? [baseLeaf, layerNode] : [layerNode, baseLeaf]
+                leaf = wrapper
             }
+        } else {
+            var baseNode = base.node
+            let baseId = baseNode.id
+            let baseKey = baseNode.key
+            baseNode.id = nil
+            baseNode.key = nil
+            var wrapper = Node(contract: ZStackContract.self)
+            wrapper.wrapsFragmentChildren = true
+            wrapper.id = baseId
+            wrapper.key = baseKey
+            wrapper.children = isOver ? [baseNode, layerNode] : [layerNode, baseNode]
+            node = wrapper
         }
+        return ModifiedContent(node: node)
     }
 }

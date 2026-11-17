@@ -30,7 +30,7 @@ final class GTKStackView: GTKTravellingLayout {
     }
 
     override func arrange(in bounds: Rect) {
-        beginArrangement(width: bounds.width)
+        beginArrangement(in: bounds)
         let places = StackArithmetic.places(
             of: items, axis: axis, spacing: spacing, padding: padding, in: bounds, direction: direction)
         for (item, place) in zip(items, places) {

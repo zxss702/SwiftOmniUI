@@ -208,6 +208,86 @@ private struct Tabbed: View {
     }
 }
 
+@MainActor
+private final class StackedBuilds {
+    var outer = 0
+    var inner = 0
+    var raise: () -> Void = {}
+}
+
+private struct Holding: View {
+    let builds: StackedBuilds
+
+    var body: some View {
+        builds.outer += 1
+        return Raising(builds: builds)
+    }
+}
+
+private struct Raising: View {
+    let builds: StackedBuilds
+    @State private var level = 0
+
+    var body: some View {
+        builds.inner += 1
+        let level = $level
+        builds.raise = { level.wrappedValue += 1 }
+        return Text("\(self.level)")
+    }
+}
+
+private struct Middle: View {
+    let builds: StackedBuilds
+    let middleBuilds: StackedBuilds
+    @State private var step = 0
+
+    var body: some View {
+        middleBuilds.outer += 1
+        let step = $step
+        middleBuilds.raise = { step.wrappedValue += 1 }
+        return Raising(builds: builds).id(self.step)
+    }
+}
+
+private struct Three: View {
+    let builds: StackedBuilds
+    let middleBuilds: StackedBuilds
+    let outerBuilds: StackedBuilds
+
+    var body: some View {
+        outerBuilds.outer += 1
+        return Middle(builds: builds, middleBuilds: middleBuilds)
+    }
+}
+
+@MainActor
+private final class Greeting {
+    var words = "hello"
+}
+
+private struct Providing: View {
+    let builds: StackedBuilds
+    let greeting: Greeting
+
+    var body: some View {
+        builds.outer += 1
+        return Greeted(builds: builds).environment(greeting)
+    }
+}
+
+private struct Greeted: View {
+    let builds: StackedBuilds
+    @Environment var greeting: Greeting
+    @State private var level = 0
+
+    var body: some View {
+        builds.inner += 1
+        let level = $level
+        builds.raise = { level.wrappedValue += 1 }
+        return Text("\(greeting.words) \(self.level)")
+    }
+}
+
 @MainActor final class InvalidationTests: XCTestCase {
     override func setUp() {
         super.setUp()
@@ -219,6 +299,47 @@ private struct Tabbed: View {
     private var changed: Set<ObjectIdentifier> { Renderer.shared.pendingChanges }
 
     // MARK: - The clean walk
+
+    func testTheViewABodyEndsOnIsBuiltForItsOwnStateAlone() {
+        let renders = Renders()
+        let builds = StackedBuilds()
+        renders.render(Holding(builds: builds).node)
+        XCTAssertEqual([builds.outer, builds.inner], [1, 1])
+
+        builds.raise()
+        let patch = renders.revisit(changed: changed)
+
+        XCTAssertEqual(builds.inner, 2, "the inner body, for what it read")
+        XCTAssertEqual(builds.outer, 1, "and not the outer one, which read nothing of it")
+        XCTAssertEqual(patch.subtree.first { $0.type == .text }?.props[.text], .string("1"))
+    }
+
+    func testOfThreeViewsAWriteBuildsFromTheOutermostThatReadIt() {
+        let renders = Renders()
+        let (inner, middle, outer) = (StackedBuilds(), StackedBuilds(), StackedBuilds())
+        renders.render(Three(builds: inner, middleBuilds: middle, outerBuilds: outer).node)
+
+        inner.raise()
+        _ = renders.revisit(changed: changed)
+        Renderer.shared.clearInvalidation()
+        XCTAssertEqual([outer.outer, middle.outer, inner.inner], [1, 1, 2], "the inner one's state: it alone")
+
+        middle.raise()
+        _ = renders.revisit(changed: changed)
+        XCTAssertEqual([outer.outer, middle.outer], [1, 2], "the middle one's: it and what it holds, never the outer")
+    }
+
+    func testAViewBuiltAloneSeesWhatTheViewsOutsideItProvided() {
+        let renders = Renders()
+        let builds = StackedBuilds()
+        renders.render(Providing(builds: builds, greeting: Greeting()).node)
+
+        builds.raise()
+        let patch = renders.revisit(changed: changed)
+
+        XCTAssertEqual([builds.outer, builds.inner], [1, 2])
+        XCTAssertEqual(patch.subtree.first { $0.type == .text }?.props[.text], .string("hello 1"))
+    }
 
     func testACleanWalkDoesNotRefoldUnrelatedMountedBranches() {
         for count in [10, 1_000] {

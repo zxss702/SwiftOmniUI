@@ -3,8 +3,9 @@
 
 import CSwiftOmniUIWinUI
 @_spi(Host) import SwiftOmniUICore
-@_spi(Host) import SwiftOmniUIHost
+@_spi(Host) @testable import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
+import SwiftOmniUIConformance
 import XCTest
 
 final class WinUISidebarLifecycleTests: XCTestCase {
@@ -172,5 +173,121 @@ final class WinUISidebarLifecycleTests: XCTestCase {
 
     @MainActor private static func read(_ property: String, from view: WinUIView) -> String {
         WinUIStrings.read { swiftomniui_winui_read(view.handle, property, $0, $1) }
+    }
+
+    func testSidebarTabSwitchTransitionAndPill() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let tab = State(wrappedValue: 0)
+            let columns = State(wrappedValue: NavigationSplitViewVisibility.all)
+            let ns = Namespace().wrappedValue
+            let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(columnVisibility: columns.projectedValue) {
+                    VStack {
+                        Group {
+                            switch tab.wrappedValue {
+                            case 0:
+                                ScrollView {
+                                    LazyVStack(spacing: 0) {
+                                        ForEach(0..<40) { i in
+                                            Text("File \(i)").frame(height: 28)
+                                        }
+                                    }
+                                }
+                                .id("tab-0")
+                            case 1:
+                                List(0..<20, id: \.self) { i in
+                                    Text("Search \(i)")
+                                }
+                                .id("tab-1")
+                            default:
+                                ScrollView {
+                                    VStack {
+                                        Text("Git")
+                                    }
+                                }
+                                .id("tab-2")
+                            }
+                        }
+                        .transition(.blur.combined(with: .scale(scale: 1.01, anchor: .top)).animation(.snappy))
+                    }
+                    .frame(maxHeight: .infinity)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        HStack(spacing: 4) {
+                            ForEach(0..<3, id: \.self) { idx in
+                                Button {
+                                    withAnimation(.bouncy) { tab.wrappedValue = idx }
+                                } label: {
+                                    Text("T\(idx)")
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                        .background {
+                                            if tab.wrappedValue == idx {
+                                                Color.clear
+                                                    .frame(height: 32)
+                                                    .background(Color.white, in: Capsule(style: .continuous))
+                                                    .matchedGeometryEffect(id: "sideBarButton", in: ns)
+                                                    .id("pill-\(idx)")
+                                            }
+                                        }
+                                }
+                            }
+                        }
+                        .frame(height: 32)
+                        .padding(8)
+                    }
+                } detail: {
+                    Text("Detail")
+                }
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let t0Before = try XCTUnwrap(host.view(id: .manual("tab-0")))
+            let pill0Before = try XCTUnwrap(host.view(id: .manual("pill-0")))
+            let vstackBefore = try XCTUnwrap(t0Before.sourceElement?.parent?.winUI.view)
+            let beforeOriginX = pill0Before.origin.x
+            XCTAssertEqual(t0Before.frame.y, 0, accuracy: 0.5)
+            XCTAssertEqual(vstackBefore.frame.height, 700, accuracy: 0.5)
+
+            withAnimation(.bouncy) { tab.wrappedValue = 1 }
+            host.runtime.pump.turn()
+            let t1AfterTurn = try XCTUnwrap(host.view(id: .manual("tab-1")))
+            XCTAssertNotNil(t1AfterTurn.sourceElement?.transition)
+
+            var originsX: [Double] = []
+            var t1Opacities: [Double] = []
+            for _ in 0..<8 {
+                clock.now += 16
+                host.step()
+                host.frame()
+                let t0 = host.view(id: .manual("tab-0"))
+                let t1 = try XCTUnwrap(host.view(id: .manual("tab-1")))
+                let p1 = try XCTUnwrap(host.view(id: .manual("pill-1")))
+                if let t0 {
+                    XCTAssertEqual(t0.frame.y, 0, accuracy: 0.5, "departing scroll tab must remain aligned under safeAreaInset")
+                    XCTAssertEqual(t0.frame.height, 700, accuracy: 0.5)
+                }
+                XCTAssertEqual(t1.frame.y, 0, accuracy: 0.5)
+                XCTAssertEqual(t1.frame.height, 700, accuracy: 0.5)
+                XCTAssertEqual(vstackBefore.frame.height, 700, accuracy: 0.5)
+                t1Opacities.append(t1.opacity)
+                originsX.append(p1.origin.x)
+            }
+
+            XCTAssertLessThan(t1Opacities[0], 0.2, "entering List must start its transition from low opacity")
+            XCTAssertGreaterThan(t1Opacities.last ?? 0, t1Opacities[0] + 0.15, "entering List must fade in across frames")
+            XCTAssertEqual(originsX[0], beforeOriginX, accuracy: 2.0, "matchedGeometry pill must launch from the previous pill's origin")
+            XCTAssertGreaterThan(originsX.last ?? 0, originsX[0] + 10, "matchedGeometry pill must travel smoothly toward target button")
+
+            for _ in 0..<45 {
+                clock.now += 16
+                host.step()
+                host.frame()
+            }
+            let settledT1 = try XCTUnwrap(host.view(id: .manual("tab-1")))
+            let settledPill = try XCTUnwrap(host.view(id: .manual("pill-1")))
+            XCTAssertEqual(settledT1.opacity, 1.0, accuracy: 0.02)
+            XCTAssertEqual(settledT1.blur, 0.0, accuracy: 0.05)
+            XCTAssertGreaterThan(settledPill.origin.x, beforeOriginX + 60)
+            XCTAssertEqual(settledPill.placedFrame.x, 0, accuracy: 0.5)
+        }
     }
 }

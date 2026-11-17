@@ -278,6 +278,8 @@ class GTKTextView: GTKPanelView {
         GTKDoorbell.afterLayout {
             let labels = Self.pendingTextLayouts
             Self.pendingTextLayouts = []
+            GTKRenderer.shared?.runtime.frames.laidOut()
+            GTKRenderer.shared?.runtime.frames.commitLayout()
             let publish = {
                 for label in labels {
                     label.textLayoutPending = false

@@ -269,6 +269,9 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_blur_make(SwiftOmniUIObjectRef
         shown.Opacity(element.Opacity());
         shown.RenderTransform(element.RenderTransform());
         shown.Projection(element.Projection());
+        if (placed.ActualWidth() > 0 || placed.ActualHeight() > 0) {
+            made->size = Size{static_cast<float>(placed.ActualWidth()), static_cast<float>(placed.ActualHeight())};
+        }
         if (slot) slot(nullptr);
         try {
             made->source.Children().Append(element);

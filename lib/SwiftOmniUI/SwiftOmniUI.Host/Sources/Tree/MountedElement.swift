@@ -84,6 +84,12 @@ import CRT
     public var animation: HostLayoutMotion? { placementTransition ?? configuredAnimation }
     private var configuredAnimation: HostLayoutMotion?
     private var placementTransition: HostLayoutMotion?
+    private var placementTransitionPending = false
+
+    /// Marks the pending placement transition as consumed by its layout pass.
+    public func consumePlacementTransition() {
+        placementTransitionPending = false
+    }
 
     /// Whether this element's frame, or any frame under it, is read.
     public private(set) var framesRead = false
@@ -108,6 +114,7 @@ import CRT
 
     /// The frame report this element last said, which a report the same says again to nobody.
     var reportedFrame: [Double] = []
+    var reportedScrollGeometry: [Double] = []
     var reportedSafeAreaInsets: EdgeInsets?
 
     /// The named spaces the element last reported enclosing it.
@@ -118,6 +125,11 @@ import CRT
 
     /// Where the states a press dragged carries stood as it began.
     var dragStart = Point(x: 0, y: 0)
+
+    /// Sizing properties whose intermediate changes re-run enclosing layout; deferred when layout itself animates.
+    private static let layoutTransitionInputs: Set<Prop> = [
+        .width, .height, .minimumWidth, .maximumWidth, .minimumHeight, .maximumHeight, .padding,
+    ]
 
     /// The toolkit's half of the element.
     public private(set) var native: (any NativeElement)!
@@ -227,11 +239,29 @@ import CRT
         }
         if let transition = patch.layoutTransition {
             placementTransition = transition
+            placementTransitionPending = true
         } else if !isLazyRun || patch.lazyContentChanged || patch.lazyRows != nil || changed.contains(.items) {
-            // A deferred lazy realization completes the same data change. Keep
-            // its timing until that data is replaced, rather than losing it in
-            // the intervening viewport-only render.
-            placementTransition = nil
+            let replacesChild: Bool = {
+                if case .changed(let childPatches) = patch.children { return childPatches.contains { $0.replace } }
+                return false
+            }()
+            let isArrangedPatch: Bool = {
+                if case .arranged = patch.children { return true }
+                return false
+            }()
+            // A descendant-only state turn (such as List.realizedChanged during Measure)
+            // walks through an unarranged ancestor with a forwarding patch. Keep an
+            // unconsumed placement transition until this layout's own arrange pass runs.
+            if !placementTransitionPending || isLazyRun || isArrangedPatch || replacesChild
+                || !patch.properties.isEmpty || !patch.clearedProperties.isEmpty
+                || patch.customLayoutChanged || patch.lazyContentChanged || patch.lazyRows != nil
+                || changed.contains(.items) {
+                // A deferred lazy realization completes the same data change. Keep
+                // its timing until that data is replaced, rather than losing it in
+                // the intervening viewport-only render.
+                placementTransition = nil
+                placementTransitionPending = false
+            }
         }
 
         if case .unchanged = patch.children {
@@ -305,16 +335,21 @@ import CRT
 
         // Most newly realized Text/Image properties are static. Only a patch
         // carrying transitions or an existing mount's motion needs this walk.
+        let isLazyParent = parent?.type == .lazyVStack || parent?.type == .lazyHStack
+            || parent?.type == .lazyVGrid || parent?.type == .lazyHGrid
+        let layoutAnimatedAbove = parent?.animation != nil && !isLazyParent
+            && (parent?.parent?.animation != nil || (parent?.type != .zStack && (parent?.children.count ?? 0) > 1))
         let motionProperties = patch.transitions.isEmpty && !tree.hasPropertyMotions(on: mount)
             ? [] : changed.sorted()
         for property in motionProperties {
             let hasDrivenPresentation = driven[property].map { $0.mode != .in } ?? false
+            let defersToLayout = layoutAnimatedAbove && Self.layoutTransitionInputs.contains(property)
             tree.receiveProperty(
                 mount: mount,
                 property: property,
                 standing: standing[property],
                 target: resolvedValue(property),
-                animation: hasDrivenPresentation || !native.animates(property)
+                animation: hasDrivenPresentation || defersToLayout || !native.animates(property)
                     ? nil
                     : patch.transitions[property]?.animation)
         }

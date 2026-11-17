@@ -21,6 +21,9 @@ extension GTKElement: FrameReporter {
             return
         }
         guard let host, let numbers = view?.frameReport() else { return }
+        if let scroll = view as? GTKScrollView, element.events[.scrollGeometryChanged] != nil {
+            element.reportScrollGeometry(scroll.scrollGeometryNumbers, in: host.runtime)
+        }
         let named = element.namedSpaceFrames { ($0.native as? GTKElement)?.view?.windowRect() }
         element.reportFrame(numbers, named: named, in: host.runtime,
                             geometryInsets: view?.safeAreaContext?.insets)

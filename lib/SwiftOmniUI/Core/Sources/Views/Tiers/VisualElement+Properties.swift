@@ -19,13 +19,26 @@ extension Node {
         var content = self
         let fillsAcross = content.props[.horizontalAlignment]?.enumeration == AxisAlignment.fill.rawValue
         let fillsDown = content.props[.verticalAlignment]?.enumeration == AxisAlignment.fill.rawValue
+        let boundedAcross = content.props[.width] != nil || content.driven[.width] != nil
+            || (content.props[.maximumWidth]?.number.map { $0 < .infinity } ?? false)
+        let boundedDown = content.props[.height] != nil || content.driven[.height] != nil
+            || (content.props[.maximumHeight]?.number.map { $0 < .infinity } ?? false)
         self = Node(contract: GridContract.self)
         isFrameWrapper = true
+        fragmentContentIndex = 0
         for property: Prop in [.gridRow, .gridColumn, .gridRowSpan, .gridColumnSpan, .area,
             .flex, .layoutPriority, .horizontalGuide, .verticalGuide,
             .horizontalAlignment, .verticalAlignment, .horizontalAlignmentDefault, .verticalAlignmentDefault] {
             props[property] = content.props.removeValue(forKey: property)
             driven[property] = content.driven.removeValue(forKey: property)
+        }
+        if fillsAcross && boundedAcross {
+            props.removeValue(forKey: .horizontalAlignment)
+            driven.removeValue(forKey: .horizontalAlignment)
+        }
+        if fillsDown && boundedDown {
+            props.removeValue(forKey: .verticalAlignment)
+            driven.removeValue(forKey: .verticalAlignment)
         }
         id = content.id
         key = content.key
@@ -575,11 +588,13 @@ extension View {
         alignment: Alignment = .center
     ) -> ModifiedContent {
         revised { node in
-            node.wrapPaddedFrame(alignment: alignment)
-            if let width { node.write(VisualElementContract.width, width) }
-            if let height { node.write(VisualElementContract.height, height) }
-            node.write(ViewContract.horizontalContentAlignment, alignment.horizontal.axis)
-            node.write(ViewContract.verticalContentAlignment, alignment.vertical.axis)
+            node = node.mappingLayoutLeaves {
+                $0.wrapPaddedFrame(alignment: alignment)
+                if let width { $0.write(VisualElementContract.width, width) }
+                if let height { $0.write(VisualElementContract.height, height) }
+                $0.write(ViewContract.horizontalContentAlignment, alignment.horizontal.axis)
+                $0.write(ViewContract.verticalContentAlignment, alignment.vertical.axis)
+            }
         }
     }
 
@@ -596,13 +611,15 @@ extension View {
         alignment: Alignment = .center
     ) -> ModifiedContent {
         revised { node in
-            node.wrapPaddedFrame(alignment: alignment)
-            if let minWidth { node.write(VisualElementContract.minimumWidth, minWidth) }
-            if let maxWidth { node.write(VisualElementContract.maximumWidth, maxWidth) }
-            if let minHeight { node.write(VisualElementContract.minimumHeight, minHeight) }
-            if let maxHeight { node.write(VisualElementContract.maximumHeight, maxHeight) }
-            node.write(ViewContract.horizontalContentAlignment, alignment.horizontal.axis)
-            node.write(ViewContract.verticalContentAlignment, alignment.vertical.axis)
+            node = node.mappingLayoutLeaves {
+                $0.wrapPaddedFrame(alignment: alignment)
+                if let minWidth { $0.write(VisualElementContract.minimumWidth, minWidth) }
+                if let maxWidth { $0.write(VisualElementContract.maximumWidth, maxWidth) }
+                if let minHeight { $0.write(VisualElementContract.minimumHeight, minHeight) }
+                if let maxHeight { $0.write(VisualElementContract.maximumHeight, maxHeight) }
+                $0.write(ViewContract.horizontalContentAlignment, alignment.horizontal.axis)
+                $0.write(ViewContract.verticalContentAlignment, alignment.vertical.axis)
+            }
         }
     }
 
@@ -736,8 +753,10 @@ extension View {
     @_disfavoredOverload
     @_spi(Host) public func frame(width: Binding<Double>) -> ModifiedContent {
         revised { node in
-            node.wrapPaddedFrame()
-            node.driveJourney(VisualElementContract.width, by: width)
+            node = node.mappingLayoutLeaves {
+                $0.wrapPaddedFrame()
+                $0.driveJourney(VisualElementContract.width, by: width)
+            }
         }
     }
 
@@ -745,8 +764,10 @@ extension View {
     @_disfavoredOverload
     @_spi(Host) public func frame(height: Binding<Double>) -> ModifiedContent {
         revised { node in
-            node.wrapPaddedFrame()
-            node.driveJourney(VisualElementContract.height, by: height)
+            node = node.mappingLayoutLeaves {
+                $0.wrapPaddedFrame()
+                $0.driveJourney(VisualElementContract.height, by: height)
+            }
         }
     }
 

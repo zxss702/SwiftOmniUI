@@ -839,6 +839,15 @@ extension StateTests {
                        "a write through the wrapper reaches the reader")
     }
 
+    func testBindingTransactionClearsDescribedStorageAndImage() {
+        let text = State("")
+        let animated = text.projectedValue.transaction(Transaction(animation: .snappy))
+        XCTAssertNil(animated.described, "a transaction-bearing binding must write through its closure")
+        XCTAssertNil(animated.image)
+        XCTAssertNotNil(text.projectedValue.described)
+        XCTAssertNotNil(text.projectedValue.image)
+    }
+
     /// `TextField($name)` borrows focus state the way SCE's fields do.
     private struct FocusField: View {
         @FocusState var focused: Bool

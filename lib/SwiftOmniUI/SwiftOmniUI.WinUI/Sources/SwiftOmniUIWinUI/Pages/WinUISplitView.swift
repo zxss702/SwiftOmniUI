@@ -217,7 +217,8 @@ final class WinUISplitView: WinUILayoutView {
         let offset = isAttached && page.isAttached ? page.layoutOffset(relativeTo: self) : nil
         let width = offset == nil ? bounds.width : max(bounds.width, contextBounds.width)
         let proposal = Rect(0, 0, width, max(0, bounds.height - top - bottom + row))
-        let place = Rect(offset?.x ?? 0, -top + row, bounds.width, bounds.height)
+        let x = max(0, min(offset?.x ?? 0, max(0, width - bounds.width)))
+        let place = Rect(x, -top + row, bounds.width, bounds.height)
         return layoutSafeArea(in: proposal)
             .child(in: place, preservingOutsets: page.carriesSafeAreaOutsets)
             .resizedLayout(to: bounds)

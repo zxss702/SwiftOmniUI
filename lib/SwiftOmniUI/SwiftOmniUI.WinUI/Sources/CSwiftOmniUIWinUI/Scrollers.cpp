@@ -60,6 +60,8 @@ namespace {
         winrt::event_token readerExtent{};
         winrt::event_token readerCompleted{};
         int32_t pendingJump = -1;
+        bool trackingSyncScrollTo = false;
+        int32_t syncCompletedCorrelation = -1;
         double pendingX = 0, pendingY = 0;
         std::array<ControllerRequests, 2> controllers;
         std::array<ScrollController, 2> testingControllers{nullptr, nullptr};
@@ -403,16 +405,22 @@ namespace {
     void scrollTo(controls::ScrollView const &scroller, double x, double y, bool animated) {
         // Completion also reports cancellation. The native presenter owns the
         // request's lifetime; never resurrect its target from ScrollCompleted.
+        auto found = insetStates.find(winrt::get_abi(scroller));
+        auto state = found != insetStates.end() ? found->second.lock() : std::shared_ptr<ScrollerInsets>{};
+        if (state) {
+            state->trackingSyncScrollTo = true;
+            state->syncCompletedCorrelation = -1;
+        }
         auto correlation = scroller.ScrollTo(x, y, controls::ScrollingScrollOptions(
             animated ? controls::ScrollingAnimationMode::Enabled : controls::ScrollingAnimationMode::Disabled,
             controls::ScrollingSnapPointsMode::Ignore));
-        auto found = insetStates.find(winrt::get_abi(scroller));
-        if (found != insetStates.end()) {
-            if (auto state = found->second.lock()) {
-                state->pendingJump = animated ? -1 : correlation;
-                state->pendingX = std::clamp(x, 0.0, scroller.ScrollableWidth());
-                state->pendingY = std::clamp(y, 0.0, scroller.ScrollableHeight());
-            }
+        if (state) {
+            state->trackingSyncScrollTo = false;
+            bool completedNow = correlation >= 0 && state->syncCompletedCorrelation == correlation;
+            state->syncCompletedCorrelation = -1;
+            state->pendingJump = (!animated && !completedNow) ? correlation : -1;
+            state->pendingX = std::clamp(x, 0.0, scroller.ScrollableWidth());
+            state->pendingY = std::clamp(y, 0.0, scroller.ScrollableHeight());
         }
     }
 }
@@ -429,6 +437,11 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
         insetStates[winrt::get_abi(scroller)] = insets;
         scroller.ScrollCompleted(guarded("completing a prepared scroll jump",
             [view, insets](controls::ScrollView const &scroller, controls::ScrollingScrollCompletedEventArgs const &args) {
+            if (insets->trackingSyncScrollTo) {
+                insets->syncCompletedCorrelation = args.CorrelationId();
+                callbacks.scrolled(view, scroller.HorizontalOffset(), scroller.VerticalOffset());
+                return;
+            }
             if (insets->pendingJump == -1 || insets->pendingJump != args.CorrelationId()) return;
             insets->pendingJump = -1;
             // Completion includes cancellation. Reconcile with the actual

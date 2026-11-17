@@ -42,6 +42,8 @@
     @ViewBuilder var body: Body { get }
 }
 
+protocol FragmentDistributionBarrier {}
+
 extension View {
     /// A composed view as a node: a placeholder the differ expands once it
     /// knows whether this view stood here last render - so its `@State` is
@@ -49,7 +51,9 @@ extension View {
     /// runs only for composed views.
     /// Design: docs/design/views/composition.md#a-composed-view-is-a-placeholder
     public var node: Node {
-        Node.composed(self, type: ElementTypeNames.qualified(Self.self)) { body.node }
+        var node = Node.composed(self, type: ElementTypeNames.qualified(Self.self)) { body.node }
+        if self is any FragmentDistributionBarrier { node.stopsFragmentDistribution = true }
+        return node
     }
 }
 

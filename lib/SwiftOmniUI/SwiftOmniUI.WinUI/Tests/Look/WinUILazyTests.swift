@@ -655,6 +655,7 @@ final class WinUILazyTests: XCTestCase {
             XCTAssertTrue(lazy.isWaitingForViewport)
 
             WinUITestHost.window.show(scroll)
+            WinUITestHost.pump(0.02)
             host.layOut()
             WinUIDoorbell.commitPending()
             host.layOut()
@@ -682,7 +683,12 @@ final class WinUILazyTests: XCTestCase {
             }
             for _ in 0..<16 { host.step(); host.frame() }
             let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
-            let document = try XCTUnwrap(host.views(WinUIScrollDocument.self).first)
+            let document = try XCTUnwrap(
+                lazy.placingLayout.flatMap {
+                    sequence(first: $0, next: { $0.placingLayout })
+                        .compactMap { $0 as? WinUIScrollDocument }.first
+                }
+            )
             let extent = lazy.cells.total
             let revision = document.measurementRevision
 
@@ -713,7 +719,7 @@ final class WinUILazyTests: XCTestCase {
             }
             for _ in 0..<16 { host.step(); host.frame() }
             let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
-            let document = try XCTUnwrap(host.views(WinUIScrollDocument.self).first)
+            let document = try XCTUnwrap(lazy.placingLayout as? WinUIScrollDocument)
             let row = try XCTUnwrap(host.view(id: .manual("row-0")))
             let extent = lazy.cells.total
             let revision = document.measurementRevision
@@ -844,6 +850,7 @@ final class WinUILazyTests: XCTestCase {
             lazy.viewportChanged(Rect(0, 0, 0, 0))
             let root = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             WinUITestHost.window.show(root)
+            WinUITestHost.pump(0.02)
             for _ in 0..<12 { host.layOut(); WinUIDoorbell.commitPending() }
             XCTAssertTrue(lazy.isAttached)
             let window = try XCTUnwrap(lazy.cells.window)
@@ -1083,6 +1090,56 @@ final class WinUILazyTests: XCTestCase {
                 XCTAssertEqual(retained.placedFrame.y, target, accuracy: 1)
                 XCTAssertLessThan(builds.numbers.count, 80, "only the viewport and its overscan are built")
             }
+        }
+    }
+
+    func testCollapseBlurTransitionKeepsDepartingPresenterArrangedAndMovesSuffixRows() throws {
+        try onUIThread {
+            let expanded = Array(0..<2) + Array(1_000..<1_025) + Array(2..<60)
+            let collapsed = Array(0..<60)
+            let rows = State(wrappedValue: expanded)
+            let clock = TestClock()
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue) { number in
+                            Text("File \(number)")
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                        }
+                        .transition(.blur.combined(with: .offset(y: -48)))
+                    }
+                }
+                .frame(width: 320, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
+            let departingIdentity = lazy.cells.orderedIdentities[2]
+            let suffixIdentity = lazy.cells.orderedIdentities[30]
+            XCTAssertNil(lazy.mounted[suffixIdentity], "suffix row 5 must start unmounted outside the expanded window")
+            let departingItem = try XCTUnwrap(lazy.mounted[departingIdentity])
+            XCTAssertEqual(departingItem.view.presentationHandle, departingItem.view.handle)
+
+            let began = clock.now
+            withAnimation(.eased(200, .linear)) { rows.wrappedValue = collapsed }
+            for _ in 0..<12 { host.step(); host.frame() }
+
+            XCTAssertTrue(lazy.mounted[departingIdentity]?.departing == true)
+            XCTAssertNotEqual(departingItem.view.presentationHandle, departingItem.view.handle,
+                              "collapsing a settled row with .blur prepares its BlurPresenter")
+            let suffixView = try XCTUnwrap(lazy.mounted[suffixIdentity]?.view)
+
+            clock.now = began + 100
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertEqual(departingItem.view.drawnOpacity, 0.5, accuracy: 0.05)
+            XCTAssertGreaterThan(departingItem.view.laidOutFrame.width, 0)
+            XCTAssertEqual(departingItem.view.laidOutFrame.height, 28, accuracy: 1)
+            XCTAssertEqual(suffixView.placedFrame.y, 490, accuracy: 2,
+                           "newly materialized suffix row must travel from its pre-collapse position (840 -> 140)")
+
+            clock.now = began + 200
+            for _ in 0..<12 { host.step(); host.frame() }
+            XCTAssertEqual(suffixView.placedFrame.y, 140, accuracy: 1)
         }
     }
 
@@ -1659,6 +1716,7 @@ final class WinUILazyTests: XCTestCase {
                 let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
                 let lazy = try XCTUnwrap(host.views(WinUILazyView.self).first)
                 scroll.scroller.move(to: Point(horizontal ? 400 : 0, horizontal ? 0 : 400))
+                host.settle { !swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle) }
                 for _ in 0..<8 {
                     host.step()
                     host.frame()
@@ -2503,11 +2561,19 @@ final class WinUILazyTests: XCTestCase {
         try onUIThread {
             let host = WinUIRenderer.running { LazyRowsPage() }
             let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
-            host.settle { host.views(WinUILabelView.self).contains { $0.text == "Row 0" } }
-
             let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
-            scroll.scroller.move(to: Point(0, lazy.cells.offset(of: 500)))
-            host.settle { host.views(WinUILabelView.self).contains { $0.text == "Row 500" } }
+            host.settle {
+                scroll.scroller.standing.reach.y >= lazy.cells.offset(of: 500)
+                    && (lazy.span.map { lazy.hasMountedWindow(in: $0) } ?? false)
+                    && host.views(WinUILabelView.self).contains { $0.text == "Row 0" }
+            }
+            let targetY = lazy.cells.offset(of: 500)
+            scroll.scroller.move(to: Point(0, targetY))
+            host.settle {
+                !swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle)
+                    && host.views(WinUILabelView.self).contains { $0.text == "Row 500" }
+            }
+            for _ in 0..<4 { host.step(); host.frame() }
 
             let standing = host.views(WinUILabelView.self).map(\.text)
             XCTAssertFalse(standing.contains("Row 0"), "the first row was let go")
@@ -2541,6 +2607,99 @@ final class WinUILazyTests: XCTestCase {
             host.settle { host.views(WinUILabelView.self).count == 30 }
 
             XCTAssertEqual(host.views(WinUILabelView.self).count, 30)
+        }
+    }
+
+    /// Cold-opening a lazy sidebar whose initial row build exceeds the 8ms frame
+    /// slice must still complete the visible viewport in one fill instead of
+    /// painting one folder over a blank white pane.
+    func testColdOpenWithSlowInitialRowFillsEntireVisibleViewportWithoutWhiteGap() throws {
+        try onUIThread {
+            let slept = State(wrappedValue: false)
+            let host = WinUIRenderer.running(room: LayoutSize(width: 280, height: 600)) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(0..<80) { index in
+                            HStack(spacing: 6) {
+                                Text("Item \(index)")
+                                    .frame(height: 28)
+                            }
+                            .onAppear {
+                                if index == 0, !slept.wrappedValue {
+                                    slept.wrappedValue = true
+                                    WinSDK.Sleep(12)
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(width: 280, height: 600)
+            }
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            // Pump until the first visible fill has realized any rows; it must
+            // complete the entire visible viewport in one pass rather than 1 row + white.
+            for _ in 0..<16 where lazy.cells.built.isEmpty {
+                host.runtime.pump.turn()
+                WinUIDoorbell.commitPending()
+                host.layOut()
+            }
+            let span = try XCTUnwrap(lazy.span)
+            XCTAssertTrue(lazy.hasBuiltVisibleWindow(in: span),
+                          "cold open exited mid-visible-viewport: built=\(lazy.cells.built), span=\(span)")
+            XCTAssertGreaterThanOrEqual(lazy.cells.built.count, 18,
+                                        "28pt rows in 600pt viewport should all fill together")
+        }
+    }
+
+    func testCollapsingFolderInLazyStackAnimatesDepartingBlurAndAllSurvivingSiblings() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let rows = State(wrappedValue: Array(0..<80))
+            let host = WinUIRenderer.running(clock: clock, room: LayoutSize(width: 280, height: 600)) {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(rows.wrappedValue, id: \.self) { row in
+                            HStack(spacing: 4) {
+                                Text("Row \(row)")
+                            }
+                            .frame(height: 28)
+                            .id("file-\(row)")
+                            .transition(.blur.combined(with: .offset(y: -48)))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(width: 280, height: 600)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let lazy = try XCTUnwrap(host.views(WinUILazyStackView.self).first)
+            let departingRow = try XCTUnwrap(host.view(id: .manual("file-1")))
+            XCTAssertFalse(lazy.cells.built.contains(44), "later surviving rows must start unbuilt")
+
+            withAnimation(.snappy.speed(2)) {
+                rows.wrappedValue.removeSubrange(1..<26)
+            }
+            host.runtime.pump.turn()
+            clock.now += 40
+            for _ in 0..<8 { host.step(); host.frame() }
+
+            XCTAssertTrue(departingRow.isShown, "departing folder child must animate out")
+            XCTAssertGreaterThan(departingRow.blur, 0, "departing blur presenter must activate on frame 0")
+            XCTAssertLessThan(departingRow.drawing.translationY, -1, "departing row must translate with offset transition")
+
+            for surviving in [26, 30, 35, 40, 44] {
+                let rowView = try XCTUnwrap(host.view(id: .manual("file-\(surviving)")),
+                                            "surviving Row \(surviving) must be mounted")
+                let destinationY = Double(surviving - 25) * 30
+                XCTAssertGreaterThan(rowView.frame.y, destinationY + 10,
+                                     "surviving Row \(surviving) must animate displacement instead of popping to \(destinationY)")
+            }
+
+            clock.now += 1500
+            for _ in 0..<8 { host.step(); host.frame() }
+            XCTAssertNil(host.view(id: .manual("file-1")), "departing row must unmount after transition finishes")
+            let settled40 = try XCTUnwrap(host.view(id: .manual("file-40")))
+            XCTAssertEqual(settled40.frame.y, 15.0 * 30.0, accuracy: 1.5)
         }
     }
 }

@@ -170,8 +170,10 @@ final class Differ {
     /// The root the last walk answered, so a dispatched handler can ask its tree.
     private(set) var lastRendered: RenderedNode?
 
-    /// One kept element: built again from its placeholder when its reads moved,
-    /// walked for changed descendants when they did not.
+    /// One kept element: built again from its placeholder when its reads moved - from the outermost of its views
+    /// whose own body read what moved, those outside it standing as they were - walked for changed descendants when
+    /// they did not.
+    /// Design: docs/design/core/identity-and-diffing.md#the-clean-walk
     func revisit(
         _ rendered: RenderedNode,
         walking: Bool = true
@@ -197,7 +199,9 @@ final class Differ {
                 rendered: rendered,
                 node: placeholder,
                 forced: true,
-                sizesArrive: rendered.sizesArrive)
+                sizesArrive: rendered.sizesArrive,
+                wrapFragmentChildren: rendered.wrapFragmentChildren,
+                from: Self.start(of: rendered, changed: changed))
         }
 
         // A composed view walked past is written down only as the path to something

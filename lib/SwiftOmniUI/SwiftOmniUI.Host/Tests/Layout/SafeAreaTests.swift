@@ -107,6 +107,17 @@ final class SafeAreaTests: XCTestCase {
         XCTAssertEqual(child.resizedLayout(to: Rect(0, 0, 200, 100)).safe.width, 0)
     }
 
+    func testChildSafeAreaPaddingDoesNotDropLeadingOrTopOnUlpOvershoot() {
+        let parentHeight = 288.9438548011863
+        let childY = 160.86808149146896
+        let childHeight = 128.0757733097174 // childY + childHeight exceeds parentHeight by 1 ULP
+        let parent = SafeAreaContext(bounds: Rect(0, 0, 500, parentHeight))
+        let child = parent.child(in: Rect(0, childY, 500, childHeight), preservingOutsets: false)
+        let padded = child.padding(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 0))
+        XCTAssertEqual(padded.safe.y, 12, accuracy: 1e-9)
+        XCTAssertEqual(padded.safe.height, childHeight - 24, accuracy: 1e-9)
+    }
+
     func testAColumnRebasesItsEdgeContributionsWithoutClippingANewProposalToOldBounds() {
         let window = SafeAreaContext(
             bounds: Rect(0, -48, 800, 648), layout: Rect(0, 0, 800, 600),

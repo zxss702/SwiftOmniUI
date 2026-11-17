@@ -58,7 +58,16 @@
     }
 
     /// A layout moved: report it when the host finishes layout, or on the next display frame.
+    public private(set) var layoutGeneration: UInt64 = 0
+
     public func laidOut() {
+        layoutGeneration &+= 1
+        guard !reporters.isEmpty, !moved else { return }
+        moved = true
+        runtime.displayCycle.hold()
+    }
+
+    public func scrolled() {
         guard !reporters.isEmpty, !moved else { return }
         moved = true
         runtime.displayCycle.hold()
