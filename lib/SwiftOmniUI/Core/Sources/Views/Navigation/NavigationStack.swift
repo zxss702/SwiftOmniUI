@@ -207,6 +207,77 @@ public struct NavigationStack: VisualElement, BarElement, PageElement, PageArran
         }
     }
 
+    /// A stack whose pushed pages come from a type-erased `NavigationPath`
+    /// and the destinations registered on `root` - SwiftUI's
+    /// `NavigationStack(path: $navigationPath) { … .navigationDestination(for:) { … } }`.
+    public init(
+        path: Binding<NavigationPath>,
+        root: @escaping () -> any Page
+    ) {
+        let links = ElementSession(NavigationLinks.self) { NavigationLinks() }
+        var itemOnStack = false
+        var itemDismiss: (@Sendable () -> Void)?
+
+        node = Node(contract: NavigationStackContract.self)
+        node.session = links
+        node.producer = {
+            let store = Self.links(in: links)
+            let (rootNode, declared) = DeclaredDestinations.collect {
+                Self.identified(Node.page(root()), as: Self.rootIdentity)
+            }
+            var children: [Node] = [rootNode]
+
+            let destinations = Self.destinations(on: rootNode, plus: declared)
+            for (depth, item) in path.wrappedValue.elements.enumerated() {
+                let route = item.base
+                let made = destinations[ObjectIdentifier(Swift.type(of: route))]?(route)
+                    ?? EmptyView().node
+                var pushed = Self.identified(
+                    Node.page(DestinationPage(node: made)), as: "\(depth)/\(String(describing: route))")
+
+                pushed.environmentValues[keyPath: \.dismiss] = DismissAction { [path] in
+                    var updated = path.wrappedValue
+                    if updated.count > depth {
+                        updated.removeLast(updated.count - depth)
+                        path.wrappedValue = updated
+                    }
+                }
+                children.append(pushed)
+            }
+
+            itemOnStack = false
+            if let pushed = Self.itemDestinationPage(from: rootNode, declared: declared.item) {
+                children.append(pushed)
+                itemOnStack = true
+            }
+            itemDismiss = declared.item?.dismiss ?? rootNode.itemDestination?.dismiss
+                ?? rootNode.children.compactMap(\.itemDestination?.dismiss).first
+
+            children.append(contentsOf: store.pushed)
+            return children
+        }
+        Self.offersPushes(on: &node, through: links)
+
+        node.addHandler(NavigationStackContract.popped.token) {
+            guard let depth = EventBuffer.current.value()?.int else { return }
+
+            let routes = path.wrappedValue
+            let store = links.held(as: NavigationLinks.self)
+            if depth >= 0, depth < routes.count {
+                var updated = routes
+                updated.removeLast(updated.count - depth)
+                path.wrappedValue = updated
+                itemDismiss?()
+                store.pop(to: 0)
+            } else if depth == routes.count {
+                itemDismiss?()
+                store.pop(to: 0)
+            } else {
+                store.pop(to: depth - routes.count - (itemOnStack ? 1 : 0))
+            }
+        }
+    }
+
     /// A stack of one page - what SwiftUI's `NavigationStack { … }` says
     /// where no path is bound. A `.navigationDestination(item:)` on `root`
     /// still pushes and pops its page.
