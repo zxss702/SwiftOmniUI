@@ -51,6 +51,10 @@ final class RenderedNode {
     /// The builder path the element was written at (`Node.key`).
     var key: String?
 
+    /// Raw manual `.id()` / `ForEach` identity within its immediate fragment before
+    /// host-level sibling disambiguation.
+    var authoredManualId: String?
+
     /// The source row this element contributes to its lazy parent's geometry.
     var lazyIdentity: String?
 

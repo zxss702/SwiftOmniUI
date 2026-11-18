@@ -347,7 +347,7 @@ class WinUILazyView: WinUITravellingLayout {
         // A retained row may grow without changing the source identities.
         // Its later siblings still need the patch's placement law.
         if rowSizeChanged { cells.animatesChanges = true }
-        if sourceChanged || rowSizeChanged || (requestAcknowledged && cells.animatesChanges) {
+        if sourceChanged || !measurementRows.isEmpty || (requestAcknowledged && cells.animatesChanges) {
             invalidateMeasure()
             invalidateArrange()
         }
@@ -603,7 +603,8 @@ class WinUILazyView: WinUITravellingLayout {
         let realize = realizationSpan(in: target)
         var demand = incoming
         if let incoming, let realize, scrollVelocity != 0, hasMountedWindow(in: incoming) {
-            let step = abs(scrollVelocity) * displayInterval
+            let step = max(abs(scrollVelocity) * displayInterval * 2,
+                           (incoming.upperBound - incoming.lowerBound) * 0.25)
             if scrollVelocity > 0 {
                 demand = incoming.lowerBound..<min(realize.upperBound, incoming.upperBound + step)
             } else {

@@ -44,6 +44,10 @@
 
 protocol FragmentDistributionBarrier {}
 
+protocol DistributableView: View {
+    func freshDistributedCopy() -> Self
+}
+
 extension View {
     /// A composed view as a node: a placeholder the differ expands once it
     /// knows whether this view stood here last render - so its `@State` is
@@ -53,6 +57,9 @@ extension View {
     public var node: Node {
         var node = Node.composed(self, type: ElementTypeNames.qualified(Self.self)) { body.node }
         if self is any FragmentDistributionBarrier { node.stopsFragmentDistribution = true }
+        if let clonable = self as? any DistributableView {
+            node.setDistributedClone { clonable.freshDistributedCopy().node }
+        }
         return node
     }
 }
@@ -712,6 +719,16 @@ extension View {
         _ value: Value
     ) -> ModifiedContent {
         revised { $0.environmentValues[keyPath: keyPath] = value }
+    }
+
+    /// Sets this view's color scheme in the environment.
+    public func colorScheme(_ colorScheme: ColorScheme) -> ModifiedContent {
+        environment(\.colorScheme, colorScheme)
+    }
+
+    /// Sets the preferred color scheme for the enclosing presentation.
+    public func preferredColorScheme(_ colorScheme: ColorScheme?) -> ModifiedContent {
+        environment(\.colorScheme, colorScheme ?? StandardEnvironment.appInfo.colorScheme)
     }
 
     /// The keyed style from the application's style sheet that this view wears.

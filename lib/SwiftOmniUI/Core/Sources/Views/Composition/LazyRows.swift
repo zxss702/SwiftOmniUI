@@ -116,6 +116,55 @@ extension Node {
         }
         return elements
     }
+
+    /// Opens stateless composed views (such as a `ForEach`-backed wrapper view
+    /// owning no `@State` boxes) only when their body resolves to lazy rows or a
+    /// multi-child fragment, preserving lazy virtualization without eagerly
+    /// materializing `ForEach` row closures.
+    @MainActor func unwrappedLazyElements(
+        scope baseScope: [(key: ObjectIdentifier, object: AnyObject)]? = nil,
+        values baseValues: EnvironmentValues? = nil
+    ) -> [Element]? {
+        if let direct = lazyElements { return direct }
+        let startScope = baseScope ?? Differ.active?.scope ?? []
+        let startValues = baseValues ?? Differ.active?.envValues ?? EnvironmentValues()
+        if type == .fragment {
+            var fragment = self
+            fragment.materialize()
+            let curScope = startScope + fragment.environments
+            let curValues = startValues.overlaid(with: fragment.environmentValues)
+            return fragment.children.flatMap { raw -> [Element] in
+                var child = raw
+                for (property, member) in fragment.inheritedMembers { child.inherit(property, member: member) }
+                child.absorbFragmentWrites(of: fragment)
+                return child.unwrappedLazyElements(scope: curScope, values: curValues)
+                    ?? child.asChildren.map { $0 as Element }
+            }
+        }
+        guard type == .composed, !stopsFragmentDistribution,
+              let stateful = self.stateful, stateful.boxes.isEmpty, stateful.scene == nil else {
+            return nil
+        }
+        let curScope = startScope + environments
+        let curValues = startValues.overlaid(with: environmentValues)
+        stateful.resolve(from: curScope, under: curValues)
+        var built = stateful.build()
+        var writes = self
+        writes.stateful = nil
+        for (property, member) in writes.inheritedMembers { built.inherit(property, member: member) }
+        built.absorbFragmentWrites(of: writes)
+        if let lazy = built.lazyElements {
+            return lazy.flatMap { element -> [Element] in
+                if element is any LazyRows { return [element] }
+                let child = element.node
+                return child.unwrappedLazyElements(scope: curScope, values: curValues) ?? [element]
+            }
+        }
+        if built.type == .composed || built.type == .fragment {
+            return built.unwrappedLazyElements(scope: curScope, values: curValues)
+        }
+        return nil
+    }
 }
 
 private struct LayoutModifiedElement: Element {

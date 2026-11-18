@@ -103,6 +103,10 @@ final class Differ {
     /// `.focusedSceneValue` fold reads while the scene is still being built.
     var sceneNodes: [(id: String, node: Node)] = []
 
+    /// Active differ during a reconcile/revisit walk on the UI thread, allowing
+    /// lazy containers to resolve `@Environment` on transparent stateless wrappers.
+    nonisolated(unsafe) static weak var active: Differ?
+
     /// The tree this walk was given, where it was given one - what a
     /// `.focusedSceneValue` read folds before the rendered tree lands.
     /// Nil on the clean walk, which folds `lastRendered` instead.
@@ -118,6 +122,9 @@ final class Differ {
         describeAll: Bool = false,
         changed: Set<ObjectIdentifier> = []
     ) -> (node: RenderedNode, patch: HostPatch) {
+        let previousActive = Self.active
+        Self.active = self
+        defer { Self.active = previousActive }
         customLayoutOwners.removeAll(keepingCapacity: true)
         customLayoutsWithChangedValues.removeAll(keepingCapacity: true)
         self.describeAll = describeAll
@@ -151,6 +158,9 @@ final class Differ {
         changed: Set<ObjectIdentifier>,
         refreshPreferences: Set<ObjectIdentifier> = []
     ) -> (node: RenderedNode, patch: HostPatch) {
+        let previousActive = Self.active
+        Self.active = self
+        defer { Self.active = previousActive }
         customLayoutOwners.removeAll(keepingCapacity: true)
         customLayoutsWithChangedValues.removeAll(keepingCapacity: true)
         describeAll = false

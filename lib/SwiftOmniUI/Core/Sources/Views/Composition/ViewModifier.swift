@@ -26,14 +26,36 @@
     @ViewBuilder func body(content: Content) -> Self.Body
 }
 
+/// Stamp allocated once per `_ViewModifier_Applied` construction so that
+/// rebuilding only the modifier's own `@State` carries the unmodified `Content`
+/// subtree in O(1) without re-evaluating `Content`.
+final class ModifierContentStamp {}
+
+@MainActor protocol ModifierContentCarrier {
+    var contentStamp: ModifierContentStamp { get }
+}
+
 /// What a `ViewModifier`'s `body(content:)` is handed: the view the modifier
 /// was applied to, wrapped so it composes inside the modifier's own tree.
-public struct _ViewModifier_Content<Modifier: ViewModifier>: View {
-    /// The view the modifier was applied to.
-    let view: AnyView
+public struct _ViewModifier_Content<Modifier: ViewModifier>: View, ModifierContentCarrier {
+    let stamp: ModifierContentStamp
+    let makeNode: () -> Node
 
-    /// The content, standing as itself inside the modifier's composition.
-    public var node: Node { view.node }
+    @MainActor init(stamp: ModifierContentStamp, makeNode: @escaping () -> Node) {
+        self.stamp = stamp
+        self.makeNode = makeNode
+    }
+
+    @MainActor init(view: AnyView) {
+        self.stamp = ModifierContentStamp()
+        self.makeNode = { view.node }
+    }
+
+    var contentStamp: ModifierContentStamp { stamp }
+
+    public var node: Node {
+        Node.composed(self, type: ElementTypeNames.qualified(Self.self), build: makeNode)
+    }
 }
 
 /// What `modifier(_:)` makes: a view standing in for the modifier's
@@ -49,9 +71,14 @@ public struct _ViewModifier_Applied<Content: View, M: ViewModifier>: View {
     /// The modifier whose `body(content:)` composes here.
     let modifier: M
 
+    /// Stable across clean-walk rebuilds triggered solely by `modifier`'s own `@State`;
+    /// fresh whenever the enclosing view reconstructs `_ViewModifier_Applied`.
+    let stamp = ModifierContentStamp()
+
     /// What the modifier composes from the view it was written on.
     public var body: some View {
-        modifier.body(content: _ViewModifier_Content<M>(view: AnyView(content)))
+        let captured = content
+        modifier.body(content: _ViewModifier_Content<M>(stamp: stamp) { captured.node })
     }
 }
 

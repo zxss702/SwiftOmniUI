@@ -141,6 +141,7 @@ class WinUITextView: WinUIView {
         init(_ labels: [Label]) { self.labels = labels }
 
         func advance() {
+            let deadline = WinUIFrameClock.monotonic() + 4.0
             while index < labels.count {
                 let held = labels[index]
                 index += 1
@@ -153,12 +154,12 @@ class WinUITextView: WinUIView {
                 if let report = label.readTextLayout() {
                     reports.append((held, label.textLayoutRevision, report))
                 }
-                break
+                if index < labels.count, WinUIFrameClock.monotonic() >= deadline {
+                    break
+                }
             }
             if index < labels.count {
                 WinUIDoorbell.afterMetadata {
-                    WinUIRenderer.shared?.runtime.frames.laidOut()
-                    WinUIRenderer.shared?.runtime.frames.commitLayout()
                     self.advance()
                 }
                 return

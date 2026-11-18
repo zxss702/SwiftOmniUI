@@ -96,7 +96,7 @@ extension Scene {
     ///         Window("设置", id: "setting") { SettingsWindow() }
     ///             .modelContainer(appModelContainer)
     ///     }
-    public func modelContainer(_ container: ModelContainer) -> Scene {
+    public func modelContainer(_ container: ModelContainer) -> some Scene {
         environment(\.modelContext, container.contextOnMain)
             .environment(container.contextOnMain)
     }

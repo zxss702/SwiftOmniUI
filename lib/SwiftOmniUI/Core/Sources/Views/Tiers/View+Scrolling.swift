@@ -235,4 +235,60 @@ extension View {
             attach(&node)
         }
     }
+
+    /// Runs `action` when the enclosed scroll view's interaction phase changes.
+    public func onScrollPhaseChange(
+        _ action: @escaping (_ oldPhase: ScrollPhase, _ newPhase: ScrollPhase) -> Void
+    ) -> ModifiedContent {
+        onScrollPhaseChange { oldPhase, newPhase, _ in
+            action(oldPhase, newPhase)
+        }
+    }
+
+    /// Runs `action` with scroll geometry context when the enclosed scroll view's
+    /// interaction phase changes.
+    public func onScrollPhaseChange(
+        _ action: @escaping (_ oldPhase: ScrollPhase, _ newPhase: ScrollPhase, _ context: ScrollPhaseChangeContext) -> Void
+    ) -> ModifiedContent {
+        let box = ScrollPhaseBox()
+        return revised { node in
+            func attach(_ node: inout Node) {
+                node.materialize()
+                if node.type == ScrollViewContract.nodeType {
+                    node.addHandler(.scrollGeometryChanged) {
+                        guard let numbers = MemberValues.carried(
+                            EventBuffer.current, by: "scrollGeometryChanged", as: [Double].self)
+                        else { return }
+                        if numbers.count == 20, let current = ScrollGeometry(numbers: Array(numbers[10..<20])) {
+                            box.geometry = current
+                        } else if let current = ScrollGeometry(numbers: numbers) {
+                            box.geometry = current
+                        }
+                    }
+                    for event in [ScrollViewContract.scrollXChanged.token, ScrollViewContract.scrollYChanged.token] {
+                        node.addHandler(event) {
+                            guard box.phase != .interacting else { return }
+                            let previous = box.phase
+                            box.phase = .interacting
+                            action(previous, .interacting, ScrollPhaseChangeContext(geometry: box.geometry))
+                        }
+                    }
+                    node.addHandler(ScrollViewContract.scrollStopped.token) {
+                        guard box.phase != .idle else { return }
+                        let previous = box.phase
+                        box.phase = .idle
+                        action(previous, .idle, ScrollPhaseChangeContext(geometry: box.geometry))
+                    }
+                    return
+                }
+                for index in node.children.indices { attach(&node.children[index]) }
+            }
+            attach(&node)
+        }
+    }
+}
+
+private final class ScrollPhaseBox: @unchecked Sendable {
+    var phase: ScrollPhase = .idle
+    var geometry = ScrollGeometry()
 }

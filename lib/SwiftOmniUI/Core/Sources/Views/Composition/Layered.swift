@@ -115,7 +115,10 @@ public struct Layered<Base: View, Content: View>: View {
         let contentIndex = isOver ? 0 : 1
         let node: Node
         if distributesFragments {
+            var leafCounter = 0
             node = base.node.mappingLayoutLeaves { leaf in
+                let siblingLayer = leafCounter == 0 ? layerNode : layerNode.clonedForDistributedSibling()
+                leafCounter += 1
                 var baseLeaf = leaf
                 let leafId = baseLeaf.id
                 let leafKey = baseLeaf.key
@@ -125,7 +128,7 @@ public struct Layered<Base: View, Content: View>: View {
                 wrapper.fragmentContentIndex = contentIndex
                 wrapper.id = leafId
                 wrapper.key = leafKey
-                wrapper.children = isOver ? [baseLeaf, layerNode] : [layerNode, baseLeaf]
+                wrapper.children = isOver ? [baseLeaf, siblingLayer] : [siblingLayer, baseLeaf]
                 leaf = wrapper
             }
         } else {

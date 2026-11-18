@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+import Foundation
+
 /// `Text`'s own properties, shared by the control and its `Style<Text>`.
 public protocol TextProperties: PropertyContainer {}
 
@@ -276,6 +278,71 @@ public struct TextSpan: View, ModifiableElement, TextElement, FontElement,
     /// What is drawn behind this run - a highlight over part of a line.
     public func background(_ value: Color) -> Self {
         setValue(SpanContract.background, value)
+    }
+}
+
+extension Text {
+    /// A style for displaying a `Date` inside a `Text` view.
+    public struct DateStyle: Hashable, Sendable {
+        enum Kind: Hashable, Sendable {
+            case time
+            case date
+            case relative
+            case offset
+            case timer
+        }
+
+        let kind: Kind
+
+        public static let time = DateStyle(kind: .time)
+        public static let date = DateStyle(kind: .date)
+        public static let relative = DateStyle(kind: .relative)
+        public static let offset = DateStyle(kind: .offset)
+        public static let timer = DateStyle(kind: .timer)
+
+        func format(_ value: Date, now: Date = Date()) -> String {
+            switch kind {
+            case .time:
+                let formatter = DateFormatter()
+                formatter.dateStyle = .none
+                formatter.timeStyle = .short
+                return formatter.string(from: value)
+            case .date:
+                let formatter = DateFormatter()
+                formatter.dateStyle = .medium
+                formatter.timeStyle = .none
+                return formatter.string(from: value)
+            case .relative, .offset:
+                let delta = Int(now.timeIntervalSince(value).rounded())
+                let absSeconds = abs(delta)
+                let hours = absSeconds / 3600
+                let minutes = (absSeconds % 3600) / 60
+                let seconds = absSeconds % 60
+                let sign = delta < 0 ? "+" : "-"
+                if hours > 0 {
+                    return "\(sign)\(hours)h \(minutes)m"
+                } else if minutes > 0 {
+                    return "\(sign)\(minutes)m \(seconds)s"
+                } else {
+                    return "\(sign)\(seconds)s"
+                }
+            case .timer:
+                let absSeconds = abs(Int(now.timeIntervalSince(value)))
+                let hours = absSeconds / 3600
+                let minutes = (absSeconds % 3600) / 60
+                let seconds = absSeconds % 60
+                if hours > 0 {
+                    return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+                } else {
+                    return String(format: "%d:%02d", minutes, seconds)
+                }
+            }
+        }
+    }
+
+    /// Creates an instance that displays localized dates and times using a specific style.
+    public init(_ date: Date, style: DateStyle) {
+        self.init(style.format(date))
     }
 }
 

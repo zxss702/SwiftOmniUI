@@ -64,7 +64,6 @@ extension View {
         value: AnchorSource<A>,
         transform: @escaping (Anchor<A>) -> K.Value
     ) -> ModifiedContent {
-        let box = AnchorBox()
         let read: @Sendable (Rect, Rect) -> A
 
         switch value.kind {
@@ -77,8 +76,8 @@ extension View {
             }
         }
 
-        return revised { node in
-            // The host's own frame reports keep the anchor's answer current.
+        func installAnchor(on node: inout Node) {
+            let box = AnchorBox()
             node.anchorBoxes.append(box)
             node.addHandler(.frameChanged) {
                 let raw = EventBuffer.current
@@ -92,6 +91,17 @@ extension View {
             }
             node.preferenceSeeds.append(PreferenceSeed(
                 box: PreferenceKeyBox(K.self), lazy: { [box] in transform(Anchor<A>(box: box, read: read)) }))
+        }
+
+        return revised { node in
+            // The host's own frame reports keep the anchor's answer current.
+            let baseClone = node.distributedClone
+            installAnchor(on: &node)
+            node.distributedClone = {
+                var cloned = baseClone?() ?? Node(type: .composed)
+                installAnchor(on: &cloned)
+                return cloned
+            }
         }
     }
 

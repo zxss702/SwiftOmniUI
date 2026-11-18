@@ -278,7 +278,7 @@ extension WindowGroup {
     ///   - content: the window's page for one value.
     public init<Value: Codable & Hashable & SendableMetatype, Content: View>(
         for value: Value.Type,
-        @ViewBuilder content: @escaping (Binding<Value?>) -> Content
+        @ViewBuilder content: @escaping @MainActor (Binding<Value?>) -> Content
     ) {
         let content = Carry(content)
         self.init(WindowType(String(reflecting: Value.self)), for: value) { binding in
@@ -289,6 +289,22 @@ extension WindowGroup {
                     content.value(Binding(
                         get: { binding.wrappedValue },
                         set: { if let value = $0 { binding.wrappedValue = value } }))
+                }
+            }
+        }
+    }
+
+    /// A named group that opens one window per value with a SwiftUI `@ViewBuilder` content closure.
+    public init<Value: Codable & Hashable & SendableMetatype, Content: View>(
+        _ type: WindowType,
+        for value: Value.Type,
+        @ViewBuilder content: @escaping @MainActor (Binding<Value>) -> Content
+    ) {
+        let content = Carry(content)
+        self.init(type, for: value) { binding in
+            MainActor.assumeIsolated {
+                Window {
+                    content.value(binding)
                 }
             }
         }

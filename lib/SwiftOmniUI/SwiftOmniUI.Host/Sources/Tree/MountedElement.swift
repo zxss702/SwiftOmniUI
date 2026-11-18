@@ -738,6 +738,8 @@ import CRT
         values.isFrameContent = bool(.isFrameContent) ?? false
         values.isLayoutDecoration = bool(.isLayoutDecoration) ?? false
         switch type {
+        case .rectangle, .ellipse, .path, .canvas:
+            if values.flex == nil { values.expandingAxes = .both }
         case .image:
             if value(ImageContract.isResizable.token)?.bool == true { values.expandingAxes = .both }
         case .textField, .searchField:

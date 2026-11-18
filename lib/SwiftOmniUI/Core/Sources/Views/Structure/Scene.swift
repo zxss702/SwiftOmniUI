@@ -71,7 +71,7 @@ extension Scene {
     ///
     /// A nearer `.environment()` of the same type - on `Windows`, or on a
     /// view inside - overrides it for its own branch.
-    public func environment<Value: AnyObject>(_ object: Value) -> Scene {
+    public func environment<Value: AnyObject>(_ object: Value) -> some Scene {
         OfferingScene(base: self, key: ObjectIdentifier(Value.self), object: object)
     }
 
@@ -102,7 +102,7 @@ extension Scene {
     }
 
     /// Where the scene's windows open, the fractions outright.
-    public func defaultPosition(x: Double, y: Double) -> Scene {
+    public func defaultPosition(x: Double, y: Double) -> some Scene {
         defaultPosition(UnitPoint(x: x, y: y))
     }
 
@@ -153,7 +153,7 @@ extension Scene {
     }
 
     /// The size the scene's windows open at, as one value.
-    public func defaultSize(_ size: Size) -> Scene {
+    public func defaultSize(_ size: Size) -> some Scene {
         defaultSize(width: size.width, height: size.height)
     }
 

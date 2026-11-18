@@ -50,3 +50,27 @@ public struct ScrollGeometry: Equatable, Sendable {
         )
     }
 }
+
+/// The phase of a scroll interaction on a scrollable view.
+public enum ScrollPhase: Hashable, Sendable {
+    case idle
+    case tracking
+    case interacting
+    case decelerating
+    case animating
+
+    public var isScrolling: Bool {
+        self != .idle
+    }
+}
+
+/// Context provided when a scroll view's phase changes.
+public struct ScrollPhaseChangeContext: Sendable {
+    public let geometry: ScrollGeometry
+    public let velocity: CGSize?
+
+    public init(geometry: ScrollGeometry = ScrollGeometry(), velocity: CGSize? = nil) {
+        self.geometry = geometry
+        self.velocity = velocity
+    }
+}

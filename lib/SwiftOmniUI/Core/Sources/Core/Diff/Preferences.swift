@@ -78,7 +78,7 @@ struct PreferenceObserver {
     let box: PreferenceKeyBox
 
     /// What runs with the value it had and the one it now has.
-    let run: ErasedChangeHandler
+    var run: ErasedChangeHandler
 }
 
 /// The observer as a rendered element keeps it.
@@ -90,7 +90,7 @@ struct PreferenceWatch {
     var last: Any
 
     /// What runs with the value it had and the one it now has.
-    let run: ErasedChangeHandler
+    var run: ErasedChangeHandler
 }
 
 /// One `.transformPreference` rewrite a node carries.

@@ -261,15 +261,16 @@ class GTKLazyView: GTKTravellingLayout {
     /// GTK asks the run's measure again where its places moved.
     func revalidateMeasurements(across: Bool, forSize: Int32) {
         // GTK can invalidate an intrinsic size without a core patch (native input,
-        // font or CSS changes). Revalidate cached rows here instead of dropping all
-        // cached measurements; unchanged sizes update revision without counting again.
+        // font or CSS changes). Revalidate only rows whose own measurement revision
+        // actually moved instead of re-measuring every mounted subtree on every query.
         for (identity, item) in mounted where !item.departing {
-            guard let cached = measured[identity] else { continue }
+            guard let cached = measured[identity],
+                  cached.revision != item.view.measurementRevision else { continue }
             let size = item.size(offered: cached.proposal)
             if size != cached.size {
                 measured[identity] = (cached.proposal, size, item.view.measurementRevision)
                 cells.measurements += 1
-            } else if cached.revision != item.view.measurementRevision {
+            } else {
                 measured[identity] = (cached.proposal, size, item.view.measurementRevision)
             }
         }
@@ -478,9 +479,13 @@ final class GTKLazyStackView: GTKLazyView {
             let start = cells.offset(of: place)
             return start..<(start + max(1, cells.extents.extent(of: identity)))
         }
-        let margin = max(0, span.upperBound - span.lowerBound) * 0.5
+        let room = max(0, span.upperBound - span.lowerBound)
+        let margin = room * 0.5
         let realize = target ?? (span.isEmpty ? nil : (span.lowerBound - margin)..<(span.upperBound + margin))
-        cells.show(span, realize: realize, keeping: travellingIdentities, prefetch: false)
+        let observed = max(20, cells.measuredRunExtent(perRun: 1, grid: false, forward: true))
+        let unknownRuns = room > 0 ? max(2, Int((room / observed).rounded(.up)) + 1) : 1
+        cells.show(span, realize: realize, keeping: travellingIdentities,
+                   prefetch: false, unknownRuns: unknownRuns)
     }
 }
 
@@ -672,10 +677,13 @@ final class GTKLazyGridView: GTKLazyView {
             let start = cells.runs.offset(of: run, count: count)
             return start..<(start + max(1, cells.runs.extent(of: run)))
         }
-        let margin = max(0, span.upperBound - span.lowerBound) * 0.5
+        let room = max(0, span.upperBound - span.lowerBound)
+        let margin = room * 0.5
         let realize = target ?? (span.isEmpty ? nil : (span.lowerBound - margin)..<(span.upperBound + margin))
+        let observed = max(20, cells.measuredRunExtent(perRun: perRun, grid: true, forward: true))
+        let unknownRuns = room > 0 ? max(2, Int((room / observed).rounded(.up)) + 1) : 1
         cells.show(span, perRun: perRun, grid: true, realize: realize,
-                   keeping: travellingIdentities, prefetch: false)
+                   keeping: travellingIdentities, prefetch: false, unknownRuns: unknownRuns)
     }
 }
 

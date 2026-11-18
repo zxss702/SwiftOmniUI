@@ -219,6 +219,15 @@ enum Input {
         return
     }
 
+    if let carrier = value as? any ModifierContentCarrier {
+        inputs.append((path: "\(path).stamp", input: .reference(ObjectIdentifier(carrier.contentStamp))))
+        return
+    }
+
+    if value is ModifierContentStamp {
+        return
+    }
+
     if value is any LazyRowStateBoundary {
         inputs.append((path: path, input: .opaque))
         return
@@ -416,10 +425,27 @@ extension Node {
             if node.type == .fragment { node.materialize() }
             if node.type == .fragment, node.children.count > 1, written.lazyIdentity != nil,
                let stack = written.props[.lazyRowStack]?.numbers, !stack.isEmpty {
-                let children = node.asChildren
-                node.type = stack[0] == 1 ? .hStack : .vStack
+                let isHorizontal = stack[0] == 1
+                let alignRaw = stack.count > 1 ? Int32(stack[1]) : nil
+                let align = alignRaw.flatMap(AxisAlignment.init(rawValue:))
+                let children = node.asChildren.map { child -> Node in
+                    var child = child
+                    if let align {
+                        if isHorizontal {
+                            if child.props[.verticalAlignment] == nil {
+                                child.write(ViewContract.verticalAlignment,
+                                            child.props[.maximumHeight]?.number == .infinity ? .fill : align)
+                            }
+                        } else if child.props[.horizontalAlignment] == nil {
+                            child.write(ViewContract.horizontalAlignment,
+                                        child.props[.maximumWidth]?.number == .infinity ? .fill : align)
+                        }
+                    }
+                    return child
+                }
+                node.type = isHorizontal ? .hStack : .vStack
                 node.children = children
-                if stack.count > 1 { node.write(StackBaseContract.spacing, stack[1]) }
+                if stack.count > 2 { node.write(StackBaseContract.spacing, stack[2]) }
             }
             for (property, member) in written.inheritedMembers {
                 node.inherit(property, member: member)

@@ -56,7 +56,8 @@ extension Differ {
         forced: Bool = false,
         sizesArrive: Bool = false,
         wrapFragmentChildren: Bool = false,
-        from start: Int = 0
+        from start: Int = 0,
+        hostClaimedIds: HostClaimedIds? = nil
     ) -> (node: RenderedNode, patch: HostPatch) {
         var pass = ElementPass(
             id: id, rendered: rendered, node: node, forced: forced,
@@ -83,9 +84,13 @@ extension Differ {
                 pass.node.children = expanded
                 prepareElement(&pass)
             } else {
+                var strippedFragment = pass.node
+                if expanded.count > 1 {
+                    strippedFragment.lazyIdentity = nil
+                }
                 pass.node.children = expanded.map { child in
                     var child = child
-                    child.absorbFragmentWrites(of: pass.node, environments: false)
+                    child.absorbFragmentWrites(of: strippedFragment, environments: false)
                     return child
                 }
                 if let rendered, rendered.type != .fragment { forget(rendered) }
@@ -94,6 +99,11 @@ extension Differ {
             }
         } else {
             prepareElement(&pass)
+        }
+        let activeHostClaimed: HostClaimedIds? = if pass.node.type == .fragment {
+            hostClaimedIds ?? Self.enclosingHostClaimedIds(excluding: rendered)
+        } else {
+            nil
         }
         let children = withCustomLayoutOwner(pass.node.type == .customLayout ? id : nil) {
             // A value gate changes this subtree's transaction for this update,
@@ -110,7 +120,8 @@ extension Differ {
                               sizesArrive: pass.node.type == .fragment ? sizesArrive : pass.node.childSizesArrive,
                               wrapFragmentChildren: pass.node.type == .fragment
                                   ? pass.wrapFragmentChildren
-                                  : (pass.node.wrapsFragmentChildren || pass.node.isFrameWrapper))
+                                  : (pass.node.wrapsFragmentChildren || pass.node.isFrameWrapper),
+                              hostClaimedIds: activeHostClaimed)
         }
         return finishElement(&pass, children: children)
     }
@@ -377,8 +388,25 @@ extension Differ {
                 if made.type == .fragment, made.children.count > 1, made.lazyIdentity != nil,
                    let row = made.props.removeValue(forKey: .lazyRowStack)?.numbers,
                    let axis = row.first {
-                    made.type = axis == 0 ? .vStack : .hStack
-                    if row.count > 1 { made.write(StackBaseContract.spacing, row[1]) }
+                    let isHorizontal = axis == 1
+                    let align = row.count > 1 ? AxisAlignment(rawValue: Int32(row[1])) : nil
+                    made.type = isHorizontal ? .hStack : .vStack
+                    if let align {
+                        made.children = made.children.map { child in
+                            var child = child
+                            if isHorizontal {
+                                if child.props[.verticalAlignment] == nil {
+                                    child.write(ViewContract.verticalAlignment,
+                                                child.props[.maximumHeight]?.number == .infinity ? .fill : align)
+                                }
+                            } else if child.props[.horizontalAlignment] == nil {
+                                child.write(ViewContract.horizontalAlignment,
+                                            child.props[.maximumWidth]?.number == .infinity ? .fill : align)
+                            }
+                            return child
+                        }
+                    }
+                    if row.count > 2 { made.write(StackBaseContract.spacing, row[2]) }
                 }
                 return made
             }
@@ -586,11 +614,30 @@ extension Differ {
             return
         }
 
-        let wrapped = Self.expandedFragmentLeaves(of: current).map { Self.wrapLeaf($0, in: shells) }
+        let wrapped = Self.expandedFragmentLeaves(of: current).enumerated().map { index, leaf in
+            Self.wrapLeaf(leaf, in: shells, cloneShells: index > 0)
+        }
 
         if let stack = outerLazyRowStack, !stack.isEmpty, outerLazyIdentity != nil, wrapped.count > 1 {
-            var row = Node(type: stack[0] == 1 ? .hStack : .vStack, children: wrapped)
-            if stack.count > 1 { row.write(StackBaseContract.spacing, stack[1]) }
+            let isHorizontal = stack[0] == 1
+            let align = stack.count > 1 ? AxisAlignment(rawValue: Int32(stack[1])) : nil
+            let alignedChildren = wrapped.map { child -> Node in
+                var child = child
+                if let align {
+                    if isHorizontal {
+                        if child.props[.verticalAlignment] == nil {
+                            child.write(ViewContract.verticalAlignment,
+                                        child.props[.maximumHeight]?.number == .infinity ? .fill : align)
+                        }
+                    } else if child.props[.horizontalAlignment] == nil {
+                        child.write(ViewContract.horizontalAlignment,
+                                    child.props[.maximumWidth]?.number == .infinity ? .fill : align)
+                    }
+                }
+                return child
+            }
+            var row = Node(type: isHorizontal ? .hStack : .vStack, children: alignedChildren)
+            if stack.count > 2 { row.write(StackBaseContract.spacing, stack[2]) }
             row.id = outerId
             row.key = outerKey
             row.lazyIdentity = outerLazyIdentity
@@ -627,7 +674,11 @@ extension Differ {
         }
     }
 
-    private static func wrapLeaf(_ leaf: Node, in shells: [(beforeView: Int, node: Node)]) -> Node {
+    private static func wrapLeaf(
+        _ leaf: Node,
+        in shells: [(beforeView: Int, node: Node)],
+        cloneShells: Bool = false
+    ) -> Node {
         let leafId = leaf.id
         let leafKey = leaf.key
         let leafLazy = leaf.lazyIdentity
@@ -635,7 +686,7 @@ extension Differ {
         wrapped.id = nil
         wrapped.key = nil
         for (_, shell) in shells.reversed() {
-            var node = shell
+            var node = cloneShells ? shell.clonedForDistributedSibling() : shell
             node.id = nil
             node.key = nil
             node.lazyIdentity = nil
@@ -1317,10 +1368,7 @@ extension Differ {
             node.environments.count == kept.environments.count,
             node.driven.count == kept.driven.count,
             node.preferenceSeeds.count == kept.preferenceSeeds.count,
-            // These closures are inputs too. Carrying the old composition
-            // would retain its old observer/transform rather than the one
-            // the parent just supplied; closures cannot be compared.
-            node.preferenceObservers.isEmpty, kept.preferenceObservers.isEmpty,
+            node.preferenceObservers.map(\.box.key) == kept.preferenceObservers.map(\.box.key),
             node.preferenceTransforms.isEmpty, kept.preferenceTransforms.isEmpty,
             node.focusedValues.same(as: kept.focusedValues),
             node.sceneFocusedValues.same(as: kept.sceneFocusedValues)
@@ -1374,6 +1422,12 @@ extension Differ {
         for (name, handler) in node.events {
             if let id = rendered.events[name] {
                 handlers[id] = handler
+            }
+        }
+
+        if rendered.preferenceWatches.count == node.preferenceObservers.count {
+            for index in node.preferenceObservers.indices {
+                rendered.preferenceWatches[index].run = node.preferenceObservers[index].run
             }
         }
 

@@ -189,7 +189,11 @@ public struct GeometryProxy: Sendable {
 /// its frame settles somewhere new. Several views stack from the leading top
 /// corner. Content does not determine the reader's natural size. To report a frame rather than build from it, write
 /// `.onFrameChanged` on the view.
-public struct GeometryReader: View {
+public struct GeometryReader: View, DistributableView {
+    func freshDistributedCopy() -> GeometryReader {
+        GeometryReader(build)
+    }
+
     /// The closure cannot lay out from an invented zero proposal. The empty
     /// reader still accepts space and reports it, before mounting its content.
     @State private var report: FrameReport? = nil

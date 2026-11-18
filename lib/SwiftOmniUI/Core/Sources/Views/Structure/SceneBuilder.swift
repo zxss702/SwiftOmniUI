@@ -18,38 +18,38 @@ public enum SceneBuilder {
         expression
     }
 
+    /// An existential scene boxes into a concrete `Scene` for parameter-pack blocks.
+    @_disfavoredOverload
+    public static func buildExpression(_ expression: any Scene) -> some Scene {
+        let carried = Carry(expression)
+        return MainActor.assumeIsolated { Carry(AnyScene(base: carried.value)) }.value
+    }
+
     /// The one scene the body is.
     public static func buildBlock<Content: Scene>(_ scene: Content) -> Content {
         scene
     }
 
-    /// The scenes of a body of two.
-    public static func buildBlock<First: Scene, Second: Scene>(
-        _ first: First, _ second: Second
+    /// The scenes of a multi-scene body.
+    @_disfavoredOverload
+    public static func buildBlock<each Content: Scene>(
+        _ content: repeat each Content
     ) -> TupleScene {
-        let pair = (Carry(first), Carry(second))
+        var list: [any Scene] = []
+        for item in repeat each content {
+            list.append(item)
+        }
+        let carried = Carry(list)
         return MainActor.assumeIsolated {
-            Carry(TupleScene(scenes: [pair.0.value, pair.1.value]))
+            Carry(TupleScene(scenes: carried.value))
         }.value
     }
 
-    /// The scenes of a body of three.
-    public static func buildBlock<First: Scene, Second: Scene, Third: Scene>(
-        _ first: First, _ second: Second, _ third: Third
-    ) -> TupleScene {
-        let trio = (Carry(first), Carry(second), Carry(third))
+    /// An `if` branch without an `else`.
+    public static func buildOptional<Content: Scene>(_ scene: Content?) -> TupleScene {
+        let carried = Carry(scene.map { [$0 as any Scene] } ?? [])
         return MainActor.assumeIsolated {
-            Carry(TupleScene(scenes: [trio.0.value, trio.1.value, trio.2.value]))
-        }.value
-    }
-
-    /// The scenes of a body of four.
-    public static func buildBlock<First: Scene, Second: Scene, Third: Scene, Fourth: Scene>(
-        _ first: First, _ second: Second, _ third: Third, _ fourth: Fourth
-    ) -> TupleScene {
-        let all = (Carry(first), Carry(second), Carry(third), Carry(fourth))
-        return MainActor.assumeIsolated {
-            Carry(TupleScene(scenes: [all.0.value, all.1.value, all.2.value, all.3.value]))
+            Carry(TupleScene(scenes: carried.value))
         }.value
     }
 

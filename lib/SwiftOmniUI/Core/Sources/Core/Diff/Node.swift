@@ -295,6 +295,43 @@ public struct Node {
     /// when enclosing wrappers probe for `.fragment` children.
     var stopsFragmentDistribution = false
 
+    /// Produces a sibling copy with independent `@State` / `AnchorBox` storage when a
+    /// wrapper (such as `.background { GeometryReader { ... } }`) is distributed across
+    /// multiple `.fragment` leaves.
+    var distributedClone: (() -> Node)?
+
+    @MainActor mutating func setDistributedClone(_ make: @escaping () -> Node) {
+        distributedClone = make
+    }
+
+    func clonedForDistributedSibling() -> Node {
+        if let distributedClone {
+            let fresh = distributedClone()
+            let freshStateful = fresh.stateful
+            let freshClone = fresh.distributedClone
+            let freshAnchorBoxes = fresh.anchorBoxes
+            let freshSeeds = fresh.preferenceSeeds
+            let freshEvents = fresh.events
+            var merged = self
+            merged.stateful = freshStateful
+            merged.distributedClone = freshClone
+            if !freshAnchorBoxes.isEmpty {
+                merged.anchorBoxes = freshAnchorBoxes
+                merged.preferenceSeeds = freshSeeds
+                merged.events = freshEvents
+            }
+            return merged
+        }
+        var copy = self
+        if let producer {
+            copy.producer = { producer().map { $0.clonedForDistributedSibling() } }
+        }
+        if !children.isEmpty {
+            copy.children = children.map { $0.clonedForDistributedSibling() }
+        }
+        return copy
+    }
+
     /// The container's content, run when the differ describes this element; nil once
     /// run.
     /// Design: docs/design/core/identity-and-diffing.md#containers-run-their-own-content

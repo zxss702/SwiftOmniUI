@@ -10,7 +10,7 @@ public struct ScrollPosition: Equatable, Sendable {
     public private(set) var x: CGFloat?
     public private(set) var y: CGFloat?
     public private(set) var viewID: (any Hashable & Sendable)?
-    public private(set) var isPositionedByUser = false
+    public var isPositionedByUser = false
     private var anchor: UnitPoint?
     private var revision = UUID()
     private var idType: any (Hashable & Sendable).Type

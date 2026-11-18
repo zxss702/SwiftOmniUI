@@ -989,6 +989,15 @@ static winrt::com_ptr<IDWriteFactory> dwriteWordsFactory() {
     return factory;
 }
 
+static winrt::com_ptr<IDWriteFontCollection> dwriteSystemFontCollection() {
+    static auto collection = [] {
+        winrt::com_ptr<IDWriteFontCollection> result;
+        winrt::check_hresult(dwriteWordsFactory()->GetSystemFontCollection(result.put(), FALSE));
+        return result;
+    }();
+    return collection;
+}
+
 namespace {
     struct DWriteInlineMetricsObject final : IDWriteInlineObject {
         DWRITE_INLINE_OBJECT_METRICS metrics{};
@@ -1081,15 +1090,14 @@ static int32_t readInlineRunGeometry(
     auto availW = visualFe ? visualFe.ActualWidth() : 0.0;
     auto availH = visualFe ? visualFe.ActualHeight() : 0.0;
     auto coordFe = coordinates.try_as<xaml::FrameworkElement>();
-    auto coordSize = coordinates.ActualSize();
-    if (availW <= 0 || availH <= 0 || coordSize.x <= 0 || coordSize.y <= 0
-        || (coordFe && (std::abs(coordSize.x - coordFe.ActualWidth()) > 0.5
-                        || std::abs(coordSize.y - coordFe.ActualHeight()) > 0.5)))
+    auto coordW = coordFe ? coordFe.ActualWidth() : static_cast<double>(coordinates.ActualSize().x);
+    auto coordH = coordFe ? coordFe.ActualHeight() : static_cast<double>(coordinates.ActualSize().y);
+    if (availW <= 0 || availH <= 0 || coordW <= 0 || coordH <= 0)
         return 0;
 
     auto pad = rich ? rich.Padding() : block.Padding();
-    auto layoutW = std::max(availW, static_cast<double>(coordSize.x));
-    auto layoutH = std::max(availH, static_cast<double>(coordSize.y));
+    auto layoutW = std::max(availW, coordW);
+    auto layoutH = std::max(availH, coordH);
     // Add 0.5 DIP rounding tolerance so XAML/float32 quantization on an intrinsic-width
     // box never splits the final glyph of a single line onto a spurious extra DirectWrite line.
     auto contentW = static_cast<FLOAT>(std::max(0.0, layoutW - pad.Left - pad.Right)) + 0.5f;
@@ -1164,8 +1172,7 @@ static int32_t readInlineRunGeometry(
     }
 
     auto factory = dwriteWordsFactory();
-    winrt::com_ptr<IDWriteFontCollection> collection;
-    winrt::check_hresult(factory->GetSystemFontCollection(collection.put(), FALSE));
+    auto collection = dwriteSystemFontCollection();
 
     auto unset = xaml::DependencyProperty::UnsetValue();
     std::wstring blockFamilySource = block.ReadLocalValue(controls::TextBlock::FontFamilyProperty()) == unset
@@ -1255,7 +1262,6 @@ static int32_t readInlineRunGeometry(
     if (lineCount) *lineCount = static_cast<int32_t>(std::max<UINT32>(1, dwLineCount));
 
     auto advance = rich ? rich.LineHeight() : block.LineHeight();
-    if (availW > coordSize.x + 1.0 || availH > coordSize.y + 1.0) return 0;
     if (dwLineCount > 1 && contentW > 0 && dwLineCount > 0 && contentH <= lines[0].height * 1.5f) {
         layout->SetMaxWidth(contentW + 2.0f);
         UINT32 widenedLines = 0;
@@ -1280,22 +1286,48 @@ static int32_t readInlineRunGeometry(
     }
 
     auto transform = visual.TransformToVisual(coordinates);
+    std::optional<winrt::Windows::Foundation::Point> translation;
+    if (auto matrix = transform.try_as<xaml::Media::MatrixTransform>()) {
+        auto value = matrix.Matrix();
+        if (value.M11 == 1 && value.M12 == 0 && value.M21 == 0 && value.M22 == 1)
+            translation = winrt::Windows::Foundation::Point{
+                static_cast<float>(value.OffsetX), static_cast<float>(value.OffsetY)};
+    }
     int32_t outCount = 0;
     UINT32 curLine = 0;
     UINT32 curLineEnd = dwLineCount > 0 ? lines[0].length : static_cast<UINT32>(fullText.size());
     size_t attrIdx = 0;
+    bool hasCachedLeading = false;
+    FLOAT cachedPx0 = 0, cachedPy0 = 0;
+    DWRITE_HIT_TEST_METRICS cachedM0{};
 
     for (UINT32 pos = 0; pos < static_cast<UINT32>(fullText.size()) && outCount < capacity; ++pos) {
         while (curLine + 1 < dwLineCount && pos >= curLineEnd) {
             ++curLine;
             curLineEnd += lines[curLine].length;
+            hasCachedLeading = false;
         }
         while (attrIdx < attrs.size() && pos >= attrs[attrIdx].start + attrs[attrIdx].length) ++attrIdx;
 
         FLOAT px0 = 0, py0 = 0, px1 = 0, py1 = 0;
         DWRITE_HIT_TEST_METRICS m0{}, m1{};
-        winrt::check_hresult(layout->HitTestTextPosition(pos, FALSE, &px0, &py0, &m0));
+        if (hasCachedLeading && cachedM0.textPosition == pos) {
+            px0 = cachedPx0;
+            py0 = cachedPy0;
+            m0 = cachedM0;
+        } else {
+            winrt::check_hresult(layout->HitTestTextPosition(pos, FALSE, &px0, &py0, &m0));
+        }
         winrt::check_hresult(layout->HitTestTextPosition(pos, TRUE, &px1, &py1, &m1));
+        if (m0.length == 1 && m0.bidiLevel == 0 && pos + 1 < curLineEnd) {
+            hasCachedLeading = true;
+            cachedPx0 = px1;
+            cachedPy0 = py1;
+            cachedM0 = m1;
+            cachedM0.textPosition = pos + 1;
+        } else {
+            hasCachedLeading = false;
+        }
 
         double x = m0.left;
         double w = (m0.length <= 1) ? std::abs(static_cast<double>(px1) - static_cast<double>(px0)) : m0.width;
@@ -1307,6 +1339,7 @@ static int32_t readInlineRunGeometry(
         double h = static_cast<double>(m0.height);
 
         if (attrIdx < attrs.size() && attrs[attrIdx].inlineText && pos == attrs[attrIdx].start) {
+            hasCachedLeading = false;
             auto child = attrs[attrIdx].inlineText;
             auto cw = child.Text();
             auto cx = pad.Left + x;
@@ -1322,21 +1355,35 @@ static int32_t readInlineRunGeometry(
                         cr.Width = std::abs(ce.X - cr.X); cr.X = cleft;
                     }
                 }
-                auto rect = transform.TransformBounds({
-                    static_cast<float>(cx + cr.X), static_cast<float>(cy + cr.Y), cr.Width, cr.Height});
-                rectangles[outCount * 4] = rect.X; rectangles[outCount * 4 + 1] = rect.Y;
-                rectangles[outCount * 4 + 2] = rect.Width; rectangles[outCount * 4 + 3] = rect.Height;
+                if (translation) {
+                    rectangles[outCount * 4] = cx + cr.X + translation->X;
+                    rectangles[outCount * 4 + 1] = cy + cr.Y + translation->Y;
+                    rectangles[outCount * 4 + 2] = cr.Width;
+                    rectangles[outCount * 4 + 3] = cr.Height;
+                } else {
+                    auto rect = transform.TransformBounds({
+                        static_cast<float>(cx + cr.X), static_cast<float>(cy + cr.Y), cr.Width, cr.Height});
+                    rectangles[outCount * 4] = rect.X; rectangles[outCount * 4 + 1] = rect.Y;
+                    rectangles[outCount * 4 + 2] = rect.Width; rectangles[outCount * 4 + 3] = rect.Height;
+                }
                 ++outCount;
                 cpos = cnext;
             }
             continue;
         }
 
-        auto rect = transform.TransformBounds({
-            static_cast<float>(pad.Left + x), static_cast<float>(pad.Top + y),
-            static_cast<float>(w), static_cast<float>(h)});
-        rectangles[outCount * 4] = rect.X; rectangles[outCount * 4 + 1] = rect.Y;
-        rectangles[outCount * 4 + 2] = rect.Width; rectangles[outCount * 4 + 3] = rect.Height;
+        if (translation) {
+            rectangles[outCount * 4] = pad.Left + x + translation->X;
+            rectangles[outCount * 4 + 1] = pad.Top + y + translation->Y;
+            rectangles[outCount * 4 + 2] = w;
+            rectangles[outCount * 4 + 3] = h;
+        } else {
+            auto rect = transform.TransformBounds({
+                static_cast<float>(pad.Left + x), static_cast<float>(pad.Top + y),
+                static_cast<float>(w), static_cast<float>(h)});
+            rectangles[outCount * 4] = rect.X; rectangles[outCount * 4 + 1] = rect.Y;
+            rectangles[outCount * 4 + 2] = rect.Width; rectangles[outCount * 4 + 3] = rect.Height;
+        }
         ++outCount;
     }
     return outCount;

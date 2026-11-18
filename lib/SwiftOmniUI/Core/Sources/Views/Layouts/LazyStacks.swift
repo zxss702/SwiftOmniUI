@@ -91,7 +91,7 @@ public struct LazyVStack: View, FragmentDistributionBarrier {
         element.node.lazyRequestWindow = heldGeneration.lender.map(ObjectIdentifier.init)
         element.node.lazyRequestGenerationValue = { heldGeneration.wrappedValue }
         let axis = alignment.axis
-        children.take(content(), into: &element.node, realized: held) { child, _ in
+        children.take(content(), into: &element.node, realized: held, rowAlignment: axis) { child, _ in
             if child.props[.horizontalAlignment] == nil {
                 child.write(ViewContract.horizontalAlignment,
                             child.props[.maximumWidth]?.number == .infinity ? .fill : axis)
@@ -167,7 +167,7 @@ public struct LazyHStack: View, FragmentDistributionBarrier {
         element.node.lazyRequestWindow = heldGeneration.lender.map(ObjectIdentifier.init)
         element.node.lazyRequestGenerationValue = { heldGeneration.wrappedValue }
         let axis = alignment.axis
-        children.take(content(), into: &element.node, realized: held) { child, _ in
+        children.take(content(), into: &element.node, realized: held, rowAlignment: axis) { child, _ in
             if child.props[.verticalAlignment] == nil {
                 child.write(ViewContract.verticalAlignment,
                             child.props[.maximumHeight]?.number == .infinity ? .fill : axis)
@@ -236,6 +236,7 @@ struct LazyHStackElement: StackBase {
     /// names, in the order they show. The node keeps the shared identity index.
     func take(
         _ content: any View, into node: inout Node, realized: Binding<[String]>,
+        rowAlignment: AxisAlignment? = nil,
         prepare: @escaping (inout Node, Int) -> Void
     ) {
         var segments: [Segment] = []
@@ -247,7 +248,7 @@ struct LazyHStackElement: StackBase {
                 segments.append(.rows(rows))
             } else {
                 let described = element.node
-                if let elements = described.lazyElements {
+                if let elements = described.unwrappedLazyElements() {
                     for element in elements { append(element) }
                 } else {
                     children.append(contentsOf: described.asChildren)
@@ -475,8 +476,9 @@ struct LazyHStackElement: StackBase {
         let boundaries = starts
         let positions = source.sequence
         let rowSpacing = node.props[.spacing]?.number
+        let rowAlign = (rowAlignment ?? .center).rawValue
         let rowStack: PropValue? = node.type == .lazyVStack || node.type == .lazyHStack
-            ? .numbers([node.type == .lazyHStack ? 1 : 0] + (rowSpacing.map { [$0] } ?? [])) : nil
+            ? .numbers([node.type == .lazyHStack ? 1 : 0, Double(rowAlign)] + (rowSpacing.map { [$0] } ?? [])) : nil
         node.lazyWindow = realized.lender.map(ObjectIdentifier.init)
         let readings = LazyRowReadings()
         node.lazyRowReadings = readings
