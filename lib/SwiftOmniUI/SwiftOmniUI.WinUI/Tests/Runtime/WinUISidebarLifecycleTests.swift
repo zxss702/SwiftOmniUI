@@ -6,6 +6,7 @@ import CSwiftOmniUIWinUI
 @_spi(Host) @testable import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
 import SwiftOmniUIConformance
+import WinSDK
 import XCTest
 
 final class WinUISidebarLifecycleTests: XCTestCase {
@@ -318,14 +319,16 @@ final class WinUISidebarLifecycleTests: XCTestCase {
                                             if tab.wrappedValue == idx {
                                                 Color.clear
                                                     .frame(height: 32)
-                                                    .background(Color.white, in: Capsule(style: .continuous))
+                                                    .background(Color("#FF00FF"), in: Capsule(style: .continuous))
                                                     .matchedGeometryEffect(id: "sideBarButton", in: ns)
                                                     .id("pill-\(idx)")
                                             }
                                         }
                                 }
+                                .id("tab-button-\(idx)")
                             }
                         }
+                        .buttonStyle(.plain)
                         .frame(height: 32)
                         .padding(8)
                     }
@@ -337,7 +340,24 @@ final class WinUISidebarLifecycleTests: XCTestCase {
             let t0Before = try XCTUnwrap(host.view(id: .manual("tab-0")))
             let pill0Before = try XCTUnwrap(host.view(id: .manual("pill-0")))
             let vstackBefore = try XCTUnwrap(t0Before.sourceElement?.parent?.winUI.view)
+            let window = try XCTUnwrap(host.window)
+            let root = try XCTUnwrap(window.content)
+            let title = "SOUI sidebar pill paint regression"
+            window.setTitle(title)
+            let nativeTitle = Array(title.utf16) + [0]
+            let hwnd = try XCTUnwrap(nativeTitle.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+            let positionFlags = UINT(SWP_NOACTIVATE | SWP_NOSIZE)
+            XCTAssertTrue(SetWindowPos(hwnd, HWND(bitPattern: -1), 32, 32, 0, 0, positionFlags))
+            defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 32, 32, 0, 0, positionFlags) }
             let beforeOriginX = pill0Before.origin.x
+            let nextButton = try XCTUnwrap(host.view(id: .manual("tab-button-1")))
+            let gapX = (beforeOriginX + pill0Before.laidOutFrame.width + nextButton.origin.x) / 2
+            let gapPoint = (gapX - root.origin.x, pill0Before.origin.y - root.origin.y + 16)
+            let pillColor: UInt32 = 0xFFFF_00FF
+            @MainActor func gapShowsPill() -> Bool {
+                root.presentedPixels(at: [gapPoint], in: window) == [pillColor]
+            }
+            XCTAssertFalse(gapShowsPill())
             XCTAssertEqual(t0Before.frame.y, 0, accuracy: 0.5)
             XCTAssertEqual(vstackBefore.frame.height, 700, accuracy: 0.5)
 
@@ -348,6 +368,7 @@ final class WinUISidebarLifecycleTests: XCTestCase {
 
             var originsX: [Double] = []
             var t1Opacities: [Double] = []
+            var sampledGap = false
             for _ in 0..<8 {
                 clock.now += 16
                 host.step()
@@ -364,8 +385,15 @@ final class WinUISidebarLifecycleTests: XCTestCase {
                 XCTAssertEqual(vstackBefore.frame.height, 700, accuracy: 0.5)
                 t1Opacities.append(t1.opacity)
                 originsX.append(p1.origin.x)
+                if !sampledGap, gapX > p1.origin.x + 4, gapX < p1.origin.x + p1.laidOutFrame.width - 4 {
+                    // Neither button owns this gap. The moving pill must still paint through it.
+                    host.settle { gapShowsPill() }
+                    XCTAssertTrue(gapShowsPill(), "the moving pill must paint outside its new button")
+                    sampledGap = true
+                }
             }
 
+            XCTAssertTrue(sampledGap, "the animation must carry the pill across the gap")
             XCTAssertLessThan(t1Opacities[0], 0.2, "entering List must start its transition from low opacity")
             XCTAssertGreaterThan(t1Opacities.last ?? 0, t1Opacities[0] + 0.15, "entering List must fade in across frames")
             XCTAssertEqual(originsX[0], beforeOriginX, accuracy: 2.0, "matchedGeometry pill must launch from the previous pill's origin")
