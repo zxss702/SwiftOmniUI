@@ -58,9 +58,10 @@ final class GTKLayoutMotionTests: XCTestCase {
             let background = try XCTUnwrap(host.view(id: .manual("editor-background")))
             let attach = try XCTUnwrap(host.view(id: .manual("attach")))
 
-            func bounds(_ view: GTKView) -> (top: Double, height: Double) {
+            @MainActor func bounds(_ view: GTKView) -> (top: Double, height: Double) {
                 var frame = graphene_rect_t()
-                XCTAssertNotEqual(gtk_widget_compute_bounds(view.widget, window.widget, &frame), 0)
+                let found = gtk_widget_compute_bounds(view.widget, window.widget, &frame)
+                XCTAssertNotEqual(found, 0)
                 return (Double(frame.origin.y), Double(frame.size.height))
             }
 
@@ -409,7 +410,7 @@ final class GTKLayoutMotionTests: XCTestCase {
             XCTAssertGreaterThan(row1View.y - row0View.y, 50, "second lazy row must sit below first row")
             let insetBar = try XCTUnwrap(host.views(GTKStackView.self).last)
             XCTAssertGreaterThan(insetBar.placedFrame.height, 50, "safeAreaInset composed blocks must stack vertically rather than collapse")
-            let insetBlocks = (insetBar.sourceElement?.children ?? []).compactMap { $0.gtk.view?.placedFrame }
+            let insetBlocks = insetBar.items.map { $0.view.placedFrame }
             XCTAssertEqual(insetBlocks.count, 2)
             XCTAssertGreaterThan(insetBlocks[1].y - insetBlocks[0].y, 20, "safeAreaInset composed blocks must stack vertically rather than collapse")
         }
