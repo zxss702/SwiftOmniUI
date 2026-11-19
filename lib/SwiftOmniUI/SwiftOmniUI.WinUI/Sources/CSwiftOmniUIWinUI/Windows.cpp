@@ -705,6 +705,28 @@ extern "C" void swiftomniui_winui_window_set_screen_frame(SwiftOmniUIObjectRef h
         auto at = winrt::Windows::Graphics::PointInt32{pixels(0), pixels(1)};
         if (app.Size() != size) app.Resize(size);
         if (app.Position() != at) app.Move(at);
+
+        // A window that covers a screen is that rectangle and nothing around it. Left to the presenter it keeps a
+        // resize frame (invisible borders the window is inset by), the system's 1px accent border and rounded
+        // corners: a lit band along the screen's edge, and a window smaller than the screen. Take them all away and
+        // place the HWND itself, so the rectangle is exact whatever the presenter or the monitor's scale did.
+        auto hwnd = reinterpret_cast<HWND>(app.Id().Value);
+        auto style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        auto bare = style & ~static_cast<LONG_PTR>(WS_CAPTION | WS_THICKFRAME);
+        if (bare != style) SetWindowLongPtrW(hwnd, GWL_STYLE, bare);
+        if (auto dwm = LoadLibraryW(L"dwmapi.dll")) {
+            using SetAttribute = HRESULT(WINAPI *)(HWND, DWORD, LPCVOID, DWORD);
+            if (auto set = reinterpret_cast<SetAttribute>(GetProcAddress(dwm, "DwmSetWindowAttribute"))) {
+                DWORD corners = 1;          // DWMWCP_DONOTROUND
+                DWORD noBorder = 0xFFFFFFFE; // DWMWA_COLOR_NONE
+                set(hwnd, 33, &corners, sizeof(corners));   // DWMWA_WINDOW_CORNER_PREFERENCE
+                set(hwnd, 34, &noBorder, sizeof(noBorder)); // DWMWA_BORDER_COLOR
+            }
+            FreeLibrary(dwm);
+        }
+        auto onTop = (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
+        SetWindowPos(hwnd, onTop ? HWND_TOPMOST : nullptr, pixels(0), pixels(1), pixels(2), pixels(3),
+            SWP_FRAMECHANGED | SWP_NOACTIVATE | (onTop ? 0 : SWP_NOZORDER));
     } catch (...) {
         report("placing a window over the desktop");
     }
