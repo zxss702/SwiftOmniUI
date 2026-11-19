@@ -296,6 +296,10 @@ extern "C" void swiftomniui_winui_title_bar_set(
         auto theme = words == 1 ? xaml::ElementTheme::Dark
             : words == 2 ? xaml::ElementTheme::Light : xaml::ElementTheme::Default;
         if (bar.RequestedTheme() != theme) bar.RequestedTheme(theme);
+        // Navigation can replace the title-bar background in the same display
+        // frame as its page transition. Make the acrylic scene sample that
+        // frame again instead of retaining the previous toolbar surface.
+        markAcrylicMaterialDirty();
     } catch (...) {
         report("setting a title bar");
     }

@@ -15,6 +15,7 @@
 #include <cstring>
 
 #include <winrt/Windows.System.h>
+#include <winrt/Windows.UI.Composition.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Input.h>
@@ -100,6 +101,31 @@ namespace {
     /// Whether `window` stands off the screen: minimized, or hidden.
     bool offScreen(windowing::AppWindow const &window) {
         return minimized(window) || !window.IsVisible();
+    }
+
+    namespace composition = winrt::Microsoft::UI::Composition;
+
+    /// The backdrop of a transparent window: a brush of alpha 0. A window with no backdrop at all is not
+    /// transparent - XAML paints its own opaque theme colour under the content, which shows as a white window until
+    /// the page draws - so "no material" has to be said as a backdrop that paints nothing.
+    struct TransparentBackdrop : xaml::Media::SystemBackdropT<TransparentBackdrop> {
+        // The target takes a brush of the system compositor (Windows.UI.Composition), not the XAML one.
+        winrt::Windows::UI::Composition::Compositor compositor{nullptr};
+        void OnTargetConnected(composition::ICompositionSupportsSystemBackdrop const &target, xaml::XamlRoot const &) {
+            if (!compositor) compositor = winrt::Windows::UI::Composition::Compositor();
+            target.SystemBackdrop(compositor.CreateColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+        }
+        void OnTargetDisconnected(composition::ICompositionSupportsSystemBackdrop const &target) {
+            target.SystemBackdrop(nullptr);
+        }
+    };
+    std::vector<winrt::weak_ref<xaml::Media::SystemBackdrop>> transparentBackdrops;
+
+    bool isTransparentBackdrop(xaml::Media::SystemBackdrop const &backdrop) {
+        std::erase_if(transparentBackdrops, [](auto const &entry) { return !entry.get(); });
+        if (!backdrop) return false;
+        for (auto const &entry : transparentBackdrops) if (entry.get() == backdrop) return true;
+        return false;
     }
 }
 
@@ -523,6 +549,9 @@ extern "C" void swiftomniui_winui_window_set_chrome(
             }
         }
         if (titleBar) as<controls::TitleBar>(titleBar).ApplyTemplate();
+        // The chrome row and the navigation columns must commit their material
+        // from the same presentation sample during a page transition.
+        markAcrylicMaterialDirty();
     } catch (...) {
         report("dressing a window");
     }
@@ -763,7 +792,11 @@ extern "C" void swiftomniui_winui_window_set_traits(
         // A transparent window keeps no material at all: its pages' own alpha shows the desktop exactly.
         auto previousBackdrop = window.SystemBackdrop();
         if (transparent) {
-            if (window.SystemBackdrop()) window.SystemBackdrop(nullptr);
+            if (!isTransparentBackdrop(window.SystemBackdrop())) {
+                auto made = winrt::make<TransparentBackdrop>().as<xaml::Media::SystemBackdrop>();
+                transparentBackdrops.push_back(winrt::make_weak(made));
+                window.SystemBackdrop(made);
+            }
         } else if (translucent) {
             if (!window.SystemBackdrop().try_as<xaml::Media::DesktopAcrylicBackdrop>())
                 window.SystemBackdrop(xaml::Media::DesktopAcrylicBackdrop());
