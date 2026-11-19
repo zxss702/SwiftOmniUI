@@ -16,7 +16,7 @@ import CSwiftOmniUIWinUI
                 guard count > 0 else { return "" }
                 var bytes = [CChar](repeating: 0, count: Int(count) + 1)
                 guard swiftomniui_winui_font_outline(face, glyph, &bytes, count + 1) == count else { return "" }
-                return String(cString: bytes)
+                return String(decoding: bytes.prefix(Int(count)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
             }, table: { tag in
                 let count = swiftomniui_winui_font_table(face, tag, nil, 0)
                 guard count > 0 else { return [] }
