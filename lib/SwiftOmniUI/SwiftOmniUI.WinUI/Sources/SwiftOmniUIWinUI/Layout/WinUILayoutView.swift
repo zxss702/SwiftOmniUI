@@ -9,6 +9,12 @@ import CSwiftOmniUIWinUI
 /// Design: docs/design/platforms/winui/layout.md#a-layout-is-a-panel
 @MainActor
 class WinUILayoutView: WinUIView {
+    /// Native Measure must always return to WinUI. A streamed text update can
+    /// change a descendant while this panel is preparing its plan, so waiting
+    /// for the same pass to become perfectly stable can otherwise block the UI
+    /// thread forever. The next native pass will retry with the latest result.
+    private static let maximumPreparationPasses = 32
+
     /// Intrinsic answers by width; height-sensitive queries use proposedSizes.
     let measurements = MeasurementCache()
 
@@ -637,13 +643,14 @@ class WinUILayoutView: WinUIView {
         if sourceElement?.isGeometryReader == true, proposal.width == nil {
             return naturalSize(proposal: proposal)
         }
-        while true {
+        for _ in 0..<Self.maximumPreparationPasses {
             let size = naturalSize(proposal: proposal)
             let bounds = planBounds(proposal: proposal, natural: size)
             _ = prepareLayoutPlan(in: bounds)
             let current = naturalSize(proposal: proposal)
             if planBounds(proposal: proposal, natural: current) == bounds { return current }
         }
+        return naturalSize(proposal: proposal)
     }
 
     private func keepLayoutPlan(in bounds: Rect, proposals: [NativeProposal]) {
@@ -682,7 +689,7 @@ class WinUILayoutView: WinUIView {
     private func prepareLayoutPlan(in bounds: Rect, for preparation: Preparation = .measure) -> LayoutPlan {
         prepareLayoutContent(in: bounds, measuringNative: preparation == .measure)
         var plan = completedLayoutPlan(in: bounds)
-        while true {
+        for _ in 0..<Self.maximumPreparationPasses {
             let before = WinUIView.nativeSizeRevision
             let revision = measurementRevision
             prepareChildren(plan, for: preparation)
@@ -700,6 +707,7 @@ class WinUILayoutView: WinUIView {
             prepareLayoutContent(in: bounds, measuringNative: preparation == .measure)
             plan = completedLayoutPlan(in: bounds)
         }
+        return plan
     }
 
     private func prepareChildren(_ plan: LayoutPlan, for preparation: Preparation) {

@@ -34,6 +34,18 @@ private final class CountedMeasureLayout: WinUILayoutView {
     }
 }
 
+/// Simulates a streamed native child whose proposal changes again before the
+/// enclosing Measure pass can observe a stable dependency revision.
+private final class ContinuouslyDirtyPreparationLayout: WinUILayoutView {
+    var preparations = 0
+
+    override func prepareMeasure(width: Double, height: Double? = nil) {
+        super.prepareMeasure(width: width, height: height)
+        preparations += 1
+        measurementRevision &+= 1
+    }
+}
+
 /// Lets a real XAML ArrangeOverride ask a descendant for a new measurement.
 private final class NativeArrangementMeasureProbe: WinUILayoutView {
     var onArrange: ((Rect) -> Void)?
@@ -251,6 +263,21 @@ final class WinUIMeasurementTests: XCTestCase {
             XCTAssertEqual(root.naturalSize(width: 320).height, 80)
             root.prepareMeasure(width: 320)
             XCTAssertEqual(child.calls[320], 2)
+        }
+    }
+
+    func testNativePreparationReturnsWhenAStreamingChildNeverSettles() {
+        onUIThread {
+            let child = ContinuouslyDirtyPreparationLayout()
+            let parent = WinUIStackView(axis: .vertical)
+            parent.setItems([WinUILayoutItem(view: child)])
+
+            parent.prepareMeasure(width: 320, height: 240)
+
+            XCTAssertLessThanOrEqual(child.preparations, 32,
+                                     "a native Measure pass must yield to WinUI instead of spinning forever")
+            XCTAssertTrue(parent.desiredSize.width.isFinite)
+            XCTAssertTrue(parent.desiredSize.height.isFinite)
         }
     }
 
