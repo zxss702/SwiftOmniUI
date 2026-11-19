@@ -483,7 +483,10 @@ extern "C" void swiftomniui_winui_window_set_background(
                 static_cast<uint8_t>(background >> 8), static_cast<uint8_t>(background)};
             fill = xaml::Media::SolidColorBrush(color);
         }
-        auto grid = root(borrow<xaml::Window>(handle));
+        auto window = borrow<xaml::Window>(handle);
+        auto grid = root(window);
+        if (!fill && isTransparentBackdrop(window.SystemBackdrop()))
+            fill = xaml::Media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent());
         grid.Background(fill);
         refreshWindowMaterial(grid);
     } catch (...) {
@@ -582,7 +585,12 @@ extern "C" void swiftomniui_winui_window_activate(SwiftOmniUIObjectRef handle) {
 extern "C" void swiftomniui_winui_window_close(SwiftOmniUIObjectRef handle) {
     try {
         auto window = borrow<xaml::Window>(handle);
-        releaseOwned(reinterpret_cast<HWND>(window.AppWindow().Id().Value));
+        auto app = window.AppWindow();
+        auto hwnd = reinterpret_cast<HWND>(app.Id().Value);
+        // Remove the transparent window from the desktop before closing can
+        // disconnect its backdrop or tear down the content.
+        if (isTransparentBackdrop(window.SystemBackdrop())) ShowWindow(hwnd, SW_HIDE);
+        releaseOwned(hwnd);
         window.Close();
     } catch (...) {
         report("closing a window");
@@ -821,7 +829,9 @@ extern "C" void swiftomniui_winui_window_set_traits(
             window.SystemBackdrop(xaml::Media::MicaBackdrop());
         }
         auto grid = root(window);
-        if (transparent && grid.Background()) grid.Background(nullptr);
+        if (transparent && !grid.Background()) {
+            grid.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
+        }
         setAcrylicWindowBackdrop(grid, window.SystemBackdrop());
         if (previousBackdrop != window.SystemBackdrop()) refreshWindowMaterial(grid);
     } catch (...) {

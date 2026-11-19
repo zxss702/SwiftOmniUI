@@ -164,7 +164,8 @@ final class WinUIWindowController {
         chrome.title = composed.title ?? ""
         chrome.windowTitle = composed.title ?? DesktopApplicationInfo.displayName
         chrome.subtitle = composed.subtitle ?? ""
-        chrome.showsToolbar = composed.toolbarVisibility?.enumeration != Visibility.hidden.rawValue
+        chrome.showsToolbar = traits?.isTransparent != true
+            && composed.toolbarVisibility?.enumeration != Visibility.hidden.rawValue
         chrome.back = composed.back.map { back in
             WinUIToolbarAction(title: back.title, isEnabled: true, perform: { [weak element, weak stack = back.stack] in
                 if let element, let stack { runtime.goBack(.pop(stack), in: element) }
