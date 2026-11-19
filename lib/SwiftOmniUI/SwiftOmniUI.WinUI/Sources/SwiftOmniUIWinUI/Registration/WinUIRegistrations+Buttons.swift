@@ -36,13 +36,17 @@ extension WinUIRegistrations {
             button.applies(TextMembers.members) { view, values in applyText(view, values) }
             button.applies([
                 VisualElementContract.background,
-                BorderElementContract.shape, BorderElementContract.stroke, BorderElementContract.strokeWidth,
+                BorderElementContract.stroke, BorderElementContract.strokeWidth,
             ]) { view, values in
                 view.setLook(
                     background: values[VisualElementContract.background]?.propValue,
                     stroke: values[BorderElementContract.stroke]?.propValue,
-                    strokeWidth: values[BorderElementContract.strokeWidth],
-                    shape: values[BorderElementContract.shape]?.propValue)
+                    strokeWidth: values[BorderElementContract.strokeWidth])
+            }
+            button.applies([BorderElementContract.shape, ButtonContract.buttonStyle]) { view, values in
+                view.setCornerRadius(
+                    shape: values[BorderElementContract.shape]?.propValue,
+                    style: values[ButtonContract.buttonStyle])
             }
             button.property(VisualElementContract.isEnabled) { view, enabled in
                 view.setEnabled(enabled ?? true)

@@ -81,15 +81,8 @@ final class WinUIButtonView: WinUIView {
         WinUIView.words(of: handle)
     }
 
-    /// What fills the button, its outline and its shape; nil for the platform's own.
-    func setLook(background: HostValue?, stroke: HostValue?, strokeWidth: Double?, shape: HostValue?) {
-        let radius: Double = switch shape.map(BoxArithmetic.outline) {
-        case .roundedRectangle(let radius)?: radius
-        case .unevenRoundedRectangle(let cornerRadius)?: BoxArithmetic.clockwise(cornerRadius).max() ?? 0
-        case .ellipse?, .capsule?, .circle?: .greatestFiniteMagnitude
-        case .rectangle?: 0
-        case nil: -1
-        }
+    /// What fills and outlines the button; nil for the platform's own.
+    func setLook(background: HostValue?, stroke: HostValue?, strokeWidth: Double?) {
         let (fill, outline) = (WinUIBrush(background), WinUIBrush(stroke))
         let width = BoxArithmetic.outlineWidth(stroke: stroke, width: strokeWidth)
         paint("look", followsSize: fill.followsSize || outline.followsSize) { [weak self, handle] size in
@@ -98,10 +91,24 @@ final class WinUIButtonView: WinUIView {
             fill.withRelayBrush(over: size) { fill in
                 outline.withRelayBrush(over: size) { outline in
                     swiftomniui_winui_button_set_look(
-                        handle, fill, outline, width, radius, PressedFill.underPointer, PressedFill.pressed)
+                        handle, fill, outline, width, PressedFill.underPointer, PressedFill.pressed)
                 }
             }
         }
+    }
+
+    func setCornerRadius(shape: HostValue?, style: ButtonStyleKind?) {
+        guard !isToolbarControl else { return }
+        let radius: Double = switch shape.map(BoxArithmetic.outline) {
+        case .roundedRectangle(let radius)?: radius
+        case .unevenRoundedRectangle(let cornerRadius)?: BoxArithmetic.clockwise(cornerRadius).max() ?? 0
+        case .ellipse?, .capsule?, .circle?: .greatestFiniteMagnitude
+        case .rectangle?: 0
+        // WinUI's rounded presenter clips the whole label, including
+        // backgrounds travelling between plain buttons via matched geometry.
+        case nil: style == .plain ? 0 : -1
+        }
+        swiftomniui_winui_button_set_corner_radius(handle, radius)
     }
 
     /// The logical style, mapped to the theme style WinUI names for it.

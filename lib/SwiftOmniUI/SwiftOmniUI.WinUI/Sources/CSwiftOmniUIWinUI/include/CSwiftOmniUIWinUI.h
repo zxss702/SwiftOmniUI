@@ -624,10 +624,12 @@ void swiftomniui_winui_toolbar_button_set_icon(SwiftOmniUIObjectRef button, char
 void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef control, char const *utf8);
 
 /// A button's look: what fills it - the platform's for none, kept `underPointer` and `pressed` of its opacity under
-/// the pointer and pressed - its outline `strokeWidth` DIPs wide, and its corners' radius, less than 0 for the
-/// platform's.
+/// the pointer and pressed - and its outline `strokeWidth` DIPs wide.
 void swiftomniui_winui_button_set_look(SwiftOmniUIObjectRef button, SwiftOmniUIBrush background, SwiftOmniUIBrush stroke,
-                                   double strokeWidth, double cornerRadius, double underPointer, double pressed);
+                                   double strokeWidth, double underPointer, double pressed);
+
+/// A button's corner radius, less than zero to use the theme's radius.
+void swiftomniui_winui_button_set_corner_radius(SwiftOmniUIObjectRef button, double radius);
 
 /// A button's logical style kind: 2 accents it, 3 and 4 make it text, the rest the platform's own look.
 void swiftomniui_winui_button_set_style(SwiftOmniUIObjectRef button, int kind);

@@ -337,7 +337,7 @@ extern "C" void swiftomniui_winui_button_set_on(SwiftOmniUIObjectRef handle, int
 }
 
 extern "C" void swiftomniui_winui_button_set_look(
-    SwiftOmniUIObjectRef handle, SwiftOmniUIBrush background, SwiftOmniUIBrush stroke, double strokeWidth, double cornerRadius,
+    SwiftOmniUIObjectRef handle, SwiftOmniUIBrush background, SwiftOmniUIBrush stroke, double strokeWidth,
     double underPointer, double pressed
 ) {
     try {
@@ -363,12 +363,17 @@ extern "C" void swiftomniui_winui_button_set_look(
             button.ClearValue(controls::Control::BorderThicknessProperty());
         }
         keepToggleKeys(resources, L"BorderBrush", outline, outline, outline);
-
-        if (cornerRadius >= 0) button.CornerRadius({cornerRadius, cornerRadius, cornerRadius, cornerRadius});
-        else button.ClearValue(controls::Control::CornerRadiusProperty());
     } catch (...) {
         report("dressing a button");
     }
+}
+
+extern "C" void swiftomniui_winui_button_set_corner_radius(SwiftOmniUIObjectRef handle, double radius) {
+    try {
+        auto button = as<primitives::ToggleButton>(handle);
+        if (radius >= 0) button.CornerRadius({radius, radius, radius, radius});
+        else button.ClearValue(controls::Control::CornerRadiusProperty());
+    } catch (...) { report("setting a button's corners"); }
 }
 
 extern "C" void swiftomniui_winui_button_set_face(SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef content) {
