@@ -131,7 +131,7 @@ final class GTKRenderer {
             controller.window.minimize()
             return true
         case .toggleSidebar:
-            guard let split = WindowChrome(window: element, arrangement: controller.presentation.arrangement).sidebarToggle
+            guard let split = WindowChrome(window: element, arrangement: controller.arrangement).sidebarToggle
             else { return false }
             split.gtk.changeSidebarVisibility(to: !split.sidebarIsVisible)
             return true
