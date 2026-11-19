@@ -701,11 +701,6 @@ extern "C" void swiftomniui_winui_window_set_screen_frame(SwiftOmniUIObjectRef h
         auto pixels = [&](int index) { return static_cast<int32_t>(std::lround(rect[index])); };
         // The rectangle is the desktop's own and already in pixels: no work area to add, no DIPs to convert, and a
         // window with no frame of its own is the size it is placed at.
-        auto size = winrt::Windows::Graphics::SizeInt32{pixels(2), pixels(3)};
-        auto at = winrt::Windows::Graphics::PointInt32{pixels(0), pixels(1)};
-        if (app.Size() != size) app.Resize(size);
-        if (app.Position() != at) app.Move(at);
-
         // A window that covers a screen is that rectangle and nothing around it. Left to the presenter it keeps a
         // resize frame (invisible borders the window is inset by), the system's 1px accent border and rounded
         // corners: a lit band along the screen's edge, and a window smaller than the screen. Take them all away and

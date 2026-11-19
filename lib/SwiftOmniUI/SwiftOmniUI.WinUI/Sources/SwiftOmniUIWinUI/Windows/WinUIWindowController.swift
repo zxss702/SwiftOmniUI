@@ -18,6 +18,7 @@ final class WinUIWindowController {
     /// What the window shows, by the host layer's rule.
     private let presentation = WindowPresentation()
     private var traits: WindowTraits?
+    private var placedScreenFrame: Rect?
     /// The sheets the window shows, one for each page its modal stack presents, the last on top.
     private var sheets: [(element: MountedElement, sheet: WinUISheetView)] = []
 
@@ -33,7 +34,7 @@ final class WinUIWindowController {
         self.element = element
         let changes = presentation.show(element, in: runtime.lifecycle)
         if let owner = changes.owner { window.setOwner(owner.flatMap(windowOf)) }
-        stand(changes)
+        if let traits = changes.traits { self.traits = traits }
         if let (_, arrangement) = changes.arrangement { window.show(arrangement?.winUI.view, present: false) }
         showSheets(presentation.sheets)
         if let overlay = changes.overlay { window.showOverlay(overlay?.winUI.view) }
@@ -43,27 +44,28 @@ final class WinUIWindowController {
             || presentation.arrangement?.visibleSplitView != nil
         // Standalone content (including popovers) retains local inset hosting.
         window.showTopSafeAreaBars(navigation ? page?.pageTopSafeAreaBars ?? [] : [], in: navigation ? page : nil)
-        boundContent(element, requested: changes.frame,
-                     quiet: changes.arrangement == nil && changes.traits == nil && changes.bounds == nil,
-                     keepingSizing: keepingSizing)
-        let asked = WindowFrame(of: element)
-        if asked.x == nil, asked.y == nil, let anchor = element.value(.defaultPosition)?.numbers {
-            window.place(anchor)
+        let screenFrame = element.value(.screenFrame).flatMap(Rect.init(propValue:))
+        if let screenFrame {
+            // The desktop rectangle owns this window's size across presentations.
+            // Content measurements during an animation must not resize it.
+            if screenFrame != placedScreenFrame || changes.traits != nil {
+                if let traits { window.apply(traits, isResizable: false) }
+                window.placeOnScreen(screenFrame)
+            }
+        } else {
+            boundContent(element, requested: changes.frame,
+                         quiet: changes.arrangement == nil && changes.traits == nil && changes.bounds == nil,
+                         keepingSizing: keepingSizing)
+            let asked = WindowFrame(of: element)
+            if asked.x == nil, asked.y == nil, let anchor = element.value(.defaultPosition)?.numbers {
+                window.place(anchor)
+            }
         }
-        // A window the desktop places exactly is placed last: what stands above works in DIPs from a work area, which
-        // is not the desktop's own count, and the traits that take its frame away stand by now.
-        if let screenFrame = changes.screenFrame { window.placeOnScreen(screenFrame) }
+        placedScreenFrame = screenFrame
         let split = presentation.arrangement?.visibleSplitView?.winUI.view as? WinUISplitView
         window.prepareFirstPresentation(split: split)
-        window.presentContent()
-    }
-
-    /// Stands the window as the element asks: the place, the size, the bounds and the traits the tree changed, and
-    /// whether its scene hides it.
-    /// Design: docs/design/platforms/winui/runtime.md#a-windows-frame
-    private func stand(_ changes: WindowPresentation.Changes) {
-        if let traits = changes.traits { self.traits = traits }
         if let hidden = changes.hidden { window.setHidden(hidden) }
+        window.presentContent()
     }
 
     /// The sizing last made: the window's content bounds, which neither an animation's frame nor a lazy
