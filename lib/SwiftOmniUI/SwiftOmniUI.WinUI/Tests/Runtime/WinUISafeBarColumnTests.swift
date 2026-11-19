@@ -6,6 +6,7 @@ import CSwiftOmniUIWinUI
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
 import SwiftOmniUIConformance
+import WinSDK
 import XCTest
 
 @MainActor private final class NativePageOwner: WinUILayoutView {
@@ -17,6 +18,49 @@ import XCTest
 }
 
 final class WinUISafeBarColumnTests: XCTestCase {
+    func testPopoverSafeBarSharesTheCardBackground() throws {
+        try onUIThread {
+            let open = State(wrappedValue: false)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                Button("Open") { open.wrappedValue = true }
+                    .popover(isPresented: open.projectedValue, arrowEdge: .bottom) {
+                        ScrollView { Color.clear.frame(height: 360) }
+                            .frame(width: 220, height: 160)
+                            .safeAreaInset(edge: .top, spacing: 0) {
+                                Color.clear.frame(height: 40)
+                            }
+                    }
+            }
+            let window = try XCTUnwrap(host.window)
+            window.setBackground(.color(red: 255, green: 0, blue: 255, alpha: 255))
+            let title = "SOUI popover backdrop regression"
+            window.setTitle(title)
+            let nativeTitle = Array(title.utf16) + [0]
+            let hwnd = try XCTUnwrap(nativeTitle.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+            let flags = UINT(SWP_NOACTIVATE | SWP_NOSIZE)
+            XCTAssertTrue(SetWindowPos(hwnd, HWND(bitPattern: -1), 32, 32, 0, 0, flags))
+            defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 32, 32, 0, 0, flags) }
+
+            open.wrappedValue = true
+            host.settle { host.views(WinUIPopoverView.self).first?.isAttached == true }
+            let card = try XCTUnwrap(host.views(WinUIPopoverView.self).first)
+            guard card.isAttached && card.showsCard else {
+                return XCTFail("the popover must be visible before checking its backdrop")
+            }
+            let points: [(Double, Double)] = [(100, 30), (100, 50)]
+            @MainActor func shareBackground(_ pixels: [UInt32]) -> Bool {
+                guard pixels.count == 2 else { return false }
+                // The acrylic texture itself can vary slightly across pixels.
+                return [0, 8, 16].allSatisfy { shift in
+                    abs(Int((pixels[0] >> shift) & 0xff) - Int((pixels[1] >> shift) & 0xff)) <= 16
+                }
+            }
+            host.settle { shareBackground(card.presentedPixels(at: points, in: window)) }
+            let pixels = card.presentedPixels(at: points, in: window)
+            XCTAssertTrue(shareBackground(pixels), "bar and body should show the same popover backdrop: \(pixels)")
+        }
+    }
+
     func testNavigationColumnsCropBeforeFilteringAndMergeOnlyTheirOwnBars() throws {
         try onUIThread {
             let detailShown = State(wrappedValue: true)
@@ -502,6 +546,7 @@ final class WinUISafeBarColumnTests: XCTestCase {
                                 }
                             }.padding(16)
                         }
+                        .hiddenSafeBarBackground()
                 }
             }
             let editor = try XCTUnwrap(host.view(id: .manual("editor")))

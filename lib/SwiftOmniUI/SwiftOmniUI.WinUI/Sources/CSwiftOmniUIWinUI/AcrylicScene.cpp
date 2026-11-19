@@ -505,10 +505,16 @@ namespace swiftomniui {
             for (auto at = xaml::Media::VisualTreeHelper::GetParent(source); at && at != coordinates;
                  at = xaml::Media::VisualTreeHelper::GetParent(at)) {
                 if (auto parent = at.try_as<Element>()) {
+                    if (auto presenter = parent.try_as<controls::FlyoutPresenter>()) {
+                        // The presenter already paints beneath the whole popover.
+                        // Filter only its content, so the bar never resamples its acrylic.
+                        if (auto card = presenter.Content().try_as<Element>(); card && descendant(source, card))
+                            content = card;
+                        break;
+                    }
                     const auto tag = winrt::unbox_value_or<winrt::hstring>(parent.Tag(), L"");
                     if (tag == L"sheets" || tag == L"overlay") break;
                     content = parent;
-                    if (parent.try_as<controls::FlyoutPresenter>()) break;
                 }
             }
             coordinates = content;

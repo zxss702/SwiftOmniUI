@@ -69,7 +69,7 @@ namespace swiftomniui {
         void arrange(winrt::Windows::Foundation::Size size) { backing.Arrange({0, 0, size.Width, size.Height}); }
         void paint(xaml::FrameworkElement const &self,
                    std::vector<winrt::Windows::Foundation::Rect> const &next,
-                   xaml::Media::Brush const &brush) {
+                   xaml::Media::Brush const &brush, bool useFoundation = true) {
             namespace composition = winrt::Microsoft::UI::Composition;
             // A post-layout commit must not rewrite XAML Path.Data. If a
             // subsequent native operation fails, rewriting that Data at the
@@ -94,12 +94,17 @@ namespace swiftomniui {
                 controlsClip = fixedClip;
                 regions = next;
             }
-            if (surface.Background() != brush) surface.Background(brush);
-            auto background = usesFoundation ? acrylicFoundationFill(self) : nullptr;
+            const bool hasFoundation = usesFoundation && useFoundation;
+            // FlyoutPresenter already owns the popover's acrylic. A second
+            // content blur here would sample the card below and tint the bar
+            // differently from the presenter behind the rest of the card.
+            auto material = hasFoundation ? brush : nullptr;
+            if (surface.Background() != material) surface.Background(material);
+            auto background = hasFoundation ? acrylicFoundationFill(self) : nullptr;
             if (fill.Background() != background) fill.Background(background);
-            if (foundation && !foundationFailed && self.IsLoaded() && !next.empty()) {
+            if (foundation && !foundationFailed && self.IsLoaded() && (!hasFoundation || !next.empty())) {
                 try {
-                    auto backdrop = acrylicFoundationBackdrop(self);
+                    auto backdrop = hasFoundation ? acrylicFoundationBackdrop(self) : nullptr;
                     if (foundation.SystemBackdrop() != backdrop) foundation.SystemBackdrop(backdrop);
                 } catch (...) {
                     foundationFailed = true;
@@ -108,7 +113,7 @@ namespace swiftomniui {
             }
             // Underlay stays in ordinary Measure/Arrange while empty. Opacity
             // changes rendering only and never defers its first real size.
-            const double opacity = !next.empty() && !foundationFailed ? 1 : 0;
+            const double opacity = hasFoundation && !next.empty() && !foundationFailed ? 1 : 0;
             if (foundation && foundation.Opacity() != opacity) foundation.Opacity(opacity);
             if (backing.Opacity() != 1) backing.Opacity(1);
         }
@@ -152,7 +157,19 @@ namespace swiftomniui {
                     || acrylicUsesLocalPresentation(self, acrylicSceneRoot(scene)));
                 if (local && extent.Width > 0 && extent.Height > 0)
                     next.push_back({0, 0, extent.Width, extent.Height});
-                drawing.paint(self, next, next.empty() ? nullptr : brush);
+                // A popover supplies one background behind both its bar and body,
+                // even though the presenter can share the window's XamlRoot.
+                bool useFoundation = true;
+                if (scene && !acrylicSceneIsWindow(scene)) {
+                    for (auto parent = xaml::Media::VisualTreeHelper::GetParent(self); parent;
+                         parent = xaml::Media::VisualTreeHelper::GetParent(parent)) {
+                        if (parent.try_as<controls::FlyoutPresenter>()) {
+                            useFoundation = false;
+                            break;
+                        }
+                    }
+                }
+                drawing.paint(self, next, next.empty() ? nullptr : brush, useFoundation);
             } catch (...) { report("updating a safe bar material"); }
         }
         winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size available) {
