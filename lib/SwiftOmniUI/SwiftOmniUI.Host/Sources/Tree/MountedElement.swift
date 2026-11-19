@@ -391,9 +391,13 @@ import CRT
         }
         let before = children
         let departingRooms = Dictionary(uniqueKeysWithValues: before.compactMap { child in
-            child.native.departingRoom.map { (child.id, $0) }
+            child.native.departingRoom.map { (ObjectIdentifier(child), $0) }
         })
-        let previous = Dictionary(uniqueKeysWithValues: children.map { ($0.id, $0) })
+        // A replacement can share a key with the outgoing element. Match the
+        // current element first while the older one finishes its transition.
+        let previous = Dictionary(before.map { ($0.id, $0) }) { first, second in
+            first.isDeparting ? second : first
+        }
 
         var arranged = patches.map { patch in
             if let child = previous[patch.id], child.type == patch.type, !patch.replace {
@@ -420,9 +424,11 @@ import CRT
             } else {
                 recycling = false
             }
-            if !recycling, child.isDeparting || child.depart(room: departingRooms[child.id], under: placementTransition, closed: { [weak self] in
-                self?.departed(child)
-            }) { arranged.append(child) }
+            if !recycling, child.isDeparting || child.depart(
+                room: departingRooms[ObjectIdentifier(child)], under: placementTransition, closed: { [weak self] in
+                    self?.departed(child)
+                }
+            ) { arranged.append(child) }
         }
         children = arranged
         leave(before)
