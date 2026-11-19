@@ -157,16 +157,65 @@ extension View {
 /// What a `GeometryReader` hands its content: the view's size, where the safe
 /// area cuts into it, and its frame in the space asked for.
 public struct GeometryProxy: Sendable {
-    /// The report this proxy reads.
-    let report: FrameReport
+    enum Source: Sendable {
+        case constant(FrameReport)
+        case state(
+            size: State<Size?>,
+            report: State<FrameReport>,
+            named: State<[NamedSpaceFrame]>,
+            insets: State<EdgeInsets?>
+        )
+    }
+
+    private let source: Source
+
+    init(report: FrameReport) {
+        self.source = .constant(report)
+    }
+
+    init(
+        size: State<Size?>,
+        report: State<FrameReport>,
+        named: State<[NamedSpaceFrame]>,
+        insets: State<EdgeInsets?>
+    ) {
+        self.source = .state(size: size, report: report, named: named, insets: insets)
+    }
+
+    /// The full report this proxy resolves anchors against.
+    var report: FrameReport {
+        switch source {
+        case .constant(let report):
+            return report
+        case .state(_, let report, let named, let insets):
+            var resolved = report.wrappedValue
+            resolved.named = named.wrappedValue
+            resolved.reportedInsets = insets.wrappedValue
+            return resolved
+        }
+    }
 
     /// The size the view was laid out at.
-    public var size: Size { Size(report.frame.width, report.frame.height) }
+    public var size: Size {
+        switch source {
+        case .constant(let report):
+            return Size(report.frame.width, report.frame.height)
+        case .state(let size, _, _, _):
+            return size.wrappedValue ?? Size(0, 0)
+        }
+    }
 
     /// The container's remaining safe-area contributions. A safe allocation
     /// can exclude these strips from `size` while still observing them here;
     /// a scroll document consumes them before reporting its inner geometry.
-    public var safeAreaInsets: EdgeInsets { report.safeAreaInsets }
+    public var safeAreaInsets: EdgeInsets {
+        switch source {
+        case .constant(let report):
+            return report.safeAreaInsets
+        case .state(_, let report, _, let insets):
+            return insets.wrappedValue ?? report.wrappedValue.safeAreaInsets
+        }
+    }
 
     /// The view's frame in the space named - `.local` for its own bounds,
     /// `.global` for the window, `.parent` where the parent placed it,
@@ -174,7 +223,22 @@ public struct GeometryProxy: Sendable {
     /// the ancestor `.coordinateSpace(.named(name))` declared, `.zero` for a
     /// name nobody declared.
     public func frame(in space: CoordinateSpace) -> Rect {
-        report.frame(in: space)
+        switch source {
+        case .constant(let report):
+            return report.frame(in: space)
+        case .state(let size, let report, let named, _):
+            switch space {
+            case .local:
+                let current = size.wrappedValue ?? Size(0, 0)
+                return Rect(0, 0, current.width, current.height)
+            case .parent, .global, .safeArea:
+                return report.wrappedValue.frame(in: space)
+            case .named:
+                var resolved = report.wrappedValue
+                resolved.named = named.wrappedValue
+                return resolved.frame(in: space)
+            }
+        }
     }
 }
 
@@ -196,7 +260,10 @@ public struct GeometryReader: View, DistributableView {
 
     /// The closure cannot lay out from an invented zero proposal. The empty
     /// reader still accepts space and reports it, before mounting its content.
-    @State private var report: FrameReport? = nil
+    /// Size lives in its own state so readers of `proxy.size` alone do not
+    /// rebuild when scrolling only moves window coordinates.
+    @State private var size: Size? = nil
+    @State private var report: FrameReport = .zero
 
     /// The named spaces the last report travelled with.
     @State private var named: [NamedSpaceFrame] = []
@@ -219,14 +286,10 @@ public struct GeometryReader: View, DistributableView {
     public var body: some View { AnyView(content) }
 
     private var content: any View {
-        let proxy = report.map { report in
-            var report = report
-            report.named = named
-            report.reportedInsets = insets
-            return GeometryProxy(report: report)
-        }
+        let hasSize = size != nil
+        let proxy = GeometryProxy(size: _size, report: _report, named: _named, insets: _insets)
         var container = Grid {
-            if let proxy { build(proxy) }
+            if hasSize { build(proxy) }
         }
         container.node.props[.isGeometryReader] = true.propValue
         return container
@@ -244,10 +307,17 @@ public struct GeometryReader: View, DistributableView {
             withTransaction(transaction) { self.insets = insets }
         }
         .hearing(ViewContract.frameChanged) { numbers in
-            guard let report = FrameReport(numbers), report != self.report else { return }
+            guard let report = FrameReport(numbers) else { return }
+            let nextSize = Size(report.frame.width, report.frame.height)
+            let sizeChanged = self.size != nextSize
+            let reportChanged = self.report != report
+            guard sizeChanged || reportChanged else { return }
             var transaction = Transaction()
             transaction.isGeometryFeedback = true
-            withTransaction(transaction) { self.report = report }
+            withTransaction(transaction) {
+                if sizeChanged { self.size = nextSize }
+                if reportChanged { self.report = report }
+            }
         }
     }
 }

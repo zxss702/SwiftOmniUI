@@ -98,7 +98,7 @@ extension Layout {
     ///     }
     ///
     /// - Parameter content: The children the layout measures and places.
-    public func callAsFunction<Content: View>(
+    @MainActor public func callAsFunction<Content: View>(
         @ViewBuilder _ content: () -> Content
     ) -> CustomLayoutContainer<Self, Content> {
         CustomLayoutContainer(layout: self, content: content())

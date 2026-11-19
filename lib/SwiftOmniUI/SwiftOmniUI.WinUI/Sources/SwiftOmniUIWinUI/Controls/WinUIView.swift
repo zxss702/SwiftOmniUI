@@ -35,16 +35,27 @@ class WinUIView {
     private(set) var blur = 0.0
     private var inheritedBlur = 0.0
     private var writtenBlur = 0.0
+    private var multiplyBlend = false
+    private var writtenMultiplyBlend = false
+    var transitionBlurReserve = 0.0
     private var blurCommitPending = false
     private var pendingBlurPresenter = false
+    private var cachedInsideScroller: Bool?
 
     /// The number the relay's callbacks name this view by.
     let number: Int64
 
     /// The layout that places this view, which a place written between passes asks to arrange again.
     weak var placingLayout: WinUILayoutView? {
-        didSet { if placingLayout !== oldValue { nativeParentChanged() } }
+        didSet {
+            if placingLayout !== oldValue {
+                placementBottom = nil
+                nativeParentChanged()
+            }
+        }
     }
+    /// A bottom-aligned placement derives its origin from its presented height.
+    var placementBottom: Double?
     /// Native controls own arbitrary SwiftUI label roots without placing them
     /// through a SOUI stack. Size corrections must cross that ownership edge.
     weak var nativeContentOwner: WinUIView? {
@@ -122,7 +133,7 @@ class WinUIView {
     func clearSafeBarDrawing() {
         safeBarDrawing = nil
         inheritedBlur = 0
-        writeBlur()
+        writeDrawingEffects()
         setPlacedDrawing(nil, opacity: 1)
         writeTransform()
     }
@@ -157,7 +168,7 @@ class WinUIView {
         unmoved.m42 = -totalY
         safeBarDrawing = matrix * unmoved
         inheritedBlur = blurVariance.squareRoot()
-        writeBlur()
+        writeDrawingEffects()
         setPlacedDrawing(placedDrawing, opacity: opacity)
         writeTransform()
     }
@@ -167,6 +178,7 @@ class WinUIView {
     func refreshNativeSafeBarDrawing() {
         // Promotion registers its actual drawing dependencies. Most animated
         // rows have none; they must not search their entire subtree per frame.
+        guard !promotedBars.isEmpty else { return }
         for (number, entry) in promotedBars {
             if let bar = entry.view, bar.nativeSafeBarOwner != nil { bar.updateSafeBarDrawing() }
             else { promotedBars.removeValue(forKey: number) }
@@ -248,8 +260,70 @@ class WinUIView {
         Self.attachmentPass &+= 1
         WinUILayoutUpdates.rearmAncestorWalks()
         hierarchyRevision &+= 1
+        cachedInsideScroller = nil
+        swiftomniui_winui_material_mark_dirty()
         discardMeasurementResults()
     }
+
+    private var isStrictlyInsideScroller: Bool {
+        if nativeSafeBarOwner != nil || !promotedBars.isEmpty { return false }
+        if let cachedInsideScroller { return cachedInsideScroller }
+        var current: WinUIView? = placingLayout ?? nativeContentOwner ?? nativeLayoutOwner
+        if current == nil, var parentElement = sourceElement?.parent {
+            while current == nil {
+                current = parentElement.winUI.view
+                guard let next = parentElement.parent else { break }
+                parentElement = next
+            }
+        }
+        var found = false
+        var visited = 0
+        while let view = current, visited < 64 {
+            if view is WinUIScrollView || view is WinUIItemsView {
+                found = true
+                break
+            }
+            if view.nativeSafeBarOwner != nil {
+                found = false
+                break
+            }
+            let next = view.placingLayout ?? view.nativeContentOwner ?? view.nativeLayoutOwner
+            if let next {
+                current = next
+            } else if var parentElement = view.sourceElement?.parent {
+                current = nil
+                while current == nil {
+                    current = parentElement.winUI.view
+                    guard let upper = parentElement.parent else { break }
+                    parentElement = upper
+                }
+            } else {
+                current = nil
+            }
+            visited += 1
+        }
+        cachedInsideScroller = found
+        return found
+    }
+
+    @inline(__always)
+    private func markMaterialDirtyIfNeeded() {
+        if !isStrictlyInsideScroller || swiftomniui_winui_material_has_scroller_insets() {
+            swiftomniui_winui_material_mark_dirty()
+        }
+    }
+
+    private struct WrittenCompositeTransform {
+        var handle: SwiftOmniUIObjectRef
+        var translationX: Double
+        var translationY: Double
+        var rotation: Double
+        var scaleX: Double
+        var scaleY: Double
+        var centerX: Double
+        var centerY: Double
+    }
+    private var writtenTransform: WrittenCompositeTransform?
 
     /// Where the view was last placed, in DIPs of its parent; nil before its first place.
     private(set) var placed: Rect?
@@ -354,6 +428,7 @@ class WinUIView {
     func setShown(_ shown: Bool) {
         isShown = shown
         swiftomniui_winui_set_shown(presentationHandle, shown)
+        markMaterialDirtyIfNeeded()
     }
 
     /// How opaque the view's own property draws it, with a placing layout's opacity over it; written only where
@@ -364,6 +439,7 @@ class WinUIView {
         guard drawn != writtenOpacity else { return }
         writtenOpacity = drawn
         swiftomniui_winui_set_opacity(presentationHandle, drawn)
+        markMaterialDirtyIfNeeded()
         refreshNativeSafeBarDrawing()
     }
 
@@ -390,8 +466,14 @@ class WinUIView {
         let radius = radius.isFinite ? max(0, radius) : 0
         guard radius != blur else { return }
         blur = radius
-        writeBlur()
+        writeDrawingEffects()
         refreshNativeSafeBarDrawing()
+    }
+
+    func setMultiplyBlend(_ enabled: Bool) {
+        guard enabled != multiplyBlend else { return }
+        multiplyBlend = enabled
+        writeDrawingEffects()
     }
 
     private func scheduleBlurCommit() {
@@ -405,16 +487,17 @@ class WinUIView {
                 self.pendingBlurPresenter = false
                 self.prepareBlur()
             }
-            self.writeBlur()
+            self.writeDrawingEffects()
         }
     }
 
-    private func writeBlur() {
+    func writeDrawingEffects() {
         let radius = (blur * blur + inheritedBlur * inheritedBlur).squareRoot()
-        guard radius != writtenBlur else { return }
+        let multiply = multiplyBlend && hasBlendContent
+        guard !isDetached, radius != writtenBlur || multiply != writtenMultiplyBlend else { return }
         // Creating a presenter changes native ownership exactly once. Never
         // change parent/child relationships during Measure or Arrange.
-        if blurPresenter == nil, radius > 0 {
+        if blurPresenter == nil, radius > 0 || multiply {
             guard Self.arranging == 0, Self.measuring == 0 else {
                 scheduleBlurCommit()
                 return
@@ -422,22 +505,30 @@ class WinUIView {
             prepareBlur()
         }
         guard let blurPresenter else { return }
-        let transition = sourceElement?.transition
-        let reserve = max(radius, max(sourceElement?.resolvedValue(.blur)?.number ?? 0,
-                                     max(transition?.insertion.blur ?? 0, transition?.removal.blur ?? 0)))
-        if swiftomniui_winui_blur_set(blurPresenter, radius, reserve) { writtenBlur = radius }
+        let reserve = max(radius, max(sourceElement?.properties[.blur]?.number ?? 0, transitionBlurReserve))
+        if swiftomniui_winui_drawing_effects_set(blurPresenter, radius, reserve, multiply) {
+            writtenBlur = radius
+            writtenMultiplyBlend = multiply
+            markMaterialDirtyIfNeeded()
+        }
     }
+
+    var hasBlendContent: Bool { true }
 
     /// How a placing layout draws the view over the place it gave, and how opaque; nil and 1 for as the view says.
     /// Design: docs/design/platforms/winui/drawing.md#a-placed-child
     func setPlacedDrawing(_ drawing: HostDrawingTransform?, opacity: Double) {
         guard drawing != placedDrawing || opacity != placedOpacity else { return }
+        let transformChanged = drawing != placedDrawing
 
         placedDrawing = drawing
         placedOpacity = opacity
         writeTransform()
         setOpacity(self.opacity)
         refreshNativeSafeBarDrawing()
+        if transformChanged {
+            WinUIRenderer.shared?.runtime.frames.laidOut()
+        }
     }
 
     /// Whether clicks and touches go through the view to what is behind it.
@@ -497,6 +588,7 @@ class WinUIView {
         self.transform = transform
         writeTransform()
         refreshNativeSafeBarDrawing()
+        WinUIRenderer.shared?.runtime.frames.laidOut()
     }
 
     /// How the view is drawn over its place: its own transform with a placing layout's over it
@@ -511,19 +603,47 @@ class WinUIView {
     private func writeTransform() {
         let drawn = drawing
         let size = committedFrame ?? Rect(x: 0, y: 0, width: 0, height: 0)
-        swiftomniui_winui_set_transform(
-            presentationHandle, drawn.translationX, drawn.translationY, drawn.rotation,
-            drawn.scaleX, drawn.scaleY, drawn.pivotX * size.width, drawn.pivotY * size.height)
+        let targetHandle = presentationHandle
+        let centerX = drawn.pivotX * size.width
+        let centerY = drawn.pivotY * size.height
+        var mask: UInt32 = 0
+        if let previous = writtenTransform, previous.handle == targetHandle {
+            if previous.translationX != drawn.translationX { mask |= 1 << 0 }
+            if previous.translationY != drawn.translationY { mask |= 1 << 1 }
+            if previous.rotation != drawn.rotation { mask |= 1 << 2 }
+            if previous.scaleX != drawn.scaleX { mask |= 1 << 3 }
+            if previous.scaleY != drawn.scaleY { mask |= 1 << 4 }
+            if previous.centerX != centerX { mask |= 1 << 5 }
+            if previous.centerY != centerY { mask |= 1 << 6 }
+        } else {
+            mask = 0x7f
+        }
+        if mask != 0 {
+            swiftomniui_winui_set_transform_masked(
+                targetHandle, drawn.translationX, drawn.translationY, drawn.rotation,
+                drawn.scaleX, drawn.scaleY, centerX, centerY, mask)
+            writtenTransform = WrittenCompositeTransform(
+                handle: targetHandle,
+                translationX: drawn.translationX,
+                translationY: drawn.translationY,
+                rotation: drawn.rotation,
+                scaleX: drawn.scaleX,
+                scaleY: drawn.scaleY,
+                centerX: centerX,
+                centerY: centerY)
+            markMaterialDirtyIfNeeded()
+        }
         let ownTip = drawn.tip(width: size.width, height: size.height)
         let tip = safeBarDrawing.map { (ownTip ?? .identity) * $0 } ?? ownTip
         guard tip != writtenTip else { return }
         writtenTip = tip
-        guard let tip else { return swiftomniui_winui_set_projection(presentationHandle, nil) }
+        markMaterialDirtyIfNeeded()
+        guard let tip else { return swiftomniui_winui_set_projection(targetHandle, nil) }
         let numbers = [
             tip.m11, tip.m12, tip.m13, tip.m14, tip.m21, tip.m22, tip.m23, tip.m24,
             tip.m31, tip.m32, tip.m33, tip.m34, tip.m41, tip.m42, tip.m43, tip.m44,
         ]
-        swiftomniui_winui_set_projection(presentationHandle, numbers)
+        swiftomniui_winui_set_projection(targetHandle, numbers)
     }
 
     /// Asks WinUI to measure this element again, and every panel above it.
@@ -685,6 +805,7 @@ class WinUIView {
     /// Design: docs/design/platforms/winui/layout.md#a-place-between-passes
     func layout(_ place: Rect) {
         var place = place
+        if let placementBottom { place.y = placementBottom - place.height }
         if var frozen = departureFrame {
             var ancestor = sourceElement?.parent
             while let element = ancestor {
@@ -786,10 +907,12 @@ class WinUIView {
         let revision: Int
         let hierarchy: Int
         let context: Int
+        let hasBlurPresenter: Bool
         let parentAllocation: Rect?
         let parentRevision: Int
         let parentHierarchy: Int
         let parentContext: Int
+        let parentHasBlurPresenter: Bool
     }
     @MainActor private final class ReportOffset {
         weak var parent: WinUILayoutView?
@@ -810,9 +933,9 @@ class WinUIView {
             || self is WinUICustomLayoutView
             || (self as? WinUILayoutView)?.retainsArithmeticOnNativeMeasure == true
         guard ownsLayout, let placed, let committedFrame,
-              nativeAllocation == nil, blurPresenter == nil,
+              nativeAllocation == nil,
               nativeContentOwner == nil, nativeLayoutOwner == nil, nativeSafeBarOwner == nil,
-              parent.nativeAllocation == nil, parent.blurPresenter == nil,
+              parent.nativeAllocation == nil,
               !(parent is WinUIScrollView) else {
             reportOffset = nil
             return layoutOffset(relativeTo: parent).map { ($0, false) }
@@ -820,8 +943,10 @@ class WinUIView {
         let stamp = ReportOffsetStamp(
             place: placed, allocation: committedFrame, words: wordsRoom,
             revision: measurementRevision, hierarchy: hierarchyRevision, context: layoutContextRevision,
+            hasBlurPresenter: blurPresenter != nil,
             parentAllocation: parent.committedFrame, parentRevision: parent.measurementRevision,
-            parentHierarchy: parent.hierarchyRevision, parentContext: parent.layoutContextRevision)
+            parentHierarchy: parent.hierarchyRevision, parentContext: parent.layoutContextRevision,
+            parentHasBlurPresenter: parent.blurPresenter != nil)
         if let previous = reportOffset, previous.parent === parent, previous.stamp == stamp {
             return (previous.point, true)
         }
@@ -1143,67 +1268,77 @@ final class WinUIFrameReportCache {
         let document: WinUIScrollDocument
         let offset: Point
     }
+    struct DocumentMatrix {
+        let m11: Double
+        let m12: Double
+        let m21: Double
+        let m22: Double
+        let offsetX: Double
+        let offsetY: Double
+        var isTranslation: Bool { m11 == 1 && m12 == 0 && m21 == 0 && m22 == 1 }
+        func transform(_ point: Point) -> Point {
+            Point(point.x * m11 + point.y * m21 + offsetX, point.x * m12 + point.y * m22 + offsetY)
+        }
+    }
     private var generation: UInt64?
     private var coordinates: [Int64: Coordinates] = [:]
     private var unsupported: Set<Int64> = []
-    private var documentOrigins: [Int64: Point] = [:]
+    private var documentMatrices: [Int64: DocumentMatrix] = [:]
     private var transformedDocuments: Set<Int64> = []
     private var safeAreas: [UInt64: Rect] = [:]
 
+    private func resetIfNeeded(generation: UInt64) {
+        guard self.generation != generation else { return }
+        coordinates.removeAll(keepingCapacity: true)
+        unsupported.removeAll(keepingCapacity: true)
+        documentMatrices.removeAll(keepingCapacity: true)
+        transformedDocuments.removeAll(keepingCapacity: true)
+        safeAreas.removeAll(keepingCapacity: true)
+        self.generation = generation
+    }
+
     func documentCoordinates(of view: WinUIView, generation: UInt64) -> Coordinates? {
-        if self.generation != generation {
-            coordinates.removeAll(keepingCapacity: true)
-            unsupported.removeAll(keepingCapacity: true)
-            documentOrigins.removeAll(keepingCapacity: true)
-            transformedDocuments.removeAll(keepingCapacity: true)
-            safeAreas.removeAll(keepingCapacity: true)
-            self.generation = generation
-        }
+        resetIfNeeded(generation: generation)
         return read(view)
     }
 
     func safeArea(of element: MountedElement, in host: WinUIRenderer, generation: UInt64) -> Rect {
-        if self.generation != generation {
-            coordinates.removeAll(keepingCapacity: true)
-            unsupported.removeAll(keepingCapacity: true)
-            documentOrigins.removeAll(keepingCapacity: true)
-            transformedDocuments.removeAll(keepingCapacity: true)
-            safeAreas.removeAll(keepingCapacity: true)
-            self.generation = generation
-        }
+        resetIfNeeded(generation: generation)
         if let cached = safeAreas[element.mount] { return cached }
         let area = host.safeArea(of: element)
         safeAreas[element.mount] = area
         return area
     }
 
-    func rootOrigin(of coordinates: Coordinates) -> Point? {
-        let document = coordinates.document
+    private func rootMatrix(of document: WinUIScrollDocument) -> DocumentMatrix? {
         if transformedDocuments.contains(document.number) { return nil }
-        let corner: Point
-        if let held = documentOrigins[document.number] { corner = held }
-        else if let scroll = document.scrollView, !scroll.held, scroll.direction == .leftToRight,
-                let parent = read(scroll), let base = rootOrigin(of: parent),
-                let local = document.layoutOffset(relativeTo: scroll) {
-            // An idle horizontal table moves with its outer vertical document.
-            // Reading its root transform independently rounds that common scroll
-            // translation again, changing cell anchors on every outer frame.
-            // Compose the idle inner offset in the shared document coordinates.
-            // A moving inner scroller keeps the native composition transform.
+        if let held = documentMatrices[document.number] { return held }
+        if let scroll = document.scrollView, !scroll.held, scroll.direction == .leftToRight,
+           let parent = read(scroll), let outer = rootMatrix(of: parent.document), outer.isTranslation,
+           let local = document.layoutOffset(relativeTo: scroll) {
             let offset = scroll.scroller.standing.offset
-            corner = Point(base.x + local.x - offset.x, base.y + local.y - offset.y)
-            documentOrigins[document.number] = corner
+            let composed = DocumentMatrix(
+                m11: 1, m12: 0, m21: 0, m22: 1,
+                offsetX: outer.offsetX + parent.offset.x + local.x - offset.x,
+                offsetY: outer.offsetY + parent.offset.y + local.y - offset.y)
+            documentMatrices[document.number] = composed
+            return composed
         }
-        else {
-            var position = [0.0, 0.0]
-            guard swiftomniui_winui_translation_to_root(document.handle, &position) else {
-                transformedDocuments.insert(document.number)
-                return nil
-            }
-            corner = Point(position[0], position[1])
-            documentOrigins[document.number] = corner
+        var values = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        guard swiftomniui_winui_matrix_to_root(document.handle, &values) else {
+            transformedDocuments.insert(document.number)
+            return nil
         }
-        return Point(corner.x + coordinates.offset.x, corner.y + coordinates.offset.y)
+        let matrix = DocumentMatrix(
+            m11: values[0], m12: values[1], m21: values[2], m22: values[3],
+            offsetX: values[4], offsetY: values[5])
+        documentMatrices[document.number] = matrix
+        return matrix
+    }
+
+    func rootOrigin(of coordinates: Coordinates) -> Point? {
+        guard let matrix = rootMatrix(of: coordinates.document) else { return nil }
+        return matrix.transform(coordinates.offset)
     }
 
     private func read(_ view: WinUIView) -> Coordinates? {

@@ -112,6 +112,10 @@ import CRT
     /// left behind by a newer - touches nothing.
     var departureSerial = 0
 
+    var cachedTransition: AnyTransition?
+    var transitionDecoded = false
+    var activeTransitionPivot: UnitPoint?
+
     /// The frame report this element last said, which a report the same says again to nobody.
     var reportedFrame: [Double] = []
     var reportedScrollGeometry: [Double] = []
@@ -202,6 +206,10 @@ import CRT
         // native factory. Rewriting it on first apply only copies its shared
         // Dictionary storage. Later sparse patches still merge normally.
         if described {
+            if changed.contains(.transition) {
+                transitionDecoded = false
+                cachedTransition = nil
+            }
             for property in patch.clearedProperties {
                 properties[property] = nil
             }
@@ -509,6 +517,7 @@ import CRT
             tree.removeMotions(mount: mount)
         }
         wornStates = []
+        activeTransitionPivot = nil
         isLeaving = false
         native.leave()
         for child in children { child.leave() }
@@ -641,8 +650,10 @@ import CRT
         return own.union(descendants)
     }
 
-    private static let drawingFrameProperties = Set<Prop>([.opacity, .blur, .renderTransform])
-        .union(transformProperties)
+    /// Properties presented directly by native views on animation ticks without per-type registry lookup or layout.
+    public static let fastDrawingFrameProperties: Set<Prop> = Set<Prop>([.opacity, .blur]).union(transformProperties)
+
+    private static let drawingFrameProperties = fastDrawingFrameProperties.union([.renderTransform])
 
     /// Presents `changed` on a frame and says what that asks around the element, the same on every host: its own
     /// presentation; its parent's arrangement where it moved in its slot or shows no view of its own, being drawn
@@ -653,19 +664,21 @@ import CRT
         return FrameImpact(
             content: true,
             arrangement: !native.presentsView
-                || !changed.subtracting(ownPlacementRun).isDisjoint(with: Self.arrangedProperties),
+                || (!changed.isSubset(of: Self.drawingFrameProperties)
+                    && !changed.subtracting(ownPlacementRun).isDisjoint(with: Self.arrangedProperties)),
             windowChrome: WindowChrome.follows(type, changing: changed))
     }
 
     /// The value `property` presents: a running animation's, else the described or bound one -
     /// and where the element carries the property's lookup key, what the host's tables answer it.
     public func value(_ property: Prop) -> HostValue? {
-        let presented = if driven[property].map({ $0.mode != .in }) == true {
+        let presented = if !driven.isEmpty, driven[property].map({ $0.mode != .in }) == true {
             resolvedValue(property)
         } else {
             tree?.presentedPropertyValue(mount: mount, property: property) ?? resolvedValue(property)
         }
-        if let key = lookupKey(for: property),
+        if Self.keyProperties[property] != nil,
+           let key = lookupKey(for: property),
            let resolved = tree?.localization(key) {
             return .string(resolved)
         }
@@ -696,10 +709,26 @@ import CRT
     public func name(_ property: Prop) -> String? { value(property)?.name }
 
     /// The number value of `property`.
-    public func number(_ property: Prop) -> Double? { value(property)?.number }
+    public func number(_ property: Prop) -> Double? {
+        if !driven.isEmpty, let binding = driven[property], binding.mode != .in {
+            return resolvedValue(property)?.number
+        }
+        if let presented = tree?.presentedPropertyNumber(mount: mount, property: property) {
+            return presented
+        }
+        return properties[property]?.number
+    }
 
     /// The Boolean value of `property`.
-    public func bool(_ property: Prop) -> Bool? { value(property)?.bool }
+    public func bool(_ property: Prop) -> Bool? {
+        if !driven.isEmpty, let binding = driven[property], binding.mode != .in {
+            return resolvedValue(property)?.bool
+        }
+        if let presented = tree?.presentedPropertyValue(mount: mount, property: property) {
+            return presented.bool
+        }
+        return properties[property]?.bool
+    }
 
     /// The four sides `property` gives - leading, top, trailing, bottom - or nothing all round where it gives none.
     public func insets(_ property: Prop) -> EdgeInsets {
@@ -741,7 +770,15 @@ import CRT
         case .rectangle, .ellipse, .path, .canvas:
             if values.flex == nil { values.expandingAxes = .both }
         case .image:
-            if value(ImageContract.isResizable.token)?.bool == true { values.expandingAxes = .both }
+            if value(ImageContract.isResizable.token)?.bool == true {
+                let aspect = value(ImageElementContract.aspect.token)?.enumeration
+                    .flatMap(ContentMode.init(rawValue:)) ?? .stretch
+                if aspect == .fit {
+                    values.scalesToFit = true
+                } else {
+                    values.expandingAxes = .both
+                }
+            }
         case .textField, .searchField:
             values.expandingAxes = .horizontal
         case .textEditor:
@@ -764,10 +801,24 @@ import CRT
             // An arrangement is a viewport: it takes the room it is given and
             // lays out its own pages and bars inside it.
             values.expandingAxes = .both
+        case .customLayout where bool(Prop("aspectFit")) == true:
+            var horizontal = false, vertical = false, scalesToFit = false
+            for child in currentChildren {
+                let childValues = readChild(child)
+                guard !childValues.isLayoutDecoration else { continue }
+                let axes = childValues.scrollAxes
+                scalesToFit = scalesToFit || childValues.scalesToFit
+                    || childValues.expandingAxes != .neither || childValues.flex != nil
+                horizontal = horizontal || (childValues.width == nil && (axes == .horizontal || axes == .both))
+                vertical = vertical || (childValues.height == nil && (axes == .vertical || axes == .both))
+            }
+            values.scrollAxes = horizontal && vertical ? .both : horizontal ? .horizontal
+                : vertical ? .vertical : .neither
+            values.scalesToFit = scalesToFit
         case .hStack, .vStack, .zStack, .grid, .gridRow, .lazyHStack, .lazyVStack,
              .lazyHGrid, .lazyVGrid, .customLayout, .masked:
             var horizontal = false, vertical = false
-            var expandsAcross = false, expandsDown = false
+            var expandsAcross = false, expandsDown = false, scalesToFit = false
             for child in currentChildren {
                 let childValues = readChild(child)
                 guard !childValues.isLayoutDecoration else { continue }
@@ -778,6 +829,7 @@ import CRT
                 expandsDown = expandsDown || expands == .vertical || expands == .both
                     || (childValues.flex != nil && childValues.height == nil
                         && type != .hStack && type != .lazyHStack && type != .gridRow)
+                scalesToFit = scalesToFit || childValues.scalesToFit
                 horizontal = horizontal || (childValues.width == nil && (axes == .horizontal || axes == .both))
                 vertical = vertical || (childValues.height == nil && (axes == .vertical || axes == .both))
             }
@@ -785,6 +837,7 @@ import CRT
                 : vertical ? .vertical : .neither
             values.expandingAxes = expandsAcross && expandsDown ? .both : expandsAcross ? .horizontal
                 : expandsDown ? .vertical : .neither
+            values.scalesToFit = scalesToFit
         case .button, .menuButton:
             // A control that wears a face is laid out as the face asks: the first child is what the native
             // button draws (`GTKElement+Layout.arrangeChildren`, `WinUIElement+Layout.arrangeChildren`), so a
@@ -792,7 +845,7 @@ import CRT
             // button takes the share its stack gives, as SwiftUI's does. A face that bounds neither way, or
             // one the control itself bounds, leaves the control's own values alone.
             // Design: docs/design/host/layout.md#a-control-and-its-face
-            var expandsAcross = false, expandsDown = false
+            var expandsAcross = false, expandsDown = false, scalesToFit = false
             for child in currentChildren {
                 let childValues = readChild(child)
                 guard !childValues.isLayoutDecoration else { continue }
@@ -800,9 +853,11 @@ import CRT
                     || childValues.expandingAxes == .both
                 expandsDown = expandsDown || childValues.expandingAxes == .vertical
                     || childValues.expandingAxes == .both
+                scalesToFit = scalesToFit || childValues.scalesToFit
             }
             values.expandingAxes = expandsAcross && expandsDown ? .both : expandsAcross ? .horizontal
                 : expandsDown ? .vertical : .neither
+            values.scalesToFit = scalesToFit
         default:
             break
         }
@@ -810,6 +865,7 @@ import CRT
             // Its content never supplies the reader's ideal size or scroll axes.
             values.scrollAxes = .neither
             values.expandingAxes = .both
+            values.scalesToFit = false
         }
         if values.scrollAxes != .neither { values.safeBarSizingAxes = safeBarSizingAxes }
         values.horizontal = value(.horizontalAlignment)?.enumeration
@@ -820,6 +876,7 @@ import CRT
         values.height = stated(.height)
         if isLayoutDivider {
             values.expandingAxes = dividerAxis
+            values.scalesToFit = false
             if dividerAxis == .vertical { values.width = values.width ?? 1 }
             else { values.height = values.height ?? 1 }
         }
@@ -832,6 +889,11 @@ import CRT
         values.minimumHeight = stated(.minimumHeight).map { max(0, $0 - down) }
         values.maximumWidth = number(.maximumWidth).flatMap { $0 >= 0 ? max(0, $0 - across) : nil }
         values.maximumHeight = number(.maximumHeight).flatMap { $0 >= 0 ? max(0, $0 - down) : nil }
+        if values.width != nil || values.height != nil
+            || (values.maximumWidth.map { $0 < .infinity } ?? false)
+            || (values.maximumHeight.map { $0 < .infinity } ?? false) {
+            values.scalesToFit = false
+        }
         let expandsAcross = values.width == nil && (values.maximumWidth == .infinity
             || value(.horizontalAlignment)?.enumeration == AxisAlignment.fill.rawValue
             || values.expandingAxes == .horizontal || values.expandingAxes == .both

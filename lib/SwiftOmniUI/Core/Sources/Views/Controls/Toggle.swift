@@ -155,6 +155,8 @@ public struct Toggle: View {
 /// `Text`'s, an `Image`'s, a `Label`'s - and draws beside the button where
 /// it cannot.
 private struct ToggleButton: View {
+    @Environment(\.isToolbarContent) private var isToolbarContent
+
     /// The two-way state, or none for a toggle that only shows.
     let isOn: Binding<Bool>?
 
@@ -167,12 +169,14 @@ private struct ToggleButton: View {
     var body: some View {
         var button: Button.Modified = isOn.map(Button().isOn) ?? Button().isOn(initial)
         var label = label
-        if let (text, key, icon) = label.buttonCaption {
-            if let text { button = button.text(text) }
-            if let key {
+        if let caption = label.buttonCaption(inToolbar: isToolbarContent) {
+            if let text = caption.text { button = button.text(text) }
+            if let key = caption.key {
                 button = button.modified { $0.props[TextElementContract.textKey.token] = key.propValue }
             }
-            if let icon { button = button.icon(icon) }
+            if let icon = caption.icon { button = button.icon(icon) }
+            if let width = caption.iconWidth { button = button.setValue(ButtonContract.iconWidth, width) }
+            if let height = caption.iconHeight { button = button.setValue(ButtonContract.iconHeight, height) }
             label = EmptyView()
         }
         let toggling = button.onEvent(ButtonContract.toggled) { isOn?.wrappedValue = $0 }
@@ -194,21 +198,49 @@ extension View {
     /// What of this view a captioned button can carry - a `Text`'s words and
     /// their lookup key, an `Image`'s picture, a `Label`'s all three - or
     /// `nil` where nothing carries, the view drawing beside the button then.
-    fileprivate var buttonCaption: (text: String?, key: LocalizedStringKey?, icon: ImageSource?)? {
+    fileprivate func buttonCaption(inToolbar: Bool) -> ToggleButtonCaption? {
         let view = unwrappedStatement(self)
         if let text = view as? Text {
-            return (text.node.props[.text]?.string, text.wordsKey, nil)
+            return ToggleButtonCaption(text: text.node.props[.text]?.string, key: text.wordsKey)
         }
         if let image = view as? Image {
-            return (nil, nil, image.node.props[.source].flatMap(ImageSource.init(propValue:)))
+            return ToggleButtonCaption(icon: image.node.props[.source].flatMap(ImageSource.init(propValue:)))
         }
         if let label = view as? Label {
             let parts = label.semanticParts
-            return parts.title != nil || parts.icon != nil
-                ? (parts.title?.display, parts.title?.key, parts.icon) : nil
+            if parts.title != nil || parts.icon != nil {
+                return ToggleButtonCaption(text: parts.title?.display, key: parts.title?.key, icon: parts.icon)
+            }
+            guard inToolbar, let title = unwrappedStatement(label.title) as? Text else { return nil }
+
+            // A frame supplies dimensions as well as a picture. The outermost
+            // explicit dimension on each axis is the one offered to the toolbar.
+            var picture = unwrappedStatement(label.icon).node
+            var width: Double?
+            var height: Double?
+            while picture.isFrameWrapper, picture.children.count == 1, let content = picture.children.first {
+                width = width ?? picture.props[.width]?.number
+                height = height ?? picture.props[.height]?.number
+                picture = content
+            }
+            guard picture.type == .image,
+                  let icon = picture.props[.source].flatMap(ImageSource.init(propValue:)),
+                  !icon.isEmpty, icon.bitmap == nil
+            else { return nil }
+            return ToggleButtonCaption(
+                text: title.node.props[.text]?.string, key: title.wordsKey, icon: icon,
+                iconWidth: width, iconHeight: height)
         }
         return nil
     }
+}
+
+fileprivate struct ToggleButtonCaption {
+    var text: String?
+    var key: LocalizedStringKey?
+    var icon: ImageSource?
+    var iconWidth: Double?
+    var iconHeight: Double?
 }
 
 extension View {

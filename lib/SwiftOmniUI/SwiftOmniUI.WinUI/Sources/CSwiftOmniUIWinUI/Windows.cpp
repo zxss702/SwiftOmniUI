@@ -116,6 +116,18 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number) {
             controls::Canvas::SetZIndex(material, 1);
             grid.Children().Append(material);
         } catch (...) { report("creating the optional window material layer"); }
+        auto layoutToken = std::make_shared<winrt::event_token>();
+        *layoutToken = grid.LayoutUpdated(guarded("committing settled layout",
+            [weakGrid = winrt::make_weak(grid)](IInspectable const &, IInspectable const &) {
+                auto grid = weakGrid.get();
+                if (!grid || !grid.IsLoaded() || !grid.XamlRoot()) return;
+                if (callbacks.layoutCommitted) callbacks.layoutCommitted();
+            }));
+        auto shortcutToken = std::make_shared<winrt::event_token>();
+        *shortcutToken = grid.PreviewKeyDown(guarded("dispatching window keyboard shortcuts",
+            [weakGrid = winrt::make_weak(grid), number](IInspectable const &, xaml::Input::KeyRoutedEventArgs const &args) {
+                if (auto grid = weakGrid.get()) dispatchWindowShortcut(grid, number, args);
+            }));
         // The window's state is read at each of them: a minimized window is also told it lost its activation, and
         // one hidden - with the window it belongs to, or by its scene - stands off the screen as a minimized one.
         window.Activated(guarded("handling Activated",
@@ -140,7 +152,17 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number) {
                 if (!args.DidPresenterChange() && !args.DidSizeChange()) return;
                 if (minimized(sender)) callbacks.windowStateChanged(number, true, false);
             }));
-        window.Closed(guarded("handling Closed", [number](IInspectable const &sender, xaml::WindowEventArgs const &) {
+        window.Closed(guarded("handling Closed", [number, weakGrid = winrt::make_weak(grid), layoutToken, shortcutToken](IInspectable const &sender, xaml::WindowEventArgs const &) {
+            if (auto grid = weakGrid.get()) {
+                if (layoutToken->value) {
+                    grid.LayoutUpdated(*layoutToken);
+                    *layoutToken = {};
+                }
+                if (shortcutToken->value) {
+                    grid.PreviewKeyDown(*shortcutToken);
+                    *shortcutToken = {};
+                }
+            }
             releaseOwned(reinterpret_cast<HWND>(sender.as<xaml::Window>().AppWindow().Id().Value));
             // windowClosed renders - and a render inside XAML's teardown of this very window touches what is
             // dying, so the tree hears of the close once the event is through.
@@ -204,15 +226,36 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_safe_area_background_make(void
 }
 
 extern "C" void swiftomniui_winui_safe_area_host_set_background(SwiftOmniUIObjectRef handle, bool shown) {
-    try { as<xaml::FrameworkElement>(handle).Resources().Insert(winrt::box_value(L"safeBarAcrylic"), winrt::box_value(shown)); }
-    catch (...) { report("setting a promoted safe bar's material visibility"); }
+    try {
+        as<xaml::FrameworkElement>(handle).Resources().Insert(winrt::box_value(L"safeBarAcrylic"), winrt::box_value(shown));
+        markAcrylicMaterialDirty();
+    } catch (...) { report("setting a promoted safe bar's material visibility"); }
 }
 
 extern "C" void swiftomniui_winui_material_present(void) {
     try {
+        (void)takeAcrylicMaterialDirty();
         presentAcrylicScenes();
         for (auto const &root : acrylicWindowRoots()) refreshWindowMaterial(root.as<controls::Grid>());
     } catch (...) { report("presenting material with the host animation transaction"); }
+}
+
+extern "C" void swiftomniui_winui_material_present_if_needed(void) {
+    try {
+        if (!takeAcrylicMaterialDirty()) return;
+        presentAcrylicScenes();
+        for (auto const &root : acrylicWindowRoots()) refreshWindowMaterial(root.as<controls::Grid>());
+    } catch (...) { report("presenting material with the host animation transaction"); }
+}
+
+extern "C" void swiftomniui_winui_material_mark_dirty(void) {
+    try { markAcrylicMaterialDirty(); }
+    catch (...) { report("marking material presentation dirty"); }
+}
+
+extern "C" bool swiftomniui_winui_material_has_scroller_insets(void) {
+    try { return hasAcrylicScrollerInsets(); }
+    catch (...) { report("reading scroller material insets"); return false; }
 }
 
 extern "C" bool swiftomniui_winui_window_material_redirects(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element) {
@@ -514,6 +557,30 @@ extern "C" void swiftomniui_winui_window_close(SwiftOmniUIObjectRef handle) {
         window.Close();
     } catch (...) {
         report("closing a window");
+    }
+}
+
+extern "C" void swiftomniui_winui_window_minimize(SwiftOmniUIObjectRef handle) {
+    try {
+        auto app = borrow<xaml::Window>(handle).AppWindow();
+        if (auto presenter = app.Presenter().try_as<windowing::OverlappedPresenter>(); presenter && presenter.IsMinimizable()) {
+            presenter.Minimize();
+        }
+    } catch (...) {
+        report("minimizing a window");
+    }
+}
+
+extern "C" void swiftomniui_winui_window_toggle_fullscreen(SwiftOmniUIObjectRef handle) {
+    try {
+        auto app = borrow<xaml::Window>(handle).AppWindow();
+        if (app.Presenter().Kind() == windowing::AppWindowPresenterKind::FullScreen) {
+            app.SetPresenter(windowing::AppWindowPresenterKind::Overlapped);
+        } else {
+            app.SetPresenter(windowing::AppWindowPresenterKind::FullScreen);
+        }
+    } catch (...) {
+        report("toggling window fullscreen");
     }
 }
 

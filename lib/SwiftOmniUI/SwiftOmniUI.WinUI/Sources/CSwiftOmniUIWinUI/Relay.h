@@ -56,6 +56,15 @@ namespace swiftomniui {
     /// Whether the keyboard's focus is on `element` or on what stands in it.
     bool holdsFocus(xaml::UIElement const &element);
 
+    /// Registers a menu owner's window-level keyboard shortcuts and dispatches
+    /// button/menu shortcuts from the window root's PreviewKeyDown (supporting
+    /// OEM punctuation keys and IME VK_PROCESSKEY that KeyboardAccelerator drops).
+    void registerMenuShortcuts(xaml::FrameworkElement const &owner, int64_t view,
+                               int32_t const *keys, int32_t const *modifiers,
+                               int32_t const *items, int32_t count);
+    bool dispatchWindowShortcut(controls::Grid const &windowRoot, int64_t windowNumber,
+                                xaml::Input::KeyRoutedEventArgs const &args);
+
     /// Reads the control's theme again, so its template takes the resources written into the control.
     void readThemeAgain(xaml::FrameworkElement const &control);
 
@@ -92,6 +101,9 @@ namespace swiftomniui {
 
     /// A source drawing the application's picture `file` - a bitmap, or an SVG - at its own proportions.
     xaml::Media::ImageSource pictureSource(std::wstring const &file);
+
+    /// Gives an AppBar button its label and updates icon-only sizing and tooltip.
+    bool setBarButtonCaption(controls::Control const &control, winrt::hstring const &words);
 
     /// Paints a panel clear while its view listens for the user or offers a context menu, so it is hit across its
     /// bounds and not only where its children stand; takes that away once neither holds. An author's background

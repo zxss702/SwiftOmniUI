@@ -41,6 +41,8 @@ final class WinUICanvasView: WinUIView {
     private var drawnCommands: [DrawCommand]?
     private var requestedSize: (element: ElementId, size: Size)?
 
+    override var hasBlendContent: Bool { drawnCommands?.isEmpty == false }
+
     init() {
         super.init { number in swiftomniui_winui_canvas_make(number) }
     }
@@ -63,6 +65,7 @@ final class WinUICanvasView: WinUIView {
     func draw(_ drawing: [DrawCommand]?) {
         let commands = drawing ?? []
         guard drawnCommands != commands else { return }
+        let hadBlendContent = hasBlendContent
         drawnCommands = commands
         let flat = HostDrawing(commands)
         let words = flat.strings.flatMap { $0.utf8.map { CChar(bitPattern: $0) } }
@@ -78,6 +81,7 @@ final class WinUICanvasView: WinUIView {
                 }
             }
         }
+        if hasBlendContent != hadBlendContent { writeDrawingEffects() }
     }
 
     /// The room `text` takes drawn in the font `look` names, measured by DirectWrite: wrapped at `maximumWidth`

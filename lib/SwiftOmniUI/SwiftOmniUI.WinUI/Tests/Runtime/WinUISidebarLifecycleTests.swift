@@ -9,6 +9,100 @@ import SwiftOmniUIConformance
 import XCTest
 
 final class WinUISidebarLifecycleTests: XCTestCase {
+    func testNativeTextAndPicturesRenderAfterRepeatedPageChanges() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let files = State(wrappedValue: true)
+            let document = State(wrappedValue: 0)
+            let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(Binding(get: { true }, set: { _ in })) {
+                    VStack {
+                        Group {
+                            if files.wrappedValue {
+                                ScrollView {
+                                    LazyVStack(alignment: .leading, spacing: 0) {
+                                        ForEach(0..<80) { index in
+                                            HStack {
+                                                Image("test_halves.svg").resizable().scaledToFit()
+                                                    .frame(width: 24, height: 24).id("picture-\(index)")
+                                                Text("Package \(index)").foregroundStyle(.black)
+                                                    .id("filename-\(index)")
+                                            }
+                                            .frame(height: 32)
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text("Conversation history")
+                            }
+                        }
+                        .transition(.blur.combined(with: .scale(scale: 1.01, anchor: .top)).animation(.snappy))
+                    }
+                    .background(Color.white)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Image(systemName: "\u{E721}").foregroundStyle(.black)
+                            .frame(width: 24, height: 40).id("search-symbol")
+                    }
+                } detail: {
+                    TextEditor(text: Binding(
+                        get: { "Document \(document.wrappedValue)\nVisible source text" },
+                        set: { _ in }
+                    ))
+                        .foregroundStyle(.black).background(Color.white)
+                        .id("editor-\(document.wrappedValue)")
+                }
+            }
+            @MainActor func advance(frames: Int) {
+                for _ in 0..<frames {
+                    clock.now += 16
+                    host.step()
+                    host.frame()
+                }
+            }
+
+            @MainActor func sample(_ view: WinUIView, inset: Int = 0) -> [UInt32] {
+                let across = min(128, Int(view.laidOutFrame.width) - inset)
+                let down = min(50, Int(view.laidOutFrame.height) - inset)
+                let points = stride(from: inset, to: down, by: 2).flatMap { y in
+                    stride(from: inset, to: across, by: 2).map { x in (Double(x) + 0.5, Double(y) + 0.5) }
+                }
+                guard !points.isEmpty else { return [] }
+                return view.pixels(at: points)
+            }
+
+            func hasDarkInk(_ pixels: [UInt32]) -> Bool {
+                pixels.contains { pixel in
+                    pixel >> 24 >= 0xf0 && [0, 8, 16].allSatisfy { (pixel >> $0) & 0xff < 0x50 }
+                }
+            }
+
+            advance(frames: 36)
+            for turn in 0..<8 {
+                if turn > 0 {
+                    withAnimation(.snappy) {
+                        files.wrappedValue = false
+                        document.wrappedValue = turn
+                    }
+                    advance(frames: turn <= 3 ? 36 : 4)
+                    withAnimation(.snappy) { files.wrappedValue = true }
+                    advance(frames: 36)
+                }
+                // Rows can scroll beneath the safe-area material. Sample below it.
+                let label = try XCTUnwrap(host.view(id: .manual("filename-3")) as? WinUILabelView)
+                let picture = try XCTUnwrap(host.view(id: .manual("picture-3")))
+                let symbolFrame = try XCTUnwrap(host.view(id: .manual("search-symbol")))
+                let symbol = try XCTUnwrap(symbolFrame.sourceElement?.first(type: .image)?.winUI.view as? WinUIImageView)
+                let editor = try XCTUnwrap(host.view(id: .manual("editor-\(turn)")) as? WinUITextEditorView)
+                XCTAssertEqual(label.text, "Package 3")
+                XCTAssertEqual(editor.text, "Document \(turn)\nVisible source text")
+                XCTAssertTrue(sample(picture).contains(0xffff_0000), "picture, turn \(turn)")
+                XCTAssertTrue(hasDarkInk(sample(label)), "file label, turn \(turn)")
+                XCTAssertTrue(sample(symbol).contains { $0 >> 24 != 0 }, "Fluent glyph, turn \(turn)")
+                XCTAssertTrue(hasDarkInk(sample(editor, inset: 8)), "editor, turn \(turn)")
+            }
+        }
+    }
+
     func testNativePagesKeepALiveSafeAreaProvider() {
         onUIThread {
             let navigation = WinUINavigationView()

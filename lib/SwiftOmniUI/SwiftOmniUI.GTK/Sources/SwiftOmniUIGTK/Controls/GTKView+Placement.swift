@@ -16,6 +16,7 @@ extension GTKView {
     /// Design: docs/design/platforms/gtk/layout.md#a-place-between-passes
     func layout(_ place: Rect) {
         var place = place
+        if let placementBottom { place.y = placementBottom - place.height }
         if var frozen = departureFrame {
             var ancestor = sourceElement?.parent
             while let element = ancestor {

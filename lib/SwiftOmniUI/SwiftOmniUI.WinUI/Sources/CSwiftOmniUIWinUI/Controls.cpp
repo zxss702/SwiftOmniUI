@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.h>
@@ -384,22 +385,7 @@ extern "C" void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef handle, char 
     try {
         auto control = as<controls::ContentControl>(handle);
         auto words = text(utf8);
-        // The bar's button is named by its label; with a picture in its icon slot the words move to its tip.
-        auto place = [&](auto const &command) {
-            bool pictured = command.Icon() != nullptr;
-            bool collapsed = words.empty() || pictured;
-            command.Label(words);
-            command.LabelPosition(collapsed ? controls::CommandBarLabelPosition::Collapsed
-                                            : controls::CommandBarLabelPosition::Default);
-            // Showing its icon alone, the button stands as wide as the bar's own back and pane buttons - the
-            // system gives those 40. Words alone keep the default width, which a label needs.
-            if (collapsed) command.Width(40);
-            else command.ClearValue(xaml::FrameworkElement::WidthProperty());
-            if (pictured && !words.empty()) controls::ToolTipService::SetToolTip(command, winrt::box_value(words));
-        };
-        if (auto toggle = control.try_as<controls::AppBarToggleButton>()) return place(toggle);
-        if (auto command = control.try_as<controls::AppBarButton>()) return place(command);
-        control.Content(winrt::box_value(words));
+        if (!setBarButtonCaption(control, words)) control.Content(winrt::box_value(words));
     } catch (...) {
         report("setting a caption");
     }
@@ -496,10 +482,186 @@ extern "C" void swiftomniui_winui_button_invoke(SwiftOmniUIObjectRef handle) {
     }
 }
 
+namespace {
+    struct ButtonShortcutEntry {
+        winrt::weak_ref<primitives::ToggleButton> button;
+        int64_t view = 0;
+        int32_t key = 0;
+        int32_t modifiers = 0;
+    };
+
+    struct MenuShortcutItem {
+        int32_t key = 0;
+        int32_t modifiers = 0;
+        int32_t item = 0;
+    };
+
+    struct MenuShortcutEntry {
+        winrt::weak_ref<xaml::FrameworkElement> owner;
+        int64_t view = 0;
+        std::vector<MenuShortcutItem> items;
+    };
+
+    std::vector<ButtonShortcutEntry> buttonShortcuts;
+    std::vector<MenuShortcutEntry> menuShortcuts;
+
+    int32_t fallbackAsciiVirtualKey(uint32_t scalar) {
+        if (scalar >= 'a' && scalar <= 'z') return static_cast<int32_t>(scalar - 'a' + 'A');
+        if (scalar >= 'A' && scalar <= 'Z') return static_cast<int32_t>(scalar);
+        if (scalar >= '0' && scalar <= '9') return static_cast<int32_t>(scalar);
+        switch (scalar) {
+        case '.': return VK_OEM_PERIOD;
+        case ',': return VK_OEM_COMMA;
+        case '-': return VK_OEM_MINUS;
+        case '=': return VK_OEM_PLUS;
+        case ';': return VK_OEM_1;
+        case '/': return VK_OEM_2;
+        case '`': return VK_OEM_3;
+        case '[': return VK_OEM_4;
+        case '\\': return VK_OEM_5;
+        case ']': return VK_OEM_6;
+        case '\'': return VK_OEM_7;
+        default: return 0;
+        }
+    }
+
+    bool matchesShortcutKey(int32_t registered, int32_t pressed) {
+        if (registered == pressed) return true;
+        if (registered == VK_OEM_PERIOD && pressed == VK_DECIMAL) return true;
+        return false;
+    }
+
+    bool inWindowAndVisible(xaml::FrameworkElement const &element, xaml::XamlRoot const &root) {
+        if (!element.IsLoaded() || element.XamlRoot() != root) return false;
+        for (xaml::DependencyObject at = element; at; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
+            if (auto ui = at.try_as<xaml::UIElement>(); ui && ui.Visibility() != xaml::Visibility::Visible) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+namespace swiftomniui {
+    void registerMenuShortcuts(xaml::FrameworkElement const &owner, int64_t view,
+                               int32_t const *keys, int32_t const *modifiers,
+                               int32_t const *items, int32_t count) {
+        menuShortcuts.erase(std::remove_if(menuShortcuts.begin(), menuShortcuts.end(),
+            [view](MenuShortcutEntry const &entry) {
+                return entry.view == view || !entry.owner.get();
+            }), menuShortcuts.end());
+        if (!keys || !modifiers || !items || count <= 0) return;
+        MenuShortcutEntry entry{winrt::make_weak(owner), view, {}};
+        entry.items.reserve(static_cast<size_t>(count));
+        for (int32_t at = 0; at < count; ++at) {
+            if (keys[at] == 0) continue;
+            entry.items.push_back({keys[at], modifiers[at], items[at]});
+        }
+        if (!entry.items.empty()) menuShortcuts.push_back(std::move(entry));
+    }
+
+    bool dispatchWindowShortcut(controls::Grid const &windowRoot, int64_t windowNumber,
+                                xaml::Input::KeyRoutedEventArgs const &args) {
+        if (args.Handled()) return false;
+        auto key = static_cast<int32_t>(args.Key());
+        if (key == VK_PROCESSKEY || key == 0) {
+            key = static_cast<int32_t>(args.OriginalKey());
+        }
+        if (key == 0 || key == VK_CONTROL || key == VK_LCONTROL || key == VK_RCONTROL
+            || key == VK_SHIFT || key == VK_LSHIFT || key == VK_RSHIFT
+            || key == VK_MENU || key == VK_LMENU || key == VK_RMENU
+            || key == VK_LWIN || key == VK_RWIN) {
+            return false;
+        }
+        if ((GetKeyState(VK_LWIN) & 0x8000) || (GetKeyState(VK_RWIN) & 0x8000)) return false;
+
+        int32_t modifiers = 0;
+        if (GetKeyState(VK_CONTROL) & 0x8000) modifiers |= 1;
+        if (GetKeyState(VK_MENU) & 0x8000) modifiers |= 2;
+        if (GetKeyState(VK_SHIFT) & 0x8000) modifiers |= 4;
+
+        auto root = windowRoot.XamlRoot();
+        if (!root) return false;
+
+        // Bare (no Ctrl/Alt) keys must not steal typing from text inputs,
+        // except Escape (.cancelAction) and single-line Return (.defaultAction).
+        if ((modifiers & 3) == 0 && key != VK_ESCAPE) {
+            auto focused = xaml::Input::FocusManager::GetFocusedElement(root).try_as<xaml::DependencyObject>();
+            for (auto at = focused; at; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
+                if (auto box = at.try_as<controls::TextBox>()) {
+                    if (key == VK_RETURN && !box.AcceptsReturn()) break;
+                    return false;
+                }
+                if (at.try_as<controls::PasswordBox>()) {
+                    if (key == VK_RETURN) break;
+                    return false;
+                }
+                if (at.try_as<controls::RichEditBox>()) return false;
+            }
+        }
+
+        // Check button shortcuts in reverse registration order so topmost
+        // controls (such as buttons inside an active sheet) take priority.
+        for (auto it = buttonShortcuts.rbegin(); it != buttonShortcuts.rend(); ++it) {
+            if (it->modifiers != modifiers || !matchesShortcutKey(it->key, key)) continue;
+            auto target = it->button.get();
+            if (!target || !target.IsEnabled() || !inWindowAndVisible(target, root)) continue;
+            auto view = it->view;
+            args.Handled(true);
+            pattern<provider::IToggleProvider>(target, PatternInterface::Toggle).Toggle();
+            callbacks.clicked(view);
+            return true;
+        }
+
+        for (auto it = menuShortcuts.rbegin(); it != menuShortcuts.rend(); ++it) {
+            auto owner = it->owner.get();
+            if (!owner || !inWindowAndVisible(owner, root)) continue;
+            for (auto const &item : it->items) {
+                if (item.modifiers != modifiers || !matchesShortcutKey(item.key, key)) continue;
+                auto view = it->view;
+                auto chosen = item.item;
+                args.Handled(true);
+                callbacks.menuChosen(view, chosen);
+                return true;
+            }
+        }
+
+        // Built-in macOS-anchored standard shortcuts (only when no button or menu claimed the key):
+        // Ctrl+N (newWindow=1), Ctrl+, (openSettings=2), Ctrl+W (closeWindow=3),
+        // Ctrl+Q (quitApp=4), Ctrl+M (minimizeWindow=5),
+        // Ctrl+Alt+S (toggleSidebar=6), Ctrl+Alt+F (toggleFullscreen=7).
+        if (callbacks.windowShortcut) {
+            int32_t standard = 0;
+            if (modifiers == 1) {
+                switch (key) {
+                case 'N': standard = 1; break;
+                case VK_OEM_COMMA: standard = 2; break;
+                case 'W': standard = 3; break;
+                case 'Q': standard = 4; break;
+                case 'M': standard = 5; break;
+                default: break;
+                }
+            } else if (modifiers == 3) {
+                switch (key) {
+                case 'S': standard = 6; break;
+                case 'F': standard = 7; break;
+                default: break;
+                }
+            }
+            if (standard != 0 && callbacks.windowShortcut(windowNumber, standard)) {
+                args.Handled(true);
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 extern "C" int32_t swiftomniui_winui_shortcut_key(uint32_t scalar, int32_t *modifiers) {
     if (scalar > 0xffff || (scalar >= 0xd800 && scalar <= 0xdfff)) return 0;
     auto mapped = VkKeyScanExW(static_cast<wchar_t>(scalar), GetKeyboardLayout(0));
-    if (mapped == -1) return 0;
+    if (mapped == -1) return fallbackAsciiVirtualKey(scalar);
     auto shift = (static_cast<uint16_t>(mapped) >> 8) & 0xff;
     if (modifiers) {
         if (shift & 1) *modifiers |= 4; // Shift
@@ -512,26 +674,13 @@ extern "C" int32_t swiftomniui_winui_shortcut_key(uint32_t scalar, int32_t *modi
 extern "C" void swiftomniui_winui_button_set_shortcut(SwiftOmniUIObjectRef handle, int64_t view, int32_t key, int32_t modifiers) {
     try {
         auto button = as<primitives::ToggleButton>(handle);
-        // No key takes the shortcut away; any other is a Windows virtual key
-        // the Swift side chose, the modifiers its flags in the same order.
-        auto accelerators = button.KeyboardAccelerators();
-        accelerators.Clear();
+        button.KeyboardAccelerators().Clear();
+        buttonShortcuts.erase(std::remove_if(buttonShortcuts.begin(), buttonShortcuts.end(),
+            [view](ButtonShortcutEntry const &entry) {
+                return entry.view == view || !entry.button.get();
+            }), buttonShortcuts.end());
         if (key == 0) return;
-        xaml::Input::KeyboardAccelerator accelerator;
-        accelerator.Key(static_cast<winrt::Windows::System::VirtualKey>(key));
-        accelerator.Modifiers(static_cast<winrt::Windows::System::VirtualKeyModifiers>(modifiers));
-        // Our native buttons are ToggleButtons. Their default accelerator uses
-        // UIA Toggle, which changes IsChecked but does not raise Click. Dispatch
-        // the same toggle-then-click sequence as a pointer press, exactly once.
-        accelerator.Invoked(guarded("handling a button shortcut",
-            [weak = winrt::make_weak(button), view](auto const &, xaml::Input::KeyboardAcceleratorInvokedEventArgs const &args) {
-                auto target = weak.get();
-                if (!target || !target.IsEnabled()) return;
-                args.Handled(true);
-                pattern<provider::IToggleProvider>(target, PatternInterface::Toggle).Toggle();
-                callbacks.clicked(view);
-            }));
-        accelerators.Append(accelerator);
+        buttonShortcuts.push_back({winrt::make_weak(button), view, key, modifiers});
     } catch (...) {
         report("setting a button's shortcut");
     }

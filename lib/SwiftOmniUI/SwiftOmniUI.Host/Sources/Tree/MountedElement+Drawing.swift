@@ -14,17 +14,33 @@ extension MountedElement {
     /// How the view is moved, turned and scaled: `scale` multiplies both axes on top of `scaleX` and `scaleY`, and
     /// it turns about its middle where the tree says no pivot.
     public var drawingTransform: HostDrawingTransform {
-        let scale = number(.scale) ?? 1
+        let hasDriven = !driven.isEmpty
+        let tree = self.tree
+        let hasMotion = tree?.hasPropertyMotions(on: mount) == true
+
+        @inline(__always)
+        func read(_ property: Prop) -> Double? {
+            if hasDriven, let binding = driven[property], binding.mode != .in {
+                return resolvedValue(property)?.number
+            }
+            if hasMotion, let presented = tree?.presentedPropertyNumberUnchecked(mount: mount, property: property) {
+                return presented
+            }
+            return properties[property]?.number
+        }
+
+        let scale = read(.scale) ?? 1
+        let fallbackPivot = hasMotion ? activeTransitionPivot : nil
         return HostDrawingTransform(
-            translationX: number(.translationX) ?? 0,
-            translationY: number(.translationY) ?? 0,
-            rotation: number(.rotation) ?? 0,
-            rotationX: number(.rotationX) ?? 0,
-            rotationY: number(.rotationY) ?? 0,
-            scaleX: scale * (number(.scaleX) ?? 1),
-            scaleY: scale * (number(.scaleY) ?? 1),
-            pivotX: number(.pivotX) ?? 0.5,
-            pivotY: number(.pivotY) ?? 0.5)
+            translationX: read(.translationX) ?? 0,
+            translationY: read(.translationY) ?? 0,
+            rotation: read(.rotation) ?? 0,
+            rotationX: read(.rotationX) ?? 0,
+            rotationY: read(.rotationY) ?? 0,
+            scaleX: scale * (read(.scaleX) ?? 1),
+            scaleY: scale * (read(.scaleY) ?? 1),
+            pivotX: read(.pivotX) ?? fallbackPivot?.x ?? 0.5,
+            pivotY: read(.pivotY) ?? fallbackPivot?.y ?? 0.5)
     }
 
     /// The layout's own placing run, where a state drives one: it moves the children without changing what the

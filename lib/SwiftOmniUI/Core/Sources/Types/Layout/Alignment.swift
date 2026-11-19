@@ -147,7 +147,7 @@ public struct Alignment: Equatable, Sendable {
 ///
 /// `.center` is the middle, `.topLeading` the top left corner; `UnitPoint(x:y:)`
 /// names anywhere else, 0 to 1 across the view and down it.
-public struct UnitPoint: Equatable, Sendable {
+public struct UnitPoint: Equatable, Hashable, Sendable {
     /// The fraction across: 0 the left edge, 1 the right.
     public var x: Double
 

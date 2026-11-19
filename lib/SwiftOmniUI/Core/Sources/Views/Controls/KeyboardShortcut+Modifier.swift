@@ -25,6 +25,15 @@ extension View {
         setting(ButtonContract.shortcut, KeyboardShortcut(key, modifiers: modifiers))
     }
 
+    /// A keyboard shortcut value (such as `.defaultAction` or `.cancelAction`),
+    /// or `nil` to remove any shortcut.
+    public func keyboardShortcut(_ shortcut: KeyboardShortcut?) -> ModifiedContent {
+        if let shortcut {
+            return setting(ButtonContract.shortcut, shortcut)
+        }
+        return revised { $0.props.removeValue(forKey: ButtonContract.shortcut.token) }
+    }
+
     /// A keyboard shortcut from a state, `$s`: the host rebinds as it moves.
     public func keyboardShortcut(_ shortcut: Binding<KeyboardShortcut>) -> ModifiedContent {
         revised { $0.drivePlain(ButtonContract.shortcut, by: shortcut) }

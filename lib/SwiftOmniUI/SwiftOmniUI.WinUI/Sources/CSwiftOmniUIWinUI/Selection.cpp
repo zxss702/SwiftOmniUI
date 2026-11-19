@@ -19,6 +19,18 @@ namespace {
             if (node.try_as<controls::TextBox>() || node.try_as<controls::RichEditBox>()) return true;
         return false;
     }
+    xaml::UIElement selectionInputRoot(xaml::FrameworkElement const &view) {
+        auto xamlRoot = view.XamlRoot();
+        if (!xamlRoot) return nullptr;
+        auto window = xamlRoot.Content();
+        // A Flyout shares the window's XamlRoot, but its events route
+        // through the presenter in the popup tree.
+        for (auto node = xaml::Media::VisualTreeHelper::GetParent(view); node && node != window;
+             node = xaml::Media::VisualTreeHelper::GetParent(node)) {
+            if (auto presenter = node.try_as<controls::FlyoutPresenter>()) return presenter;
+        }
+        return window;
+    }
     struct Selection : std::enable_shared_from_this<Selection> {
         int64_t number;
         winrt::weak_ref<xaml::FrameworkElement> element;
@@ -42,7 +54,7 @@ namespace {
                 if (auto state = weak.lock()) state->attach();
             }));
             unloaded = view.Unloaded(guarded("detaching selection input", [weak](auto const &, auto const &) {
-                if (auto state = weak.lock()) state->disconnect();
+                if (auto state = weak.lock()) state->unload();
             }));
             timer = view.DispatcherQueue().CreateTimer(); timer.Interval(std::chrono::milliseconds(16));
             timer.Tick(guarded("autoscrolling a selection", [weak](auto const &, auto const &) {
@@ -72,9 +84,14 @@ namespace {
             }
             ownsCommands = false;
         }
+        void unload() {
+            const bool clear = active && root.try_as<controls::FlyoutPresenter>();
+            disconnect();
+            if (clear) input(number, 0, 0, 0);
+        }
         void attach() {
-            auto view = element.get(); if (!view || !view.XamlRoot()) return;
-            auto next = view.XamlRoot().Content(); if (root == next) return;
+            auto view = element.get(); if (!view || !view.IsLoaded()) return;
+            auto next = selectionInputRoot(view); if (!next || root == next) return;
             disconnect(); root = next;
             auto weak = weak_from_this();
             pointer = winrt::box_value(xaml::Input::PointerEventHandler(guarded("following selection presses", [weak](IInspectable const &, xaml::Input::PointerRoutedEventArgs const &args) {
@@ -112,7 +129,7 @@ namespace {
         void scrolled() {
             if (!pendingScroll || !dragging || !root) return;
             auto view = element.get(); auto visual = scrollVisual();
-            if (!view || !visual || !view.XamlRoot() || view.XamlRoot().Content() != root) return;
+            if (!view || !visual || !view.IsLoaded() || view.XamlRoot() != root.XamlRoot()) return;
             auto inverse = view.TransformToVisual(visual).Inverse(); if (!inverse) return;
             // ViewChanged, rather than a queued dispatcher turn, says the
             // native scroll offset and its content transform actually changed.

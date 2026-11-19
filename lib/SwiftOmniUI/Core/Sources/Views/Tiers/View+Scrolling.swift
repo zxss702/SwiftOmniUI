@@ -8,7 +8,10 @@ extension View {
         return revised { node in
             func positionScrollView(_ node: inout Node) {
                 node.materialize()
-                if node.type == ScrollViewContract.nodeType {
+                // A ViewModifier's `content` (and composed views wrapping a ScrollView)
+                // is still a `.composed` placeholder here; `Stateful.expand` merges
+                // properties and event handlers onto its expanded ScrollView root.
+                if node.type == ScrollViewContract.nodeType || node.type == .composed {
                     if let request { node.write(ScrollViewContract.positionRequest, request) }
                     if request?.edge == .bottom { node.write(ScrollViewContract.defaultScrollAnchor, .bottom) }
                     if request?.edge == .top { node.write(ScrollViewContract.defaultScrollAnchor, .top) }
@@ -205,7 +208,7 @@ extension View {
         revised { node in
             func attach(_ node: inout Node) {
                 node.materialize()
-                if node.type == ScrollViewContract.nodeType {
+                if node.type == ScrollViewContract.nodeType || node.type == .composed {
                     node.addHandler(.scrollGeometryChanged) {
                         guard let numbers = MemberValues.carried(
                             EventBuffer.current, by: "scrollGeometryChanged", as: [Double].self)
@@ -254,7 +257,7 @@ extension View {
         return revised { node in
             func attach(_ node: inout Node) {
                 node.materialize()
-                if node.type == ScrollViewContract.nodeType {
+                if node.type == ScrollViewContract.nodeType || node.type == .composed {
                     node.addHandler(.scrollGeometryChanged) {
                         guard let numbers = MemberValues.carried(
                             EventBuffer.current, by: "scrollGeometryChanged", as: [Double].self)

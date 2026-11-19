@@ -105,6 +105,11 @@ final class GTKImageView: GTKPanelView {
         across ? size.width : size.height
     }
 
+    override func measure(width: Double?, height: Double?) -> LayoutSize {
+        guard aspect == .fit else { return super.measure(width: width, height: height) }
+        return PictureArithmetic.fittedSize(size, in: ProposedViewSize(width: width, height: height))
+    }
+
     override func allocate(width: Double, height: Double) {
         read(for: LayoutSize(width: width, height: height))
     }

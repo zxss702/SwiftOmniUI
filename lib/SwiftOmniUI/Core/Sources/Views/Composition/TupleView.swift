@@ -131,12 +131,12 @@ public struct AnyView: View {
 /// SwiftOmniUI reads a view's stored properties as its inputs and rebuilds it
 /// where they differ; an `Equatable` view's inputs already compare by value,
 /// which is what the wrapper declares.
-public struct EquatableView<Content: View & Equatable>: View, Equatable {
+public nonisolated struct EquatableView<Content: View & Equatable>: View, Equatable {
     /// The wrapped view.
     public var content: Content
 
     /// The wrapped view's node, as written.
-    public var node: Node { content.node }
+    @MainActor public var node: Node { content.node }
 
     /// Wraps `content`, declared `Equatable`.
     public init(content: Content) {

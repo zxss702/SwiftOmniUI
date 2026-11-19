@@ -16,12 +16,23 @@ namespace swiftomniui {
                                              xaml::FrameworkElement const &target);
     xaml::FrameworkElement acrylicSceneRoot(std::shared_ptr<AcrylicScene> const &scene);
     winrt::Microsoft::UI::Composition::Visual acrylicSceneVisual(std::shared_ptr<AcrylicScene> const &scene);
+    struct AcrylicPartGeometry {
+        winrt::Windows::Foundation::Rect visible{};
+        winrt::Windows::Foundation::Rect localClip{};
+        winrt::Windows::Foundation::Numerics::float4x4 matrix{};
+        float opacity = 0;
+    };
     winrt::Windows::Foundation::Rect acrylicVisibleBounds(xaml::FrameworkElement const &element, xaml::FrameworkElement const &root);
+    AcrylicPartGeometry acrylicPartGeometry(xaml::FrameworkElement const &element, xaml::FrameworkElement const &root);
     float acrylicPresentationOpacity(xaml::FrameworkElement const &element, xaml::FrameworkElement const &root);
     bool acrylicUsesLocalPresentation(xaml::FrameworkElement const &element, xaml::FrameworkElement const &root);
     winrt::Windows::Foundation::Numerics::float4x4 acrylicPresentationMatrix(xaml::FrameworkElement const &element, xaml::FrameworkElement const &root);
     winrt::Windows::Foundation::Rect acrylicLocalClip(xaml::FrameworkElement const &element, xaml::FrameworkElement const &root,
         winrt::Windows::Foundation::Rect const &visible);
+    void setAcrylicLocalPresentation(IInspectable const &element, bool active) noexcept;
+    bool hasAcrylicScrollerInsets() noexcept;
+    void markAcrylicMaterialDirty() noexcept;
+    bool takeAcrylicMaterialDirty() noexcept;
     void presentAcrylicScenes();
     std::vector<xaml::FrameworkElement> acrylicWindowRoots();
     bool acrylicSceneIsWindow(std::shared_ptr<AcrylicScene> const &scene);

@@ -44,6 +44,22 @@ public struct AnyTransition: Equatable, Sendable {
         /// The edge a `move` slides along - the element's own room across.
         public var move: Edge?
 
+        /// Clockwise plane rotation in degrees at this phase, where said.
+        public var rotation: Double?
+
+        /// Horizontal-axis 3D rotation in degrees at this phase, where said.
+        public var rotationX: Double?
+
+        /// Vertical-axis 3D rotation in degrees at this phase, where said.
+        public var rotationY: Double?
+
+        /// Whether this phase leaves every drawn property untouched.
+        @_spi(Host) public var isEmpty: Bool {
+            opacity == nil && offset == nil && scaleX == nil && scaleY == nil
+                && pivot == nil && blur == nil && move == nil
+                && rotation == nil && rotationX == nil && rotationY == nil
+        }
+
         /// A phase that changes nothing.
         public init() {}
     }
@@ -140,6 +156,46 @@ extension AnyTransition {
     /// Slides along the leading edge - the SwiftUI shorthand.
     public static var slide: AnyTransition { .move(edge: .leading) }
 
+    /// Inserts by sliding in from `edge` while fading in, and removes by
+    /// sliding out toward the opposite edge while fading out - the SwiftUI
+    /// `.push(from:)` spelling.
+    public static func push(from edge: Edge) -> AnyTransition {
+        let opposite: Edge = switch edge {
+        case .top: .bottom
+        case .bottom: .top
+        case .leading: .trailing
+        case .trailing: .leading
+        }
+        return .asymmetric(
+            insertion: .move(edge: edge).combined(with: .opacity),
+            removal: .move(edge: opposite).combined(with: .opacity))
+    }
+
+    /// Blurs, fades, and subtly scales on arrival and departure - the SwiftUI
+    /// `.blurReplace` spelling.
+    public static var blurReplace: AnyTransition {
+        var insertion = Phase()
+        insertion.opacity = 0
+        insertion.blur = 8
+        insertion.scaleX = 0.96
+        insertion.scaleY = 0.96
+        var removal = Phase()
+        removal.opacity = 0
+        removal.blur = 8
+        removal.scaleX = 1.04
+        removal.scaleY = 1.04
+        return AnyTransition(insertion: insertion, removal: removal)
+    }
+
+    private struct ModifierCacheKey: Hashable {
+        let type: ObjectIdentifier
+        let active: AnyHashable
+        let identity: AnyHashable
+    }
+
+    @MainActor private static var modifierCache: [ModifierCacheKey: AnyTransition] = [:]
+    @MainActor private static let probeTemplate = Node(type: .rectangle)
+
     /// The transition a pair of modifiers describe: `active` is how the
     /// element differs at the edge, `identity` where it stands - the drawn
     /// properties the two write differently cross.
@@ -154,9 +210,30 @@ extension AnyTransition {
     ///   - active: The modifier whose look the element crosses from and to.
     ///   - identity: The modifier whose look the element rests at.
     @MainActor public static func modifier<M: ViewModifier>(active: M, identity: M) -> AnyTransition {
+        if let hashableActive = active as? any Hashable,
+           let hashableIdentity = identity as? any Hashable {
+            let key = ModifierCacheKey(
+                type: ObjectIdentifier(M.self),
+                active: AnyHashable(hashableActive),
+                identity: AnyHashable(hashableIdentity))
+            if let cached = modifierCache[key] { return cached }
+            let computed = buildModifierTransition(active: active, identity: identity)
+            if modifierCache.count >= 256 { modifierCache.removeAll(keepingCapacity: true) }
+            modifierCache[key] = computed
+            return computed
+        }
+        return buildModifierTransition(active: active, identity: identity)
+    }
+
+    @MainActor private static func buildModifierTransition<M: ViewModifier>(active: M, identity: M) -> AnyTransition {
         let activeProps = props(of: active)
         let identityProps = props(of: identity)
+        let phase = Self.phase(from: activeProps, relativeTo: identityProps)
+        return AnyTransition(insertion: phase, removal: phase)
+    }
 
+    /// Extracts the animated phase delta from `activeProps` relative to `identityProps`.
+    static func phase(from activeProps: [Prop: PropValue], relativeTo identityProps: [Prop: PropValue]) -> Phase {
         var phase = Phase()
         for (prop, value) in activeProps where identityProps[prop] != value {
             switch prop {
@@ -183,33 +260,43 @@ extension AnyTransition {
             case .pivotY:
                 phase.pivot = UnitPoint(
                     x: phase.pivot?.x ?? 0.5, y: value.number ?? 0.5)
+            case .rotation:
+                phase.rotation = value.number
+            case .rotationX:
+                phase.rotationX = value.number
+            case .rotationY:
+                phase.rotationY = value.number
             default:
                 break
             }
         }
-        return AnyTransition(insertion: phase, removal: phase)
+        return phase
     }
 
     /// The properties `modifier` leaves on a view it is applied to - how it
-    /// differs read flat. The probe is a `Rectangle`: an element with a node
-    /// of its own for the modifier to write on, found again by its type.
+    /// differs read flat. Uses a reusable static probe template without contract lookup.
     @MainActor private static func props<M: ViewModifier>(of modifier: M) -> [Prop: PropValue] {
-        var node = modifier.body(content: _ViewModifier_Content(view: AnyView(Rectangle()))).node
-        node.materialize()
-        return props(of: node, as: Rectangle().node.type)
+        let node = modifier.body(content: _ViewModifier_Content(transitionProbe: probeTemplate)).node
+        return probeProps(of: node)
     }
 
-    /// The properties on the first node of `type` in the tree - the probe's.
-    private static func props(of node: Node, as type: NodeType) -> [Prop: PropValue] {
+    /// The properties on the first `.rectangle` probe node in `node`.
+    static func probeProps(of node: Node) -> [Prop: PropValue] {
+        if node.type == .rectangle, node.producer == nil, node.stateful == nil {
+            return node.props
+        }
         var node = node
         node.materialize()
-        if node.type == type { return node.props }
+        if node.type == .rectangle { return node.props }
         for child in node.children {
-            let found = props(of: child, as: type)
-            if !found.isEmpty || child.type == type { return found }
+            let found = probeProps(of: child)
+            if !found.isEmpty || child.type == .rectangle { return found }
         }
         return [:]
     }
+
+    /// Reusable probe template for custom transition extraction.
+    @MainActor static var transitionProbeNode: Node { probeTemplate }
 
     /// Both halves - the second transition's phases over the first's, so the
     /// pieces each names move together:
@@ -256,6 +343,9 @@ extension AnyTransition.Phase {
         if let value = other.pivot { phase.pivot = value }
         if let value = other.blur { phase.blur = (phase.blur ?? 0) + value }
         if let value = other.move { phase.move = value }
+        if let value = other.rotation { phase.rotation = (phase.rotation ?? 0) + value }
+        if let value = other.rotationX { phase.rotationX = (phase.rotationX ?? 0) + value }
+        if let value = other.rotationY { phase.rotationY = (phase.rotationY ?? 0) + value }
         return phase
     }
 }
@@ -265,7 +355,7 @@ extension AnyTransition.Phase {
 extension AnyTransition {
     /// The component tags in a phase's encoding.
     private enum Component: Int32 {
-        case opacity = 1, offset = 2, scale = 3, blur = 4, move = 5
+        case opacity = 1, offset = 2, scale = 3, blur = 4, move = 5, rotation = 6
     }
 }
 
@@ -292,6 +382,11 @@ extension AnyTransition.Phase: HostRepresentable {
         if let move {
             parts.append(.values([
                 .enumeration(AnyTransition.Component.move.rawValue), .enumeration(Int32(move.rawValue))]))
+        }
+        if rotation != nil || rotationX != nil || rotationY != nil {
+            parts.append(.values([
+                .enumeration(AnyTransition.Component.rotation.rawValue),
+                .number(rotation ?? 0), .number(rotationX ?? 0), .number(rotationY ?? 0)]))
         }
         return .values(parts)
     }
@@ -321,6 +416,10 @@ extension AnyTransition.Phase: HostRepresentable {
                 if let raw = fields[1].enumeration.flatMap({ Int8(truncatingIfNeeded: $0) }) {
                     move = Edge(rawValue: raw)
                 }
+            case (.rotation, 4):
+                if let r = fields[1].number, r != 0 { rotation = r }
+                if let rx = fields[2].number, rx != 0 { rotationX = rx }
+                if let ry = fields[3].number, ry != 0 { rotationY = ry }
             default: continue
             }
         }

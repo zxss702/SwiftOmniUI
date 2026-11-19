@@ -27,6 +27,239 @@ import CRT
     public let rested: Bool
 }
 
+/// Precomputed time-dependent coefficients for an `Animation` at a given `elapsed` millisecond instant.
+///
+/// Dozens or hundreds of combined property and layout animations started in the same
+/// transaction share one `(Animation, elapsed)` pair on every display tick. Computing
+/// the transcendental basis (`exp`, `sin`, `cos`, `sqrt`, curve & slope) once in a
+/// kernel reduces each lane evaluation to a few scalar multiplies and adds while keeping
+/// bit-for-bit identical results with `HostMotionLaw.sample`.
+@_spi(Host) public struct HostMotionKernel: Sendable {
+    fileprivate enum Storage: Sendable {
+        case landed
+        case eased(
+            length: Double,
+            curve: Easing,
+            progress: Double,
+            amount: Double,
+            climbOverLength: Double,
+            h00: Double,
+            h10Length: Double,
+            h01: Double,
+            d00OverLength: Double,
+            d10: Double,
+            d01OverLength: Double
+        )
+        case springCritical(
+            frequency: Double,
+            elapsed: Double,
+            decay: Double
+        )
+        case springUnderdamped(
+            damped: Double,
+            dampFreq: Double,
+            decay: Double,
+            cosine: Double,
+            sine: Double
+        )
+        case springOverdamped(
+            first: Double,
+            second: Double,
+            span: Double,
+            expFirst: Double,
+            expSecond: Double
+        )
+    }
+
+    fileprivate let storage: Storage
+
+    /// Precomputes the evaluation kernel for `animation` at `elapsed` milliseconds.
+    public init(_ animation: Animation, elapsed: Double) {
+        switch animation.law {
+        case .eased:
+            let length = Double(animation.millis)
+            guard length > 0, elapsed < length else {
+                storage = .landed
+                return
+            }
+            let progress = elapsed / length
+            let amount = HostMotionLaw.ease(animation.curve, at: progress)
+            let climbOverLength = HostMotionLaw.slope(animation.curve, at: progress) / length
+            let h00 = ((2 * progress) - 3) * progress * progress + 1
+            let h10 = ((progress - 2) * progress + 1) * progress
+            let h01 = (3 - (2 * progress)) * progress * progress
+            let d00 = (6 * progress * progress) - (6 * progress)
+            let d10 = (3 * progress * progress) - (4 * progress) + 1
+            let d01 = (6 * progress) - (6 * progress * progress)
+            storage = .eased(
+                length: length,
+                curve: animation.curve,
+                progress: progress,
+                amount: amount,
+                climbOverLength: climbOverLength,
+                h00: h00,
+                h10Length: h10 * length,
+                h01: h01,
+                d00OverLength: d00 / length,
+                d10: d10,
+                d01OverLength: d01 / length
+            )
+
+        case .spring:
+            guard elapsed < HostMotionLaw.longest else {
+                storage = .landed
+                return
+            }
+            let response = Double(max(animation.millis, 1))
+            let damping = max(animation.factor, 0.01)
+            let frequency = 2 * Double.pi / response
+            if abs(damping - 1) < 1e-6 {
+                storage = .springCritical(
+                    frequency: frequency,
+                    elapsed: elapsed,
+                    decay: exp(-frequency * elapsed)
+                )
+            } else if damping < 1 {
+                let damped = frequency * sqrt(1 - (damping * damping))
+                let dampFreq = damping * frequency
+                storage = .springUnderdamped(
+                    damped: damped,
+                    dampFreq: dampFreq,
+                    decay: exp(-dampFreq * elapsed),
+                    cosine: cos(damped * elapsed),
+                    sine: sin(damped * elapsed)
+                )
+            } else {
+                let root = frequency * sqrt((damping * damping) - 1)
+                let first = -(frequency * damping) + root
+                let second = -(frequency * damping) - root
+                storage = .springOverdamped(
+                    first: first,
+                    second: second,
+                    span: first - second,
+                    expFirst: exp(first * elapsed),
+                    expSecond: exp(second * elapsed)
+                )
+            }
+        }
+    }
+
+    /// Evaluates a single lane without allocating intermediate arrays unless needed.
+    @inline(__always)
+    public func evaluateLane(
+        from: Double,
+        destination target: Double,
+        velocity initialSpeed: Double
+    ) -> (value: Double, velocity: Double, rested: Bool) {
+        switch storage {
+        case .landed:
+            return (target, 0, true)
+
+        case let .eased(_, _, _, amount, climbOverLength, h00, h10Length, h01, d00OverLength, d10, d01OverLength):
+            if initialSpeed == 0 {
+                let delta = target - from
+                return (from + (delta * amount), delta * climbOverLength, false)
+            } else {
+                let v = (h00 * from) + (h10Length * initialSpeed) + (h01 * target)
+                let s = (d00OverLength * from) + (d10 * initialSpeed) + (d01OverLength * target)
+                return (v, s, false)
+            }
+
+        case let .springCritical(frequency, elapsed, decay):
+            let displacement = from - target
+            let b = initialSpeed + (frequency * displacement)
+            let term = displacement + (b * elapsed)
+            let remaining = term * decay
+            let derivative = (b - (frequency * term)) * decay
+            if abs(remaining) <= HostMotionLaw.still && abs(derivative) <= HostMotionLaw.still {
+                return (target, 0, true)
+            }
+            return (target + remaining, derivative, false)
+
+        case let .springUnderdamped(damped, dampFreq, decay, cosine, sine):
+            let a = from - target
+            let b = (initialSpeed + (dampFreq * a)) / damped
+            let combo = (a * cosine) + (b * sine)
+            let remaining = decay * combo
+            let derivative = decay * ((-dampFreq * combo) + (damped * ((b * cosine) - (a * sine))))
+            if abs(remaining) <= HostMotionLaw.still && abs(derivative) <= HostMotionLaw.still {
+                return (target, 0, true)
+            }
+            return (target + remaining, derivative, false)
+
+        case let .springOverdamped(first, second, span, expFirst, expSecond):
+            let displacement = from - target
+            let c1 = (initialSpeed - (second * displacement)) / span
+            let c2 = displacement - c1
+            let term1 = c1 * expFirst
+            let term2 = c2 * expSecond
+            let remaining = term1 + term2
+            let derivative = (term1 * first) + (term2 * second)
+            if abs(remaining) <= HostMotionLaw.still && abs(derivative) <= HostMotionLaw.still {
+                return (target, 0, true)
+            }
+            return (target + remaining, derivative, false)
+        }
+    }
+
+    /// Evaluates an arbitrary lane vector using this precomputed kernel.
+    public func sample(
+        from: [Double],
+        destination: [Double],
+        velocity: [Double]
+    ) -> HostMotionSample {
+        let count = destination.count
+        guard from.count == count, velocity.count == count else {
+            return HostMotionSample(
+                value: destination,
+                velocity: Array(repeating: 0, count: count),
+                rested: true
+            )
+        }
+        if case .landed = storage {
+            return HostMotionSample(
+                value: destination,
+                velocity: Array(repeating: 0, count: count),
+                rested: true
+            )
+        }
+        if count == 1 {
+            let single = evaluateLane(from: from[0], destination: destination[0], velocity: velocity[0])
+            if single.rested {
+                return HostMotionSample(value: destination, velocity: [0], rested: true)
+            }
+            return HostMotionSample(value: [single.value], velocity: [single.velocity], rested: false)
+        }
+
+        var rested = true
+        var speed = Array<Double>(unsafeUninitializedCapacity: count) { buffer, initialized in
+            initialized = count
+            for i in 0..<count { buffer[i] = 0 }
+        }
+        let value = Array<Double>(unsafeUninitializedCapacity: count) { valBuf, initialized in
+            initialized = count
+            for lane in 0..<count {
+                let step = evaluateLane(
+                    from: from[lane],
+                    destination: destination[lane],
+                    velocity: velocity[lane]
+                )
+                valBuf[lane] = step.value
+                speed[lane] = step.velocity
+                if !step.rested { rested = false }
+            }
+        }
+        if rested {
+            return HostMotionSample(
+                value: destination,
+                velocity: Array(repeating: 0, count: count),
+                rested: true
+            )
+        }
+        return HostMotionSample(value: value, velocity: speed, rested: false)
+    }
+}
+
 /// The two animation laws, evaluated from the time since an animation began.
 ///
 /// Time is in milliseconds, the unit of `Animation`'s numbers, so velocity is per
@@ -68,25 +301,11 @@ import CRT
         guard from.count == destination.count, from.count == velocity.count else {
             return landed(destination)
         }
-
-        switch animation.law {
-        case .eased:
-            return eased(
-                length: Double(animation.millis),
-                curve: animation.curve,
-                elapsed: elapsed,
-                from: from,
-                destination: destination,
-                velocity: velocity)
-        case .spring:
-            return spring(
-                response: Double(max(animation.millis, 1)),
-                damping: max(animation.factor, 0.01),
-                elapsed: elapsed,
-                from: from,
-                destination: destination,
-                velocity: velocity)
-        }
+        return HostMotionKernel(animation, elapsed: elapsed).sample(
+            from: from,
+            destination: destination,
+            velocity: velocity
+        )
     }
 
     /// An animation at its destination, standing still.
@@ -95,116 +314,6 @@ import CRT
             value: destination,
             velocity: Array(repeating: 0, count: destination.count),
             rested: true)
-    }
-
-    private static func eased(
-        length: Double,
-        curve: Easing,
-        elapsed: Double,
-        from: [Double],
-        destination: [Double],
-        velocity: [Double]
-    ) -> HostMotionSample {
-        guard length > 0, elapsed < length else { return landed(destination) }
-
-        let progress = elapsed / length
-        let amount = ease(curve, at: progress)
-        let climb = slope(curve, at: progress)
-
-        // The Hermite basis and its derivative, which only a lane that began
-        // moving needs.
-        let h00 = ((2 * progress) - 3) * progress * progress + 1
-        let h10 = ((progress - 2) * progress + 1) * progress
-        let h01 = (3 - (2 * progress)) * progress * progress
-        let d00 = (6 * progress * progress) - (6 * progress)
-        let d10 = (3 * progress * progress) - (4 * progress) + 1
-        let d01 = (6 * progress) - (6 * progress * progress)
-
-        var value = Array(repeating: 0.0, count: from.count)
-        var speed = value
-
-        for lane in value.indices {
-            if velocity[lane] == 0 {
-                value[lane] = from[lane] + ((destination[lane] - from[lane]) * amount)
-                speed[lane] = (destination[lane] - from[lane]) * climb / length
-            } else {
-                value[lane] = (h00 * from[lane])
-                    + (h10 * length * velocity[lane])
-                    + (h01 * destination[lane])
-                speed[lane] = ((d00 * from[lane])
-                    + (d10 * length * velocity[lane])
-                    + (d01 * destination[lane])) / length
-            }
-        }
-
-        return HostMotionSample(value: value, velocity: speed, rested: false)
-    }
-
-    /// A mass on a spring, in closed form about the distance left rather than
-    /// the value - which makes the three damping cases the textbook ones and
-    /// keeps the destination out of the exponentials.
-    private static func spring(
-        response: Double,
-        damping: Double,
-        elapsed: Double,
-        from: [Double],
-        destination: [Double],
-        velocity: [Double]
-    ) -> HostMotionSample {
-        guard elapsed < longest else { return landed(destination) }
-
-        let frequency = 2 * Double.pi / response
-        var value = Array(repeating: 0.0, count: from.count)
-        var speed = value
-        var rested = true
-
-        for lane in value.indices {
-            let target = destination[lane]
-            let displacement = from[lane] - target
-            let initialSpeed = velocity[lane]
-            let remaining: Double
-            let derivative: Double
-
-            if abs(damping - 1) < 1e-6 {
-                let b = initialSpeed + (frequency * displacement)
-                let decay = exp(-frequency * elapsed)
-                remaining = (displacement + (b * elapsed)) * decay
-                derivative = (b - (frequency * (displacement + (b * elapsed)))) * decay
-            } else if damping < 1 {
-                let damped = frequency * sqrt(1 - (damping * damping))
-                let a = displacement
-                let b = (initialSpeed + (damping * frequency * displacement)) / damped
-                let decay = exp(-damping * frequency * elapsed)
-                let cosine = cos(damped * elapsed)
-                let sine = sin(damped * elapsed)
-                remaining = decay * ((a * cosine) + (b * sine))
-                derivative = decay * (
-                    (-damping * frequency * ((a * cosine) + (b * sine)))
-                        + (damped * ((b * cosine) - (a * sine))))
-            } else {
-                let root = frequency * sqrt((damping * damping) - 1)
-                let first = -(frequency * damping) + root
-                let second = -(frequency * damping) - root
-                let c1 = (initialSpeed - (second * displacement)) / (first - second)
-                let c2 = displacement - c1
-                remaining = (c1 * exp(first * elapsed)) + (c2 * exp(second * elapsed))
-                derivative = (c1 * first * exp(first * elapsed))
-                    + (c2 * second * exp(second * elapsed))
-            }
-
-            if abs(remaining) <= still && abs(derivative) <= still {
-                value[lane] = target
-                speed[lane] = 0
-            } else {
-                value[lane] = target + remaining
-                speed[lane] = derivative
-                rested = false
-            }
-        }
-
-        return rested
-            ? landed(destination)
-            : HostMotionSample(value: value, velocity: speed, rested: false)
     }
 
     /// How far through the change an eased animation is when `progress` of its

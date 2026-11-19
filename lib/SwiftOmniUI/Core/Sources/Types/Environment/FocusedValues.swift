@@ -93,11 +93,7 @@ extension FocusedValues {
             return open(equatable)
         }
 
-        if let a = a as? AnyObject, let b = b as? AnyObject {
-            return a === b
-        }
-
-        return stampA == stampB
+        return sameReference(a, b) ?? (stampA == stampB)
     }
 }
 

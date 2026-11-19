@@ -95,9 +95,8 @@ final class WinUIImageView: WinUIView {
         hasWrittenTint = true
     }
 
-    /// The picture's own size, whatever the room offered: an SVG's declared, a bitmap's once read - and a
-    /// symbol's nominal glyph box. WinUI is asked for no room, so the picture is drawn in the place its layout
-    /// gives it.
+    /// A fitted picture uses the proposal and its intrinsic aspect ratio.
+    /// Other drawing modes keep the picture's intrinsic measurement.
     /// Design: docs/design/platforms/winui/controls.md#pictures
     override func measure(width: Double?, height: Double?) -> LayoutSize {
         let intrinsic: LayoutSize
@@ -116,7 +115,9 @@ final class WinUIImageView: WinUIView {
         if WinUILayoutView.queryingSize == 0 {
             _ = super.measure(width: intrinsic.width, height: intrinsic.height)
         }
-        return intrinsic
+        return aspect == .fit
+            ? PictureArithmetic.fittedSize(intrinsic, in: ProposedViewSize(width: width, height: height))
+            : intrinsic
     }
 
     override func commitGeometry(in place: Rect) {

@@ -57,12 +57,37 @@ final class GTKGridView: GTKTravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
+        gridSize(width: width, height: nil)
+    }
+
+    override func contentSize(width: Double?, offeredHeight: Double) -> LayoutSize? {
+        guard items.count == 1, items[0].values.isFrameContent else { return nil }
+        return gridSize(width: width, height: offeredHeight)
+    }
+
+    override func firstTextBaseline(in size: LayoutSize) -> Double? {
+        let bounds = Rect(0, 0, size.width, size.height)
+        let places = GridArithmetic.places(
+            of: items, rows: implicitRows, columns: implicitColumns,
+            rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, in: bounds,
+            direction: direction, flow: flowColumns)
+        for (item, place) in zip(items, places) {
+            guard let place, item.isShown, !item.departing else { continue }
+            if let explicit = item.values.verticalGuide, explicit.slot == 4 { return place.y + explicit.offset }
+            if let baseline = item.view.firstTextBaseline(in: LayoutSize(width: place.width, height: place.height)) {
+                return place.y + baseline
+            }
+        }
+        return nil
+    }
+
+    private func gridSize(width: Double?, height: Double?) -> LayoutSize {
         if sourceElement?.isGeometryReader == true { return GeometryReaderArithmetic.size(width: width) }
         let barPadding = sourceElement?.safeAreaPadding != nil && sourceElement?.safeBarSizingAxes != .neither
             ? sourceElement?.safeAreaPadding ?? EdgeInsets(0) : EdgeInsets(0)
         return GridArithmetic.size(
             of: items, rows: implicitRows, columns: implicitColumns,
-            rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding + barPadding, width: width,
+            rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding + barPadding, width: width, height: height,
             flow: flowColumns)
     }
 

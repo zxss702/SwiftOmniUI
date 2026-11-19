@@ -68,6 +68,38 @@ final class Scenes: @unchecked Sendable {
         return record.id
     }
 
+    /// Opens (or locates, if already open) the application's settings window:
+    /// a declared value-less window group whose id is `"settings"`, `"setting"`,
+    /// or `"preferences"` (case-insensitive).
+    func openSettingsWindow() -> (scene: String, windowKey: String)? {
+        let standing = _list.storage.value
+        let names: Set<String> = ["settings", "setting", "preferences"]
+        for record in standing {
+            if let mainType = record.mainWindowType, names.contains(mainType.name.lowercased()) {
+                if !record.mainIsOpen {
+                    record.mainIsOpen = true
+                    Renderer.shared.setNeedsRender()
+                }
+                return (record.id, SceneElement.mainKey)
+            }
+            if let (type, shape) = record.declared.first(where: {
+                $0.value.valueType == nil && names.contains($0.key.name.lowercased())
+            }) {
+                if let existing = record.windows.first(where: { $0.type == type && $0.value == nil }) {
+                    return (record.id, existing.key)
+                }
+                try? record.open(type)
+                Renderer.shared.setNeedsRender()
+                if let opened = record.windows.first(where: { $0.type == type && $0.value == nil }) {
+                    return (record.id, opened.key)
+                }
+                let fallbackKey = shape.isSingleton ? "window \(type.name)" : "\(type.name) 1"
+                return (record.id, fallbackKey)
+            }
+        }
+        return nil
+    }
+
     /// Opens another scene, for the host to open a platform window for.
     func openScene() throws {
         guard Scenes.opensWindows else { throw WindowError.unsupported }
@@ -129,10 +161,17 @@ final class Scenes: @unchecked Sendable {
     }
 
     /// The application as the root of a message: one node per open scene.
-    func tree(of application: any App) -> Node {
+    @MainActor func tree(of application: any App) -> Node {
         // One scene value per scene: a scene's `@State` boxes are its value's own.
         Node(
             contract: AppContract.self,
             children: list.map { SceneElement(record: $0, scene: application.body).node })
+    }
+}
+
+@_spi(Host) extension HostBoundary {
+    /// Opens (or locates, if already open) the application's settings window.
+    public static func openSettingsWindow() -> (scene: String, windowKey: String)? {
+        Scenes.shared.openSettingsWindow()
     }
 }

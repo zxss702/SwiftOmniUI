@@ -9,6 +9,47 @@ import Foundation
 import XCTest
 
 final class WinUIImageViewTests: XCTestCase {
+    func testHeightOnlyFittedIconKeepsTheButtonLabelCompact() throws {
+        try onUIThread {
+            struct ToolFileIcon: View {
+                var body: some View {
+                    Image("test_halves.svg").resizable().scaledToFit()
+                }
+            }
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                VStack(alignment: .leading) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: "\u{E7B3}").resizable().scaledToFit()
+                            .frame(width: 12, height: 12)
+                        Text("Read").id("tool-name")
+                        Button {} label: {
+                            HStack(spacing: 8) {
+                                ToolFileIcon()
+                                    .frame(height: 12)
+                                    .id("icon-frame")
+                                Text("Package").lineLimit(1).id("file-name")
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        Text("1 - 201").font(.footnote).bold().id("line-range")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            host.settle { (host.view(id: .manual("file-name"))?.placedFrame.width ?? 0) > 0 }
+            let tool = try XCTUnwrap(host.view(id: .manual("tool-name"))).placedFrame
+            let icon = try XCTUnwrap(host.view(id: .manual("icon-frame"))).placedFrame
+            let name = try XCTUnwrap(host.view(id: .manual("file-name"))).placedFrame
+            let range = try XCTUnwrap(host.view(id: .manual("line-range"))).placedFrame
+
+            XCTAssertEqual(icon.height, 12, accuracy: 0.5)
+            XCTAssertEqual(icon.width, 24, accuracy: 0.5)
+            XCTAssertEqual(name.x - (icon.x + icon.width), 8, accuracy: 0.5)
+            XCTAssertLessThan(range.x - (tool.x + tool.width), 200,
+                              "a height-fixed scaledToFit icon must not expand across an infinity-maxWidth leading row")
+        }
+    }
+
     private func checkSymbolCanStartUnscaledThenScaleAndSwitchToPixels() throws {
         try onUIThread {
             let mode = State(wrappedValue: 0)

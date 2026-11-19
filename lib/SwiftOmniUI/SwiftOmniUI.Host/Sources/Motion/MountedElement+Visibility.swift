@@ -25,7 +25,7 @@ extension MountedElement {
     /// Whether the element stands shown: as the tree says, or while it fades
     /// out, or while it rides its removal transition.
     public var standsShown: Bool {
-        isLeaving || isDeparting || value(.isVisible)?.bool != false
+        isLeaving || isDeparting || bool(.isVisible) != false
     }
 
     /// Whether the element fades in as it joins a standing layout: it was described
@@ -89,7 +89,17 @@ extension MountedElement {
 extension MountedElement {
     /// The transition the element was described with; nil for none.
     public var transition: AnyTransition? {
-        resolvedValue(.transition).flatMap(AnyTransition.init(propValue:))
+        if !transitionDecoded {
+            cachedTransition = resolvedValue(.transition).flatMap(AnyTransition.init(propValue:))
+            transitionDecoded = true
+        }
+        return cachedTransition
+    }
+
+    /// Whether the element carries an authored or driven pivot/rotation that a transition pivot must interpolate against.
+    private var hasExplicitPivotOrRotation: Bool {
+        properties[.pivotX] != nil || properties[.pivotY] != nil || properties[.rotation] != nil
+            || driven[.pivotX] != nil || driven[.pivotY] != nil || driven[.rotation] != nil
     }
 
     /// Fades the element in as it joins a layout already standing - the
@@ -101,17 +111,28 @@ extension MountedElement {
         guard let tree else { return }
 
         let law = transition.animation ?? animation
-        let components = phaseValues(transition.insertion, room: room)
+        let holdPivot = !hasExplicitPivotOrRotation && transition.insertion.pivot != nil
+        activeTransitionPivot = holdPivot ? transition.insertion.pivot : nil
+        let components = phaseValues(transition.insertion, room: room, includePivot: !holdPivot)
+        let hadMotions = tree.hasPropertyMotions(on: mount)
+        var initialFrameProperties: Set<Prop> = []
         for (property, standing) in components {
+            let target = resolvedValue(property) ?? resting(of: property)
+            if !hadMotions, standing == target, properties[property] == nil { continue }
             _ = tree.receiveProperty(
                 mount: mount, property: property, standing: standing,
-                target: resolvedValue(property) ?? resting(of: property), animation: law)
+                target: target, animation: law)
+            initialFrameProperties.insert(property)
+        }
+        if holdPivot, !initialFrameProperties.isEmpty {
+            initialFrameProperties.insert(.pivotX)
+            initialFrameProperties.insert(.pivotY)
         }
         // Layout can snapshot a newly placed view before the next clock tick.
         // Commit the complete insertion drawing now, rather than briefly
         // showing the authored identity and then jumping to the phase's start.
-        if !components.isEmpty {
-            ProgramWrite.perform { native.presentFrame(Set(components.map { $0.0 })) }
+        if !initialFrameProperties.isEmpty {
+            ProgramWrite.perform { native.presentFrame(initialFrameProperties) }
         }
     }
 
@@ -123,11 +144,13 @@ extension MountedElement {
     /// `room` is the place its view last stood at, which a `move` measures by.
     public func depart(room: Rect?, under placement: HostLayoutMotion? = nil, closed: @escaping () -> Void) -> Bool {
         guard !isDeparting, let tree, let transition else { return false }
-        let components = phaseValues(transition.removal, room: room)
+        let holdPivot = !hasExplicitPivotOrRotation && transition.removal.pivot != nil
+        let components = phaseValues(transition.removal, room: room, includePivot: !holdPivot)
         guard !components.isEmpty,
               let law = transition.animation ?? tree.layoutMotion.law(of: placement ?? animation)
         else { return false }
 
+        activeTransitionPivot = holdPivot ? transition.removal.pivot : nil
         isDeparting = true
         native.departureChanged()
         departureSerial += 1
@@ -154,6 +177,7 @@ extension MountedElement {
             if !started { pending -= 1 }
         }
         if pending == 0 {
+            activeTransitionPivot = nil
             isDeparting = false
             native.departureChanged()
             return false
@@ -169,8 +193,9 @@ extension MountedElement {
 
         guard let tree else { return }
         native.departureChanged()
+        let holdPivot = !hasExplicitPivotOrRotation && transition.removal.pivot != nil
         let law = transition.animation ?? tree.layoutMotion.law(of: animation) ?? .standard
-        for (property, _) in phaseValues(transition.removal, room: nil) {
+        for (property, _) in phaseValues(transition.removal, room: nil, includePivot: !holdPivot) {
             _ = tree.receiveProperty(
                 mount: mount, property: property, standing: value(property),
                 target: resolvedValue(property) ?? resting(of: property), animation: law)
@@ -179,8 +204,9 @@ extension MountedElement {
 
     /// The values a phase's components stand at, by property - a component the
     /// element already drives stays the state's.
-    private func phaseValues(_ phase: AnyTransition.Phase, room: Rect?) -> [(Prop, HostValue)] {
+    private func phaseValues(_ phase: AnyTransition.Phase, room: Rect?, includePivot: Bool) -> [(Prop, HostValue)] {
         var values: [(Prop, HostValue)] = []
+        values.reserveCapacity(6)
         var offset = phase.offset ?? Point(0, 0)
         if let move = phase.move {
             let across = room?.width ?? 0, down = room?.height ?? 0
@@ -201,9 +227,12 @@ extension MountedElement {
         }
         if let scaleX = phase.scaleX, driven[.scaleX] == nil { values.append((.scaleX, .number(scaleX))) }
         if let scaleY = phase.scaleY, driven[.scaleY] == nil { values.append((.scaleY, .number(scaleY))) }
-        if let pivot = phase.pivot {
-            values.append((.pivotX, .number(pivot.x)))
-            values.append((.pivotY, .number(pivot.y)))
+        if let rotation = phase.rotation, driven[.rotation] == nil { values.append((.rotation, .number(rotation))) }
+        if let rotationX = phase.rotationX, driven[.rotationX] == nil { values.append((.rotationX, .number(rotationX))) }
+        if let rotationY = phase.rotationY, driven[.rotationY] == nil { values.append((.rotationY, .number(rotationY))) }
+        if includePivot, let pivot = phase.pivot {
+            if driven[.pivotX] == nil { values.append((.pivotX, .number(pivot.x))) }
+            if driven[.pivotY] == nil { values.append((.pivotY, .number(pivot.y))) }
         }
         if let blur = phase.blur, driven[.blur] == nil { values.append((.blur, .number(blur))) }
         // A transition only waits for components the native half presents.

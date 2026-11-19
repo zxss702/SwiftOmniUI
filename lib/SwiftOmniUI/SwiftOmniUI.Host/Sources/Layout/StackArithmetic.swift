@@ -34,7 +34,8 @@
     /// The room a stack's shown children take, each measured once for the width offered.
     @MainActor
     public static func size<Child: LayoutChild>(
-        of items: [Child], axis: Axis, spacing: Double?, padding: EdgeInsets, width offered: Double?
+        of items: [Child], axis: Axis, spacing: Double?, padding: EdgeInsets, width offered: Double?,
+        height offeredHeight: Double? = nil
     ) -> LayoutSize {
         let visible = items.filter(\.isShown)
         let gaps = Self.gaps(of: visible, axis: axis, spacing: spacing).reduce(0, +)
@@ -59,21 +60,49 @@
                 height: padding.top + padding.bottom + gaps + along)
 
         case .horizontal:
-            let ideal = visible.map { $0.size(offered: nil) }
+            let availableHeight = offeredHeight.flatMap { $0.isFinite ? max(0, $0 - padding.top - padding.bottom) : nil }
+            let ideal = visible.map { item -> LayoutSize in
+                guard let availableHeight else { return item.size(offered: nil) }
+                let margin = item.values.margin
+                return item.size(offered: ProposedViewSize(
+                    width: nil, height: max(0, availableHeight - margin.top - margin.bottom)))
+            }
             let available = offered.flatMap { $0.isFinite ? max(0, $0 - padding.left - padding.right) : nil }
             let widths = available.map {
                 alongs(visible, naturals: ideal, axis: axis, spacing: spacing,
-                       in: Rect(0, 0, $0, 0))
+                       in: Rect(0, 0, $0, availableHeight ?? 0), crossFinite: availableHeight != nil)
             }
+            var maxAscent = 0.0
+            var maxDescent = 0.0
+            var hasBaseline = false
             for (index, item) in visible.enumerated() {
                 // A row's height belongs to the widths it actually gives its
                 // children. In particular, a text column beside an icon and
                 // Spacer must wrap during measurement, before placement.
-                let size = widths.map { item.size(offered: $0[index]) } ?? ideal[index]
                 let margin = item.values.margin
+                let size: LayoutSize
+                if let widths {
+                    if let availableHeight {
+                        size = item.size(offered: ProposedViewSize(
+                            width: widths[index], height: max(0, availableHeight - margin.top - margin.bottom)))
+                    } else {
+                        size = item.size(offered: widths[index])
+                    }
+                } else {
+                    size = ideal[index]
+                }
                 along += (widths?[index] ?? max(size.width, item.values.flex ?? 0)) + margin.left + margin.right
-                across = max(across, size.height + margin.top + margin.bottom)
+                let slot = item.values.vertical
+                if slot == 4 || slot == 5 {
+                    hasBaseline = true
+                    let line = guide(item.values.verticalGuide, in: item, size: size, slot: slot)
+                    maxAscent = max(maxAscent, margin.top + line)
+                    maxDescent = max(maxDescent, size.height - line + margin.bottom)
+                } else {
+                    across = max(across, size.height + margin.top + margin.bottom)
+                }
             }
+            if hasBaseline { across = max(across, maxAscent + maxDescent) }
             return LayoutSize(
                 width: padding.left + padding.right + gaps + along,
                 height: padding.top + padding.bottom + across)
@@ -103,10 +132,12 @@
             let cross = axis == .vertical ? content.width : content.height
             return item.size(offered: axis == .vertical ? max(0, cross - margin.left - margin.right) : nil)
         }
-        let extents = alongs(items, naturals: naturals, axis: axis, spacing: spacing, in: content)
+        let extents = alongs(items, naturals: naturals, axis: axis, spacing: spacing, in: content, crossFinite: true)
         if axis == .horizontal {
             for index in items.indices where items[index].isShown {
-                naturals[index] = items[index].size(offered: extents[index])
+                let margin = items[index].values.margin
+                naturals[index] = items[index].size(offered: ProposedViewSize(
+                    width: extents[index], height: max(0, content.height - margin.top - margin.bottom)))
             }
         }
 
@@ -117,7 +148,7 @@
         if axis == .horizontal {
             baseline = content.y + (zip(items, naturals).map { item, natural -> Double in
                 guard item.isShown, item.values.vertical == 4 || item.values.vertical == 5 else { return 0 }
-                return guide(item.values.verticalGuide, in: item, natural: natural.height,
+                return guide(item.values.verticalGuide, in: item, size: natural,
                              slot: item.values.vertical)
             }.max() ?? 0)
         }
@@ -170,7 +201,7 @@
                 let y: Double
                 if values.vertical == 4 || values.vertical == 5 {
                     y = baseline - guide(values.verticalGuide, in: item,
-                                         natural: height, slot: values.vertical)
+                                         size: LayoutSize(width: along, height: height), slot: values.vertical)
                 } else {
                     y = Extent.start(
                         option: values.vertical, extent: height, start: content.y + margin.top,
@@ -189,14 +220,33 @@
     /// remaining room before intrinsic siblings give up their natural sizes.
     @MainActor
     private static func alongs<Child: LayoutChild>(
-        _ items: [Child], naturals: [LayoutSize], axis: Axis, spacing: Double?, in content: Rect
+        _ items: [Child], naturals: [LayoutSize], axis: Axis, spacing: Double?, in content: Rect,
+        crossFinite: Bool = true
     ) -> [Double] {
         var minima = items.map { item in
             let minimum = axis == .vertical ? item.values.minimumHeight : item.values.minimumWidth
             return max(max(0, minimum ?? 0), item.values.flex ?? 0)
         }
-        let maxima = items.indices.map { index in
-            let maximum = axis == .vertical ? items[index].values.maximumHeight : items[index].values.maximumWidth
+        let maxima = items.indices.map { index -> Double in
+            let values = items[index].values
+            let maximum = axis == .vertical ? values.maximumHeight : values.maximumWidth
+            let scrolls = values.scrollAxes == .both
+                || (axis == .vertical ? values.scrollAxes == .vertical : values.scrollAxes == .horizontal)
+            let expands = values.expandingAxes == .both
+                || (axis == .vertical ? values.expandingAxes == .vertical : values.expandingAxes == .horizontal)
+            let bounded = axis == .horizontal ? values.maximumWidth != nil : values.maximumHeight != nil
+            if items[index].isShown && crossFinite && values.scalesToFit
+                && values.flex == nil && !bounded && !scrolls && !expands {
+                let fitted: Double
+                if axis == .vertical {
+                    fitted = naturals[index].height
+                } else {
+                    let margin = values.margin
+                    fitted = items[index].size(offered: ProposedViewSize(
+                        width: content.width, height: max(0, content.height - margin.top - margin.bottom))).width
+                }
+                return max(minima[index], min(maximum ?? .greatestFiniteMagnitude, fitted))
+            }
             return max(minima[index], maximum ?? .greatestFiniteMagnitude)
         }
         let flexible = items.indices.filter { index in
@@ -208,7 +258,7 @@
                 || (axis == .vertical ? values.expandingAxes == .vertical : values.expandingAxes == .horizontal)
             let bounded = axis == .horizontal ? values.maximumWidth != nil : values.maximumHeight != nil
             return items[index].isShown && stated == nil
-                && (values.flex != nil || bounded || scrolls || expands)
+                && (values.flex != nil || bounded || scrolls || expands || values.scalesToFit)
         }
         let flexibleIndices = Set(flexible)
         var extents = items.indices.map { index -> Double in
@@ -323,13 +373,13 @@
     /// host reads one, its extent's far edge for a last baseline.
     @MainActor
     private static func guide<Child: LayoutChild>(
-        _ explicit: AlignmentGuide?, in child: Child, natural: Double, slot: Int32
+        _ explicit: AlignmentGuide?, in child: Child, size: LayoutSize, slot: Int32
     ) -> Double {
         if let explicit, explicit.slot == slot { return explicit.offset }
         switch slot {
-        case 4: return child.firstBaseline ?? natural
-        case 5: return child.lastBaseline ?? natural
-        default: return natural / 2
+        case 4: return child.firstBaseline(in: size) ?? size.height
+        case 5: return child.lastBaseline(in: size) ?? size.height
+        default: return size.height / 2
         }
     }
 }

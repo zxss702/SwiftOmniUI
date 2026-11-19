@@ -2,14 +2,14 @@
 @_spi(Host) import SwiftOmniUICore
 import CSwiftOmniUIGTK
 
-/// Window controllers stay attached only while their selection container is mapped.
+/// Input controllers stay attached to the selection's surface while it is mapped.
 @MainActor final class GTKSelectionInteraction {
     weak var view: GTKView?
     var send: (Event, [PropValue]) -> Void
     var active = false
     var point: Point?
     private var ownsCommands = false
-    // Borrowed only for identity comparison; the root owns the focused widget.
+    // Borrowed only for identity comparison; the window owns the focused widget.
     private var commandFocus: GTKWidget?
     private var root: GTKWidget?
     private var controllers: [OpaquePointer] = []
@@ -23,7 +23,7 @@ import CSwiftOmniUIGTK
             MainActor.assumeIsolated { GTKView.find(viewNumber(data))?.selectionInteraction?.attach() }
         }
         unmapped = connectSignal(UnsafeMutableRawPointer(view.widget), "unmap", number: view.number) { _, data in
-            MainActor.assumeIsolated { GTKView.find(viewNumber(data))?.selectionInteraction?.disconnect() }
+            MainActor.assumeIsolated { GTKView.find(viewNumber(data))?.selectionInteraction?.unmap() }
         }
     }
     func dispose() {
@@ -48,7 +48,9 @@ import CSwiftOmniUIGTK
     }
     private func attach() {
         guard let view, gtk_widget_get_mapped(view.widget) != 0,
-              let next = gtk_widget_get_root(view.widget) else { return }
+              let next = gtk_widget_get_native(view.widget) else { return }
+        // A popover has its own native surface; a window's capture
+        // controllers normally only see events on the window's surface.
         let widget = UnsafeMutablePointer<GtkWidget>(next)
         guard root != widget else { return }
         disconnect(); root = widget; g_object_ref(widget)
@@ -78,6 +80,19 @@ import CSwiftOmniUIGTK
         }
         controllers = []; root = nil; ownsCommands = false; commandFocus = nil; lastFrame = 0
     }
+    private func unmap() {
+        let clear = active && root.map {
+            g_type_check_instance_is_a($0.of(GTypeInstance.self), gtk_popover_get_type()) != 0
+        } == true
+        disconnect()
+        if clear { send(.windowPointerPressed, []) }
+    }
+
+    private var focusedWidget: GTKWidget? {
+        guard let root, let window = gtk_widget_get_root(root) else { return nil }
+        return gtk_root_get_focus(window)
+    }
+
     private func pressed(x: Double, y: Double) {
         guard let root, let view else { return }
         var input = graphene_point_t(x: Float(x), y: Float(y)), output = graphene_point_t()
@@ -94,11 +109,11 @@ import CSwiftOmniUIGTK
                 current = gtk_widget_get_parent(widget)
             }
         }
-        commandFocus = gtk_root_get_focus(OpaquePointer(root))
+        commandFocus = focusedWidget
         send(.windowPointerPressed, [])
     }
     private func keyPressed(_ key: guint, modifiers: GdkModifierType) -> Bool {
-        let focus = root.flatMap { gtk_root_get_focus(OpaquePointer($0)) }
+        let focus = focusedWidget
         // A click in selectable text may leave the old editor focused. A later
         // keyboard focus change returns command ownership to the new control.
         if focus != commandFocus { ownsCommands = false }

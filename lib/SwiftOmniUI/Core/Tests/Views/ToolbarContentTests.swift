@@ -118,6 +118,30 @@ private struct Composed: ToolbarContent {
         XCTAssertEqual(items.children[0].children.map { $0.type }, ["Text"])
     }
 
+    func testAToolbarToggleCarriesItsFramedPictureOnTheButton() throws {
+        let items = try XCTUnwrap(slot(VStack { Text("content") }.toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Toggle(true) {
+                    Label {
+                        Text("Group chat")
+                    } icon: {
+                        Image("group-chat").resizable().scaledToFit().frame(width: 40)
+                    }
+                }
+                .toggleStyle(.button)
+            }
+        }))
+
+        let controls = try XCTUnwrap(items.children.first).children.flatMap(\.asChildren)
+        XCTAssertEqual(controls.map(\.type), [.button])
+        let button = try XCTUnwrap(controls.first)
+        XCTAssertEqual(button.props[.icon], .string("group-chat"))
+        XCTAssertEqual(button.props[ButtonContract.iconWidth.token], .number(40))
+        XCTAssertNil(button.props[ButtonContract.iconHeight.token])
+        XCTAssertEqual(button.props[.isOn], .bool(true))
+        XCTAssertEqual(button.props[.text], .string("Group chat"))
+    }
+
     /// A `ToolbarSpacer` is an entry of its own kind: its variant and where
     /// it stands ride the node.
     func testASpacerCarriesItsVariantAndPlacement() throws {

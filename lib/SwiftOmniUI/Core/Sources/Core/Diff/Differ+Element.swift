@@ -87,6 +87,8 @@ extension Differ {
                 var strippedFragment = pass.node
                 if expanded.count > 1 {
                     strippedFragment.lazyIdentity = nil
+                    strippedFragment.preferenceObservers = []
+                    strippedFragment.preferenceTransforms = []
                 }
                 pass.node.children = expanded.map { child in
                     var child = child
@@ -643,7 +645,6 @@ extension Differ {
             row.lazyIdentity = outerLazyIdentity
             row.environmentValues = accumulatedEnv
             pass.node = row
-            prepareElement(&pass)
         } else {
             var fragment = Node(type: .fragment, children: wrapped)
             fragment.id = outerId
@@ -1107,9 +1108,27 @@ extension Differ {
             result.lazyIdentity = node.lazyIdentity
             result.wrapFragmentChildren = pass.wrapFragmentChildren
             result.distributedWrappers = pass.distributedWrappers
-            // Its writes and listeners fanned out into the children above; what
-            // a parent's fold reads of it is theirs alone.
-            result.preferenceValues = foldedPreferences(seeds: [], transforms: [], children: children)
+            // Its writes fanned out into the children above; multi-child fragment
+            // observers and transforms fold across all children together rather than
+            // overwriting sibling answers one child at a time.
+            let fragmentTransforms = children.count > 1 ? node.preferenceTransforms : []
+            let folded = foldedPreferences(seeds: [], transforms: fragmentTransforms, children: children)
+            result.preferenceTransforms = fragmentTransforms
+            result.preferenceValues = folded
+            if children.count > 1, !node.preferenceObservers.isEmpty {
+                result.preferenceWatches = node.preferenceObservers.enumerated().map { index, observer in
+                    let answer = folded[observer.box.key]?.value ?? observer.box.makeDefault()
+                    if previous?.preferenceWatches.count == node.preferenceObservers.count,
+                       let heard = previous?.preferenceWatches[index].last {
+                        if !observer.box.same(heard, answer) {
+                            fire { try await observer.run(heard, answer) }
+                        }
+                    } else {
+                        fire { try await observer.run(answer, answer) }
+                    }
+                    return PreferenceWatch(box: observer.box, last: answer, run: observer.run)
+                }
+            }
             result.session = session
             return (result, patch)
         }

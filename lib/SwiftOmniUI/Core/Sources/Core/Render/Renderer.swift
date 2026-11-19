@@ -554,8 +554,10 @@ public final class Renderer: @unchecked Sendable {
 
         // The application is the root and its open scenes its children.
         let session = StandardEnvironment.app
+        let authored = Carry(application)
+        let tree = onMain { Scenes.shared.tree(of: authored.value) }
 
-        return (Scenes.shared.tree(of: application), session.styles, session.animation)
+        return (tree, session.styles, session.animation)
     }
 
     /// Shown until an application registers, in the shape a real one has.

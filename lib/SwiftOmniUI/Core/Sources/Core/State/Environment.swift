@@ -48,13 +48,28 @@ private protocol OptionalParts {
     static func some(_ object: AnyObject) -> Any?
 
     /// `.none` as the optional type.
-    static var none: Any { get }
+    static var emptyValue: Any { get }
+
+    /// The wrapped reference, where one is present.
+    var reference: AnyObject? { get }
 }
 
 extension Optional: OptionalParts {
     static var wrappedObject: AnyObject.Type? { Wrapped.self as? AnyObject.Type }
     static func some(_ object: AnyObject) -> Any? { object as? Wrapped }
-    static var none: Any { Optional<Wrapped>.none as Any }
+    static var emptyValue: Any { (nil as Wrapped?) as Any }
+    var reference: AnyObject? { flatMap(referenceValue) }
+}
+
+/// Identity applies only to reference values. Swift also boxes value types as AnyObject.
+func sameReference(_ a: Any, _ b: Any) -> Bool? {
+    guard let first = referenceValue(a), let second = referenceValue(b) else { return nil }
+    return first === second
+}
+
+private func referenceValue(_ value: Any) -> AnyObject? {
+    if type(of: value) is AnyObject.Type { return value as AnyObject }
+    return (value as? any OptionalParts)?.reference
 }
 
 /// An object an ancestor provided with `.environment()`, resolved by its type -
@@ -147,7 +162,7 @@ public final class Environment<Value>: @unchecked Sendable {
                 return standard
             }
 
-            if let none = (Value.self as? OptionalParts.Type)?.none as? Value {
+            if let none = (Value.self as? OptionalParts.Type)?.emptyValue as? Value {
                 return none
             }
 
@@ -229,10 +244,7 @@ extension Environment: EnvironmentSlot {
                 func open<T: Equatable>(_ a: T) -> Bool { (theirs as? T).map { $0 == a } ?? false }
                 return open(equatable)
             }
-            if let a = mine as? AnyObject, let b = theirs as? AnyObject {
-                return a === b
-            }
-            return false
+            return sameReference(mine, theirs) ?? false
         default:
             return false
         }

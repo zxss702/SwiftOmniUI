@@ -76,4 +76,50 @@ final class WinUIScrollPositionTests: XCTestCase {
             XCTAssertEqual(reportedOffsets.last?.1 ?? -1, 120, accuracy: 0.5)
         }
     }
+
+    func testScrollPositionEdgeBottomWorksInsideViewModifierAndFollowsGrowth() {
+        onUIThread {
+            struct BottomPinnedModifier: ViewModifier {
+                @State private var position = ScrollPosition(edge: .bottom)
+                let onGeometry: (ScrollGeometry) -> Void
+                func body(content: Content) -> some View {
+                    content
+                        .scrollPosition($position, anchor: .bottom)
+                        .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in }
+                        .onScrollGeometryChange(for: CGFloat.self) { $0.visibleRect.maxY } action: { _, _ in }
+                }
+            }
+            let clock = TestClock()
+            let height = State(wrappedValue: 800.0)
+            let host = WinUIRenderer.running(clock: clock, reducesMotion: true) {
+                ScrollView {
+                    Text("messages").frame(height: height.wrappedValue)
+                }
+                .modifier(BottomPinnedModifier { _ in })
+                .frame(width: 240, height: 200)
+            }
+            for _ in 0..<20 {
+                WinUITestHost.pump(0.01)
+                clock.now += 16
+                host.frame()
+                if let scroll = host.views(WinUIScrollView.self).first,
+                   scroll.scroller.standing.offset.y >= 590 { break }
+            }
+            let scroll = host.views(WinUIScrollView.self).first
+            XCTAssertNotNil(scroll)
+            XCTAssertGreaterThanOrEqual(scroll?.scroller.standing.offset.y ?? 0, 590,
+                "first screen with ScrollPosition(edge: .bottom) in a ViewModifier must anchor at the bottom")
+
+            height.wrappedValue = 1200.0
+            for _ in 0..<20 {
+                WinUITestHost.pump(0.01)
+                clock.now += 16
+                host.frame()
+                if let scroll = host.views(WinUIScrollView.self).first,
+                   scroll.scroller.standing.offset.y >= 990 { break }
+            }
+            XCTAssertGreaterThanOrEqual(scroll?.scroller.standing.offset.y ?? 0, 990,
+                "growing content while pinned to .bottom must keep following the bottom edge")
+        }
+    }
 }

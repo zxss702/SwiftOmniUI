@@ -93,6 +93,29 @@ import XCTest
         XCTAssertEqual(crossed.insertion.blur, 12)
     }
 
+    func testABlurAndOpacityModifierSurvivesCombinationWithScale() throws {
+        struct BlurPair: ViewModifier {
+            let active: Bool
+
+            func body(content: Content) -> some View {
+                content
+                    .blur(radius: active ? 8 : 0)
+                    .opacity(active ? 0 : 1)
+                    .allowsHitTesting(!active)
+            }
+        }
+
+        let combined = AnyTransition.modifier(active: BlurPair(active: true), identity: BlurPair(active: false))
+            .combined(with: .scale(scale: 1.01, anchor: .top))
+            .animation(.snappy)
+        let crossed = try XCTUnwrap(transition(Text("Sidebar").transition(combined)))
+
+        XCTAssertEqual(crossed.insertion.blur, 8)
+        XCTAssertEqual(crossed.insertion.opacity, 0)
+        XCTAssertEqual(crossed.insertion.scaleY, 1.01)
+        XCTAssertEqual(crossed.removal, crossed.insertion)
+    }
+
     /// A property no phase can cross - padding's room, say - stays; the pair
     /// differing only there reads as the identity.
     func testAComposingModifierDescribesNoDelta() {

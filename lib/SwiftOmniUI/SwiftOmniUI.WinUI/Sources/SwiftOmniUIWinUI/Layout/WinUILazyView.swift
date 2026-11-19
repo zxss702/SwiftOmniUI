@@ -1209,8 +1209,13 @@ class WinUILazyView: WinUITravellingLayout {
             }
             place(item, at: proposal.place, arrivedFrom: arrivedFrom)
         }
+        let wasAnimatingChanges = cells.animatesChanges
         cells.consumeAnimationChange()
-        retell()
+        if wasAnimatingChanges || watching == nil || jumpViewport != nil
+            || cells.needsWindowUpdate || needsRowMeasurements
+            || cells.retained != travellingIdentities {
+            retell()
+        }
     }
 
     override func holdDeparting() {
@@ -1229,6 +1234,9 @@ class WinUILazyView: WinUITravellingLayout {
     /// Measuring again, the window is re-asked: a new pass is a new chance
     /// for the places the run holds.
     override func measure(width: Double, height: Double) -> LayoutSize {
+        if Self.queryingSize > 0 {
+            return super.measure(width: width, height: height)
+        }
         for number in readyAnchors {
             guard let identity = identitiesByView[number], let item = mounted[identity], !item.departing else { continue }
             swiftomniui_winui_scroller_anchor(item.view.presentationHandle, true)
@@ -1334,7 +1342,9 @@ final class WinUILazyStackView: WinUILazyView {
                 cells.extents.measure(identity, extent: 0)
             }
             for item in mounted.values where item.departing {
-                if let frame = item.view.placed { _ = item.size(offered: frame.width) }
+                if item.view.committedFrame == nil, let frame = item.view.placed {
+                    _ = item.size(offered: frame.width)
+                }
             }
             for identity in takeMeasurementRows() {
                 guard let item = mounted[identity], !item.departing,
@@ -1569,7 +1579,9 @@ final class WinUILazyGridView: WinUILazyView {
                 cells.runs.measure(run, extent: extent)
             }
             for item in mounted.values where item.departing {
-                if let frame = item.view.placed { _ = item.size(offered: frame.width) }
+                if item.view.committedFrame == nil, let frame = item.view.placed {
+                    _ = item.size(offered: frame.width)
+                }
             }
             commitAnchor(perRun: perRun, grid: true)
             let total = cells.runs.total(count: runCount)

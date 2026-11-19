@@ -14,10 +14,10 @@
     public static func size<Child: LayoutChild>(
         of items: [Child], rows: [GridLength], columns: [GridLength],
         rowSpacing: Double, columnSpacing: Double, padding: EdgeInsets, width offered: Double? = nil,
-        flow: [GridItem] = []
+        height: Double? = nil, flow: [GridItem] = []
     ) -> LayoutSize {
         if items.count == 1, let item = items.first, item.values.isFrameContent {
-            return SingleChildArithmetic.size(of: item, padding: padding, width: offered)
+            return SingleChildArithmetic.size(of: item, padding: padding, width: offered, height: height)
         }
         let flowing = !flow.isEmpty
         let flowColumns = flowing ? resolvedFlow(flow, width: offered, spacing: columnSpacing) : []
@@ -67,7 +67,12 @@
         rowSpacing: Double, columnSpacing: Double, padding: EdgeInsets, in bounds: Rect,
         direction: LayoutDirection, flow: [GridItem] = []
     ) -> [Rect?] {
-        leftToRight(
+        if rows.isEmpty, columns.isEmpty, flow.isEmpty, items.count == 1, let item = items.first,
+           item.values.isFrameContent, item.values.row == 0, item.values.column == 0,
+           item.values.rowSpan == 1, item.values.columnSpan == 1 {
+            return [item.isShown ? SingleChildArithmetic.place(of: item, in: bounds, padding: padding, direction: direction) : nil]
+        }
+        return leftToRight(
             of: items, rows: rows, columns: columns, rowSpacing: rowSpacing,
             columnSpacing: columnSpacing, padding: padding, in: bounds, flow: flow)
             .map { $0.map { direction.places($0, in: bounds) } }

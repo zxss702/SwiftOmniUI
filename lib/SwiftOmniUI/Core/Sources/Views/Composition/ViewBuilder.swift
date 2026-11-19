@@ -134,7 +134,7 @@ public enum ViewBuilder {
     public static func buildArray(_ components: [TupleView]) -> TupleView {
         let components = Carry(components)
         return onMain { TupleView(components.value.enumerated().flatMap { turn in
-            slice(turn.offset, turn.element)
+            at(turn.offset, turn.element)
         }) }
     }
 
@@ -195,12 +195,7 @@ public enum ViewBuilder {
     /// keeping its statements - a branch's or a turn's - is keyed the same
     /// way, so the row sources inside stay whole under theirs.
     /// Design: docs/design/views/builders.md#several-views-from-one-statement
-    private static func at(_ index: Int, _ view: any View) -> [Element] {
-        // Builders run where the body that wrote them stood - the UI thread.
-        return MainActor.assumeIsolated { Carry(slice(index, view)) }.value
-    }
-
-    @MainActor private static func slice(_ index: Int, _ view: any View) -> [Element] {
+    @MainActor private static func at(_ index: Int, _ view: any View) -> [Element] {
         let segment = String(index)
         if let rows = view as? any LazyRows {
             return [LazyKeyed(segment: segment, rows: rows)]

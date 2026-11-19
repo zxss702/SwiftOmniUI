@@ -56,9 +56,10 @@ namespace swiftomniui {
                 }
                 const auto size = element.ActualSize();
                 const auto owner = nativeOwner.get();
-                const auto visible = owner.TransformToVisual(self).TransformBounds(acrylicVisibleBounds(element, owner));
+                const auto ownerPart = acrylicPartGeometry(element, owner);
+                const auto visible = owner.TransformToVisual(self).TransformBounds(ownerPart.visible);
                 const auto clipped = acrylicLocalClip(element, self, visible);
-                const auto opacity = acrylicPresentationOpacity(element, nativeOwner.get());
+                const auto opacity = ownerPart.opacity;
                 const bool shown = clipped.Width > 0 && clipped.Height > 0 && opacity > 0;
                 if (bar.visual.IsVisible() != shown) bar.visual.IsVisible(shown);
                 if (bar.visual.Opacity() != opacity) bar.visual.Opacity(opacity);

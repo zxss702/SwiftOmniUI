@@ -46,6 +46,7 @@ final class WinUIElement: NativeElement {
         .flex, .isFrameContent, .isLayoutDecoration, .orientation,
         .horizontalAlignmentDefault, .verticalAlignmentDefault,
         .layoutPriority, .horizontalGuide, .verticalGuide,
+        ImageContract.isResizable.token, ImageElementContract.aspect.token, Prop("aspectFit"),
     ])
 
     private static func geometryLanes(affectedBy properties: Set<Prop>) -> AnimationLanes {
@@ -146,8 +147,12 @@ final class WinUIElement: NativeElement {
         self.host = host
         view = makeView()
         view?.sourceElement = element
-        let hasTransitionBlur = element.transition?.insertion.blur != nil
-            || element.transition?.removal.blur != nil
+        let transition = element.transition
+        let insertionBlur = transition?.insertion.blur ?? 0
+        let removalBlur = transition?.removal.blur ?? 0
+        view?.transitionBlurReserve = max(insertionBlur, removalBlur)
+        let hasTransitionBlur = transition?.insertion.blur != nil
+            || transition?.removal.blur != nil
         var inLazyContainer = false
         if hasTransitionBlur {
             var ancestor = element.parent
@@ -208,6 +213,10 @@ final class WinUIElement: NativeElement {
                 presented.insert(property)
             }
             layoutItemChanged(presentedLanes: Self.geometryLanes(affectedBy: presented))
+        }
+        if wasDescribed, changed.contains(.transition) {
+            let transition = element.transition
+            view?.transitionBlurReserve = max(transition?.insertion.blur ?? 0, transition?.removal.blur ?? 0)
         }
         if wasDescribed, changed.contains(.isVisible) { crossVisibility() }
         if let observe = Self.workObserver {
@@ -274,6 +283,18 @@ final class WinUIElement: NativeElement {
     }
 
     func presentFrame(_ changed: Set<Prop>) {
+        if let view, changed.isSubset(of: MountedElement.fastDrawingFrameProperties) {
+            var transforms = false
+            for property in changed {
+                switch property {
+                case .opacity: view.setOpacity(element.number(.opacity) ?? 1)
+                case .blur: view.setBlur(element.number(.blur) ?? 0)
+                default: transforms = true
+                }
+            }
+            if transforms { view.setTransform(element.drawingTransform) }
+            return
+        }
         if !changed.isDisjoint(with: Self.layoutInputs) {
             layoutItemChanged(followingPresentation: true, presentedLanes: Self.geometryLanes(affectedBy: changed))
         }

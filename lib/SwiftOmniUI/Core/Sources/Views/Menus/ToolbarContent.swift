@@ -171,9 +171,8 @@ public enum ToolbarContentBuilder {
 
     /// The entries written under one statement, keyed by the statement's
     /// number - several, where one statement stands for more than one entry.
-    private static func at(_ index: Int, _ content: any ToolbarContent) -> [Node] {
-        // Builders run where the body that wrote them stood - the UI thread.
-        let nodes = MainActor.assumeIsolated { Carry(content.toolbarNodes) }.value
+    @MainActor private static func at(_ index: Int, _ content: any ToolbarContent) -> [Node] {
+        let nodes = content.toolbarNodes
         return nodes.enumerated().map { offset, child in
             var child = child
             let segment = nodes.count > 1 ? "\(index).\(offset)" : String(index)

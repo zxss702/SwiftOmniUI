@@ -2,24 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 @_spi(Host) import SwiftOmniUICore
+@_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIGTK
 
 /// Native key conversion shared by buttons and command menus.
 enum GTKKeyboardShortcut {
     static func modifiers(_ shortcut: KeyboardShortcut) -> GdkModifierType {
+        let mapped = ShortcutMapping.desktopShortcut(for: shortcut).modifiers
         var mask = GdkModifierType(rawValue: 0).rawValue
-        // Preserve the old wire's Control bit without exposing `.control` in
-        // the public Windows/Linux API.
-        if shortcut.modifiers.contains(.command) || shortcut.modifiers.rawValue & (1 << 3) != 0 {
-            mask |= GDK_CONTROL_MASK.rawValue
-        }
-        if shortcut.modifiers.contains(.shift) { mask |= GDK_SHIFT_MASK.rawValue }
-        if shortcut.modifiers.contains(.option) { mask |= GDK_ALT_MASK.rawValue }
+        if mapped.contains(.control) { mask |= GDK_CONTROL_MASK.rawValue }
+        if mapped.contains(.shift) { mask |= GDK_SHIFT_MASK.rawValue }
+        if mapped.contains(.alt) { mask |= GDK_ALT_MASK.rawValue }
         return GdkModifierType(rawValue: mask)
     }
 
     static func trigger(_ shortcut: KeyboardShortcut) -> OpaquePointer? {
-        let key = keyval(shortcut.key.name)
+        let mapped = ShortcutMapping.desktopShortcut(for: shortcut)
+        let key = keyval(mapped.key)
         guard key != GDK_KEY_VoidSymbol, key != 0 else { return nil }
         return gtk_keyval_trigger_new(key, modifiers(shortcut))
     }

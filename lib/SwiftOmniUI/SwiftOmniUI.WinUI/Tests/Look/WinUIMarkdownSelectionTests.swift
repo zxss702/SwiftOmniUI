@@ -759,4 +759,397 @@ extension WinUIMarkdownSelectionTests {
             }
         }
     }
+
+    func testInlineSpansBoldBulletAndCjkGlyphGeometryMatchesNativeRenderedWidth() throws {
+        try onUIThread {
+            let probe = SelectionProbe()
+            let line1 = Text(" • ").bold()
+                + Text("包名 ")
+                + Text("DocumentKit").font(.system(size: 13.3, design: .monospaced)).background(Color.gray.opacity(0.15))
+                + Text("，只支持 macOS 15 起，Swift 6 (tools 6.0 / swiftLanguageModes ")
+                + Text(".v6").font(.system(size: 13.3, design: .monospaced)).background(Color.gray.opacity(0.15))
+                + Text(")")
+            let line2 = Text(" • ").bold() + Text("依赖三个：")
+            let line3 = Text(" ◦ ").bold() + Text("tomasf/Zip 2.1.0 —— 读写 zip，docx 本质就是 zip 包")
+            let line4 = Text(" ◦ ").bold() + Text("CoreOffice/XMLCoder 0.17.0 —— XML 编解码，处理 OOXML")
+
+            let host = WinUIRenderer.running(room: LayoutSize(width: 1200, height: 600)) {
+                VStack(alignment: .leading, spacing: 8) {
+                    line1.font(.system(size: 14)).modifier(ProbeSelectableText(id: "l1"))
+                    line2.font(.system(size: 14)).modifier(ProbeSelectableText(id: "l2"))
+                    line3.font(.system(size: 14)).modifier(ProbeSelectableText(id: "l3"))
+                    line4.font(.system(size: 14)).modifier(ProbeSelectableText(id: "l4"))
+                }
+                .modifier(ProbeSelectableContainer(probe: probe))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            host.settle {
+                probe.anchors.count == 4
+                    && probe.sliceCounts.count == 4
+                    && probe.sliceCounts.allSatisfy { $0 > 0 }
+            }
+            let labels = host.views(WinUILabelView.self)
+            for (idx, id) in ["l1", "l2", "l3", "l4"].enumerated() {
+                let anchor = try XCTUnwrap(probe.anchors.first(where: { $0.id == id }))
+                let layout = try XCTUnwrap(anchor.textLayouts.first)
+                let label = labels[idx]
+                var maxX = 0.0
+                var count = 0
+                for line in layout {
+                    for run in line {
+                        for slice in run {
+                            count += 1
+                            maxX = max(maxX, slice.typographicBounds.rect.x + slice.typographicBounds.rect.width)
+                        }
+                    }
+                }
+                XCTAssertEqual(count, label.text.count, "id=\(id) slice count mismatch")
+                XCTAssertEqual(maxX, label.laidOutFrame.width, accuracy: 2.0,
+                               "id=\(id) synthetic glyph width (\(maxX)) fell short of XAML rendered width (\(label.laidOutFrame.width))")
+            }
+        }
+    }
+
+    func testManagementDialogueSidePanelMultiBlockSelectionAndDrag() throws {
+        try onUIThread {
+            struct MockMarkdownBlocks: View {
+                let msgID: String
+                let blocks: [String]
+                var body: some View {
+                    ForEach(Array(blocks.enumerated()), id: \.offset) { idx, text in
+                        Text(text)
+                            .font(.system(size: 12))
+                            .modifier(ProbeSelectableText(id: "\(msgID)-\(idx)"))
+                            .compositingGroup()
+                            .drawingGroup()
+                    }
+                }
+            }
+            struct StatelessManagementDialogueListView: View {
+                let messages: [SideTestMsg]
+                var body: some View {
+                    ForEach(messages) { msg in
+                        MockMarkdownBlocks(msgID: msg.id, blocks: msg.blocks)
+                            .transition(.blur.combined(with: .offset(x: -48, y: 80)))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            struct SideHostView: View {
+                let model: SideTestModel
+                let leftProbe: SelectionProbe
+                let probe: SelectionProbe
+                @State private var sideWidth: Double = 320
+                @State private var columns: NavigationSplitViewVisibility = .all
+                @State private var scrollPos = ScrollPosition(edge: .bottom)
+                var body: some View {
+                    NavigationSplitView(columnVisibility: $columns) {
+                        Text("Sidebar")
+                            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 400)
+                    } detail: {
+                        NavigationStack {
+                            GeometryReader { _ in
+                                HStack(spacing: 0) {
+                                    VStack {
+                                        ScrollView {
+                                            LazyVStack(alignment: .leading) {
+                                                Text("Main dialogue line")
+                                                    .modifier(ProbeSelectableText(id: "main-0"))
+                                            }
+                                            .modifier(ProbeSelectableContainer(probe: leftProbe))
+                                            .padding(.all, 16)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .safeAreaInset(edge: .bottom) {
+                                        Text("Composer").frame(height: 40)
+                                    }
+
+                                    if model.showSide {
+                                        VStack {
+                                            if model.selectAgent {
+                                                ScrollView {
+                                                    LazyVStack(alignment: .leading) {
+                                                        StatelessManagementDialogueListView(messages: model.messages)
+                                                        Color.clear.frame(height: 48)
+                                                    }
+                                                    .scrollTargetLayout()
+                                                    .padding(.all, 8)
+                                                    .modifier(ProbeSelectableContainer(probe: probe))
+                                                }
+                                                .scrollPosition($scrollPos, anchor: .bottom)
+                                                .onChange(of: model.scrollTrigger) {
+                                                    withAnimation(.snappy) {
+                                                        scrollPos.scrollTo(edge: .bottom)
+                                                    }
+                                                }
+                                                .transition(.identity)
+                                                .id("agent-1")
+                                            } else {
+                                                ScrollView {
+                                                    LazyVStack(alignment: .leading) {
+                                                        Text("Group chat")
+                                                            .modifier(ProbeSelectableText(id: "group-0"))
+                                                    }
+                                                    .padding(.all, 8)
+                                                    .modifier(ProbeSelectableContainer(probe: SelectionProbe()))
+                                                }
+                                                .transition(.identity)
+                                            }
+                                        }
+                                        .safeAreaInset(edge: .top, spacing: 0) {
+                                            ScrollView(.horizontal) {
+                                                HStack {
+                                                    Button("Tab") {}
+                                                }
+                                                .padding(.all, 8)
+                                            }
+                                        }
+                                        .hiddenSafeBarBackground(false)
+                                        .frame(width: sideWidth)
+                                        .overlay(alignment: .leading) {
+                                            Color.clear
+                                                .frame(width: 16)
+                                                .contentShape(Rectangle())
+                                                .gesture(DragGesture(minimumDistance: 0).onChanged { _ in })
+                                                .offset(x: -8)
+                                                .ignoresSafeArea()
+                                        }
+                                        .background(Color.white)
+                                        .transition(.offset(x: sideWidth))
+                                    }
+                                }
+                            }
+                            .toolbar {
+                                ToolbarItem(placement: .automatic) {
+                                    Button("Toggle") {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let model = SideTestModel()
+            let leftProbe = SelectionProbe()
+            let probe = SelectionProbe()
+            let host = WinUIRenderer.running(room: LayoutSize(width: 1200, height: 700)) {
+                SideHostView(model: model, leftProbe: leftProbe, probe: probe)
+            }
+            host.settle { !leftProbe.sliceCounts.isEmpty }
+
+            withAnimation(.snappy) {
+                model.showSide = true
+            }
+            for _ in 0..<50 { host.step() }
+
+            withAnimation(.snappy) {
+                model.selectAgent = true
+            }
+            for _ in 0..<60 { host.step() }
+
+            withAnimation(.snappy) {
+                model.messages.append(SideTestMsg(id: "mTail", blocks: [
+                    "Canvas 1920x1080 (16:9). Padding 96-120.",
+                    "Now reply to the lead. Keep it a short paragraph-ish."
+                ]))
+                model.scrollTrigger += 1
+            }
+            for _ in 0..<80 { host.step() }
+
+            let labels = host.views(WinUILabelView.self)
+            let canvases = host.views(WinUICanvasView.self)
+            let dragViews = host.views(WinUIView.self).filter { $0.hearing.contains(.drags) }
+            let overlayCanvas = try XCTUnwrap(canvases.last)
+            let sideLabels = labels.filter { $0.origin.x > 600 && ($0.text.hasPrefix("Message ") || $0.text.contains("Now reply") || $0.text.contains("Canvas 1920")) }
+            let visibleSideLabels = sideLabels.filter { $0.origin.y >= 48 && $0.origin.y < 680 }
+            XCTAssertFalse(visibleSideLabels.isEmpty,
+                           "No visible side labels! allLabels=\(labels.map { "\($0.text.prefix(16))@\($0.origin)" }) anchors=\(probe.anchors.map(\.id))")
+            let targetLabel = visibleSideLabels.first(where: { $0.text.contains("Now reply") }) ?? visibleSideLabels.last!
+            let expectedX = targetLabel.origin.x - overlayCanvas.origin.x
+            let expectedY = targetLabel.origin.y - overlayCanvas.origin.y
+            let matchingIdx = try XCTUnwrap(
+                probe.anchors.indices.first(where: { idx in
+                    abs(probe.resolvedBounds[idx].y - expectedY) < 2.5
+                }),
+                "No anchor matched visible label '\(targetLabel.text.prefix(24))' expected=(\(expectedX),\(expectedY)) anchors=\(probe.anchors.map(\.id)) bounds=\(probe.resolvedBounds) origins=\(probe.textOrigins) canvas=\(overlayCanvas.origin)"
+            )
+            let matchedBounds = probe.resolvedBounds[matchingIdx]
+            let matchedLayout = try XCTUnwrap(probe.anchors[matchingIdx].textLayouts.first)
+            let liveOrigin = try XCTUnwrap(probe.lastProxy.map { $0[matchedLayout.origin] })
+            let storedOrigin = probe.textOrigins[matchingIdx]
+
+            let selDragTarget = try XCTUnwrap(dragViews.last(where: { $0.laidOutFrame.width > 100 && $0.origin.x > 600 }))
+            let localClickX = targetLabel.origin.x - selDragTarget.origin.x + 20
+            let localClickY = targetLabel.origin.y - selDragTarget.origin.y + 8
+            let winStart = Point(x: targetLabel.origin.x + 20, y: targetLabel.origin.y + 8)
+            let winEnd = Point(x: targetLabel.origin.x + 120, y: targetLabel.origin.y + 8)
+            XCTAssertTrue(selDragTarget.reaches(localClickX, localClickY),
+                          "HitTest blocked! target=\(selDragTarget.number)@\(selDragTarget.origin)/\(selDragTarget.laidOutFrame) label=\(targetLabel.origin) local=(\(localClickX),\(localClickY)) hits=\(selDragTarget.hits(localClickX, localClickY))")
+            XCTAssertEqual(matchedBounds.x, expectedX, accuracy: 2.0, "matchedBounds=\(matchedBounds) expected=(\(expectedX),\(expectedY))")
+            XCTAssertEqual(matchedBounds.y, expectedY, accuracy: 2.0, "matchedBounds=\(matchedBounds) expected=(\(expectedX),\(expectedY))")
+            XCTAssertEqual(storedOrigin.x, expectedX, accuracy: 2.0, "storedOrigin=\(storedOrigin) liveOrigin=\(liveOrigin) expected=(\(expectedX),\(expectedY))")
+            XCTAssertEqual(storedOrigin.y, expectedY, accuracy: 2.0, "storedOrigin=\(storedOrigin) liveOrigin=\(liveOrigin) expected=(\(expectedX),\(expectedY))")
+            selDragTarget.heardPress(phase: 0, at: winStart)
+            selDragTarget.heardPress(phase: 1, at: winEnd)
+            selDragTarget.heardPress(phase: 2, at: winEnd)
+            for _ in 0..<10 { host.step() }
+            XCTAssertFalse(probe.dragEvents.isEmpty, "Drag over model label in side panel must fire DragGesture")
+        }
+    }
+
+    func testTransitionOffsetSettlesSelectionAnchorAndOriginWithoutContainerResize() throws {
+        try onUIThread {
+            @MainActor
+            struct FixedTransitionView: View {
+                let model: SideTestModel
+                let probe: SelectionProbe
+                var body: some View {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if model.selectAgent {
+                                Text("Animated model output block with transition offset")
+                                    .font(.system(size: 12))
+                                    .modifier(ProbeSelectableText(id: "anim-0"))
+                                    .transition(.blur.combined(with: .offset(x: -48, y: 80)))
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .frame(width: 304, height: 400, alignment: .topLeading)
+                        .padding(.all, 8)
+                        .modifier(ProbeSelectableContainer(probe: probe))
+                    }
+                    .frame(width: 320, height: 300)
+                }
+            }
+            let model = SideTestModel()
+            let probe = SelectionProbe()
+            let host = WinUIRenderer.running(room: LayoutSize(width: 400, height: 400)) {
+                FixedTransitionView(model: model, probe: probe)
+            }
+            host.settle { probe.containerSize.width > 0 }
+            withAnimation(.snappy) {
+                model.selectAgent = true
+            }
+            for _ in 0..<80 { host.step() }
+
+            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
+            let overlayCanvas = try XCTUnwrap(host.views(WinUICanvasView.self).last)
+            let expectedX = label.origin.x - overlayCanvas.origin.x
+            let expectedY = label.origin.y - overlayCanvas.origin.y
+            let bounds = try XCTUnwrap(probe.resolvedBounds.first)
+            let origin = try XCTUnwrap(probe.textOrigins.first)
+            XCTAssertEqual(bounds.x, expectedX, accuracy: 2.0, "Settled bounds X must not retain -48 transition offset: \(bounds)")
+            XCTAssertEqual(bounds.y, expectedY, accuracy: 2.0, "Settled bounds Y must not retain +80 transition offset: \(bounds)")
+            XCTAssertEqual(origin.x, expectedX, accuracy: 2.0, "Settled origin X must not retain -48 transition offset: \(origin)")
+            XCTAssertEqual(origin.y, expectedY, accuracy: 2.0, "Settled origin Y must not retain +80 transition offset: \(origin)")
+        }
+    }
+
+    func testOversizedScrollSelectionCanvasPaintsBeyondD3DTextureLimit() throws {
+        try onUIThread {
+            let probe = SelectionProbe()
+            let host = WinUIRenderer.running(room: LayoutSize(width: 400, height: 500)) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Color.clear.frame(height: 19_000)
+                        Text("Deep management dialogue model output at 19000 DIPs")
+                            .font(.system(size: 12))
+                            .modifier(ProbeSelectableText(id: "deep-0"))
+                        Color.clear.frame(height: 500)
+                    }
+                    .frame(width: 304, alignment: .leading)
+                    .padding(.all, 8)
+                    .modifier(ProbeSelectableContainer(probe: probe))
+                }
+                .frame(width: 320, height: 480)
+            }
+            host.settle { !probe.sliceCounts.isEmpty && probe.sliceCounts.allSatisfy { $0 > 0 } }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            swiftomniui_winui_scroller_move(scroll.scroller.handle, 0, 18_850, false)
+            for _ in 0..<25 { host.step() }
+
+            let canvases = host.views(WinUICanvasView.self)
+            let overlayCanvas = try XCTUnwrap(canvases.last)
+            XCTAssertGreaterThan(overlayCanvas.laidOutFrame.height, 19_000)
+
+            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
+            let dragViews = host.views(WinUIView.self).filter { $0.hearing.contains(.drags) }
+            let selDragTarget = try XCTUnwrap(dragViews.first)
+            let beforePaints = swiftomniui_winui_canvas_paints(overlayCanvas.handle)
+            let winStart = Point(x: label.origin.x + 10, y: label.origin.y + 6)
+            let winEnd = Point(x: label.origin.x + 140, y: label.origin.y + 6)
+            selDragTarget.heardPress(phase: 0, at: winStart)
+            selDragTarget.heardPress(phase: 1, at: winEnd)
+            selDragTarget.heardPress(phase: 2, at: winEnd)
+            for _ in 0..<20 { host.step() }
+
+            let afterPaints = swiftomniui_winui_canvas_paints(overlayCanvas.handle)
+            XCTAssertFalse(probe.dragEvents.isEmpty)
+            XCTAssertGreaterThan(afterPaints, beforePaints,
+                                 "Oversized selection overlay Canvas (> 16384 px) must successfully paint visible viewport tile")
+        }
+    }
+
+    func testExplicitNewlineMultiLineShrinkWrappedParagraphDoesNotFalseWrap() throws {
+        try onUIThread {
+            let probe = SelectionProbe()
+            let mplSection = """
+            1.1. "Contributor"
+            means each individual or legal entity that creates, contributes to
+            the creation of, or owns Covered Software.
+            """
+            let host = WinUIRenderer.running(room: LayoutSize(width: 900, height: 400)) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(mplSection)
+                        .font(.system(size: 14))
+                        .lineSpacing(4)
+                        .modifier(ProbeSelectableText(id: "mpl-1.1"))
+                }
+                .modifier(ProbeSelectableContainer(probe: probe))
+                .padding(.all, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            host.settle {
+                !probe.anchors.isEmpty && !probe.sliceCounts.isEmpty && probe.sliceCounts.allSatisfy { $0 > 0 }
+            }
+            let label = try XCTUnwrap(host.views(WinUILabelView.self).first)
+            let layout = try XCTUnwrap(probe.anchors.first?.textLayouts.first)
+            XCTAssertEqual(layout.count, 3,
+                           "3-line explicit-newline paragraph must stay 3 lines without false soft-wrap creating a phantom 4th line")
+            var lineMaxX: [Double] = []
+            for line in layout {
+                var mx = 0.0
+                for run in line {
+                    for slice in run {
+                        mx = max(mx, slice.typographicBounds.rect.x + slice.typographicBounds.rect.width)
+                    }
+                }
+                lineMaxX.append(mx)
+            }
+            XCTAssertEqual(lineMaxX[1], label.laidOutFrame.width, accuracy: 4.0,
+                           "Longest middle line ('...contributes to') must reach full rendered width without wrapping 'to'")
+            XCTAssertGreaterThan(lineMaxX[2], 200,
+                                 "Third line ('the creation of, or owns Covered Software.') must stay complete on line 2")
+        }
+    }
+}
+
+private struct SideTestMsg: Identifiable {
+    let id: String
+    let blocks: [String]
+}
+
+@MainActor
+@Observable
+private final class SideTestModel {
+    var showSide = false
+    var selectAgent = false
+    var scrollTrigger = 0
+    var messages: [SideTestMsg] = (0..<25).map { idx in
+        SideTestMsg(id: "m\(idx)", blocks: [
+            "Message \(idx) first block with enough text to wrap across multiple lines in the 320pt management dialogue panel.",
+            "Message \(idx) second block checking blackboard state and tool outputs."
+        ])
+    }
 }

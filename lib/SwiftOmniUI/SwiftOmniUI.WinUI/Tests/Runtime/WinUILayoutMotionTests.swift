@@ -742,6 +742,60 @@ final class WinUILayoutMotionTests: XCTestCase {
         }
     }
 
+    /// A `GeometryReader` background must settle and paint in the same layout cycle as its foreground `Text`,
+    /// without flashing a blank frame while waiting for the next `CompositionTarget.Rendering` tick.
+    func testGeometryReaderBackgroundMountsBeforeFirstPaint() throws {
+        try onUIThread {
+            struct BubbleShape: Shape {
+                var size: Size
+                func path(in rect: Rect) -> Path {
+                    let s = size == .zero ? Size(width: rect.width, height: rect.height) : size
+                    var path = Path()
+                    path.addRect(Rect(x: 0, y: 0, width: s.width, height: s.height))
+                    return path
+                }
+            }
+            let clock = TestClock()
+            let showSecond = State(wrappedValue: false)
+            let host = WinUIRenderer.running(clock: clock, room: LayoutSize(width: 600, height: 400)) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("First message")
+                        .padding(EdgeInsets(top: 10, leading: 16, bottom: 15, trailing: 16))
+                        .background {
+                            GeometryReader { geo in
+                                BubbleShape(size: geo.size).fill(Color.blue)
+                            }
+                        }
+                    if showSecond.wrappedValue {
+                        Text("Newly scrolled-in message")
+                            .padding(EdgeInsets(top: 10, leading: 16, bottom: 15, trailing: 16))
+                            .background {
+                                GeometryReader { geo in
+                                    BubbleShape(size: geo.size).fill(Color.green)
+                                }
+                            }
+                    }
+                }
+            }
+            // Initial window layout already ran without advancing `clock` / `host.frame()`.
+            let initialPaths = host.views(WinUIPathView.self).filter { $0.drawsInk }
+            XCTAssertEqual(initialPaths.count, 1, "initial GeometryReader shape must exist before first paint")
+            XCTAssertGreaterThan(initialPaths[0].laidOutFrame.width, 40)
+            XCTAssertNotEqual(initialPaths[0].pixels(at: [(10, 10)])[0] >> 24, 0)
+
+            // Mount a second row and run only the render turn + native layout (no extra display frame).
+            showSecond.wrappedValue = true
+            _ = host.runtime.core.runJobs()
+            host.runtime.pump.turn()
+            host.layOut()
+
+            let updatedPaths = host.views(WinUIPathView.self).filter { $0.drawsInk }
+            XCTAssertEqual(updatedPaths.count, 2, "newly realized GeometryReader shape must mount in the same layout pass")
+            XCTAssertGreaterThan(updatedPaths[1].laidOutFrame.width, 40)
+            XCTAssertNotEqual(updatedPaths[1].pixels(at: [(10, 10)])[0] >> 24, 0)
+        }
+    }
+
     func testWelcomeRecentListKeepsConstantWidthOnRemovalAndInsertion() throws {
         try onUIThread {
             let clock = TestClock()

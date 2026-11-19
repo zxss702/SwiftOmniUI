@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <unordered_set>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <winrt/Microsoft.UI.Composition.h>
@@ -75,6 +76,22 @@ namespace {
         if (panel.Children().IndexOf(child, index)) panel.Children().RemoveAt(index);
     }
 
+    std::optional<uint32_t> focusedChildIndex(controls::Panel const &owner) {
+        auto root = owner.XamlRoot();
+        if (!root) return std::nullopt;
+        auto child = input::FocusManager::GetFocusedElement(root).try_as<xaml::DependencyObject>();
+        while (child) {
+            auto parent = xaml::Media::VisualTreeHelper::GetParent(child);
+            if (parent == owner) {
+                uint32_t index;
+                if (owner.Children().IndexOf(child.as<xaml::UIElement>(), index)) return index;
+                break;
+            }
+            child = parent;
+        }
+        return std::nullopt;
+    }
+
     // A moving lazy window normally drops children at one edge and adds them at
     // the other. Keep the overlapping projected UIElements attached. Comparing
     // projections here is intentional: their ABI interface pointers need not
@@ -104,6 +121,9 @@ namespace {
                 if (items.GetAt(oldStart + index) != held[index]) { equal = false; break; }
             }
             if (equal) {
+                // A transition can move a retained input to the other edge.
+                // Let the general reorder keep its native subtree attached.
+                if (auto focused = focusedChildIndex(owner); focused && *focused < oldStart) return false;
                 for (uint32_t index = 0; index < oldStart; ++index) items.RemoveAt(0);
                 for (uint32_t index = overlap; index < newCount; ++index) {
                     detachFromForeignPanel(owner, held[index]);
@@ -124,6 +144,7 @@ namespace {
                     if (items.GetAt(index) != held[offset + index]) { equal = false; break; }
                 }
                 if (equal) {
+                    if (auto focused = focusedChildIndex(owner); focused && *focused >= overlap) return false;
                     while (items.Size() > overlap) items.RemoveAtEnd();
                     for (uint32_t index = offset; index > 0; --index) {
                         detachFromForeignPanel(owner, held[index - 1]);
@@ -191,7 +212,6 @@ namespace {
     /// measures and arranges the original children in the parent's coordinates.
     struct MaskSourcePanel : controls::PanelT<MaskSourcePanel> {
         explicit MaskSourcePanel(bool mask) : mask(mask) {
-            Resources().Insert(winrt::box_value(L"safeBarLocalPresentation"), winrt::box_value(true));
             HorizontalAlignment(xaml::HorizontalAlignment::Stretch);
             VerticalAlignment(xaml::VerticalAlignment::Stretch);
             if (mask) {
@@ -228,6 +248,8 @@ namespace {
         composition::SpriteVisual output{nullptr};
 
         explicit AlphaMask(controls::Panel const &owner) {
+            setAcrylicLocalPresentation(content, true);
+            setAcrylicLocalPresentation(mask, true);
             auto contentVisual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(content);
             auto maskVisual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(mask);
             auto compositor = contentVisual.Compositor();
@@ -287,7 +309,14 @@ namespace {
             output.Size(size);
         }
 
+        ~AlphaMask() {
+            if (content) setAcrylicLocalPresentation(content, false);
+            if (mask) setAcrylicLocalPresentation(mask, false);
+        }
+
         void close(controls::Panel const &owner) {
+            if (content) setAcrylicLocalPresentation(content, false);
+            if (mask) setAcrylicLocalPresentation(mask, false);
             xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(owner, nullptr);
             output.Brush(nullptr);
             brush.Source(nullptr);
@@ -401,7 +430,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view) 
         owner->navigation.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
         owner->navigation.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
         owner->navigation.Navigated(guarded("hosting a navigated page",
-            [](IInspectable const &, xaml::Navigation::NavigationEventArgs const &args) {
+            [navigation = winrt::make_weak(held)](IInspectable const &, xaml::Navigation::NavigationEventArgs const &args) {
                 auto page = args.Content().as<controls::Page>();
                 page.NavigationCacheMode(xaml::Navigation::NavigationCacheMode::Disabled);
                 page.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
@@ -414,6 +443,11 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view) 
                 transitions.Append(xaml::Media::Animation::NavigationThemeTransition());
                 page.Transitions(transitions);
                 page.Content(args.Parameter().as<xaml::UIElement>());
+                // Frame swaps pages outside the panel child reconciliation.
+                // Rebuild the Acrylic inputs once the new page is in the tree.
+                page.Loaded([navigation](auto const &, auto const &) {
+                    if (auto owner = navigation.get()) acrylicStructureChanged(owner);
+                });
             }));
         held.Children().Append(owner->navigationViewport);
         return detach(held);
@@ -448,6 +482,7 @@ extern "C" void swiftomniui_winui_navigation_set(
         if (!next) {
             frame.Content(nullptr);
             owner->navigationContent = nullptr;
+            acrylicStructureChanged(held);
             return;
         }
         // A rapid return may find the retained Swift view in a Page whose
@@ -471,6 +506,7 @@ extern "C" void swiftomniui_winui_navigation_set(
         if (!frame.Navigate(winrt::xaml_typename<controls::Page>(), next, transition))
             throw winrt::hresult_error(E_FAIL, L"WinUI refused the navigation page");
         owner->navigationContent = next;
+        acrylicStructureChanged(held);
     } catch (...) {
         report("navigating the retained page");
     }
@@ -547,10 +583,6 @@ extern "C" void swiftomniui_winui_panel_set_children(
         held.reserve(count);
         for (int32_t index = 0; index < count; ++index) held.push_back(as<xaml::UIElement>(children[index]));
         if (sameChildren(items, held)) return;
-        auto root = owner.XamlRoot();
-        auto focused = root
-            ? input::FocusManager::GetFocusedElement(root).try_as<xaml::UIElement>()
-            : nullptr;
         // A lazy window usually changes at its edges. Keep the intersecting
         // UIElements attached, preserving their native state and composition.
         // Only inserted elements can belong to another panel. Querying native
@@ -559,7 +591,6 @@ extern "C" void swiftomniui_winui_panel_set_children(
             removeUnused(items, held);
             insertInOrder(items, held, owner);
         }
-        if (focused) focused.Focus(xaml::FocusState::Programmatic);
         acrylicStructureChanged(owner);
     } catch (...) {
         report("holding a panel's children");

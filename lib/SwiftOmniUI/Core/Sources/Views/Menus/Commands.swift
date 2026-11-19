@@ -158,9 +158,8 @@ public enum CommandsBuilder {
 
     /// The menus written under one statement, keyed by the statement's
     /// number - several, where one statement stands for more than one menu.
-    private static func at(_ index: Int, _ content: any Commands) -> [Node] {
-        // Builders run where the body that wrote them stood - the UI thread.
-        let nodes = MainActor.assumeIsolated { Carry(content.commandNodes) }.value
+    @MainActor private static func at(_ index: Int, _ content: any Commands) -> [Node] {
+        let nodes = content.commandNodes
         return nodes.enumerated().map { offset, child in
             var child = child
             let segment = nodes.count > 1 ? "\(index).\(offset)" : String(index)

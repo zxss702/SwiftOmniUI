@@ -15,6 +15,17 @@ final class WinUIButtonView: WinUIView {
     private weak var labelRoot: WinUIView?
     override var controlStateOpacity: Double { hasViewLabel && !enabled ? 0.5 : 1 }
 
+    override func firstTextBaseline(in size: LayoutSize) -> Double? {
+        guard hasViewLabel, let labelRoot else { return nil }
+        if let layout = labelRoot as? WinUILayoutView {
+            let content = layout.naturalSize(proposal: ProposedViewSize(width: size.width, height: size.height))
+            let inner = LayoutSize(width: min(size.width, content.width), height: min(size.height, content.height))
+            guard let baseline = layout.firstTextBaseline(in: inner) else { return nil }
+            return max(0, (size.height - inner.height) / 2) + baseline
+        }
+        return labelRoot.firstTextBaseline(in: size)
+    }
+
     /// An arbitrary label may paint its own foreground/background. Native
     /// ForegroundDisabled alone cannot affect those explicitly drawn colors.
     func setFace(_ face: WinUIView?) {
@@ -58,10 +69,11 @@ final class WinUIButtonView: WinUIView {
 
     /// The picture in the bar's button's icon slot - a Fluent glyph or a picture's file; its words move to its
     /// tip. The platform's own button draws no picture.
-    func setIcon(_ picture: ImageSource?) {
+    func setIcon(_ picture: ImageSource?, width: Double?, height: Double?) {
         guard isToolbarControl else { return }
         let files = picture.map(\.file).flatMap { $0.isEmpty ? nil : PictureArithmetic.files(for: $0) } ?? []
-        swiftomniui_winui_toolbar_button_set_icon(handle, picture?.symbol ?? "", files.map { $0 + "\n" }.joined())
+        swiftomniui_winui_toolbar_button_set_icon(
+            handle, picture?.symbol ?? "", files.map { $0 + "\n" }.joined(), width ?? -1, height ?? -1)
     }
 
     /// The caption the button shows now, read back from WinUI.

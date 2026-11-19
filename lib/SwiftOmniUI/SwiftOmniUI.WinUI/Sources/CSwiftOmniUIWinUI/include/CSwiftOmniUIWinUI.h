@@ -114,6 +114,9 @@ typedef struct {
     /// A panel's ArrangeOverride: the view places its children in the size given.
     void (*arrange)(int64_t view, double width, double height);
 
+    /// Native layout finished a pass and settled its allocations before painting.
+    void (*layoutCommitted)(void);
+
     /// A virtualizing panel's effective viewport, including independent touch scrolling and ancestor clipping.
     void (*viewportChanged)(int64_t view, double x, double y, double width, double height,
                             double bringX, double bringY);
@@ -226,6 +229,10 @@ typedef struct {
     void (*paneWidthChanged)(int64_t view);
     /// Classifies a synchronous native change before its asynchronous notification.
     bool (*isProgramWriting)(void);
+
+    /// Built-in macOS-anchored standard window/app shortcut (StandardShortcut rawValue),
+    /// invoked only when no view button or menu command claimed the key.
+    bool (*windowShortcut)(int64_t window, int32_t command);
 } SwiftOmniUIWinUICallbacks;
 
 /// What the environment is, in groups, each read at once.
@@ -294,6 +301,9 @@ void swiftomniui_winui_material_columns(SwiftOmniUIObjectRef owner, SwiftOmniUIO
 void swiftomniui_winui_safe_area_host_set_background(SwiftOmniUIObjectRef host, bool shown);
 /// Commit material/control presentation with the host's existing animation sample.
 void swiftomniui_winui_material_present(void);
+void swiftomniui_winui_material_present_if_needed(void);
+void swiftomniui_winui_material_mark_dirty(void);
+bool swiftomniui_winui_material_has_scroller_insets(void);
 /// Diagnostics inspect the committed state without repairing/refreshing it.
 bool swiftomniui_winui_window_material_covers(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
 /// Whether the current shared overlay redirects this control or an ancestor.
@@ -315,6 +325,10 @@ void swiftomniui_winui_window_set_chrome(SwiftOmniUIObjectRef window, SwiftOmniU
 /// Restores and shows the window, then requests native foreground activation, including redirected launches.
 void swiftomniui_winui_window_activate(SwiftOmniUIObjectRef window);
 void swiftomniui_winui_window_close(SwiftOmniUIObjectRef window);
+/// Minimizes the window when minimizable.
+void swiftomniui_winui_window_minimize(SwiftOmniUIObjectRef window);
+/// Toggles between overlapped and fullscreen presentation.
+void swiftomniui_winui_window_toggle_fullscreen(SwiftOmniUIObjectRef window);
 /// Hides the window, or shows it again without activating it.
 void swiftomniui_winui_window_set_shown(SwiftOmniUIObjectRef window, bool shown);
 /// Minimizes or restores the window as its buttons do: `ShowWindow` with `command`. What a test does.
@@ -392,6 +406,7 @@ void swiftomniui_winui_set_tooltip(SwiftOmniUIObjectRef element, char const *utf
 void swiftomniui_winui_origin(SwiftOmniUIObjectRef element, double *origin);
 // The root transform is translation only; false requires the general transform path.
 bool swiftomniui_winui_translation_to_root(SwiftOmniUIObjectRef element, double *origin);
+bool swiftomniui_winui_matrix_to_root(SwiftOmniUIObjectRef element, double *values);
 
 /// Arrange offsets relative to an actual visual ancestor, excluding presentation transforms.
 /// Returns false if the element has not been attached beneath that ancestor.
@@ -453,6 +468,9 @@ void swiftomniui_winui_hosted_viewport_set(SwiftOmniUIObjectRef viewport, double
 /// (`centerX`, `centerY`) of it, in DIPs.
 void swiftomniui_winui_set_transform(SwiftOmniUIObjectRef element, double translationX, double translationY,
                                  double rotation, double scaleX, double scaleY, double centerX, double centerY);
+void swiftomniui_winui_set_transform_masked(SwiftOmniUIObjectRef element, double translationX, double translationY,
+                                        double rotation, double scaleX, double scaleY, double centerX, double centerY,
+                                        uint32_t mask);
 
 /// The transform as WinUI holds it, in `set_transform`'s order: seven values.
 void swiftomniui_winui_transform(SwiftOmniUIObjectRef element, double *values);
@@ -496,7 +514,8 @@ void swiftomniui_winui_masked_panel_clear(SwiftOmniUIObjectRef panel);
 /// A drawing-only presentation boundary retaining the original native control.
 SwiftOmniUIObjectRef swiftomniui_winui_blur_make(SwiftOmniUIObjectRef element);
 /// Updates a retained live Composition Gaussian-blur brush, in logical pixels.
-bool swiftomniui_winui_blur_set(SwiftOmniUIObjectRef presenter, double radius, double reserveRadius);
+bool swiftomniui_winui_drawing_effects_set(
+    SwiftOmniUIObjectRef presenter, double radius, double reserveRadius, bool multiply);
 void swiftomniui_winui_blur_clear(SwiftOmniUIObjectRef presenter);
 
 /// How words look on a text block or any control showing them: the font - a size of 0 or less and an empty
@@ -598,7 +617,8 @@ SwiftOmniUIObjectRef swiftomniui_winui_toolbar_button_make(int64_t view);
 
 /// The picture in a toolbar button's icon slot: the first of the newline-separated `icons` files the pictures
 /// hold, else the Fluent glyph `symbol` is; both empty for none. Pictured, its words move to its tip.
-void swiftomniui_winui_toolbar_button_set_icon(SwiftOmniUIObjectRef button, char const *symbol, char const *icons);
+void swiftomniui_winui_toolbar_button_set_icon(SwiftOmniUIObjectRef button, char const *symbol, char const *icons,
+                                               double width, double height);
 
 /// The words a button or a radio button shows.
 void swiftomniui_winui_set_caption(SwiftOmniUIObjectRef control, char const *utf8);

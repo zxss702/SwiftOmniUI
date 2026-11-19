@@ -37,6 +37,11 @@ final class GTKButtonView: GTKView {
         return GTKFace.size(of: widget, wearing: faceView, width: width, height: height)
     }
 
+    override func firstTextBaseline(in size: LayoutSize) -> Double? {
+        guard hasViewLabel, let faceView else { return nil }
+        return faceView.firstTextBaseline(in: size)
+    }
+
     /// What the button does when the user clicks it.
     var onClicked: (() -> Void)?
 

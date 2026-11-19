@@ -6,9 +6,115 @@ import CSwiftOmniUIWinUI
 @_spi(Host) @testable import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
 import SwiftOmniUIConformance
+import WinSDK
 import XCTest
 
 final class WinUIMotionTests: XCTestCase {
+    func testBothConversationPanesPaintTextAfterADelayedTransitionFrame() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let record = State(wrappedValue: 0)
+            let messages = State(wrappedValue: false)
+            let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(Binding(get: { true }, set: { _ in })) {
+                    Text("Workspace.swift").id("workspace")
+                } detail: {
+                    HStack(spacing: 0) {
+                        Self.conversationPane("center", record: record.wrappedValue, loaded: messages.wrappedValue)
+                        Self.conversationPane("group", record: record.wrappedValue, loaded: messages.wrappedValue)
+                            .frame(width: 260)
+                            .safeAreaInset(edge: .top, spacing: 0) {
+                                Text("Group chat").frame(height: 36)
+                            }
+                    }
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            let title = "SOUI conversation paint regression"
+            window.setTitle(title)
+            let nativeTitle = Array(title.utf16) + [0]
+            let hwnd = try XCTUnwrap(nativeTitle.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+            let positionFlags = UINT(SWP_NOACTIVATE | SWP_NOSIZE)
+            XCTAssertTrue(SetWindowPos(hwnd, HWND(bitPattern: -1), 32, 32, 0, 0, positionFlags))
+            defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 32, 32, 0, 0, positionFlags) }
+            var presentedLabels = 0
+            for selection in 1...4 {
+                withAnimation(.snappy) {
+                    record.wrappedValue = selection
+                    messages.wrappedValue = false
+                }
+                host.step()
+                host.frame()
+                clock.now += 32
+                withAnimation(.snappy) { messages.wrappedValue = true }
+                host.settle {
+                    ["center", "group"].allSatisfy {
+                        host.view(id: .manual("\($0)-\(selection)-bubble")) != nil
+                    }
+                }
+                host.frame()
+                for pane in ["center", "group"] {
+                    let bubble = try XCTUnwrap(host.view(id: .manual("\(pane)-\(selection)-bubble")))
+                    XCTAssertGreaterThan(bubble.blur, 0, "\(pane) starts with a live blur transition")
+                }
+
+                // Resume the display clock after a gap long enough to finish both transitions.
+                clock.now += 1_200
+                host.frame()
+                for _ in 0..<5 { host.step() }
+
+                for pane in ["center", "group"] {
+                    let bubble = try XCTUnwrap(host.view(id: .manual("\(pane)-\(selection)-bubble")))
+                    let label = try XCTUnwrap(
+                        bubble.sourceElement?.first(type: .text)?.winUI.view as? WinUILabelView,
+                        "\(pane) conversation \(selection) must mount its message"
+                    )
+                    XCTAssertEqual(bubble.blur, 0, accuracy: 0.01)
+                    XCTAssertEqual(bubble.drawnOpacity, 1, accuracy: 0.01)
+                    XCTAssertTrue(WinUIView.words(of: label.handle).contains("Imported conversation \(selection)"))
+                    let points = stride(from: 2.5, to: min(34, label.frame.height), by: 4).flatMap { y in
+                        stride(from: 2.5, to: min(148, label.frame.width), by: 4).map { x in (x, y) }
+                    }
+                    let presented = label.presentedPixels(at: points, in: window)
+                    if !presented.isEmpty {
+                        XCTAssertTrue(presented.contains(where: Self.isDarkInk), "\(pane) presented text")
+                        presentedLabels += 1
+                    }
+                    XCTAssertTrue(label.pixels(at: points).contains(where: Self.isDarkInk), "\(pane) XAML text")
+                }
+            }
+            print("Conversation text sampled on the desktop for \(presentedLabels) of 8 labels")
+        }
+    }
+
+    private static func isDarkInk(_ pixel: UInt32) -> Bool {
+        pixel >> 24 > 127 && (pixel & 0xff) < 100 && ((pixel >> 8) & 0xff) < 100
+            && ((pixel >> 16) & 0xff) < 100
+    }
+
+    @MainActor private static func conversationPane(_ name: String, record: Int, loaded: Bool) -> some View {
+        ScrollView {
+            LazyVStack(alignment: .leading) {
+                if loaded {
+                    VStack(alignment: .leading) {
+                        (Text("Imported conversation \(record)").bold()
+                         + Text("\nSeveral lines of selectable message text.\nAdditional content for native layout."))
+                            .foregroundStyle(.black)
+                            .backgroundPreferenceValue(Text.LayoutKey.self) { _ in Color.clear }
+                    }
+                    .padding(16)
+                    .background { RoundedRectangle(cornerRadius: 12).fill(Color("#E1EEF8")) }
+                    .id("\(name)-\(record)-bubble")
+                    .transition(.blur.combined(with: .offset(x: 48, y: 80)))
+                }
+                Color.clear.frame(height: 520)
+            }
+            .padding(16)
+        }
+        .id("\(name)-\(record)")
+        .transition(.blur.combined(with: .scale(y: 1.02, anchor: .top)))
+    }
+
     func testTextEditorBackgroundKeepsTheEditorsAnimatedFrame() throws {
         try onUIThread {
             let clock = TestClock()

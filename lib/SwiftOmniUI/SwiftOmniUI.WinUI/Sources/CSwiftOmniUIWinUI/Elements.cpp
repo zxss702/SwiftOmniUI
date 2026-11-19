@@ -157,6 +157,23 @@ extern "C" bool swiftomniui_winui_translation_to_root(SwiftOmniUIObjectRef handl
     } catch (...) { return false; }
 }
 
+extern "C" bool swiftomniui_winui_matrix_to_root(SwiftOmniUIObjectRef handle, double *values) {
+    try {
+        auto element = as<xaml::UIElement>(handle);
+        if (!element.XamlRoot()) return false;
+        auto transform = element.TransformToVisual(nullptr).try_as<xaml::Media::MatrixTransform>();
+        if (!transform) return false;
+        auto matrix = transform.Matrix();
+        values[0] = matrix.M11;
+        values[1] = matrix.M12;
+        values[2] = matrix.M21;
+        values[3] = matrix.M22;
+        values[4] = matrix.OffsetX;
+        values[5] = matrix.OffsetY;
+        return true;
+    } catch (...) { return false; }
+}
+
 extern "C" bool swiftomniui_winui_layout_offset(
     SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef ancestor, double *offset
 ) {
@@ -339,6 +356,33 @@ extern "C" void swiftomniui_winui_set_transform(
         transform.Rotation(rotation);
         transform.ScaleX(scaleX);
         transform.ScaleY(scaleY);
+    } catch (...) {
+        report("transforming");
+    }
+}
+
+extern "C" void swiftomniui_winui_set_transform_masked(
+    SwiftOmniUIObjectRef handle, double translationX, double translationY, double rotation, double scaleX,
+    double scaleY, double centerX, double centerY, uint32_t mask
+) {
+    try {
+        if (mask == 0) return;
+        auto element = as<xaml::UIElement>(handle);
+        auto transform = element.RenderTransform().try_as<xaml::Media::CompositeTransform>();
+        if (!transform) {
+            if (mask == 0x7fu && translationX == 0 && translationY == 0 && rotation == 0
+                && scaleX == 1 && scaleY == 1 && centerX == 0 && centerY == 0) return;
+            transform = xaml::Media::CompositeTransform();
+            element.RenderTransform(transform);
+            mask = 0x7fu;
+        }
+        if (mask & (1u << 0)) transform.TranslateX(translationX);
+        if (mask & (1u << 1)) transform.TranslateY(translationY);
+        if (mask & (1u << 2)) transform.Rotation(rotation);
+        if (mask & (1u << 3)) transform.ScaleX(scaleX);
+        if (mask & (1u << 4)) transform.ScaleY(scaleY);
+        if (mask & (1u << 5)) transform.CenterX(centerX);
+        if (mask & (1u << 6)) transform.CenterY(centerY);
     } catch (...) {
         report("transforming");
     }

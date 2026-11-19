@@ -32,12 +32,15 @@ final class GTKMaskedView: GTKZStackView {
     /// The content under the mask's alpha: the mask rendered into the mask
     /// slot, the children into the source - the mask's own widget skipped in
     /// that pass.
-    override func drawContent(_ snapshot: OpaquePointer) {
+    override func drawContent(_ snapshot: OpaquePointer, clip: GskRoundedRect?, backdrop: () -> Void) {
         guard let mask = maskView else {
-            drawChildren(snapshot)
+            super.drawContent(snapshot, clip: clip, backdrop: backdrop)
             return
         }
 
+        backdrop()
+        if var clip { gtk_snapshot_push_rounded_clip(snapshot, &clip) }
+        defer { if clip != nil { gtk_snapshot_pop(snapshot) } }
         gtk_snapshot_push_mask(snapshot, GSK_MASK_MODE_ALPHA)
         gtk_widget_snapshot_child(widget, mask.widget, snapshot)
         gtk_snapshot_pop(snapshot)

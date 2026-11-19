@@ -331,4 +331,35 @@ import XCTest
 
         Renderer.shared.clearInvalidation()
     }
+
+    /// A GeometryReader whose content only reads `proxy.size` (like a chat bubble
+    /// background shape) must not rebuild on every scroll tick when only its window
+    /// origin moves.
+    func testASizeOnlyReaderDoesNotRebuildWhenOnlyWindowOriginMoves() {
+        let renders = Renders()
+
+        func tree() -> Node {
+            Node(type: "WindowScene", children: [
+                VStack {
+                    GeometryReader { proxy in
+                        Text("\(Int(proxy.size.width))x\(Int(proxy.size.height))")
+                    }
+                }.node,
+            ])
+        }
+
+        let first = renders.render(tree())
+        let grid = first.children.first?.children.first
+
+        Renderer.shared.clearInvalidation()
+        renders.fire(grid?.events?["frameChanged"] ?? -1, with: [.numbers([0, 0, 300, 120, 16, 80, 0, 0, 800, 600])])
+        _ = renders.render(tree(), changed: Renderer.shared.pendingChanges)
+
+        Renderer.shared.clearInvalidation()
+        // Scroll moves global y from 80 to 40 while local size stays 300x120.
+        renders.fire(grid?.events?["frameChanged"] ?? -1, with: [.numbers([0, 0, 300, 120, 16, 40, 0, 0, 800, 600])])
+
+        XCTAssertTrue(Renderer.shared.pendingChanges.isEmpty,
+            "a size-only GeometryReader should not schedule a render for pure scroll origin changes")
+    }
 }

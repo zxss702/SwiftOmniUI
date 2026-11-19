@@ -27,6 +27,10 @@ public enum ButtonContract: ElementContract {
     /// The picture beside the caption.
     public static let icon = ElementProperty<Self, ImageSource>("icon", layer: .adaptive)
 
+    /// The explicitly framed width and height of a custom toolbar picture, in logical points.
+    public static let iconWidth = ElementProperty<Self, Double>("iconWidth", layer: .adaptive)
+    public static let iconHeight = ElementProperty<Self, Double>("iconHeight", layer: .adaptive)
+
     /// Which side of the caption the icon stands on.
     public static let iconPosition = ElementProperty<Self, IconPosition>("iconPosition", layer: .adaptive)
 
@@ -61,7 +65,7 @@ public enum ButtonContract: ElementContract {
 
     /// The element's own members.
     public static let members: [any ContractMember] = [
-        buttonStyle, clicked, icon, iconPosition, iconSpacing, isOn, lineBreak, pressed, released,
+        buttonStyle, clicked, icon, iconWidth, iconHeight, iconPosition, iconSpacing, isOn, lineBreak, pressed, released,
         role, shortcut, toggled,
     ]
 }

@@ -27,6 +27,67 @@ private struct LengtheningPage: View {
 
 /// A stack's children travel to the places a patch gives them; one that joins fades in, one hidden fades out first.
 final class GTKLayoutMotionTests: XCTestCase {
+    func testBottomInsetEditorGrowsAndShrinksWithItsBottomFixed() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let text = State(wrappedValue: "")
+            let host = GTKRenderer.running(clock: clock) {
+                ScrollView { Text("History") }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        let height = text.wrappedValue.isEmpty ? 40.0 : 128.0
+                        VStack {
+                            HStack(alignment: .bottom) {
+                                Button("Attach") {}.frame(width: 40, height: 40).id("attach")
+                                ZStack(alignment: .bottom) {
+                                    TextEditor(text: text.projectedValue.transaction(.init(animation: .linear(duration: 0.2))))
+                                        .scrollContentBackground(.hidden)
+                                        .safeAreaPadding(.vertical, 12)
+                                        .frame(height: height)
+                                        .background { Color.white.id("editor-background") }
+                                        .id("editor")
+                                }.frame(height: height)
+                            }
+                        }.padding(16)
+                    }
+                    .hiddenSafeBarBackground()
+            }
+            for _ in 0..<4 { host.step(); host.frame() }
+            let window = try XCTUnwrap(host.window)
+            let input = try XCTUnwrap(host.views(GTKTextEditorView.self).first)
+            let editor = try XCTUnwrap(host.view(id: .manual("editor")))
+            let background = try XCTUnwrap(host.view(id: .manual("editor-background")))
+            let attach = try XCTUnwrap(host.view(id: .manual("attach")))
+
+            func bounds(_ view: GTKView) -> (top: Double, height: Double) {
+                var frame = graphene_rect_t()
+                XCTAssertNotEqual(gtk_widget_compute_bounds(view.widget, window.widget, &frame), 0)
+                return (Double(frame.origin.y), Double(frame.size.height))
+            }
+
+            let initial = bounds(editor)
+            let bottom = initial.top + initial.height
+            let attachTop = bounds(attach).top
+            for (words, start, end) in [("hello", 40.0, 128.0), ("", 128.0, 40.0)] {
+                let began = clock.now
+                input.setText(words)
+                host.runtime.pump.turn()
+                for elapsed in [0.0, 50, 100, 150, 200] {
+                    clock.now = began + elapsed
+                    host.frame()
+                    let editorFrame = bounds(editor)
+                    let backgroundFrame = bounds(background)
+                    let expectedHeight = start + (end - start) * elapsed / 200
+                    XCTAssertEqual(editorFrame.height, expectedHeight, accuracy: 2, "\(words) at \(elapsed) ms")
+                    XCTAssertEqual(editorFrame.top + editorFrame.height, bottom, accuracy: 2)
+                    XCTAssertEqual(backgroundFrame.top, editorFrame.top, accuracy: 1)
+                    XCTAssertEqual(backgroundFrame.height, editorFrame.height, accuracy: 1)
+                    XCTAssertEqual(bounds(attach).top, attachTop, accuracy: 1)
+                }
+                XCTAssertTrue(host.views(GTKTextEditorView.self).first === input)
+            }
+        }
+    }
+
     func testDepartingWelcomeKeepsItsWindowPositionWhileItsParentReflows() throws {
         try onUIThread {
             let clock = TestClock()

@@ -82,14 +82,20 @@ class GTKZStackView: GTKTravellingLayout {
             insetContext = next
             let base = current[0]
             insetBase = base.view
+            base.view.placementBottom = nil
             let basePlace = SafeAreaArithmetic.base(of: base, boundary: base.element?.preservesSafeAreaProposal == true,
                                                    ignores: base.element?.ignoresSafeArea,
                                                    in: next, direction: direction)
             self.place(base, at: basePlace)
             if bar.isShown {
+                bar.view.placementBottom = nil
                 if bar.view.nativeSafeBarOwner != nil {
                     bar.view.recordSafeBarPlace(barPlace, context: SafeAreaContext(bounds: Rect(0, 0, barPlace.width, barPlace.height)))
                 } else {
+                    if edge == .bottom {
+                        let safe = layoutSafeArea(in: allocatedBounds).safe
+                        bar.view.placementBottom = safe.y + safe.height - bar.values.margin.bottom
+                    }
                     self.place(bar, at: barPlace)
                 }
             }
@@ -102,6 +108,7 @@ class GTKZStackView: GTKTravellingLayout {
         let places = ZStackArithmetic.places(
             of: items, in: room, decorationRoom: decorationRoom, padding: padding, direction: direction)
         for (item, place) in zip(items, places) {
+            item.view.placementBottom = nil
             if let place { self.place(item, at: place) }
         }
     }
@@ -113,6 +120,7 @@ class GTKZStackView: GTKTravellingLayout {
         for index in 0..<count {
             let placement = placements[index]
             let view = items[index].view
+            view.placementBottom = nil
             view.setPlacedDrawing(placement.drawing, opacity: placement.drawnOpacity)
             view.layout(placement.place)
             (view as? GTKGridView)?.setShadeOpacity(placement.drawnShade)

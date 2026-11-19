@@ -25,7 +25,11 @@
 @_spi(Host) @MainActor public final class FrameFollowers {
     private unowned let runtime: HostRuntime
     private var scrollers: [Int64: HeldScroller] = [:]
+    private var sortedScrollerOrders: [Int64] = []
+    private var scrollersDirty = false
     private var reporters: [Int64: HeldReporter] = [:]
+    private var sortedReporterOrders: [Int64] = []
+    private var reportersDirty = false
     private var moved = false
     /// A completed-layout reporting batch. Native adapters may share ancestor
     /// reads within this transaction, but never across a later layout or scroll.
@@ -45,6 +49,7 @@
 
     /// Keeps the display's frames coming for `scroller`, made `order`th, until it stands and has said everything.
     public func serve(_ scroller: any FramedScroller, order: Int64) {
+        if scrollers[order] == nil { scrollersDirty = true }
         scrollers[order] = HeldScroller(scroller: scroller)
         runtime.displayCycle.hold()
     }
@@ -54,7 +59,12 @@
     public func follow(_ reporter: any FrameReporter, order: Int64, reads: Bool) {
         guard reads != (reporters[order] != nil) else { return }
         reporters[order] = reads ? HeldReporter(reporter: reporter) : nil
-        if reads { laidOut() }
+        if reads {
+            reportersDirty = true
+            laidOut()
+        } else {
+            sortedReporterOrders.removeAll { $0 == order }
+        }
     }
 
     /// A layout moved: report it when the host finishes layout, or on the next display frame.
@@ -73,6 +83,9 @@
         runtime.displayCycle.hold()
     }
 
+    /// Whether a frame read may have moved since the last report.
+    public var hasPendingReports: Bool { moved }
+
     /// Whether a scroller moves or has something to say, or a frame read may have moved.
     public var wantsFrames: Bool {
         moved || scrollers.values.contains { $0.scroller?.wantsFrames == true }
@@ -82,13 +95,20 @@
         guard moved else { return }
         moved = false
         reportGeneration &+= 1
-        for order in reporters.keys.sorted() {
+        if reportersDirty {
+            sortedReporterOrders = reporters.keys.sorted()
+            reportersDirty = false
+        }
+        var stale = false
+        for order in sortedReporterOrders {
             guard let reporter = reporters[order]?.reporter else {
                 reporters[order] = nil
+                stale = true
                 continue
             }
             reporter.reportFrame()
         }
+        if stale { sortedReporterOrders.removeAll { reporters[$0] == nil } }
     }
 
     /// Reports a completed native layout before it is painted, without advancing scrollers.
@@ -98,7 +118,10 @@
         // measurement took time. Reentrant reports retain the same scope.
         let outer = runtime.displayCycle.layingOut
         runtime.displayCycle.layingOut = true
-        defer { runtime.displayCycle.layingOut = outer }
+        defer {
+            runtime.displayCycle.layingOut = outer
+            if !outer { runtime.displayCycle.hold() }
+        }
         runtime.performUserTransaction { reportFrames() }
     }
 
@@ -107,14 +130,24 @@
     public func commit(now: Double) {
         guard !scrollers.isEmpty || moved else { return }
         runtime.performUserTransaction {
-            for order in scrollers.keys.sorted() {
+            if scrollersDirty {
+                sortedScrollerOrders = scrollers.keys.sorted()
+                scrollersDirty = false
+            }
+            var staleScrollers = false
+            for order in sortedScrollerOrders {
                 guard let scroller = scrollers[order]?.scroller else {
                     scrollers[order] = nil
+                    staleScrollers = true
                     continue
                 }
                 scroller.frame(now: now)
-                if !scroller.wantsFrames { scrollers[order] = nil }
+                if !scroller.wantsFrames {
+                    scrollers[order] = nil
+                    staleScrollers = true
+                }
             }
+            if staleScrollers { sortedScrollerOrders.removeAll { scrollers[$0] == nil } }
 
             reportFrames()
         }

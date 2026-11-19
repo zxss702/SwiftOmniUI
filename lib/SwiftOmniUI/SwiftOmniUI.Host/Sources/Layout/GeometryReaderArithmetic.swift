@@ -33,6 +33,7 @@
         }
         var isShown: Bool { base.isShown }
         func size(offered width: Double?) -> LayoutSize { base.size(offered: width) }
+        func size(offered proposal: ProposedViewSize) -> LayoutSize { base.size(offered: proposal) }
     }
 }
 

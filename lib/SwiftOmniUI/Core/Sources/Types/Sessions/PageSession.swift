@@ -129,7 +129,7 @@ public final class PageSession {
 
     /// What hangs off the page besides its content: the title view, the
     /// toolbar items and the menus, each as the node the host knows it by.
-    var slots: [Node] {
+    @MainActor var slots: [Node] {
         var slots: [Node] = []
 
         if let titleView = titleView {

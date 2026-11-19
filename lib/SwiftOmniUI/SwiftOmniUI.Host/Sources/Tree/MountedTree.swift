@@ -257,6 +257,15 @@
         describedMotion.presentedValue(for: DescribedKey(mount: mount, property: property))
     }
 
+    /// The scalar number a running animation draws for `property` on the element `mount`.
+    public func presentedPropertyNumber(mount: UInt64, property: Prop) -> Double? {
+        describedMotion.presentedNumber(for: DescribedKey(mount: mount, property: property))
+    }
+
+    func presentedPropertyNumberUnchecked(mount: UInt64, property: Prop) -> Double? {
+        describedMotion.presentedNumberUnchecked(for: DescribedKey(mount: mount, property: property))
+    }
+
     func hasPropertyMotions(on mount: UInt64) -> Bool { describedMotion.hasProperties(on: mount) }
 
     func presentedValue(for binding: HostStateBinding, from carried: HostStateValue) -> HostStateValue {

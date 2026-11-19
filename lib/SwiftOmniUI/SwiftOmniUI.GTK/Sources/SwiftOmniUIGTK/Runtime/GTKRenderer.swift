@@ -103,6 +103,44 @@ final class GTKRenderer {
         controller.window.present()
     }
 
+    /// Dispatches a built-in macOS-anchored standard shortcut (only invoked when no
+    /// widget or menu shortcut claimed the key).
+    func handleStandardShortcut(
+        element: MountedElement,
+        controller: GTKWindowController,
+        shortcut: StandardShortcut
+    ) -> Bool {
+        switch shortcut {
+        case .newWindow:
+            guard let target = runtime.initialWindowForActivation(),
+                  let targetController = roster.controller(of: target) else { return false }
+            targetController.window.present()
+            return true
+        case .openSettings:
+            guard let target = runtime.openSettingsWindow(),
+                  let targetController = roster.controller(of: target) else { return false }
+            targetController.window.present()
+            return true
+        case .closeWindow:
+            controller.window.close()
+            return true
+        case .quitApp:
+            for open in roster.controllers { open.window.close() }
+            return true
+        case .minimizeWindow:
+            controller.window.minimize()
+            return true
+        case .toggleSidebar:
+            guard let split = WindowChrome(window: element, arrangement: controller.presentation.arrangement).sidebarToggle
+            else { return false }
+            split.gtk.changeSidebarVisibility(to: !split.sidebarIsVisible)
+            return true
+        case .toggleFullscreen:
+            controller.window.toggleFullscreen()
+            return true
+        }
+    }
+
     /// The platform handed the application files to open - a launch under `HANDLES_OPEN` emits `open` instead of
     /// `activate`, so the host starts here where it never did; then every `onOpenURL` listener hears each URL.
     nonisolated static func opened(_ application: UnsafeMutablePointer<GtkApplication>, urls: [String]) {
@@ -166,6 +204,10 @@ final class GTKRenderer {
                 controller.window.onActiveChanged = { [weak self, weak element] active in
                     guard let self, let element else { return }
                     runtime.windowStateChanged(element, minimized: false, activated: active)
+                }
+                controller.window.onStandardShortcut = { [weak self, weak element, weak controller] shortcut in
+                    guard let self, let element, let controller else { return false }
+                    return handleStandardShortcut(element: element, controller: controller, shortcut: shortcut)
                 }
                 return controller
             },

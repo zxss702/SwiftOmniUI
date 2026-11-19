@@ -26,9 +26,34 @@ final class WinUIStackView: WinUITravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        Self.querySize {
-            StackArithmetic.size(of: items, axis: axis, spacing: spacing, padding: padding, width: width)
+        contentSize(proposal: ProposedViewSize(width: width))
+    }
+
+    override var contentSizeDependsOnHeight: Bool {
+        axis == .horizontal && items.contains { $0.isShown && !$0.departing && ($0.values.scalesToFit || $0.values.isFrameContent) }
+    }
+
+    override func contentSize(proposal: ProposedViewSize) -> LayoutSize {
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        let height = proposal.height.flatMap { $0.isFinite ? $0 : nil }
+        return Self.querySize {
+            StackArithmetic.size(of: items, axis: axis, spacing: spacing, padding: padding, width: width, height: height)
         }
+    }
+
+    override func firstTextBaseline(in size: LayoutSize) -> Double? {
+        let places = Self.querySize {
+            StackArithmetic.places(of: items, axis: axis, spacing: spacing, padding: padding,
+                                   in: Rect(x: 0, y: 0, width: size.width, height: size.height), direction: direction)
+        }
+        for (item, place) in zip(items, places) {
+            guard let place, item.isShown, !item.departing else { continue }
+            if let explicit = item.values.verticalGuide, explicit.slot == 4 { return place.y + explicit.offset }
+            if let baseline = item.view.firstTextBaseline(in: LayoutSize(width: place.width, height: place.height)) {
+                return place.y + baseline
+            }
+        }
+        return nil
     }
 
     override var hasNativeProposals: Bool { true }
@@ -52,7 +77,17 @@ final class WinUIStackView: WinUITravellingLayout {
             guard let view = proposal.view else { continue }
             while index < items.endIndex, items[index].view !== view { index += 1 }
             guard index < items.endIndex else { break }
-            place(items[index], at: proposal.place)
+            let item = items[index]
+            if axis == .horizontal, item.values.vertical == AxisAlignment.end.rawValue,
+               item.values.verticalGuide == nil, item.matchedGeometry == nil {
+                // The row may plan its children at the destination height.
+                // Their bottom alignment belongs to the actual native room.
+                let top = padding.top + item.values.margin.top
+                view.placementBottom = max(top, allocatedBounds.height - padding.bottom - item.values.margin.bottom)
+            } else {
+                view.placementBottom = nil
+            }
+            place(item, at: proposal.place)
             index += 1
         }
     }

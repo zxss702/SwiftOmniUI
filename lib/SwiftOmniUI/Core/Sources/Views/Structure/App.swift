@@ -174,7 +174,7 @@ extension Node {
     /// What a window lays over its page and the pages presented over it: one ZStack of its overlays, each under
     /// its key, so a layer keeps its elements as the others come and go; nil for none.
     /// Design: docs/design/views/pages.md#the-children-of-a-window
-    static func overlay(_ overlays: WindowOverlays) -> Node? {
+    @MainActor static func overlay(_ overlays: WindowOverlays) -> Node? {
         guard !overlays.layers.isEmpty else { return nil }
 
         var stack = ZStack().letsInputThrough(true).node
@@ -257,7 +257,7 @@ extension Node {
     /// gaining a title view does not move its content - then what hangs off it.
     /// A `.navigationTitle` or `.badge` written on the content's root names the
     /// page itself, where the session has not already.
-    private static func page(around content: Node, session: PageSession) -> Node {
+    @MainActor private static func page(around content: Node, session: PageSession) -> Node {
         var node = Node(contract: PageContract.self, children: [content] + session.slots)
         node.props = session.props
         for member in [

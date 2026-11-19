@@ -97,6 +97,7 @@ final class GTKScrollView: GTKLayoutView {
     /// layout with a document to place.
     private var defaultAnchor: (x: Double, y: Double)?
     private var anchoredOnce = false
+    private var pinnedEdge: Edge?
 
     /// The scroller's orientation, padding, bars, where a reader's default
     /// anchor asks it to begin, and an offset the tree moved it to.
@@ -113,6 +114,8 @@ final class GTKScrollView: GTKLayoutView {
         if let position, position.revision != appliedPositionRevision {
             appliedPositionRevision = position.revision
             positionRequest = position
+            pinnedEdge = position.edge
+            GTKDoorbell.afterLayout { [weak self] in self?.resolvePositionRequest() }
         }
         writtenPadding = padding
         let resolvedPadding = SafeAreaArithmetic.physicalInsets(padding, direction: direction) + barsInsets
@@ -175,7 +178,7 @@ final class GTKScrollView: GTKLayoutView {
     override func arrange(in bounds: Rect) {
         let viewport = resolve(in: bounds)
         scroller.layout(viewport)
-        if positionRequest != nil {
+        if positionRequest != nil || pinnedEdge == .bottom {
             GTKDoorbell.afterLayout { [weak self] in self?.resolvePositionRequest() }
         }
         // Initial offsets/anchors wait for the resolved document extent.
@@ -191,7 +194,17 @@ final class GTKScrollView: GTKLayoutView {
     }
 
     func resolvePositionRequest() {
-        guard let request = positionRequest, document.padding == document.layoutPadding else { return }
+        guard !detached, document.padding == document.layoutPadding else { return }
+        guard let request = positionRequest else {
+            if pinnedEdge == .bottom {
+                let standing = scroller.standing
+                let target = Point(x: standing.offset.x, y: standing.reach.y)
+                if standing.reach.y > 0, ScrollArithmetic.differs(standing.offset, target) {
+                    move(to: target)
+                }
+            }
+            return
+        }
         if let id = request.id {
             guard let root = sourceElement else { return }
             func destination(in element: MountedElement) -> GTKView? {
@@ -214,6 +227,7 @@ final class GTKScrollView: GTKLayoutView {
             guard let descendant = destination(in: root), descendant.placed != nil else { return }
             scroll(toDescendant: descendant.widget, anchorX: request.anchor?.x, anchorY: request.anchor?.y)
             positionRequest = nil
+            pinnedEdge = nil
             return
         }
         let standing = scroller.standing
@@ -244,6 +258,7 @@ final class GTKScrollView: GTKLayoutView {
 
         let previous = offset
         offset = standing
+        pinnedEdge = nil
         movement.userMoved(from: previous, to: standing)
     }
 
@@ -251,6 +266,7 @@ final class GTKScrollView: GTKLayoutView {
     private func scrollerHeld(_ holding: Bool) {
         if holding {
             positionRequest = nil
+            pinnedEdge = nil
             movement.holdBegan()
         } else {
             movement.holdEnded(rests: false)

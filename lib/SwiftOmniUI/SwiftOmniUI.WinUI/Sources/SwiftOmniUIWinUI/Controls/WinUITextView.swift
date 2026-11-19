@@ -19,8 +19,13 @@ class WinUITextView: WinUIView {
     }
 
     override func firstTextBaseline(in size: LayoutSize) -> Double? {
-        let baseline = swiftomniui_winui_text_baseline(handle, size.height)
-        return baseline >= 0 ? baseline : nil
+        let contentHeight = measure(width: size.width, height: nil).height
+        let base = swiftomniui_winui_text_baseline(handle, 0)
+        guard base >= 0 else { return nil }
+        let extra = max(0, size.height - contentHeight)
+        guard extra > 0.001 else { return base }
+        let shiftUnit = swiftomniui_winui_text_baseline(handle, 1_000_000) - swiftomniui_winui_text_baseline(handle, 999_998)
+        return base + extra * max(0, min(1, shiftUnit / 2))
     }
 
     override var takesDirection: Bool { true }

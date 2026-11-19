@@ -461,10 +461,11 @@ extension View {
         item: Binding<D?>,
         @ViewBuilder destination: @escaping (D) -> C
     ) -> ModifiedContent {
-        revised {
+        let dismiss = Carry<() -> Void> { item.wrappedValue = nil }
+        return revised {
             $0.itemDestination = Node.ItemDestination(
                 make: { item.wrappedValue.map { destination($0).node } },
-                dismiss: { item.wrappedValue = nil })
+                dismiss: { dismiss.value() })
             NavigationStack.DeclaredDestinations.collecting?.item = $0.itemDestination
         }
     }

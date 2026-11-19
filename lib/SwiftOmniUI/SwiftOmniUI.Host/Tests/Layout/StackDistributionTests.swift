@@ -226,6 +226,20 @@ final class StackDistributionTests: XCTestCase {
         XCTAssertEqual(arranged.map { $0?.x }, [350, 60, nil, 10])
     }
 
+    func testScalesToFitStopsAtCrossAxisProportionWhileHeightFixedIconDoesNotExpand() {
+        var fitted = FittedStackChild(width: 40, height: 20)
+        fitted.values.scalesToFit = true
+        let label = StackChild(width: 60, height: 20)
+
+        let arranged = StackArithmetic.places(
+            of: [AnyStackChild(fitted), AnyStackChild(label)], axis: .horizontal, spacing: 8, padding: EdgeInsets(0),
+            in: Rect(0, 0, 400, 12), direction: .leftToRight)
+
+        XCTAssertEqual(arranged[0]?.width, 24)
+        XCTAssertEqual(arranged[1]?.width, 60)
+        XCTAssertEqual((arranged[1]?.x ?? 0) - ((arranged[0]?.x ?? 0) + (arranged[0]?.width ?? 0)), 8)
+    }
+
     private func places(_ children: [StackChild], axis: StackArithmetic.Axis = .horizontal, length: Double) -> [Rect?] {
         StackArithmetic.places(
             of: children, axis: axis, spacing: 0, padding: EdgeInsets(0),
@@ -256,4 +270,31 @@ private struct StackChild: LayoutChild {
 @MainActor
 private final class StackOffers {
     var widths: [Double?] = []
+}
+
+private struct FittedStackChild: LayoutChild {
+    var values = LayoutValues()
+    let intrinsic: LayoutSize
+    var isShown = true
+
+    init(width: Double, height: Double) {
+        intrinsic = LayoutSize(width: width, height: height)
+    }
+
+    func size(offered width: Double?) -> LayoutSize {
+        size(offered: ProposedViewSize(width: width))
+    }
+
+    func size(offered proposal: ProposedViewSize) -> LayoutSize {
+        PictureArithmetic.fittedSize(intrinsic, in: proposal)
+    }
+}
+
+private struct AnyStackChild: LayoutChild {
+    private let base: any LayoutChild
+    init(_ base: any LayoutChild) { self.base = base }
+    var values: LayoutValues { base.values }
+    var isShown: Bool { base.isShown }
+    func size(offered width: Double?) -> LayoutSize { base.size(offered: width) }
+    func size(offered proposal: ProposedViewSize) -> LayoutSize { base.size(offered: proposal) }
 }

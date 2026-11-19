@@ -40,21 +40,29 @@ final class ModifierContentStamp {}
 public struct _ViewModifier_Content<Modifier: ViewModifier>: View, ModifierContentCarrier {
     let stamp: ModifierContentStamp
     let makeNode: () -> Node
+    private let defersContent: Bool
 
     @MainActor init(stamp: ModifierContentStamp, makeNode: @escaping () -> Node) {
         self.stamp = stamp
         self.makeNode = makeNode
+        self.defersContent = true
     }
 
-    @MainActor init(view: AnyView) {
+    /// A transition reads the properties a modifier writes directly on a probe.
+    /// The probe has no state or content subtree for the differ to preserve.
+    @MainActor init(transitionProbe: Node) {
         self.stamp = ModifierContentStamp()
-        self.makeNode = { view.node }
+        self.makeNode = { transitionProbe }
+        self.defersContent = false
     }
 
     var contentStamp: ModifierContentStamp { stamp }
 
     public var node: Node {
-        Node.composed(self, type: ElementTypeNames.qualified(Self.self), build: makeNode)
+        if defersContent {
+            return Node.composed(self, type: ElementTypeNames.qualified(Self.self), build: makeNode)
+        }
+        return makeNode()
     }
 }
 

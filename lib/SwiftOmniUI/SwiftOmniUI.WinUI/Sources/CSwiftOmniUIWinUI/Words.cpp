@@ -1181,6 +1181,11 @@ static int32_t readInlineRunGeometry(
     auto baseSize = static_cast<FLOAT>(std::max(0.01, block.FontSize()));
     auto baseWeight = static_cast<DWRITE_FONT_WEIGHT>(std::clamp<int32_t>(block.FontWeight().Weight, 1, 999));
     auto lang = block.Language();
+    bool hasLocalLang = block.ReadLocalValue(xaml::FrameworkElement::LanguageProperty()) != unset;
+    wchar_t sysLocale[LOCALE_NAME_MAX_LENGTH]{};
+    if (!hasLocalLang || lang.empty())
+        GetUserDefaultLocaleName(sysLocale, LOCALE_NAME_MAX_LENGTH);
+    wchar_t const *localeName = (hasLocalLang && !lang.empty()) ? lang.c_str() : sysLocale;
 
     winrt::com_ptr<IDWriteTextFormat> format;
     if (blockFamilySource.empty()) {
@@ -1193,7 +1198,7 @@ static int32_t readInlineRunGeometry(
             winrt::com_ptr<IDWriteTextFormat3> format3;
             if (SUCCEEDED(factory6->CreateTextFormat(
                     L"Segoe UI Variable", nullptr, axes, ARRAYSIZE(axes), baseSize,
-                    lang.empty() ? L"" : lang.c_str(), format3.put()))) {
+                    localeName, format3.put()))) {
                 format3->SetAutomaticFontAxes(DWRITE_AUTOMATIC_FONT_AXES_OPTICAL_SIZE);
                 format3->QueryInterface(__uuidof(IDWriteTextFormat), format.put_void());
             }
@@ -1202,7 +1207,7 @@ static int32_t readInlineRunGeometry(
     if (!format) {
         winrt::check_hresult(factory->CreateTextFormat(
             baseFamily.c_str(), nullptr, baseWeight, dwriteStyle(block.FontStyle()),
-            dwriteStretch(block.FontStretch()), baseSize, lang.empty() ? L"" : lang.c_str(), format.put()));
+            dwriteStretch(block.FontStretch()), baseSize, localeName, format.put()));
         winrt::com_ptr<IDWriteTextFormat3> format3;
         if (SUCCEEDED(format->QueryInterface(__uuidof(IDWriteTextFormat3), format3.put_void())))
             format3->SetAutomaticFontAxes(DWRITE_AUTOMATIC_FONT_AXES_OPTICAL_SIZE);
@@ -1228,6 +1233,10 @@ static int32_t readInlineRunGeometry(
 
     winrt::com_ptr<IDWriteTextLayout1> layout1;
     layout->QueryInterface(__uuidof(IDWriteTextLayout1), layout1.put_void());
+    winrt::com_ptr<IDWriteTextLayout4> layout4;
+    layout->QueryInterface(__uuidof(IDWriteTextLayout4), layout4.put_void());
+    if (layout4)
+        layout4->SetAutomaticFontAxes(DWRITE_AUTOMATIC_FONT_AXES_OPTICAL_SIZE);
     if (layout1 && block.CharacterSpacing() != 0) {
         auto trailing = static_cast<FLOAT>(block.CharacterSpacing() * baseSize / 1000.0);
         layout1->SetCharacterSpacing(0.0f, trailing, 0.0f, {0, static_cast<UINT32>(fullText.size())});
@@ -1249,6 +1258,13 @@ static int32_t readInlineRunGeometry(
         layout->SetFontWeight(attr.weight, range);
         layout->SetFontStyle(attr.style, range);
         layout->SetFontStretch(attr.stretch, range);
+        if (layout4 && attr.family.empty() && blockFamilySource.empty()) {
+            DWRITE_FONT_AXIS_VALUE runAxes[] = {
+                {DWRITE_FONT_AXIS_TAG_WEIGHT, static_cast<FLOAT>(attr.weight)},
+                {DWRITE_FONT_AXIS_TAG_ITALIC, attr.style == DWRITE_FONT_STYLE_NORMAL ? 0.0f : 1.0f},
+            };
+            layout4->SetFontAxisValues(runAxes, ARRAYSIZE(runAxes), range);
+        }
         if (layout1 && attr.spacing != 0) {
             auto s = attr.size > 0 ? attr.size : baseSize;
             layout1->SetCharacterSpacing(0.0f, static_cast<FLOAT>(attr.spacing * s / 1000.0), 0.0f, range);
@@ -1262,18 +1278,65 @@ static int32_t readInlineRunGeometry(
     if (lineCount) *lineCount = static_cast<int32_t>(std::max<UINT32>(1, dwLineCount));
 
     auto advance = rich ? rich.LineHeight() : block.LineHeight();
-    if (dwLineCount > 1 && contentW > 0 && dwLineCount > 0 && contentH <= lines[0].height * 1.5f) {
-        layout->SetMaxWidth(contentW + 2.0f);
-        UINT32 widenedLines = 0;
-        layout->GetLineMetrics(nullptr, 0, &widenedLines);
-        DWRITE_TEXT_METRICS tm{};
-        if (widenedLines == 1 && SUCCEEDED(layout->GetMetrics(&tm)) && tm.widthIncludingTrailingWhitespace <= contentW + 2.0f) {
-            dwLineCount = widenedLines;
+    bool hasExplicitNewline = fullText.find(L'\n') != std::wstring::npos || fullText.find(L'\r') != std::wstring::npos;
+    int32_t explicitLines = 1;
+    for (size_t i = 0; i < fullText.size(); ++i) {
+        if (fullText[i] == L'\n') {
+            ++explicitLines;
+        } else if (fullText[i] == L'\r' && (i + 1 >= fullText.size() || fullText[i + 1] != L'\n')) {
+            ++explicitLines;
+        }
+    }
+    bool uniformLineMetrics = true;
+    for (auto const &attr : attrs) {
+        if (attr.inlineH > 0 || (attr.size > 0 && std::abs(attr.size - baseSize) > 1.5f)) {
+            uniformLineMetrics = false;
+            break;
+        }
+    }
+    int32_t expectedLines = 0;
+    if (uniformLineMetrics) {
+        auto baseNatural = naturalWordsMetrics(block).height;
+        if (baseNatural > 1.0) {
+            if (advance > 0.5 && contentH > baseNatural * 1.35) {
+                expectedLines = std::max<int32_t>(
+                    1, 1 + static_cast<int32_t>(std::llround((static_cast<double>(contentH) - baseNatural) / advance)));
+            } else {
+                expectedLines = std::max<int32_t>(
+                    1, static_cast<int32_t>(std::llround(static_cast<double>(contentH) / baseNatural)));
+            }
+        }
+    }
+
+    if (dwLineCount > 1 && contentW > 0) {
+        if ((!hasExplicitNewline && contentH <= lines[0].height * 1.55f)
+            || (expectedLines >= explicitLines && expectedLines == explicitLines
+                && dwLineCount > static_cast<UINT32>(expectedLines))) {
+            layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+            dwLineCount = 0;
+            layout->GetLineMetrics(nullptr, 0, &dwLineCount);
             lines.resize(dwLineCount);
             if (dwLineCount > 0) winrt::check_hresult(layout->GetLineMetrics(lines.data(), dwLineCount, &dwLineCount));
             if (lineCount) *lineCount = static_cast<int32_t>(std::max<UINT32>(1, dwLineCount));
-        } else {
-            layout->SetMaxWidth(contentW);
+        } else if (expectedLines > explicitLines && dwLineCount > static_cast<UINT32>(expectedLines)) {
+            constexpr FLOAT tolerances[] = {2.0f, 6.0f, 12.0f, 24.0f};
+            bool matched = false;
+            for (FLOAT extraW : tolerances) {
+                layout->SetMaxWidth(contentW + extraW);
+                UINT32 candidateLines = 0;
+                layout->GetLineMetrics(nullptr, 0, &candidateLines);
+                if (candidateLines == static_cast<UINT32>(expectedLines)) {
+                    dwLineCount = candidateLines;
+                    lines.resize(dwLineCount);
+                    if (dwLineCount > 0) winrt::check_hresult(layout->GetLineMetrics(lines.data(), dwLineCount, &dwLineCount));
+                    if (lineCount) *lineCount = static_cast<int32_t>(std::max<UINT32>(1, dwLineCount));
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                layout->SetMaxWidth(contentW);
+            }
         }
     }
     std::vector<double> lineYOffset(dwLineCount, 0.0);
@@ -1282,6 +1345,20 @@ static int32_t readInlineRunGeometry(
         for (UINT32 k = 1; k < dwLineCount; ++k) {
             extra += std::max(0.0, advance - static_cast<double>(lines[k - 1].height));
             lineYOffset[k] = extra;
+        }
+    }
+    double singleLineScaleX = 1.0;
+    if (dwLineCount == 1 && !hasExplicitNewline
+        && (align == xaml::TextAlignment::Start || align == xaml::TextAlignment::Left)
+        && block.FlowDirection() == xaml::FlowDirection::LeftToRight
+        && visualFe && visualFe.DesiredSize().Width > 0) {
+        DWRITE_TEXT_METRICS tm{};
+        double desiredW = std::min(availW, static_cast<double>(visualFe.DesiredSize().Width));
+        double xamlLineW = std::max(0.0, desiredW - pad.Left - pad.Right);
+        if (SUCCEEDED(layout->GetMetrics(&tm)) && tm.widthIncludingTrailingWhitespace > 1.0f
+            && xamlLineW > tm.widthIncludingTrailingWhitespace
+            && (xamlLineW - tm.widthIncludingTrailingWhitespace) <= std::max(8.0, xamlLineW * 0.06)) {
+            singleLineScaleX = xamlLineW / static_cast<double>(tm.widthIncludingTrailingWhitespace);
         }
     }
 
@@ -1297,49 +1374,35 @@ static int32_t readInlineRunGeometry(
     UINT32 curLine = 0;
     UINT32 curLineEnd = dwLineCount > 0 ? lines[0].length : static_cast<UINT32>(fullText.size());
     size_t attrIdx = 0;
-    bool hasCachedLeading = false;
-    FLOAT cachedPx0 = 0, cachedPy0 = 0;
-    DWRITE_HIT_TEST_METRICS cachedM0{};
 
     for (UINT32 pos = 0; pos < static_cast<UINT32>(fullText.size()) && outCount < capacity; ++pos) {
         while (curLine + 1 < dwLineCount && pos >= curLineEnd) {
             ++curLine;
             curLineEnd += lines[curLine].length;
-            hasCachedLeading = false;
         }
         while (attrIdx < attrs.size() && pos >= attrs[attrIdx].start + attrs[attrIdx].length) ++attrIdx;
 
         FLOAT px0 = 0, py0 = 0, px1 = 0, py1 = 0;
         DWRITE_HIT_TEST_METRICS m0{}, m1{};
-        if (hasCachedLeading && cachedM0.textPosition == pos) {
-            px0 = cachedPx0;
-            py0 = cachedPy0;
-            m0 = cachedM0;
-        } else {
-            winrt::check_hresult(layout->HitTestTextPosition(pos, FALSE, &px0, &py0, &m0));
-        }
+        winrt::check_hresult(layout->HitTestTextPosition(pos, FALSE, &px0, &py0, &m0));
         winrt::check_hresult(layout->HitTestTextPosition(pos, TRUE, &px1, &py1, &m1));
-        if (m0.length == 1 && m0.bidiLevel == 0 && pos + 1 < curLineEnd) {
-            hasCachedLeading = true;
-            cachedPx0 = px1;
-            cachedPy0 = py1;
-            cachedM0 = m1;
-            cachedM0.textPosition = pos + 1;
-        } else {
-            hasCachedLeading = false;
-        }
 
-        double x = m0.left;
-        double w = (m0.length <= 1) ? std::abs(static_cast<double>(px1) - static_cast<double>(px0)) : m0.width;
+        double x = (m0.length <= 1)
+            ? std::min(static_cast<double>(px0), static_cast<double>(px1))
+            : static_cast<double>(m0.left);
+        double w = (m0.length <= 1)
+            ? std::abs(static_cast<double>(px1) - static_cast<double>(px0))
+            : static_cast<double>(m0.width);
         if (pos > m0.textPosition) {
-            x = m0.left + m0.width;
+            x = static_cast<double>(m0.left) + static_cast<double>(m0.width);
             w = 0.0;
         }
+        x *= singleLineScaleX;
+        w *= singleLineScaleX;
         double y = static_cast<double>(m0.top) + (curLine < lineYOffset.size() ? lineYOffset[curLine] : 0.0);
         double h = static_cast<double>(m0.height);
 
         if (attrIdx < attrs.size() && attrs[attrIdx].inlineText && pos == attrs[attrIdx].start) {
-            hasCachedLeading = false;
             auto child = attrs[attrIdx].inlineText;
             auto cw = child.Text();
             auto cx = pad.Left + x;

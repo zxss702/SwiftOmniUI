@@ -57,7 +57,29 @@ final class WinUIGridView: WinUITravellingLayout {
     }
 
     override func contentSize(width: Double?) -> LayoutSize {
-        Self.querySize { queriedSize(width: width) }
+        contentSize(proposal: ProposedViewSize(width: width))
+    }
+
+    override var contentSizeDependsOnHeight: Bool {
+        items.count == 1 && items[0].values.isFrameContent
+    }
+
+    override func firstTextBaseline(in size: LayoutSize) -> Double? {
+        let places = Self.querySize { childPlaces(in: Rect(0, 0, size.width, size.height)) }
+        for (item, place) in zip(items, places) {
+            guard let place, item.isShown, !item.departing else { continue }
+            if let explicit = item.values.verticalGuide, explicit.slot == 4 { return place.y + explicit.offset }
+            if let baseline = item.view.firstTextBaseline(in: LayoutSize(width: place.width, height: place.height)) {
+                return place.y + baseline
+            }
+        }
+        return nil
+    }
+
+    override func contentSize(proposal: ProposedViewSize) -> LayoutSize {
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        let height = proposal.height.flatMap { $0.isFinite ? $0 : nil }
+        return Self.querySize { queriedSize(width: width, height: height) }
     }
 
     override var hasNativeProposals: Bool { true }
@@ -70,13 +92,13 @@ final class WinUIGridView: WinUITravellingLayout {
         }
     }
 
-    private func queriedSize(width: Double?) -> LayoutSize {
+    private func queriedSize(width: Double?, height: Double?) -> LayoutSize {
         if sourceElement?.isGeometryReader == true { return GeometryReaderArithmetic.size(width: width) }
         let barPadding = sourceElement?.safeAreaPadding != nil && sourceElement?.safeBarSizingAxes != .neither
             ? sourceElement?.safeAreaPadding ?? EdgeInsets(0) : EdgeInsets(0)
         return GridArithmetic.size(of: items, rows: implicitRows, columns: implicitColumns,
                                    rowSpacing: rowSpacing, columnSpacing: columnSpacing,
-                                   padding: padding + barPadding, width: width, flow: flowColumns)
+                                   padding: padding + barPadding, width: width, height: height, flow: flowColumns)
     }
 
     override func arrange(in bounds: Rect) {
@@ -115,52 +137,12 @@ final class WinUIGridView: WinUITravellingLayout {
                 $0.element?.preservesSafeAreaProposal == true
             }
         }
-        // A frame's single implicit proportional cell is exactly its padded
-        // bounds. Dense lazy file rows contain several such wrappers per row;
-        // allocating track definitions, sizes and origins adds no information.
-        if !contentSizedTracks, rows.isEmpty, columns.isEmpty, flowColumns.isEmpty,
-           items.count == 1, let item = items.first, item.values.isFrameContent,
-           item.values.row == 0, item.values.column == 0,
-           item.values.rowSpan == 1, item.values.columnSpan == 1 {
-            return [item.isShown ? framePlace(item, in: bounds) : nil]
-        }
         return GridArithmetic.places(
             of: items, rows: implicitRows, columns: implicitColumns,
             rowSpacing: rowSpacing, columnSpacing: columnSpacing, padding: padding, in: bounds,
             direction: direction, flow: flowColumns)
     }
 
-    /// The one-cell case of GridArithmetic, including a fixed inner frame
-    /// overflowing its outer frame. Ordinary grids retain track arithmetic.
-    private func framePlace(_ item: WinUILayoutItem, in bounds: Rect) -> Rect {
-        let content = Rect(bounds.x + padding.left, bounds.y + padding.top,
-                           max(0, bounds.width - padding.left - padding.right),
-                           max(0, bounds.height - padding.top - padding.bottom))
-        let values = item.values
-        let margin = values.margin
-        let across = max(0, content.width - margin.left - margin.right)
-        let down = max(0, content.height - margin.top - margin.bottom)
-        let fillsAcross = values.flex != nil || values.expandingAxes == .horizontal || values.expandingAxes == .both
-        let fillsDown = values.flex != nil || values.expandingAxes == .vertical || values.expandingAxes == .both
-        // A fixed or filling axis does not consume the child's intrinsic size.
-        // Native preparation still measures the child at the final allocation;
-        // avoid an extra arithmetic descent through nested fixed-size frames.
-        let needsNaturalWidth = !fillsAcross && values.horizontal != 3 && values.width == nil
-        let needsNaturalHeight = !fillsDown && values.vertical != 3 && values.height == nil
-        let natural = needsNaturalWidth || needsNaturalHeight ? item.size(offered: across) : .zero
-        let width = Extent.of(option: fillsAcross ? 3 : values.horizontal, stated: values.width,
-                              natural: natural.width, available: across,
-                              minimum: values.minimumWidth, maximum: values.maximumWidth, allowsOverflow: true)
-        let height = Extent.of(option: fillsDown ? 3 : values.vertical, stated: values.height,
-                               natural: natural.height, available: down,
-                               minimum: values.minimumHeight, maximum: values.maximumHeight, allowsOverflow: true)
-        return direction.places(Rect(
-            x: Extent.start(option: values.horizontal, extent: width,
-                            start: content.x + margin.left, available: across, allowsOverflow: true),
-            y: Extent.start(option: values.vertical, extent: height,
-                            start: content.y + margin.top, available: down, allowsOverflow: true),
-            width: width, height: height), in: bounds)
-    }
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
         let context = layoutSafeArea(in: contextBounds)
             .padding(SafeAreaArithmetic.physicalInsets(sourceElement?.safeAreaPadding ?? EdgeInsets(0), direction: direction))

@@ -34,6 +34,17 @@
         return LayoutSize(width: size.width * height / size.height, height: height)
     }
 
+    /// An aspect-fit picture answers the offered axes in its own proportions.
+    /// An unspecified axis follows the specified one. With no offer it stays intrinsic.
+    public static func fittedSize(_ size: LayoutSize, in proposal: ProposedViewSize) -> LayoutSize {
+        guard size.width > 0, size.height > 0 else { return size }
+        let across = proposal.width.flatMap { $0.isFinite ? max(0, $0) / size.width : nil }
+        let down = proposal.height.flatMap { $0.isFinite ? max(0, $0) / size.height : nil }
+        let scale = min(across ?? .infinity, down ?? .infinity)
+        guard scale.isFinite else { return size }
+        return LayoutSize(width: size.width * scale, height: size.height * scale)
+    }
+
     /// Where a picture `size` across stands in a room at the origin, as `aspect` says: fitted in or covering it,
     /// its proportions kept, or at its own size, in its middle; stretched over the whole of it. A picture of no
     /// size stands nowhere.

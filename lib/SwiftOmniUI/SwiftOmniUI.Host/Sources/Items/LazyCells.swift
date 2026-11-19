@@ -500,17 +500,24 @@
     private func request(_ within: Range<Int>, keeping: Set<String>) {
         let identities = orderedIdentities
         guard let element, let runtime, within != built || retained != keeping else { return }
+        if !inserting.isDisjoint(with: identities[within]) { animatesChanges = true }
+        // Retain actual moving rows, not all unbuilt rows between their old
+        // and new positions. This keeps the window lazy during a large insertion.
+        let extra = keeping.compactMap { position(of: $0) }.filter { !within.contains($0) }
+        if within == built {
+            let previousExtra = retained.compactMap { position(of: $0) }.filter { !built.contains($0) }
+            if previousExtra.sorted() == extra.sorted() {
+                retained = keeping
+                return
+            }
+        }
         let addsRows = !within.isEmpty
             && (within.lowerBound < built.lowerBound || within.upperBound > built.upperBound)
-        if !inserting.isDisjoint(with: identities[within]) { animatesChanges = true }
         built = within
         retained = keeping
         requests += 1
         if addsRows { onRowsRequested?() }
         Self.realizing = true
-        // Retain actual moving rows, not all unbuilt rows between their old
-        // and new positions. This keeps the window lazy during a large insertion.
-        let extra = keeping.compactMap { position(of: $0) }.filter { !within.contains($0) }
         let requested = (Array(within) + extra).sorted().map { identities[$0] }
         let generation = nextRequestGeneration(for: element)
         element.send(.realizedChanged, [.strings(requested), .number(Double(generation))], in: runtime)

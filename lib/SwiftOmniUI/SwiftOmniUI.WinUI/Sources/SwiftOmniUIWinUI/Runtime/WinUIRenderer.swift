@@ -17,6 +17,8 @@ final class WinUIRenderer {
 
     let frameClock: WinUIFrameClock
     let frameReportCache = WinUIFrameReportCache()
+    private var committingLayout = false
+    private var consecutiveLayoutCommits = 0
 
     /// Whether the user asked for less animation: every animation arrives at once.
     private let reducesMotion: () -> Bool
@@ -147,6 +149,46 @@ final class WinUIRenderer {
         swiftomniui_winui_window_activate(controller.window.handle)
     }
 
+    /// Dispatches a built-in macOS-anchored standard shortcut (only invoked when no
+    /// view button or menu command claimed the key).
+    func handleStandardShortcut(window number: Int64, command: Int32) -> Bool {
+        guard let shortcut = StandardShortcut(rawValue: command),
+              let controller = windows.first(where: { $0.window.number == number }),
+              !controller.window.isClosed
+        else { return false }
+
+        switch shortcut {
+        case .newWindow:
+            guard let element = runtime.initialWindowForActivation(),
+                  let target = roster.controller(of: element) else { return false }
+            swiftomniui_winui_window_activate(target.window.handle)
+            return true
+        case .openSettings:
+            guard let element = runtime.openSettingsWindow(),
+                  let target = roster.controller(of: element) else { return false }
+            swiftomniui_winui_window_activate(target.window.handle)
+            return true
+        case .closeWindow:
+            controller.window.close()
+            return true
+        case .quitApp:
+            for open in windows where !open.window.isClosed {
+                open.window.close()
+            }
+            return true
+        case .minimizeWindow:
+            swiftomniui_winui_window_minimize(controller.window.handle)
+            return true
+        case .toggleSidebar:
+            guard let toggle = controller.window.titleBar.chrome.sidebarToggle else { return false }
+            toggle()
+            return true
+        case .toggleFullscreen:
+            swiftomniui_winui_window_toggle_fullscreen(controller.window.handle)
+            return true
+        }
+    }
+
     /// Renders the application whole: the scenes kept for this start come back, else one new scene.
     /// Design: docs/design/host/runtime.md#kept-scenes
     func show() {
@@ -190,10 +232,30 @@ final class WinUIRenderer {
     func safeArea(of element: MountedElement) -> Rect {
         (controller(of: element) ?? windows.first)?.safeArea ?? Rect(x: 0, y: 0, width: 0, height: 0)
     }
+
+    /// Commits settled native allocations after XAML's layout pass, while another
+    /// layout pass can still precede paint (matching GTK's frame-clock layout hook).
+    func commitSettledLayout() {
+        guard !committingLayout, WinUIView.arranging == 0, WinUIView.measuring == 0 else { return }
+        guard runtime.frames.hasPendingReports else {
+            consecutiveLayoutCommits = 0
+            return
+        }
+        guard consecutiveLayoutCommits < 8 else { return }
+        consecutiveLayoutCommits += 1
+        committingLayout = true
+        let baseline = runtime.intake.baseline
+        defer { committingLayout = false }
+        runtime.frames.commitLayout()
+        if runtime.intake.baseline == baseline {
+            consecutiveLayoutCommits = 0
+        }
+    }
 }
 
 extension WinUIRenderer: TurnPresenter {
     func presentRendered() {
+        if !committingLayout { consecutiveLayoutCommits = 0 }
         // Commit the logical open-window roster before closing native windows
         // or scheduling shutdown after the last one.
         if let text = scenes.changed(root: runtime.tree.root) { WinUIPersistence.writeScenes(text) }
@@ -215,6 +277,7 @@ extension WinUIRenderer: FramePresenter {
     }
 
     func commitUserReports(now: Double) {
+        consecutiveLayoutCommits = 0
         runtime.frames.commit(now: now)
         // The frame's viewport requests must land before this frame is presented.
         WinUIDoorbell.commitPending()
@@ -230,7 +293,7 @@ extension WinUIRenderer: FramePresenter {
         // Material and redirected controls commit the same sampled frame,
         // including the structural sample after a removal completes.
         if WinUIView.arranging == 0, WinUIView.measuring == 0 {
-            swiftomniui_winui_material_present()
+            swiftomniui_winui_material_present_if_needed()
         }
     }
 

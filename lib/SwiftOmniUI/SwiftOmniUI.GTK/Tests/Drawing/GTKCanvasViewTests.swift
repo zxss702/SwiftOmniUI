@@ -10,6 +10,45 @@ final class GTKCanvasViewTests: XCTestCase {
     private static let red: UInt32 = 0xFFFF_0000
     private static let blue: UInt32 = 0xFF00_00FF
 
+    func testCanvasMultiplyUsesTheUnderlyingPixelsAndTracksDrawingChanges() throws {
+        try onUIThread {
+            let blend = State(wrappedValue: BlendMode.multiply)
+            let draws = State(wrappedValue: true)
+            let host = GTKRenderer.running {
+                ZStack {
+                    Color("#FF0000")
+                    Canvas { context, _ in
+                        if draws.wrappedValue {
+                            context.fill(Path(Rect(0, 0, 50, 40)), with: .color(Color("#0000FF").opacity(0.5)))
+                        }
+                    }
+                    .blendMode(blend.wrappedValue)
+                    .allowsHitTesting(false)
+                }.frame(width: 100, height: 40)
+            }
+            let root = try XCTUnwrap(host.views(GTKZStackView.self).first)
+            let canvas = try XCTUnwrap(host.views(GTKCanvasView.self).first)
+            let points: [(Double, Double)] = [(25, 20), (75, 20)]
+
+            for (mode, drawsHighlight) in [(BlendMode.multiply, true), (.normal, true), (.multiply, false), (.multiply, true)] {
+                blend.wrappedValue = mode
+                draws.wrappedValue = drawsHighlight
+                host.step()
+                func matches(_ pixels: [UInt32]) -> Bool {
+                    guard pixels.count == 2, pixels[1] == Self.red else { return false }
+                    if !drawsHighlight { return pixels[0] == Self.red }
+                    let red = (pixels[0] >> 16) & 0xff
+                    let blue = pixels[0] & 0xff
+                    return (1..<255).contains(red) && (mode == .multiply ? blue == 0 : blue > 0)
+                }
+                host.settle { matches(root.pixels(at: points)) }
+                let pixels = root.pixels(at: points)
+                XCTAssertTrue(matches(pixels), "\(mode), draws \(drawsHighlight): \(pixels)")
+                XCTAssertTrue(host.views(GTKCanvasView.self).first === canvas)
+            }
+        }
+    }
+
     /// A width-only scroll proposal still allocates the Canvas's derived
     /// height through the native custom-layout placement boundary.
     func testAspectRatioAllocatesTheCanvasHeight() throws {

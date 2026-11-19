@@ -527,6 +527,11 @@ namespace {
 
         Size ArrangeOverride(Size final) {
             if (callbacks.arrange) callbacks.arrange(view, final.Width, final.Height);
+            if (tileBorder && tileVisible) {
+                tileBorder.Arrange(winrt::Windows::Foundation::Rect(
+                    static_cast<float>(drawnSliceX), static_cast<float>(drawnSliceY),
+                    static_cast<float>(drawnSliceW), static_cast<float>(drawnSliceH)));
+            }
             if (final != size) {
                 size = final;
                 // Swift supplies the renderer's commands before Arrange. A new
@@ -554,6 +559,8 @@ namespace {
         }
 
     private:
+        static constexpr int32_t maxDirectPixels = 8192;
+
         /// Draws on the next frame, however often it is asked before then.
         void invalidate() {
             if (!rendering) rendering = media::CompositionTarget::Rendering(winrt::auto_revoke, {get_weak(), &SwiftOmniUICanvas::render});
@@ -564,6 +571,51 @@ namespace {
             paint();
         }
 
+        void clearTile() {
+            scrollChanged.revoke();
+            viewerChanged.revoke();
+            watchedScroller = {};
+            if (tileBorder) {
+                uint32_t idx = 0;
+                if (Children().IndexOf(tileBorder, idx)) Children().RemoveAt(idx);
+                tileBorder = nullptr;
+            }
+            tileVisible = false;
+            drawnSliceX = drawnSliceY = drawnSliceW = drawnSliceH = 0;
+        }
+
+        void watchScroller() {
+            xaml::DependencyObject ancestor = xaml::Media::VisualTreeHelper::GetParent(*this);
+            while (ancestor) {
+                if (auto sv = ancestor.try_as<controls::ScrollView>()) {
+                    if (watchedScroller.get() != ancestor) {
+                        scrollChanged.revoke();
+                        viewerChanged.revoke();
+                        watchedScroller = winrt::make_weak(ancestor);
+                        scrollChanged = sv.ViewChanged(winrt::auto_revoke, [weak = get_weak()](auto const &, auto const &) {
+                            if (auto self = weak.get()) self->invalidate();
+                        });
+                    }
+                    return;
+                }
+                if (auto sv = ancestor.try_as<controls::ScrollViewer>()) {
+                    if (watchedScroller.get() != ancestor) {
+                        scrollChanged.revoke();
+                        viewerChanged.revoke();
+                        watchedScroller = winrt::make_weak(ancestor);
+                        viewerChanged = sv.ViewChanged(winrt::auto_revoke, [weak = get_weak()](auto const &, auto const &) {
+                            if (auto self = weak.get()) self->invalidate();
+                        });
+                    }
+                    return;
+                }
+                ancestor = xaml::Media::VisualTreeHelper::GetParent(ancestor);
+            }
+            scrollChanged.revoke();
+            viewerChanged.revoke();
+            watchedScroller = {};
+        }
+
         /// Draws what stands, now: the drawing again where it, the room, the scale or the device moved. False
         /// where there is no root to draw in - nothing is asked for, and the drawing waits for the next notice.
         bool paint() {
@@ -571,23 +623,141 @@ namespace {
             if (!root) return false;
             watch(root);
             auto scale = static_cast<float>(root.RasterizationScale());
-            auto across = static_cast<int32_t>(std::ceil(size.Width * scale));
-            auto down = static_cast<int32_t>(std::ceil(size.Height * scale));
-            if (!stale && across == drawnAcross && down == drawnDown && scale == drawnScale
-                && made == devices.made) return true;
+            auto fullAcross = static_cast<int64_t>(std::ceil(static_cast<double>(size.Width) * scale));
+            auto fullDown = static_cast<int64_t>(std::ceil(static_cast<double>(size.Height) * scale));
+            bool oversized = fullAcross > maxDirectPixels || fullDown > maxDirectPixels;
 
-            try {
-                // Clear even when the new room is empty: a later nonempty
-                // surface at this scale must not reuse the old scale's data.
-                if (scale != drawnScale || made != devices.made) resources.clear();
-                if (across <= 0 || down <= 0) {
+            if (!oversized) {
+                if (usingTile) {
+                    clearTile();
                     surface = nullptr;
                     drawnAcross = drawnDown = 0;
-                    drawnScale = scale;
-                    stale = false;
-                    Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
-                    return true;
+                    usingTile = false;
+                    stale = true;
                 }
+                auto across = static_cast<int32_t>(fullAcross);
+                auto down = static_cast<int32_t>(fullDown);
+                if (!stale && across == drawnAcross && down == drawnDown && scale == drawnScale
+                    && made == devices.made) return true;
+
+                try {
+                    // Clear even when the new room is empty: a later nonempty
+                    // surface at this scale must not reuse the old scale's data.
+                    if (scale != drawnScale || made != devices.made) resources.clear();
+                    if (across <= 0 || down <= 0) {
+                        surface = nullptr;
+                        drawnAcross = drawnDown = 0;
+                        drawnScale = scale;
+                        stale = false;
+                        Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+                        return true;
+                    }
+                    for (int attempt = 0; attempt < 2; ++attempt) {
+                        prepare();
+                        if (made != devices.made) resources.clear();
+                        auto target = surface;
+                        bool replacement = false;
+                        if (!surface || across != drawnAcross || down != drawnDown || made != devices.made) {
+                            target = media::Imaging::SurfaceImageSource(across, down, false);
+                            winrt::check_hresult(target.as<ISurfaceImageSourceNativeWithD2D>()->SetDevice(devices.device.get()));
+                            replacement = true;
+                        }
+                        auto result = draw(target, across, down, scale, 0.0, 0.0);
+                        if (!lost(result)) {
+                            winrt::check_hresult(result);
+                            // Publish a completed surface. A resized or newly realized
+                            // row must never expose a new transparent backing while
+                            // its drawing is still being replayed.
+                            if (replacement) {
+                                media::ImageBrush painted;
+                                painted.ImageSource(target);
+                                painted.Stretch(media::Stretch::Fill);
+                                Background(painted);
+                                surface = target;
+                            }
+                            drawnAcross = across;
+                            drawnDown = down;
+                            drawnScale = scale;
+                            made = devices.made;
+                            stale = false;
+                            ++paints;
+                            return true;
+                        }
+                        // Windows took the device away: a new one, a new surface, and the drawing again.
+                        resources.clear();
+                        devices.device = nullptr;
+                    }
+                } catch (...) {
+                    report("drawing a canvas");
+                }
+                return false;
+            }
+
+            // Oversized canvas (> 8192 physical pixels, such as a selection overlay spanning a tall lazy ScrollView):
+            // D3D11 SurfaceImageSource rejects textures > 16384 px. Render only the visible window region (+ overscan)
+            // into a positioned child Border so selection highlights and tall overlays paint reliably at any height.
+            if (!usingTile) {
+                surface = nullptr;
+                drawnAcross = drawnDown = 0;
+                Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+                usingTile = true;
+                stale = true;
+            }
+            watchScroller();
+            if (scale != drawnScale || made != devices.made) resources.clear();
+            if (drawing.ints.empty() || size.Width <= 0 || size.Height <= 0) {
+                if (tileBorder) tileBorder.Visibility(xaml::Visibility::Collapsed);
+                tileVisible = false;
+                surface = nullptr;
+                drawnAcross = drawnDown = 0;
+                drawnScale = scale;
+                made = devices.made;
+                stale = false;
+                ++paints;
+                return true;
+            }
+
+            constexpr double overscan = 512.0;
+            constexpr double quantum = 256.0;
+            double maxTileDips = std::max(quantum, std::floor(static_cast<double>(maxDirectPixels) / std::max(scale, 0.01f)));
+            auto rootSize = root.Size();
+            double rootW = rootSize.Width > 0 ? rootSize.Width : 1920.0;
+            double rootH = rootSize.Height > 0 ? rootSize.Height : 1080.0;
+            double visLeft = 0.0, visTop = 0.0, visRight = std::min<double>(size.Width, maxTileDips),
+                   visBottom = std::min<double>(size.Height, maxTileDips);
+            try {
+                if (auto inv = TransformToVisual(nullptr).Inverse()) {
+                    auto local = inv.TransformBounds(winrt::Windows::Foundation::Rect(
+                        static_cast<float>(-overscan), static_cast<float>(-overscan),
+                        static_cast<float>(rootW + overscan * 2.0), static_cast<float>(rootH + overscan * 2.0)));
+                    visLeft = std::clamp<double>(local.X, 0.0, size.Width);
+                    visTop = std::clamp<double>(local.Y, 0.0, size.Height);
+                    visRight = std::clamp<double>(static_cast<double>(local.X) + local.Width, visLeft, size.Width);
+                    visBottom = std::clamp<double>(static_cast<double>(local.Y) + local.Height, visTop, size.Height);
+                }
+            } catch (...) {}
+
+            double sliceX = std::floor(visLeft / quantum) * quantum;
+            double sliceY = std::floor(visTop / quantum) * quantum;
+            double sliceRight = std::min<double>(size.Width, std::ceil(visRight / quantum) * quantum);
+            double sliceBottom = std::min<double>(size.Height, std::ceil(visBottom / quantum) * quantum);
+            double sliceW = std::min(sliceRight - sliceX, maxTileDips);
+            double sliceH = std::min(sliceBottom - sliceY, maxTileDips);
+            auto across = static_cast<int32_t>(std::min<int64_t>(maxDirectPixels, static_cast<int64_t>(std::ceil(sliceW * scale))));
+            auto down = static_cast<int32_t>(std::min<int64_t>(maxDirectPixels, static_cast<int64_t>(std::ceil(sliceH * scale))));
+            if (across <= 0 || down <= 0) {
+                if (tileBorder) tileBorder.Visibility(xaml::Visibility::Collapsed);
+                tileVisible = false;
+                stale = false;
+                ++paints;
+                return true;
+            }
+            if (!stale && tileVisible && sliceX == drawnSliceX && sliceY == drawnSliceY
+                && across == drawnAcross && down == drawnDown && scale == drawnScale && made == devices.made) {
+                return true;
+            }
+
+            try {
                 for (int attempt = 0; attempt < 2; ++attempt) {
                     prepare();
                     if (made != devices.made) resources.clear();
@@ -598,19 +768,32 @@ namespace {
                         winrt::check_hresult(target.as<ISurfaceImageSourceNativeWithD2D>()->SetDevice(devices.device.get()));
                         replacement = true;
                     }
-                    auto result = draw(target, across, down, scale);
+                    auto result = draw(target, across, down, scale, sliceX, sliceY);
                     if (!lost(result)) {
                         winrt::check_hresult(result);
-                        // Publish a completed surface. A resized or newly realized
-                        // row must never expose a new transparent backing while
-                        // its drawing is still being replayed.
-                        if (replacement) {
+                        if (!tileBorder) {
+                            tileBorder = controls::Border();
+                            tileBorder.IsHitTestVisible(false);
+                            Children().Append(tileBorder);
+                        }
+                        if (replacement || !tileBorder.Background()) {
                             media::ImageBrush painted;
                             painted.ImageSource(target);
                             painted.Stretch(media::Stretch::Fill);
-                            Background(painted);
+                            tileBorder.Background(painted);
                             surface = target;
                         }
+                        tileBorder.Visibility(xaml::Visibility::Visible);
+                        tileBorder.Width(sliceW);
+                        tileBorder.Height(sliceH);
+                        tileBorder.Arrange(winrt::Windows::Foundation::Rect(
+                            static_cast<float>(sliceX), static_cast<float>(sliceY),
+                            static_cast<float>(sliceW), static_cast<float>(sliceH)));
+                        tileVisible = true;
+                        drawnSliceX = sliceX;
+                        drawnSliceY = sliceY;
+                        drawnSliceW = sliceW;
+                        drawnSliceH = sliceH;
                         drawnAcross = across;
                         drawnDown = down;
                         drawnScale = scale;
@@ -619,18 +802,18 @@ namespace {
                         ++paints;
                         return true;
                     }
-                    // Windows took the device away: a new one, a new surface, and the drawing again.
                     resources.clear();
                     devices.device = nullptr;
                 }
             } catch (...) {
-                report("drawing a canvas");
+                report("drawing an oversized canvas tile");
             }
             return false;
         }
 
         /// Replays the drawing on the whole surface, cleared first: the canvas's DIPs at `scale` pixels each.
-        HRESULT draw(media::Imaging::SurfaceImageSource const &target, int32_t across, int32_t down, float scale) {
+        HRESULT draw(media::Imaging::SurfaceImageSource const &target, int32_t across, int32_t down, float scale,
+                     double originX, double originY) {
             auto native = target.as<ISurfaceImageSourceNativeWithD2D>();
             winrt::com_ptr<ID2D1DeviceContext> context;
             POINT offset{};
@@ -641,9 +824,13 @@ namespace {
             // The surface may be part of a larger one: the drawing starts where it does.
             context->SetDpi(96 * scale, 96 * scale);
             context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
-            auto base = D2D1::Matrix3x2F::Translation(offset.x / scale, offset.y / scale);
+            auto base = D2D1::Matrix3x2F::Translation(offset.x / scale - static_cast<float>(originX),
+                                                      offset.y / scale - static_cast<float>(originY));
             context->SetTransform(base);
-            context->PushAxisAlignedClip(D2D1::RectF(0, 0, across / scale, down / scale), D2D1_ANTIALIAS_MODE_ALIASED);
+            context->PushAxisAlignedClip(
+                D2D1::RectF(static_cast<float>(originX), static_cast<float>(originY),
+                            static_cast<float>(originX) + across / scale, static_cast<float>(originY) + down / scale),
+                D2D1_ANTIALIAS_MODE_ALIASED);
             context->Clear(D2D1::ColorF(0, 0, 0, 0));
             HRESULT replayed = S_OK;
             try {
@@ -722,6 +909,10 @@ namespace {
         bool stale = false;
 
         media::Imaging::SurfaceImageSource surface{nullptr};
+        controls::Border tileBorder{nullptr};
+        bool usingTile = false;
+        bool tileVisible = false;
+        double drawnSliceX = 0, drawnSliceY = 0, drawnSliceW = 0, drawnSliceH = 0;
         int32_t drawnAcross = 0, drawnDown = 0;
         float drawnScale = 0;
         uint32_t made = 0;
@@ -732,6 +923,9 @@ namespace {
 
         media::CompositionTarget::Rendering_revoker rendering;
         media::CompositionTarget::SurfaceContentsLost_revoker contentsLost;
+        controls::ScrollView::ViewChanged_revoker scrollChanged;
+        controls::ScrollViewer::ViewChanged_revoker viewerChanged;
+        winrt::weak_ref<xaml::DependencyObject> watchedScroller;
         winrt::weak_ref<xaml::XamlRoot> watched;
         xaml::XamlRoot::Changed_revoker rootChanged;
     };

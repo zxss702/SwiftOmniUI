@@ -96,11 +96,7 @@ extension FocusedValue: EnvironmentSlot {
             return open(equatable)
         }
 
-        if let a = a as? AnyObject, let b = b as? AnyObject {
-            return a === b
-        }
-
-        return false
+        return sameReference(a, b) ?? false
     }
 
     /// Whether the value is an empty optional - the answer most reads carry.

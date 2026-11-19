@@ -48,12 +48,11 @@
     /// A callback can hide a view whose authored value differs from its final
     /// animation value. Keep that final value through this frame's presentation.
     private var landingValues: [DescribedKey: HostValue] = [:]
-    private var outputs: [DescribedOutput?] = []
-    private var outputSlots: [UInt64: [Int]] = [:]
+    private var outputs: [DescribedOutput] = []
     /// Runtime frames present the final values before a landing removes a
     /// view. Standalone advances can still complete their callbacks inline.
-    private var landings: [(key: DescribedKey, complete: () -> Void)?] = []
-    private var landingSlots: [UInt64: [Int]] = [:]
+    private var landings: [(key: DescribedKey, complete: () -> Void)] = []
+    private var removedMounts: Set<UInt64> = []
 
     /// Described animation whose animations `animator` advances.
     public init(animator: Animator) {
@@ -63,9 +62,9 @@
     /// Whether any transition is under way.
     public var isActive: Bool { !transitions.isEmpty }
 
-    /// Includes completed values retained until a mount leaves. Static new
-    /// mounts have no motion state to retarget or cancel.
-    func hasProperties(on mount: UInt64) -> Bool { keysByMount[mount] != nil }
+    /// Includes completed values retained until a mount leaves. Static and
+    /// settled mounts have no motion state to retarget, cancel, or query.
+    public func hasProperties(on mount: UInt64) -> Bool { keysByMount[mount] != nil }
 
     /// The value a transition draws, including a finished removal component
     /// held while the rest of that element's transition still runs.
@@ -74,6 +73,32 @@
         // mount. Its integer index rules out all three property-key lookups.
         guard keysByMount[key.mount] != nil else { return nil }
         return transitions[key]?.presented ?? retainedTargets[key] ?? landingValues[key]
+    }
+
+    /// Fast scalar read avoiding `HostValue` reconstruction on every frame.
+    @inline(__always)
+    public func presentedNumber(for key: DescribedKey) -> Double? {
+        guard keysByMount[key.mount] != nil else { return nil }
+        return presentedNumberUnchecked(for: key)
+    }
+
+    /// Fast scalar read when the caller already verified `hasProperties(on: key.mount)`.
+    @inline(__always)
+    public func presentedNumberUnchecked(for key: DescribedKey) -> Double? {
+        if let transition = transitions[key] {
+            return transition.presentedNumber
+        }
+        return (retainedTargets[key] ?? landingValues[key])?.number
+    }
+
+    private func pruneKeyIfIdle(_ key: DescribedKey) {
+        guard transitions[key] == nil,
+              retainedTargets[key] == nil,
+              landingValues[key] == nil,
+              var set = keysByMount[key.mount]
+        else { return }
+        set.remove(key)
+        keysByMount[key.mount] = set.isEmpty ? nil : set
     }
 
     /// Starts, retargets or cuts short a property's animation; a nil `animation` snaps.
@@ -91,8 +116,9 @@
         now: Double,
         reducesMotion: Bool
     ) -> Bool {
-        let retained = retainedTargets.removeValue(forKey: key)
-        let landing = landingValues.removeValue(forKey: key)
+        let hadMountKeys = keysByMount[key.mount] != nil
+        let retained = hadMountKeys ? retainedTargets.removeValue(forKey: key) : nil
+        let landing = hadMountKeys ? landingValues.removeValue(forKey: key) : nil
         var source = standing ?? retained ?? landing
         var carriedLanes: [Double] = []
         var carriedVelocity: [Double] = []
@@ -102,11 +128,13 @@
             if retainingTarget, let target {
                 keysByMount[key.mount, default: []].insert(key)
                 retainedTargets[key] = target
+            } else if hadMountKeys {
+                pruneKeyIfIdle(key)
             }
             return false
         }
 
-        if let running = transitions.removeValue(forKey: key) {
+        if hadMountKeys, let running = transitions.removeValue(forKey: key) {
             if let animation = animator.animation(for: .described(key)) {
                 _ = running.follow(animation.position(at: now))
             }
@@ -125,6 +153,7 @@
               animation.factor.isFinite,
               !reducesMotion,
               !(animation.law == .eased && animation.millis == 0),
+              carriedVelocity.contains(where: { abs($0) >= HostMotionLaw.still }) || source != target,
               let plan = MotionValuePlan(
                 from: source,
                 destination: target,
@@ -158,21 +187,22 @@
             else { continue }
 
             let presented = transition.follow((step.value, step.velocity, step.rested))
-            outputSlots[key.mount, default: []].append(outputs.count)
             outputs.append(DescribedOutput(key: key, value: presented.value))
 
             if presented.rested {
                 if transition.retainingTarget { retainedTargets[key] = presented.value }
-                transitions[key] = nil
+                transitions.removeValue(forKey: key)
                 animator.halt(.described(key))
                 if let landed = transition.landed {
                     if deferringLandings {
                         if !transition.retainingTarget { landingValues[key] = presented.value }
-                        landingSlots[key.mount, default: []].append(landings.count)
                         landings.append((key, landed))
                     } else {
+                        pruneKeyIfIdle(key)
                         landed()
                     }
+                } else {
+                    pruneKeyIfIdle(key)
                 }
             }
         }
@@ -188,31 +218,49 @@
                 animator.halt(.described(key))
             }
         }
-        if let slots = outputSlots.removeValue(forKey: mount) {
-            for slot in slots { outputs[slot] = nil }
-        }
-        if let slots = landingSlots.removeValue(forKey: mount) {
-            for slot in slots { landings[slot] = nil }
+        if !outputs.isEmpty || !landings.isEmpty {
+            removedMounts.insert(mount)
         }
     }
 
     /// Takes the values drawn since the previous take.
     public func takeOutputs() -> [DescribedOutput] {
+        guard !outputs.isEmpty else {
+            if landings.isEmpty { removedMounts.removeAll(keepingCapacity: true) }
+            return []
+        }
         defer {
             outputs.removeAll(keepingCapacity: true)
-            outputSlots.removeAll(keepingCapacity: true)
+            if landings.isEmpty { removedMounts.removeAll(keepingCapacity: true) }
         }
-        return outputs.compactMap { $0 }
+        if removedMounts.isEmpty {
+            return outputs
+        }
+        return outputs.filter { !removedMounts.contains($0.key.mount) }
     }
 
     /// Takes the callbacks whose final values the display cycle just presented.
     public func takeLandings() -> [() -> Void] {
+        guard !landings.isEmpty else {
+            if !landingValues.isEmpty {
+                let staleKeys = Array(landingValues.keys)
+                landingValues.removeAll(keepingCapacity: true)
+                for key in staleKeys { pruneKeyIfIdle(key) }
+            }
+            removedMounts.removeAll(keepingCapacity: true)
+            return []
+        }
+        let finishedKeys = Array(landingValues.keys)
+        landingValues.removeAll(keepingCapacity: true)
+        for key in finishedKeys { pruneKeyIfIdle(key) }
         defer {
             landings.removeAll(keepingCapacity: true)
-            landingSlots.removeAll(keepingCapacity: true)
-            landingValues.removeAll(keepingCapacity: true)
+            removedMounts.removeAll(keepingCapacity: true)
         }
-        return landings.compactMap { $0?.complete }
+        if removedMounts.isEmpty {
+            return landings.map(\.complete)
+        }
+        return landings.compactMap { removedMounts.contains($0.key.mount) ? nil : $0.complete }
     }
 }
 
@@ -236,6 +284,13 @@ private final class DescribedTransition {
     }
 
     var presented: HostValue { plan.value(at: lanes) }
+
+    var presentedNumber: Double? {
+        guard plan.isScalarNumber, let first = lanes.first, first.isFinite else {
+            return plan.value(at: lanes).number
+        }
+        return first
+    }
 
     /// The value to draw at `position`, and whether it is over; a non-number lands.
     func follow(
@@ -262,6 +317,7 @@ private struct MotionValuePlan {
     let from: [Double]
     let destination: [Double]
     let target: HostValue
+    let isScalarNumber: Bool
 
     init?(
         from source: HostValue,
@@ -269,6 +325,16 @@ private struct MotionValuePlan {
         exactSource: [Double] = [],
         property: Prop? = nil
     ) {
+        if case .number(let s) = source, case .number(let t) = target {
+            guard s.isFinite, t.isFinite else { return nil }
+            let start = exactSource.count == 1 && exactSource[0].isFinite ? exactSource[0] : s
+            self.from = [start]
+            self.destination = [t]
+            self.target = target
+            self.isScalarNumber = true
+            return
+        }
+
         var from: [Double] = []
         var destination: [Double] = []
 
@@ -292,9 +358,14 @@ private struct MotionValuePlan {
             : from
         self.destination = destination
         self.target = target
+        self.isScalarNumber = false
     }
 
     func value(at lanes: [Double]) -> HostValue {
+        if isScalarNumber {
+            guard lanes.count == 1, lanes[0].isFinite else { return target }
+            return .number(lanes[0])
+        }
         guard lanes.count == destination.count, lanes.allSatisfy(\.isFinite) else {
             return target
         }

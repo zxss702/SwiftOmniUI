@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "Relay.h"
+#include "AcrylicScene.h"
 #include "AcrylicSurface.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cwchar>
+#include <utility>
+#include <vector>
 #include <initguid.h>
 #include <d2d1effects.h>
 #include <windows.graphics.effects.interop.h>
@@ -59,7 +63,7 @@ namespace {
                 switch (index) {
                 case D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION: property = PropertyValue::CreateSingle(0); break;
                 case D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION:
-                    property = PropertyValue::CreateUInt32(D2D1_GAUSSIANBLUR_OPTIMIZATION_BALANCED); break;
+                    property = PropertyValue::CreateUInt32(D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED); break;
                 case D2D1_GAUSSIANBLUR_PROP_BORDER_MODE:
                     property = PropertyValue::CreateUInt32(D2D1_BORDER_MODE_SOFT); break;
                 default: return E_INVALIDARG;
@@ -94,21 +98,104 @@ namespace {
         return held;
     }
 
+    struct FixedEffect : winrt::implements<FixedEffect, effects::IGraphicsEffect,
+        effects::IGraphicsEffectSource, effectABI::IGraphicsEffectD2D1Interop> {
+        GUID id;
+        winrt::hstring name;
+        std::vector<winrt::Windows::Foundation::IPropertyValue> properties;
+        std::vector<effects::IGraphicsEffectSource> sources;
+
+        FixedEffect(GUID id, std::vector<winrt::Windows::Foundation::IPropertyValue> properties,
+            std::vector<effects::IGraphicsEffectSource> sources)
+            : id(id), properties(std::move(properties)), sources(std::move(sources)) {}
+
+        winrt::hstring Name() { return name; }
+        void Name(winrt::hstring const &value) { name = value; }
+
+        HRESULT __stdcall GetEffectId(GUID *value) noexcept override {
+            if (!value) return E_POINTER;
+            *value = id;
+            return S_OK;
+        }
+        HRESULT __stdcall GetNamedPropertyMapping(LPCWSTR, UINT *,
+            effectABI::GRAPHICS_EFFECT_PROPERTY_MAPPING *) noexcept override { return E_INVALIDARG; }
+        HRESULT __stdcall GetPropertyCount(UINT *count) noexcept override {
+            if (!count) return E_POINTER;
+            *count = static_cast<UINT>(properties.size());
+            return S_OK;
+        }
+        HRESULT __stdcall GetProperty(UINT index, ABI::Windows::Foundation::IPropertyValue **value) noexcept override {
+            if (!value) return E_POINTER;
+            *value = nullptr;
+            if (index >= properties.size()) return E_INVALIDARG;
+            winrt::copy_to_abi(properties[index], *reinterpret_cast<void **>(value));
+            return S_OK;
+        }
+        HRESULT __stdcall GetSourceCount(UINT *count) noexcept override {
+            if (!count) return E_POINTER;
+            *count = static_cast<UINT>(sources.size());
+            return S_OK;
+        }
+        HRESULT __stdcall GetSource(UINT index, effectABI::IGraphicsEffectSource **value) noexcept override {
+            if (!value) return E_POINTER;
+            *value = nullptr;
+            if (index >= sources.size()) return E_INVALIDARG;
+            winrt::copy_to_abi(sources[index], *reinterpret_cast<void **>(value));
+            return S_OK;
+        }
+    };
+
+    composition::CompositionEffectFactory multiplyFactory(composition::Compositor const &compositor) {
+        static composition::CompositionEffectFactory held{nullptr};
+        if (held && held.Compositor() == compositor) return held;
+        using winrt::Windows::Foundation::IPropertyValue;
+        using winrt::Windows::Foundation::PropertyValue;
+
+        // Multiply the premultiplied foreground by (background.rgb + 1 - background.a).
+        // Keep foreground alpha so normal source-over accounts for the remaining backdrop once.
+        const std::array<float, 20> matrix{
+             1,  0,  0, 0,
+             0,  1,  0, 0,
+             0,  0,  1, 0,
+            -1, -1, -1, 0,
+             1,  1,  1, 1,
+        };
+        auto backdrop = winrt::make<FixedEffect>(CLSID_D2D1ColorMatrix,
+            std::vector<IPropertyValue>{
+                PropertyValue::CreateSingleArray(matrix).as<IPropertyValue>(),
+                PropertyValue::CreateUInt32(D2D1_COLORMATRIX_ALPHA_MODE_STRAIGHT).as<IPropertyValue>(),
+                PropertyValue::CreateBoolean(true).as<IPropertyValue>(),
+            }, std::vector<effects::IGraphicsEffectSource>{composition::CompositionEffectSourceParameter(L"Backdrop")});
+        const std::array<float, 4> coefficients{1, 0, 0, 0};
+        auto multiply = winrt::make<FixedEffect>(CLSID_D2D1ArithmeticComposite,
+            std::vector<IPropertyValue>{
+                PropertyValue::CreateSingleArray(coefficients).as<IPropertyValue>(),
+                PropertyValue::CreateBoolean(true).as<IPropertyValue>(),
+            }, std::vector<effects::IGraphicsEffectSource>{
+                winrt::make<GaussianBlur>().as<effects::IGraphicsEffectSource>(),
+                backdrop.as<effects::IGraphicsEffectSource>(),
+            });
+        held = compositor.CreateEffectFactory(multiply, {L"Blur.StandardDeviation"});
+        return held;
+    }
+
     /// The control keeps its own handle, events and native identity. Only a
-    /// view asking for blur acquires this presentation boundary, retained at
-    /// radius zero so animation never reparents controls frame by frame.
+    /// view asking for blur or multiply acquires this presentation boundary.
+    /// Retain the boundary so changing effects does not reparent controls.
     struct BlurPresenter : controls::PanelT<BlurPresenter> {
         controls::Grid source;
         composition::Visual sourceVisual{nullptr};
         composition::CompositionVisualSurface surface{nullptr};
         composition::CompositionSurfaceBrush sourceBrush{nullptr};
-        composition::CompositionEffectBrush brush{nullptr};
+        composition::CompositionEffectBrush brush{nullptr}, blurBrush{nullptr}, multiplyBrush{nullptr};
         composition::SpriteVisual output{nullptr};
-        float radius = 0;
+        float writtenRadius = -1;
         float extent = 0;
-        float writtenExtent = -1;
         Size size{0, 0};
-        Size writtenSize{-1, -1};
+        Rect writtenBounds{0, 0, -1, -1};
+        xaml::FrameworkElement::EffectiveViewportChanged_revoker viewportChanged;
+        Rect viewport{0, 0, -1, -1};
+        bool active = false;
 
         BlurPresenter() {
             UseLayoutRounding(false);
@@ -116,6 +203,10 @@ namespace {
             VerticalAlignment(xaml::VerticalAlignment::Stretch);
             source.UseLayoutRounding(false);
             Children().Append(source);
+        }
+
+        ~BlurPresenter() {
+            if (active && source) setAcrylicLocalPresentation(source, false);
         }
 
         Size MeasureOverride(Size available) {
@@ -130,8 +221,8 @@ namespace {
             return final;
         }
 
-        void ensureEffect() {
-            if (brush) return;
+        void ensureSurface() {
+            if (output) return;
             sourceVisual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(source);
             auto compositor = sourceVisual.Compositor();
             surface = compositor.CreateVisualSurface();
@@ -140,49 +231,128 @@ namespace {
             sourceBrush.Stretch(composition::CompositionStretch::None);
             sourceBrush.HorizontalAlignmentRatio(0);
             sourceBrush.VerticalAlignmentRatio(0);
-            brush = blurFactory(compositor).CreateBrush();
-            brush.SetSourceParameter(L"Source", sourceBrush);
             output = compositor.CreateSpriteVisual();
-            output.Brush(brush);
+            output.IsVisible(false);
             output.IsHitTestVisible(false);
             IInspectable self = *this;
             xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(self.as<xaml::UIElement>(), output);
         }
 
-        void resizeSurface() {
-            if (!surface || radius == 0) return;
-            if (extent == writtenExtent && size.Width == writtenSize.Width && size.Height == writtenSize.Height) return;
-            // Soft borders spread alpha beyond the layout frame. Reserve the
-            // Gaussian's native three-sigma extent without changing that frame.
-            surface.SourceOffset({-extent, -extent});
-            surface.SourceSize({size.Width + 2 * extent, size.Height + 2 * extent});
-            output.Offset({-extent, -extent, 0});
-            output.Size({size.Width + 2 * extent, size.Height + 2 * extent});
-            writtenExtent = extent;
-            writtenSize = size;
+        Rect captureRoom() {
+            auto root = XamlRoot();
+            if (brush != multiplyBrush || !root) return Rect(0, 0, size.Width, size.Height);
+            // Markdown selection can span a whole scroll document. Like the
+            // native Canvas tiles, capture only the visible region of a large view.
+            auto limit = static_cast<float>(8192 / std::max(root.RasterizationScale(), 1.0));
+            if (size.Width <= limit && size.Height <= limit) return Rect(0, 0, size.Width, size.Height);
+            if (!viewportChanged) {
+                viewportChanged = EffectiveViewportChanged(winrt::auto_revoke,
+                    guarded("updating the blend viewport", [weak = get_weak()](
+                        xaml::FrameworkElement const &, xaml::EffectiveViewportChangedEventArgs const &args) {
+                        if (auto self = weak.get()) {
+                            self->viewport = args.EffectiveViewport();
+                            self->resizeSurface();
+                        }
+                    }));
+            }
+            auto visible = viewport;
+            if (!std::isfinite(visible.X) || !std::isfinite(visible.Y)
+                || !std::isfinite(visible.Width) || !std::isfinite(visible.Height)
+                || visible.Width < 0 || visible.Height < 0) {
+                auto window = root.Size();
+                visible = Rect(0, 0, window.Width, window.Height);
+                if (auto inverse = TransformToVisual(nullptr).Inverse()) visible = inverse.TransformBounds(visible);
+            }
+            constexpr float quantum = 256;
+            auto start = [](float edge, float size) { return std::clamp(std::floor(edge / quantum) * quantum - quantum, 0.0f, size); };
+            auto end = [](float edge, float size) { return std::clamp(std::ceil(edge / quantum) * quantum + quantum, 0.0f, size); };
+            auto x = start(visible.X, size.Width), y = start(visible.Y, size.Height);
+            auto right = end(visible.X + visible.Width, size.Width), bottom = end(visible.Y + visible.Height, size.Height);
+            return Rect(x, y, std::clamp(right - x, 0.0f, limit), std::clamp(bottom - y, 0.0f, limit));
         }
 
-        void setRadius(double value, double reserve) {
+        void resizeSurface() {
+            if (!surface || !active) return;
+            auto room = captureRoom();
+            // Soft borders spread alpha beyond the layout frame. Reserve the
+            // Gaussian's native three-sigma extent without changing that frame.
+            Rect bounds(room.X - extent, room.Y - extent, room.Width + 2 * extent, room.Height + 2 * extent);
+            if (bounds == writtenBounds) return;
+            surface.SourceOffset({bounds.X, bounds.Y});
+            surface.SourceSize({bounds.Width, bounds.Height});
+            output.Offset({bounds.X, bounds.Y, 0});
+            output.Size({bounds.Width, bounds.Height});
+            writtenBounds = bounds;
+        }
+
+        void setEffects(double value, double reserve, bool multiply) {
             auto next = static_cast<float>(std::isfinite(value) ? std::clamp(value, 0.0, 250.0) : 0);
+            if (next < 0.005f) next = 0;
             auto reach = static_cast<float>(std::isfinite(reserve) ? std::clamp(reserve, 0.0, 250.0) : 0);
+            const bool nowActive = next > 0 || multiply;
+            if (!nowActive && !active) return;
+            if (!multiply && viewportChanged) {
+                viewportChanged.revoke();
+                viewport = Rect(0, 0, -1, -1);
+            }
             // Keep one surface window for the whole transition. Changing a
             // Gaussian's radius must not reallocate its source texture per frame.
             extent = std::max(extent, std::ceil(3 * std::max(next, reach)));
-            if (next > 0) ensureEffect();
-            if (brush && next != radius) brush.Properties().InsertScalar(L"Blur.StandardDeviation", next);
-            radius = next;
-            resizeSurface();
-            if (output) output.IsVisible(next > 0);
-            auto key = winrt::box_value(L"safeBarLocalPresentation");
-            auto previous = source.Resources().TryLookup(key);
-            if (!previous || winrt::unbox_value<bool>(previous) != (next > 0))
-                source.Resources().Insert(key, winrt::box_value(next > 0));
-            // As in Gallery's OpacityMaskView, VisualSurface omits only its
-            // source root's opacity. Descendant opacity and input stay intact.
-            if (sourceVisual) sourceVisual.Opacity(next > 0 ? 0 : 1);
+            if (nowActive) {
+                ensureSurface();
+                auto &selectedBrush = multiply ? multiplyBrush : blurBrush;
+                if (!selectedBrush) {
+                    auto compositor = sourceVisual.Compositor();
+                    auto made = (multiply ? multiplyFactory(compositor) : blurFactory(compositor)).CreateBrush();
+                    made.SetSourceParameter(L"Source", sourceBrush);
+                    if (multiply) made.SetSourceParameter(L"Backdrop", compositor.CreateBackdropBrush());
+                    selectedBrush = made;
+                }
+                if (brush != selectedBrush) {
+                    output.Brush(selectedBrush);
+                    brush = selectedBrush;
+                    writtenRadius = -1;
+                }
+                if (!active) {
+                    surface.SourceVisual(sourceVisual);
+                    writtenBounds = Rect(0, 0, -1, -1);
+                }
+                if (writtenRadius < 0 || std::abs(next - writtenRadius) >= 0.01f) {
+                    brush.Properties().InsertScalar(L"Blur.StandardDeviation", next);
+                    writtenRadius = next;
+                }
+                if (!active) {
+                    active = true;
+                    resizeSurface();
+                    output.IsVisible(true);
+                    setAcrylicLocalPresentation(source, true);
+                    // As in Gallery's OpacityMaskView, VisualSurface omits only its
+                    // source root's opacity. Descendant opacity and input stay intact.
+                    sourceVisual.Opacity(0);
+                } else {
+                    resizeSurface();
+                }
+            } else {
+                active = false;
+                writtenRadius = -1;
+                if (output) output.IsVisible(false);
+                if (sourceVisual) sourceVisual.Opacity(1);
+                if (surface) {
+                    surface.SourceVisual(nullptr);
+                    surface.SourceSize({0, 0});
+                }
+                writtenBounds = Rect(0, 0, -1, -1);
+                setAcrylicLocalPresentation(source, false);
+            }
         }
 
         void close() {
+            viewportChanged.revoke();
+            viewport = Rect(0, 0, -1, -1);
+            if (active) {
+                active = false;
+                setAcrylicLocalPresentation(source, false);
+            }
             if (!surface) return;
             IInspectable self = *this;
             xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(self.as<xaml::UIElement>(), nullptr);
@@ -192,12 +362,13 @@ namespace {
             output.Brush(nullptr);
             output = nullptr;
             brush = nullptr;
+            blurBrush = nullptr;
+            multiplyBrush = nullptr;
             surface = nullptr;
             sourceBrush = nullptr;
             sourceVisual = nullptr;
-            radius = 0;
-            writtenExtent = -1;
-            writtenSize = Size(-1, -1);
+            writtenRadius = -1;
+            writtenBounds = Rect(0, 0, -1, -1);
         }
     };
 
@@ -297,9 +468,10 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_blur_make(SwiftOmniUIObjectRef
     } catch (...) { report("making a blur presenter"); return nullptr; }
 }
 
-extern "C" bool swiftomniui_winui_blur_set(SwiftOmniUIObjectRef handle, double radius, double reserveRadius) {
-    try { presenter(handle)->setRadius(radius, reserveRadius); return true; }
-    catch (...) { report("setting a view's blur"); return false; }
+extern "C" bool swiftomniui_winui_drawing_effects_set(
+    SwiftOmniUIObjectRef handle, double radius, double reserveRadius, bool multiply) {
+    try { presenter(handle)->setEffects(radius, reserveRadius, multiply); return true; }
+    catch (...) { report("setting a view's drawing effects"); return false; }
 }
 
 extern "C" void swiftomniui_winui_blur_clear(SwiftOmniUIObjectRef handle) {

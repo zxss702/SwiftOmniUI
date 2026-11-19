@@ -57,6 +57,8 @@ final class GTKCanvasView: GTKPanelView {
     private var drawnCommands: [DrawCommand]?
     private var requestedSize: (element: ElementId, size: Size)?
 
+    override var hasBlendContent: Bool { !instructions.isEmpty }
+
     override init() {
         super.init()
 
@@ -101,6 +103,7 @@ final class GTKCanvasView: GTKPanelView {
         guard commands != drawnCommands else { return }
         drawnCommands = commands
         instructions = CanvasInstruction.instructions(commands)
+        refreshBlendMode()
         gtk_widget_queue_draw(widget)
     }
 

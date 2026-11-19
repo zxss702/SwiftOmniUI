@@ -5,7 +5,9 @@ extension View {
     /// ratio, use the child's ideal proportions. Fit stays inside the proposal;
     /// fill covers it without clipping the child automatically.
     public func aspectRatio(_ aspectRatio: Double? = nil, contentMode: ContentMode) -> some View {
-        AspectRatioLayout(ratio: aspectRatio, mode: contentMode) { self }
+        var container = AspectRatioLayout(ratio: aspectRatio, mode: contentMode) { self }
+        if contentMode == .fit { container.node.props[Prop("aspectFit")] = true.propValue }
+        return container
     }
 
     public func aspectRatio(_ aspectRatio: Size, contentMode: ContentMode) -> some View {

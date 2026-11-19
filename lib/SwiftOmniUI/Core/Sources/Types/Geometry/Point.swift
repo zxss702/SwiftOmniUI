@@ -6,7 +6,7 @@
 /// Where a gesture happened in the view's own coordinates, where a polygon
 /// turns a corner, or where a gradient begins. Its units belong to the property
 /// that reads it.
-public struct Point: Equatable, Sendable {
+public struct Point: Equatable, Hashable, Sendable {
     /// How far across, from the left edge. Device units where the property
     /// reading it works in those - a pointer's position, a polygon's corner -
     /// and a fraction of the view where it works in fractions, as a gradient's

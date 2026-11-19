@@ -133,10 +133,17 @@ class WinUIZStackView: WinUITravellingLayout {
         let byView = Dictionary(uniqueKeysWithValues: items.map { ($0.view.number, $0) })
         let useAllocatedDecorations = abs(bounds.width - allocatedBounds.width) > 0.5
             || abs(bounds.height - allocatedBounds.height) > 0.5
+        let insetEdge = sourceElement?.safeAreaInsetEdge
+        var bottomBarChange: (origin: Double, height: Double)?
         for proposal in preparedLayoutPlan(in: bounds) {
             if let background = safeAreaBackground, proposal.view === background {
                 background.setPlacedDrawing(nil, opacity: 1)
-                background.layout(proposal.place)
+                var frame = proposal.place
+                if let bottomBarChange {
+                    frame.y += bottomBarChange.origin
+                    frame.height = max(0, frame.height + bottomBarChange.height)
+                }
+                background.layout(frame)
                 continue
             }
             guard let view = proposal.view, let item = byView[view.number] else { continue }
@@ -148,11 +155,21 @@ class WinUIZStackView: WinUITravellingLayout {
             } else {
                 place = proposal.place
             }
-            if item.view.nativeSafeBarOwner != nil, item.view !== insetBase,
-               sourceElement?.safeAreaInsetEdge != nil {
+            if item.view.nativeSafeBarOwner != nil, item.view !== insetBase, insetEdge != nil {
                 item.view.recordSafeBarPlace(place, context: SafeAreaContext(bounds: Rect(0, 0, place.width, place.height)))
             } else {
+                let pinsBottom = insetEdge == .bottom && insetBase != nil && view !== insetBase && item.matchedGeometry == nil
+                if pinsBottom {
+                    let safe = layoutSafeArea(in: allocatedBounds).safe
+                    view.placementBottom = safe.y + safe.height - item.values.margin.bottom
+                } else {
+                    view.placementBottom = nil
+                }
                 self.place(item, at: place)
+                if pinsBottom, safeAreaBackground != nil {
+                    let presented = view.placedFrame
+                    bottomBarChange = (presented.y - proposal.place.y, presented.height - proposal.place.height)
+                }
             }
         }
     }
@@ -296,6 +313,7 @@ class WinUIZStackView: WinUITravellingLayout {
         for index in 0..<count {
             let placement = placements[index]
             let view = items[index].view
+            view.placementBottom = nil
             if view.nativeSafeBarOwner != nil, view !== insetBase,
                sourceElement?.safeAreaInsetEdge != nil {
                 let place = placement.place

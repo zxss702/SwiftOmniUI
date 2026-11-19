@@ -75,10 +75,40 @@
             return (destination, Array(repeating: 0, count: destination.count), true)
         }
         let rate = animation.law == .eased ? duration / remaining : 1
-        let sample = HostMotionLaw.sample(
-            animation, elapsed: max(0, now - segmentBegan) * rate,
-            from: from, destination: destination, velocity: velocity.map { $0 / rate })
-        return (sample.value, sample.velocity.map { $0 * rate }, sample.rested)
+        let elapsed = max(0, now - segmentBegan) * rate
+        return sample(using: HostMotionKernel(animation, elapsed: elapsed), rate: rate)
+    }
+
+    fileprivate func timingKey(at now: Double) -> AnimatorKernelKey? {
+        let duration = Double(animation.millis)
+        let remaining = began + duration - segmentBegan
+        if animation.law == .eased && (remaining <= 0 || now >= began + duration)
+            || animation.law == .spring && now - began >= HostMotionLaw.longest {
+            return nil
+        }
+        let rate = animation.law == .eased ? duration / remaining : 1
+        return AnimatorKernelKey(
+            animation: animation,
+            elapsed: max(0, now - segmentBegan) * rate,
+            rate: rate
+        )
+    }
+
+    @inline(__always)
+    fileprivate func sample(
+        using kernel: HostMotionKernel,
+        rate: Double
+    ) -> (value: [Double], velocity: [Double], rested: Bool) {
+        if rate == 1 {
+            let result = kernel.sample(from: from, destination: destination, velocity: velocity)
+            return (result.value, result.velocity, result.rested)
+        }
+        let scaledIn = velocity.map { $0 / rate }
+        let result = kernel.sample(from: from, destination: destination, velocity: scaledIn)
+        if result.rested {
+            return (result.value, result.velocity, true)
+        }
+        return (result.value, result.velocity.map { $0 * rate }, false)
     }
 
     /// Whether it starts where it ends, standing still: nothing to animate.
@@ -86,6 +116,12 @@
         zip(from, destination).allSatisfy { abs($0 - $1) < HostMotionLaw.still }
             && velocity.allSatisfy { abs($0) < HostMotionLaw.still }
     }
+}
+
+private struct AnimatorKernelKey: Equatable {
+    let animation: Animation
+    let elapsed: Double
+    let rate: Double
 }
 
 /// Where one animation stands after the animator advances.
@@ -107,6 +143,9 @@
 /// Design: docs/design/host/animation.md#one-animator
 @_spi(Host) @MainActor public final class Animator {
     private var animations: [AnimationTarget: RunningAnimation] = [:]
+    private var sortedTargets: [AnimationTarget] = []
+    private var targetsDirty = false
+    private var cachedKernels: [(key: AnimatorKernelKey, kernel: HostMotionKernel)] = []
 
     /// A animator with no animation under way.
     public init() {}
@@ -118,24 +157,85 @@
     public func animation(for target: AnimationTarget) -> RunningAnimation? { animations[target] }
 
     /// Starts `animation` for `target`, in place of any animation it had.
-    public func start(_ animation: RunningAnimation, for target: AnimationTarget) { animations[target] = animation }
+    public func start(_ animation: RunningAnimation, for target: AnimationTarget) {
+        if animations.updateValue(animation, forKey: target) == nil {
+            sortedTargets.append(target)
+            targetsDirty = true
+        }
+    }
 
     /// Ends `target`'s animation where it stands.
-    public func halt(_ target: AnimationTarget) { animations[target] = nil }
+    public func halt(_ target: AnimationTarget) {
+        animations.removeValue(forKey: target)
+    }
 
     /// Advances every animation to `now` in target order; with less animation, each one arrives.
     public func advance(to now: Double, reducesMotion: Bool = false) -> [AnimationStep] {
-        var steps: [AnimationStep] = []
+        guard !animations.isEmpty else {
+            if !sortedTargets.isEmpty {
+                sortedTargets.removeAll(keepingCapacity: true)
+                targetsDirty = false
+            }
+            return []
+        }
 
-        for target in animations.keys.sorted() {
+        if targetsDirty {
+            sortedTargets = animations.keys.sorted()
+            targetsDirty = false
+        }
+
+        var steps: [AnimationStep] = []
+        steps.reserveCapacity(animations.count)
+        cachedKernels.removeAll(keepingCapacity: true)
+        var lastKey: AnimatorKernelKey?
+        var lastKernel: HostMotionKernel?
+
+        var writeIndex = 0
+        for readIndex in sortedTargets.indices {
+            let target = sortedTargets[readIndex]
             guard let animation = animations[target] else { continue }
 
-            let position = reducesMotion
-                ? (animation.destination, Array(repeating: 0, count: animation.destination.count), true)
-                : animation.position(at: now)
+            let position: (value: [Double], velocity: [Double], rested: Bool)
+            if reducesMotion {
+                position = (animation.destination, Array(repeating: 0, count: animation.destination.count), true)
+            } else if let key = animation.timingKey(at: now) {
+                let kernel: HostMotionKernel
+                if lastKey == key, let hit = lastKernel {
+                    kernel = hit
+                } else if let hit = cachedKernels.first(where: { $0.key == key })?.kernel {
+                    lastKey = key
+                    lastKernel = hit
+                    kernel = hit
+                } else {
+                    let built = HostMotionKernel(key.animation, elapsed: key.elapsed)
+                    if cachedKernels.count < 16 {
+                        cachedKernels.append((key, built))
+                    }
+                    lastKey = key
+                    lastKernel = built
+                    kernel = built
+                }
+                position = animation.sample(using: kernel, rate: key.rate)
+            } else {
+                position = (animation.destination, Array(repeating: 0, count: animation.destination.count), true)
+            }
 
-            if position.2 { animations[target] = nil }
-            steps.append(AnimationStep(target: target, value: position.0, velocity: position.1, rested: position.2))
+            if position.rested {
+                animations.removeValue(forKey: target)
+            } else {
+                sortedTargets[writeIndex] = target
+                writeIndex += 1
+            }
+            steps.append(AnimationStep(
+                target: target,
+                value: position.value,
+                velocity: position.velocity,
+                rested: position.rested
+            ))
+        }
+
+        if writeIndex < sortedTargets.count {
+            sortedTargets.removeSubrange(writeIndex..<sortedTargets.count)
         }
 
         return steps
@@ -144,5 +244,6 @@
     /// Keeps only the animations whose target `keep` still has.
     public func retain(where keep: (AnimationTarget) -> Bool) {
         animations = animations.filter { keep($0.key) }
+        targetsDirty = true
     }
 }

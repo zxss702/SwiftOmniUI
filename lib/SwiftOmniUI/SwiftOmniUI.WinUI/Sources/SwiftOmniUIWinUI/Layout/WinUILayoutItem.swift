@@ -81,6 +81,10 @@ struct WinUILayoutItem: LayoutChild {
         return sized
     }
 
+    func firstBaseline(in size: LayoutSize) -> Double? {
+        view.firstTextBaseline(in: size)
+    }
+
     /// Whether a parent would place this item as it places `other`.
     func arranges(like other: WinUILayoutItem) -> Bool {
         view === other.view && values == other.values && isShown == other.isShown && departing == other.departing

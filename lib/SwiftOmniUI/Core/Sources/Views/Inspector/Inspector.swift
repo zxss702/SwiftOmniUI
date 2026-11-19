@@ -159,8 +159,8 @@ public enum Inspector {
     /// Design: docs/design/views/inspector.md#where-it-docks
     private static func dock(_ place: Place?, in record: SceneRecord) {
         InspectorModel.shared.places[record.id] = place
-        record.windowSession(SceneElement.mainKey).overlays[.inspector] = place.map {
-            InspectorPanel(scene: record.id, place: $0).zIndex(Double(Int32.max))
+        record.windowSession(SceneElement.mainKey).overlays[.inspector] = place.map { place in
+            onMain { InspectorPanel(scene: record.id, place: place).zIndex(Double(Int32.max)) }
         }
     }
 }

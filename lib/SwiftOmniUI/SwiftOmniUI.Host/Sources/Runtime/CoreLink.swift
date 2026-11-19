@@ -206,6 +206,11 @@
     /// The window chosen by the launch policy after rendering the scene.
     public func initialWindowKey(in scene: String) -> String? { HostBoundary.initialWindowKey(in: scene) }
 
+    /// Opens (or locates, if already open) the application's settings window.
+    public func openSettingsWindow() -> (scene: String, windowKey: String)? {
+        HostBoundary.openSettingsWindow()
+    }
+
     /// The keys read from the platform's settings store before the first render.
     public var persistentKeys: [PersistentKey] { HostBoundary.persistentKeys }
 

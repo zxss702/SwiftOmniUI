@@ -30,12 +30,15 @@ struct GTKLayoutItem: LayoutChild {
 
     /// The view's size for the width offered it, margin taken out (`LayoutValues.offer`, `sized`).
     func size(offered width: Double?) -> LayoutSize {
-        values.sized(view.measure(width: values.offer(width), height: nil), offered: width)
+        let height = values.height.map { values.boundedHeight($0) }
+        return values.sized(view.measure(width: values.offer(width), height: height), offered: width)
     }
 
     /// Custom layouts propose both axes, including a Canvas's drawing height.
     func size(offered proposal: ProposedViewSize) -> LayoutSize {
-        let height = values.height.map { values.boundedHeight($0, available: proposal.height) }
+        let height = values.height.map {
+            values.boundedHeight($0, available: values.isFrameContent ? nil : proposal.height)
+        }
             ?? [proposal.height, values.maximumHeight].compactMap { $0 }.min()
         var sized = values.sized(view.measure(width: values.offer(proposal.width), height: height),
                                  offered: proposal.width)
@@ -47,6 +50,10 @@ struct GTKLayoutItem: LayoutChild {
             }
         }
         return sized
+    }
+
+    func firstBaseline(in size: LayoutSize) -> Double? {
+        view.firstTextBaseline(in: size)
     }
 
     func arranges(like other: GTKLayoutItem) -> Bool {

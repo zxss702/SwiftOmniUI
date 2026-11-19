@@ -372,6 +372,48 @@ final class WinUISafeBarColumnTests: XCTestCase {
         }
     }
 
+    func testToolbarMaterialSamplesPushedPageBackgroundAndReturnsToRoot() throws {
+        try onUIThread {
+            let path = State(wrappedValue: [Int]())
+            let sidebar = State(wrappedValue: true)
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(sidebar.projectedValue) {
+                    Text("Sidebar").navigationSplitViewColumnWidth(220)
+                } detail: {
+                    NavigationStack(path: path.projectedValue) {
+                        ScrollView { Color.red.frame(height: 1600) }
+                            .id("material-root-scroll")
+                            .navigationDestination(for: Int.self) { _ in
+                                Text("Preview")
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .background(Color.green)
+                                    .id("material-preview")
+                            }
+                    }
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            let scroll = try XCTUnwrap(host.view(id: .manual("material-root-scroll")) as? WinUIScrollView)
+            host.settle { swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.presentationHandle) }
+            XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.presentationHandle))
+
+            path.wrappedValue = [1]
+            host.settle {
+                guard let preview = host.view(id: .manual("material-preview")) as? WinUILayoutView,
+                      let background = preview.boxView else { return false }
+                return swiftomniui_winui_window_acrylic_samples(window.handle, background.presentationHandle)
+            }
+            let preview = try XCTUnwrap(host.view(id: .manual("material-preview")) as? WinUILayoutView)
+            let background = try XCTUnwrap(preview.boxView)
+            XCTAssertEqual(background.origin.y, window.titleBar.origin.y, accuracy: 1)
+            XCTAssertTrue(swiftomniui_winui_window_acrylic_samples(window.handle, background.presentationHandle))
+
+            path.wrappedValue = []
+            host.settle { swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.presentationHandle) }
+            XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.presentationHandle))
+        }
+    }
+
     func testIntrinsicInvalidationReachesBothNativeOwnershipBoundaries() {
         onUIThread {
             let owner = NativePageOwner()
@@ -428,21 +470,34 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 } detail: {
                     ScrollView { Text(history.wrappedValue ? "History" : "Start") }
                         .safeAreaInset(edge: .bottom, spacing: 0) {
-                            HStack(alignment: .bottom) {
-                                Button("Attach") {}.frame(width: 40, height: 40).id("attach")
-                                TextEditor(text: text.projectedValue)
-                                    .scrollContentBackground(.hidden)
-                                    .frame(height: text.wrappedValue.isEmpty && history.wrappedValue ? 40 : 128)
-                                    .background {
-                                        RoundedRectangle(cornerRadius: 20).fill(Color.white).id("editor-fill")
-                                    }.id("editor")
-                                if text.wrappedValue.isEmpty {
-                                    HStack {
-                                        Button("Send") {}.frame(width: 40, height: 40).id("send-horizontal")
-                                    }
-                                } else {
-                                    VStack {
-                                        Button("Send") {}.frame(width: 40, height: 40).id("send-vertical")
+                            let height = text.wrappedValue.isEmpty && history.wrappedValue ? 40.0 : 128.0
+                            VStack {
+                                HStack(alignment: .bottom) {
+                                    Button("Attach") {}.frame(width: 40, height: 40).id("attach")
+                                    ZStack(alignment: .bottom) {
+                                        TextEditor(text: text.projectedValue.transaction(.init(animation: .eased(200, .linear))))
+                                            .scrollContentBackground(.hidden)
+                                            .background(alignment: .topLeading) {
+                                                if text.wrappedValue.isEmpty { Text("Write something") }
+                                            }
+                                            .animation(nil, value: text.wrappedValue.isEmpty)
+                                            .safeAreaPadding(.vertical, 12)
+                                            .frame(height: height)
+                                            .background {
+                                                RoundedRectangle(cornerRadius: 20).fill(Color.white).id("editor-fill")
+                                            }.id("editor")
+                                        Rectangle().fill(.clear)
+                                            .frame(height: 16)
+                                            .offset(y: -height + 8)
+                                    }.frame(height: height)
+                                    if text.wrappedValue.isEmpty {
+                                        HStack {
+                                            Button("Send") {}.frame(width: 40, height: 40).id("send-horizontal")
+                                        }
+                                    } else {
+                                        VStack {
+                                            Button("Send") {}.frame(width: 40, height: 40).id("send-vertical")
+                                        }
                                     }
                                 }
                             }.padding(16)
@@ -450,16 +505,43 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 }
             }
             let editor = try XCTUnwrap(host.view(id: .manual("editor")))
+            let editorInput = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            let fill = try XCTUnwrap(host.view(id: .manual("editor-fill")))
+            let attach = try XCTUnwrap(host.view(id: .manual("attach")))
+            for _ in 0..<12 { host.step(); host.frame() }
+            let editorBottom = editor.origin.y + editor.laidOutFrame.height
+            let attachY = attach.origin.y
             for step in 0..<4 {
-                withAnimation(.eased(200, .linear)) {
-                    history.wrappedValue = step != 3
-                    text.wrappedValue = step == 1 ? "输入内容" : ""
-                }
-                for _ in 0..<12 { host.step(); host.frame() }
-                clock.now += 400
-                for _ in 0..<12 { host.frame(); host.step() }
-                let fill = try XCTUnwrap(host.view(id: .manual("editor-fill")))
+                let started = clock.now
+                let before = editor.laidOutFrame.height
                 let expected = step == 1 || step == 3 ? 128.0 : 40.0
+                if step == 1 || step == 2 {
+                    editorInput.type(step == 1 ? "输入内容" : "")
+                } else {
+                    withAnimation(.eased(200, .linear)) { history.wrappedValue = step == 0 }
+                }
+                var previous = before
+                for sample in [0.0, 25, 50, 100, 150] {
+                    clock.now = started + sample
+                    host.step()
+                    host.frame()
+                    let height = editor.laidOutFrame.height
+                    let moment = "step \(step) at \(sample) ms"
+                    XCTAssertEqual(editor.origin.y + height, editorBottom, accuracy: 1, moment)
+                    XCTAssertEqual(fill.origin.y + fill.laidOutFrame.height, editorBottom, accuracy: 1, moment)
+                    XCTAssertEqual(fill.laidOutFrame.height, height, accuracy: 1, moment)
+                    XCTAssertEqual(attach.origin.y, attachY, accuracy: 1, moment)
+                    if sample == 0 { XCTAssertEqual(height, before, accuracy: 1, moment) }
+                    if expected > before { XCTAssertGreaterThanOrEqual(height, previous - 1, moment) }
+                    if expected < before { XCTAssertLessThanOrEqual(height, previous + 1, moment) }
+                    previous = height
+                    if sample == 100 {
+                        XCTAssertGreaterThan(height, min(before, expected) + 1, moment)
+                        XCTAssertLessThan(height, max(before, expected) - 1, moment)
+                    }
+                }
+                clock.now = started + 400
+                for _ in 0..<12 { host.frame(); host.step() }
                 XCTAssertEqual(editor.laidOutFrame.height, expected, accuracy: 1)
                 XCTAssertEqual(fill.laidOutFrame.height, expected, accuracy: 1)
                 XCTAssertTrue(host.view(id: .manual("editor")) === editor)

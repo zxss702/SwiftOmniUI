@@ -45,11 +45,6 @@ public struct KeyEquivalent: Equatable, Sendable, ExpressibleByStringLiteral {
     public static let pageUp = KeyEquivalent("pageup")
     /// The Page Down key.
     public static let pageDown = KeyEquivalent("pagedown")
-
-    /// The platform's accept key - Return, as the default button's shortcut.
-    public static let defaultAction = KeyEquivalent("defaultaction")
-    /// The platform's cancel key - Escape, as the cancel button's.
-    public static let cancelAction = KeyEquivalent("cancelaction")
 }
 
 /// The modifier keys held with a key: `.command` by default, as shortcuts
@@ -61,21 +56,20 @@ public struct EventModifiers: OptionSet, Equatable, Sendable {
     /// A set from its bits.
     public init(rawValue: Int32) { self.rawValue = rawValue }
 
-    /// The platform's command key - Command on macOS, Control elsewhere.
+    /// The platform's command key - Command on macOS, Control on Windows and Linux.
     public static let command = EventModifiers(rawValue: 1 << 0)
     /// The Shift key.
     public static let shift = EventModifiers(rawValue: 1 << 1)
-    /// The Option key - Alt elsewhere.
+    /// The Option key on macOS, Alt on Windows and Linux.
     public static let option = EventModifiers(rawValue: 1 << 2)
-    #if !os(Windows) && !os(Linux)
-    /// The physical Control key, distinct from Command on Apple platforms.
-    /// Windows and Linux use `.command` for their Control shortcuts.
+    /// The Control key on macOS; mapped automatically on Windows and Linux
+    /// (Control alone, or Alt when combined with `.command` so `[.command, .control]`
+    /// stays distinct from `.command`).
     public static let control = EventModifiers(rawValue: 1 << 3)
-    #endif
 }
 
 /// A key pressed with modifiers: `.keyboardShortcut(.return)` is Cmd-Return
-/// on macOS, the platform's own command key elsewhere.
+/// on macOS, Ctrl-Return on Windows and Linux.
 public struct KeyboardShortcut: Equatable, Sendable {
     /// The key.
     public let key: KeyEquivalent
@@ -91,6 +85,11 @@ public struct KeyboardShortcut: Equatable, Sendable {
         self.key = key
         self.modifiers = modifiers
     }
+
+    /// The platform's accept key - bare Return, as the default button's shortcut.
+    public static let defaultAction = KeyboardShortcut(.return, modifiers: [])
+    /// The platform's cancel key - bare Escape, as the cancel button's shortcut.
+    public static let cancelAction = KeyboardShortcut(.escape, modifiers: [])
 }
 
 extension KeyEquivalent: HostRepresentable {

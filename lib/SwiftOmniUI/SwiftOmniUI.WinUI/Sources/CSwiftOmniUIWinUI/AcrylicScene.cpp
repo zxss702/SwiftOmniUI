@@ -29,7 +29,9 @@ namespace swiftomniui {
         std::vector<Columns> columnGroups;
         std::vector<winrt::weak_ref<Element>> scrollers;
         std::vector<std::weak_ptr<AcrylicScene>> scenes;
+        std::unordered_set<void *> localPresentations;
         uint64_t generation = 0;
+        bool materialDirty = true;
 
         void *identity(IInspectable const &value) { return value ? value.as<::IUnknown>().get() : nullptr; }
         bool descendant(xaml::DependencyObject element, xaml::DependencyObject const &root) {
@@ -97,6 +99,51 @@ namespace swiftomniui {
         return {x, y, size.x, size.y};
     }
 
+    AcrylicPartGeometry acrylicPartGeometry(Element const &element, Element const &root) {
+        if (!element || !root || !element.IsLoaded() || element.ActualWidth() <= 0 || element.ActualHeight() <= 0) return {};
+        auto size = element.ActualSize();
+        auto transform = element.TransformToVisual(root);
+        auto bounds = transform.TransformBounds({0, 0, size.x, size.y});
+        double opacity = 1;
+        for (xaml::DependencyObject at = element; at; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
+            if (at != root) {
+                if (auto ui = at.try_as<xaml::UIElement>()) opacity *= ui.Opacity();
+            }
+            auto parent = at.try_as<Element>();
+            if (!parent) continue;
+            if (parent.Visibility() != xaml::Visibility::Visible) return {};
+            if (auto clip = parent.Clip())
+                bounds = intersect(bounds, parent.TransformToVisual(root).TransformBounds(clip.Rect()));
+            if (parent.try_as<controls::ScrollView>() || parent.try_as<controls::ScrollViewer>())
+                bounds = intersect(bounds, parent.TransformToVisual(root).TransformBounds(
+                    {0, 0, static_cast<float>(parent.ActualWidth()), static_cast<float>(parent.ActualHeight())}));
+            if (auto split = parent.try_as<controls::SplitView>(); split && parent != element) {
+                const bool pane = descendant(element, split.Pane());
+                auto slot = (pane ? split.Pane() : split.Content()).try_as<Element>();
+                if (slot) {
+                    auto room = slot.ActualSize();
+                    bounds = intersect(bounds, slot.TransformToVisual(root).TransformBounds({0, 0, room.x, room.y}));
+                }
+            }
+            if (parent == root) break;
+        }
+        auto room = root.ActualSize();
+        auto visible = intersect(bounds, {0, 0, room.x, room.y});
+        Rect localClip{};
+        if (visible.Width > 0 && visible.Height > 0) {
+            auto inverse = transform.Inverse();
+            if (inverse) localClip = inverse.TransformBounds(visible);
+        }
+        auto origin = transform.TransformPoint({0, 0});
+        auto x = transform.TransformPoint({1, 0});
+        auto y = transform.TransformPoint({0, 1});
+        winrt::Windows::Foundation::Numerics::float4x4 matrix{
+            x.X - origin.X, x.Y - origin.Y, 0, 0,
+            y.X - origin.X, y.Y - origin.Y, 0, 0,
+            0, 0, 1, 0, origin.X, origin.Y, 0, 1};
+        return {visible, localClip, matrix, static_cast<float>(std::clamp(opacity, 0.0, 1.0))};
+    }
+
     float acrylicPresentationOpacity(Element const &element, Element const &root) {
         double opacity = 1;
         for (xaml::DependencyObject at = element; at && at != root; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
@@ -108,20 +155,56 @@ namespace swiftomniui {
         // During an ancestor transition, the original native subtree already
         // owns the complete opacity, transform, clipping and removal lifetime.
         // Keep its material/controls there, sharing only the filtered texture.
+        const bool hasLocalSet = !localPresentations.empty();
         for (xaml::DependencyObject at = element; at && at != root; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
             auto parent = at.try_as<Element>();
             if (!parent) continue;
             if (parent.Opacity() != 1 || parent.Projection()) return true;
-            auto local = parent.Resources().TryLookup(winrt::box_value(L"safeBarLocalPresentation"));
-            if (local && winrt::unbox_value_or<bool>(local, false)) return true;
+            if (hasLocalSet && localPresentations.contains(identity(parent))) return true;
             if (auto transform = parent.RenderTransform()) {
-                auto origin = transform.TransformPoint({0, 0});
-                auto x = transform.TransformPoint({1, 0});
-                auto y = transform.TransformPoint({0, 1});
-                if (origin.X != 0 || origin.Y != 0 || x.X != 1 || x.Y != 0 || y.X != 0 || y.Y != 1) return true;
+                if (auto composite = transform.try_as<xaml::Media::CompositeTransform>()) {
+                    if (composite.TranslateX() != 0 || composite.TranslateY() != 0 || composite.Rotation() != 0
+                        || composite.ScaleX() != 1 || composite.ScaleY() != 1) return true;
+                } else {
+                    auto origin = transform.TransformPoint({0, 0});
+                    auto x = transform.TransformPoint({1, 0});
+                    auto y = transform.TransformPoint({0, 1});
+                    if (origin.X != 0 || origin.Y != 0 || x.X != 1 || x.Y != 0 || y.X != 0 || y.Y != 1) return true;
+                }
             }
         }
         return false;
+    }
+
+    void setAcrylicLocalPresentation(IInspectable const &element, bool active) noexcept {
+        try {
+            auto key = identity(element);
+            if (!key) return;
+            const bool changed = active ? localPresentations.insert(key).second : (localPresentations.erase(key) > 0);
+            if (changed) materialDirty = true;
+        } catch (...) {}
+    }
+
+    bool hasAcrylicScrollerInsets() noexcept {
+        try {
+            if (insets.empty()) return false;
+            for (auto const &entry : insets) {
+                auto owner = entry.owner.get();
+                if (!owner) continue;
+                for (auto at = xaml::Media::VisualTreeHelper::GetParent(owner); at;
+                     at = xaml::Media::VisualTreeHelper::GetParent(at)) {
+                    if (at.try_as<controls::ScrollView>() || at.try_as<controls::ScrollViewer>()) return true;
+                }
+            }
+        } catch (...) {}
+        return false;
+    }
+
+    void markAcrylicMaterialDirty() noexcept { materialDirty = true; }
+    bool takeAcrylicMaterialDirty() noexcept {
+        const bool was = materialDirty;
+        materialDirty = false;
+        return was;
     }
     winrt::Windows::Foundation::Numerics::float4x4 acrylicPresentationMatrix(Element const &element, Element const &root) {
         auto transform = element.TransformToVisual(root);
@@ -300,9 +383,9 @@ namespace swiftomniui {
                     continue;
                 }
                 auto size = element.ActualSize();
-                const auto visible = acrylicVisibleBounds(element, coordinates);
-                const auto clipped = acrylicLocalClip(element, coordinates, visible);
-                const auto opacity = acrylicPresentationOpacity(element, coordinates);
+                const auto geometry = acrylicPartGeometry(element, coordinates);
+                const auto &clipped = geometry.localClip;
+                const auto opacity = geometry.opacity;
                 const bool shown = clipped.Width > 0 && clipped.Height > 0 && opacity > 0;
                 if (part.sprite.Opacity() != opacity) part.sprite.Opacity(opacity);
                 if (part.sprite.IsVisible() != shown) part.sprite.IsVisible(shown);
@@ -323,7 +406,7 @@ namespace swiftomniui {
                     if (part.capture.SourceVisual() != live) part.capture.SourceVisual(live);
                     if (part.capture.SourceSize() != size) part.capture.SourceSize(size);
                 }
-                const auto matrix = acrylicPresentationMatrix(element, coordinates);
+                const auto &matrix = geometry.matrix;
                 if (part.sprite.TransformMatrix() != matrix) part.sprite.TransformMatrix(matrix);
                 if (part.sprite.Size() != size) part.sprite.Size(size);
                 auto clip = part.sprite.Clip().try_as<composition::InsetClip>();
@@ -555,6 +638,7 @@ namespace swiftomniui {
                 // within an otherwise live branch. Lazy row mutations inside
                 // a viewport returned above and never rebuild this frontier.
                 scene->revision = std::numeric_limits<uint64_t>::max();
+                materialDirty = true;
             }
         } catch (...) { report("invalidating an acrylic content scene"); }
     }
@@ -565,10 +649,12 @@ namespace swiftomniui {
             if (entry.content.get() == content) return;
             entry.content = content ? winrt::make_weak(content) : winrt::weak_ref<Element>{};
             ++generation;
+            materialDirty = true;
             return;
         }
         windows.push_back({winrt::make_weak(root), content ? winrt::make_weak(content) : winrt::weak_ref<Element>{}});
         ++generation;
+        materialDirty = true;
     }
 }
 
@@ -583,7 +669,7 @@ extern "C" void swiftomniui_winui_material_columns(
             return entry.owner.get() == element;
         });
         if (count == 0) {
-            if (found != columnGroups.end()) { columnGroups.erase(found); ++generation; }
+            if (found != columnGroups.end()) { columnGroups.erase(found); ++generation; markAcrylicMaterialDirty(); }
             return;
         }
         if (found != columnGroups.end() && found->pages.size() == static_cast<size_t>(count)) {
@@ -596,6 +682,7 @@ extern "C" void swiftomniui_winui_material_columns(
         if (found == columnGroups.end()) columnGroups.push_back(std::move(next));
         else *found = std::move(next);
         ++generation;
+        markAcrylicMaterialDirty();
     } catch (...) { report("registering navigation material columns"); }
 }
 
@@ -617,12 +704,14 @@ extern "C" void swiftomniui_winui_safe_area_register(
                 entry.material = surface ? winrt::make_weak(surface) : winrt::weak_ref<xaml::FrameworkElement>{};
             }
             ++generation;
+            markAcrylicMaterialDirty();
             return;
         }
         if (bar) {
             insets.push_back({winrt::make_weak(element), winrt::make_weak(controls),
                 surface ? winrt::make_weak(surface) : winrt::weak_ref<xaml::FrameworkElement>{}});
             ++generation;
+            markAcrylicMaterialDirty();
         }
     } catch (...) { report("registering a safe bar's content-only sampling boundary"); }
 }

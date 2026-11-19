@@ -103,26 +103,24 @@ class GTKLayoutView: GTKPanelView {
         var outline = box.outline.rounded(bounds)
         let rounded = box.outline != .rectangle
 
-        if box.fill != .none {
-            if rounded { gtk_snapshot_push_rounded_clip(snapshot, &outline) }
-            box.fill.paint(snapshot, bounds)
-            if rounded { gtk_snapshot_pop(snapshot) }
+        drawContent(snapshot, clip: box.clips ? outline : nil) {
+            if box.fill != .none {
+                if rounded { gtk_snapshot_push_rounded_clip(snapshot, &outline) }
+                box.fill.paint(snapshot, bounds)
+                if rounded { gtk_snapshot_pop(snapshot) }
+            }
+            if box.width > 0, let color = box.stroke.firstColor {
+                var widths: [Float] = Array(repeating: Float(box.width), count: 4)
+                var colors: [GdkRGBA] = Array(repeating: color, count: 4)
+                gtk_snapshot_append_border(snapshot, &outline, &widths, &colors)
+            }
         }
-        if box.width > 0, let color = box.stroke.firstColor {
-            var widths: [Float] = Array(repeating: Float(box.width), count: 4)
-            var colors: [GdkRGBA] = Array(repeating: color, count: 4)
-            gtk_snapshot_append_border(snapshot, &outline, &widths, &colors)
-        }
-
-        if box.clips { gtk_snapshot_push_rounded_clip(snapshot, &outline) }
-        drawContent(snapshot)
-        if box.clips { gtk_snapshot_pop(snapshot) }
     }
 
     /// What the layout draws inside its box - its children, unless a layout
     /// draws them its own way.
-    func drawContent(_ snapshot: OpaquePointer) {
-        drawChildren(snapshot)
+    func drawContent(_ snapshot: OpaquePointer, clip: GskRoundedRect?, backdrop: () -> Void) {
+        drawChildren(snapshot, clip: clip, backdrop: backdrop)
     }
 
     /// Holds `views` in the panel in this order, the one it draws them in.
@@ -165,6 +163,7 @@ class GTKLayoutView: GTKPanelView {
     /// different column count from the one their parent will arrange.
     override func measure(width: Double?, height: Double?) -> LayoutSize {
         _ = super.measure(width: width, height: height)
+        if let height, let size = contentSize(width: width, offeredHeight: height) { return size }
         return measurements.size(offering: width) { contentSize(width: width) }
     }
 
@@ -184,6 +183,15 @@ class GTKLayoutView: GTKPanelView {
 
     var shouldArrangeInDestinationRoom: Bool { false }
 
+    private var followsBottomPlacement: Bool {
+        var view: GTKView? = self
+        while let current = view {
+            if current.placementBottom != nil { return true }
+            view = current.placingLayout
+        }
+        return false
+    }
+
     var contextBounds: Rect {
         guard let placed else { return allocatedBounds }
         return Rect(
@@ -200,7 +208,10 @@ class GTKLayoutView: GTKPanelView {
             return bounds
         }
         if shouldArrangeInDestinationRoom {
-            return Rect(0, 0, destination.width, destination.height)
+            // A bottom-aligned branch gains space upward as its height animates.
+            // Its children can only use the additional room once it is visible.
+            let height = followsBottomPlacement ? min(bounds.height, destination.height) : destination.height
+            return Rect(0, 0, destination.width, height)
         }
         arrangementRoom = nil
         return bounds
@@ -238,6 +249,9 @@ class GTKLayoutView: GTKPanelView {
     func contentSize(width: Double?) -> LayoutSize {
         .zero
     }
+
+    /// A layout whose sizing depends on both offered axes can answer this proposal.
+    func contentSize(width: Double?, offeredHeight: Double) -> LayoutSize? { nil }
 
     func backgroundBounds(in bounds: Rect) -> Rect { bounds }
 

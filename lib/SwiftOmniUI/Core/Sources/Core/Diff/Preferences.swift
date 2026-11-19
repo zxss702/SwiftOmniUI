@@ -38,8 +38,7 @@ struct PreferenceKeyBox {
     /// Equality across an existential; a value that cannot say is always different.
     private static func equal(_ a: Any, _ b: Any) -> Bool {
         guard let a = a as? any Equatable else {
-            if let a = a as? AnyObject, let b = b as? AnyObject { return a === b }
-            return false
+            return sameReference(a, b) ?? false
         }
         func open<Value: Equatable>(_ a: Value) -> Bool {
             (b as? Value).map { $0 == a } ?? false

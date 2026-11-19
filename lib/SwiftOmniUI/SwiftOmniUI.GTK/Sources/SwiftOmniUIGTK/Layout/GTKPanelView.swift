@@ -57,11 +57,31 @@ class GTKPanelView: GTKView {
         drawChildren(snapshot)
     }
 
-    /// Draws every child in the order the panel holds them, back to front.
-    func drawChildren(_ snapshot: OpaquePointer) {
+    /// Each multiplying child blends with the preceding drawing in this panel.
+    func drawChildren(_ snapshot: OpaquePointer, clip: GskRoundedRect? = nil, backdrop: () -> Void = {}) {
+        // Open the groups in reverse order so every bottom input includes
+        // the result of all earlier groups, in normal paint order.
+        var hasBlend = false
+        var later = gtk_widget_get_last_child(widget)
+        while let each = later {
+            if GTKView.multiplies(each) {
+                gtk_snapshot_push_blend(snapshot, GSK_BLEND_MODE_MULTIPLY)
+                hasBlend = true
+            }
+            later = gtk_widget_get_prev_sibling(each)
+        }
+        backdrop()
+
+        if !hasBlend, var clip { gtk_snapshot_push_rounded_clip(snapshot, &clip) }
+        defer { if !hasBlend, clip != nil { gtk_snapshot_pop(snapshot) } }
         var child = gtk_widget_get_first_child(widget)
         while let each = child {
+            let multiply = hasBlend && GTKView.multiplies(each)
+            if multiply { gtk_snapshot_pop(snapshot) }
+            if hasBlend, var clip { gtk_snapshot_push_rounded_clip(snapshot, &clip) }
             gtk_widget_snapshot_child(widget, each, snapshot)
+            if hasBlend, clip != nil { gtk_snapshot_pop(snapshot) }
+            if multiply { gtk_snapshot_pop(snapshot) }
             child = gtk_widget_get_next_sibling(each)
         }
     }

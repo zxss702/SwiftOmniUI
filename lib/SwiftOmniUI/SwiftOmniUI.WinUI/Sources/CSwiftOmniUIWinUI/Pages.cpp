@@ -12,6 +12,7 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 #include <winrt/Microsoft.UI.Content.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
@@ -351,24 +352,77 @@ namespace {
         }
         return nullptr;
     }
+
+    template <class Command>
+    void captionBarButton(Command const &button, winrt::hstring const &words) {
+        auto icon = button.Icon();
+        bool collapsed = icon || words.empty();
+        if (button.Label() != words) button.Label(words);
+        button.LabelPosition(collapsed ? controls::CommandBarLabelPosition::Collapsed
+                                       : controls::CommandBarLabelPosition::Default);
+        if (collapsed) {
+            auto width = icon ? icon.Width() : 0;
+            button.Width(std::isfinite(width) ? std::max(40.0, width + 8.0) : 40.0);
+        } else {
+            button.ClearValue(xaml::FrameworkElement::WidthProperty());
+        }
+        if (icon && !words.empty()) controls::ToolTipService::SetToolTip(button, winrt::box_value(words));
+    }
+
+    void sizeBarPicture(controls::Control const &button, controls::IconElement const &icon,
+                        double width, double height) {
+        auto picture = icon ? icon.try_as<controls::ImageIcon>() : nullptr;
+        auto source = picture ? picture.Source().try_as<xaml::Media::Imaging::BitmapSource>() : nullptr;
+        bool hasWidth = std::isfinite(width) && width >= 0;
+        bool hasHeight = std::isfinite(height) && height >= 0;
+        bool sized = source && source.PixelWidth() > 0 && source.PixelHeight() > 0 && (hasWidth || hasHeight);
+        auto resources = button.Resources();
+        auto heightKey = winrt::box_value(L"AppBarButtonContentHeight");
+        auto marginKey = winrt::box_value(L"AppBarButtonContentViewboxCollapsedMargin");
+        auto oldHeight = resources.TryLookup(heightKey);
+        if (sized) {
+            // The native icon Viewbox normally scales everything to the system
+            // glyph height. Use a per-button resource for a framed picture.
+            auto titleBarHeight = winrt::unbox_value_or<double>(xaml::Application::Current().Resources().TryLookup(
+                winrt::box_value(L"TitleBarExpandedHeight")), 48.0);
+            constexpr double verticalInset = 4.0;
+            auto scale = std::max(0.0, titleBarHeight - 2 * verticalInset) / source.PixelHeight();
+            if (hasWidth) scale = std::min(scale, width / source.PixelWidth());
+            if (hasHeight) scale = std::min(scale, height / source.PixelHeight());
+            auto fittedHeight = source.PixelHeight() * scale;
+            picture.Width(source.PixelWidth() * scale);
+            picture.Height(fittedHeight);
+            if (oldHeight && winrt::unbox_value<double>(oldHeight) == fittedHeight) return;
+            auto inset = (titleBarHeight - fittedHeight) / 2;
+            resources.Insert(heightKey, winrt::box_value(fittedHeight));
+            resources.Insert(marginKey, winrt::box_value(xaml::Thickness{0, inset, 0, inset}));
+        } else {
+            if (!oldHeight) return;
+            resources.Remove(heightKey);
+            resources.Remove(marginKey);
+        }
+        if (button.IsLoaded()) readThemeAgain(button);
+    }
 }
 
-extern "C" void swiftomniui_winui_toolbar_button_set_icon(SwiftOmniUIObjectRef handle, char const *symbol, char const *icons) {
+bool swiftomniui::setBarButtonCaption(controls::Control const &control, winrt::hstring const &words) {
+    if (auto toggle = control.try_as<controls::AppBarToggleButton>()) captionBarButton(toggle, words);
+    else if (auto button = control.try_as<controls::AppBarButton>()) captionBarButton(button, words);
+    else return false;
+    return true;
+}
+
+extern "C" void swiftomniui_winui_toolbar_button_set_icon(
+    SwiftOmniUIObjectRef handle, char const *symbol, char const *icons, double width, double height
+) {
     try {
         // A picture stands in the icon slot and the words move to the tip; words alone are the label.
         auto icon = barIcon(symbol, icons);
         auto control = borrow<controls::Control>(handle);
+        sizeBarPicture(control, icon, width, height);
         auto place = [&](auto const &command) {
             command.Icon(icon);
-            auto words = command.Label();
-            bool collapsed = icon || words.empty();
-            command.LabelPosition(collapsed ? controls::CommandBarLabelPosition::Collapsed
-                                            : controls::CommandBarLabelPosition::Default);
-            // Showing its icon alone, the button stands as wide as the bar's own back and pane buttons - the
-            // system gives those 40. Words alone keep the default width, which a label needs.
-            if (collapsed) command.Width(40);
-            else command.ClearValue(xaml::FrameworkElement::WidthProperty());
-            if (icon && !words.empty()) controls::ToolTipService::SetToolTip(command, winrt::box_value(words));
+            captionBarButton(command, command.Label());
         };
         if (auto toggle = control.try_as<controls::AppBarToggleButton>()) return place(toggle);
         if (auto command = control.try_as<controls::AppBarButton>()) return place(command);

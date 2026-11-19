@@ -107,6 +107,9 @@ enum WinUICallbacks {
                     WinUIRenderer.shared?.runtime.frames.laidOut()
                 }
             },
+            layoutCommitted: {
+                MainActor.assumeIsolated { WinUIRenderer.shared?.commitSettledLayout() }
+            },
             viewportChanged: { view, x, y, width, height, _, _ in
                 MainActor.assumeIsolated {
                     (WinUIView.find(view) as? WinUILazyView)?.viewportReported(
@@ -272,6 +275,11 @@ enum WinUICallbacks {
             paneWidthChanged: { view in
                 MainActor.assumeIsolated { (WinUIView.find(view) as? WinUISidebarView)?.paneWidthChanged() }
             },
-            isProgramWriting: { MainActor.assumeIsolated { ProgramWrite.isWriting } })
+            isProgramWriting: { MainActor.assumeIsolated { ProgramWrite.isWriting } },
+            windowShortcut: { window, command in
+                MainActor.assumeIsolated {
+                    WinUIRenderer.shared?.handleStandardShortcut(window: window, command: command) ?? false
+                }
+            })
     }
 }

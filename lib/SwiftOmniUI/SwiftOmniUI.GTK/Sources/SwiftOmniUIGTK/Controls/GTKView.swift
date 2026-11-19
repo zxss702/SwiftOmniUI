@@ -20,7 +20,12 @@ class GTKView {
     let number: Int64
 
     /// The layout that places this view, which a place written between passes asks to allocate again.
-    weak var placingLayout: GTKLayoutView?
+    weak var placingLayout: GTKLayoutView? {
+        didSet { if placingLayout !== oldValue { placementBottom = nil } }
+    }
+
+    /// The bottom edge in the parent's current allocation, while height animates.
+    var placementBottom: Double?
 
     /// Content-size invalidation belongs to this view, not to every row in its lazy parent.
     var measurementRevision = 0
@@ -143,6 +148,8 @@ class GTKView {
     /// Blur is drawing, in logical pixels. A local provider changes only this
     /// widget's filter; animated radii never grow the display-wide style sheet.
     private(set) var blur = 0.0
+    private var multiplyBlend = false
+    private static let multiplyKey = "swiftomniui-multiply-blend"
     private var inheritedBlur = 0.0
     private var writtenBlur = 0.0
     private var blurProvider: UnsafeMutablePointer<GtkCssProvider>?
@@ -247,10 +254,31 @@ class GTKView {
         refreshNativeSafeBarDrawing()
     }
 
+    func setMultiplyBlend(_ enabled: Bool) {
+        guard enabled != multiplyBlend else { return }
+        multiplyBlend = enabled
+        refreshBlendMode()
+    }
+
+    var hasBlendContent: Bool { true }
+
+    func refreshBlendMode() {
+        let object = widget.of(GObject.self)
+        let enabled = multiplyBlend && hasBlendContent
+        guard enabled != Self.multiplies(widget) else { return }
+        g_object_set_data(object, Self.multiplyKey, enabled ? UnsafeMutableRawPointer(bitPattern: 1) : nil)
+        if let parent = gtk_widget_get_parent(widget) { gtk_widget_queue_draw(parent) }
+    }
+
+    static func multiplies(_ widget: GTKWidget) -> Bool {
+        g_object_get_data(widget.of(GObject.self), multiplyKey) != nil
+    }
+
     private func writeBlur() {
         // Successive Gaussian filters add their variances. A promoted bar has
         // left its native ancestors, so reproduce their filter on its own root.
-        let radius = (blur * blur + inheritedBlur * inheritedBlur).squareRoot()
+        let rawRadius = (blur * blur + inheritedBlur * inheritedBlur).squareRoot()
+        let radius = rawRadius < 0.005 ? 0 : (rawRadius * 100).rounded() / 100
         guard radius != writtenBlur else { return }
         writtenBlur = radius
         let context = gtk_widget_get_style_context(widget)!

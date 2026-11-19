@@ -502,6 +502,23 @@ class WinUILayoutView: WinUIView {
             WinUILayoutUpdates.beganNativeMeasure(self)
             let proposal = Self.normalized(ProposedViewSize(
                 width: width.isFinite ? width : nil, height: height.isFinite ? height : nil))
+            // An intrinsic probe from a native control (such as SplitView during
+            // WindowContentSizing) must never prepare descendant native layouts
+            // at an unconstrained or zero probe width, nor discard real plans.
+            if Self.queryingSize > 0 {
+                let size = Self.nativeDesiredSize(naturalSize(proposal: proposal))
+                let values = sourceElement?.winUI.resolvedLayoutValues ?? LayoutValues()
+                let framed = values.sized(size, offered: proposal.width)
+                let answer: LayoutSize
+                if nativeLayoutOwner != nil || rootSafeAreaContext != nil {
+                    answer = LayoutSize(width: proposal.width ?? framed.width, height: proposal.height ?? framed.height)
+                } else if hasSwiftAllocation {
+                    answer = .zero
+                } else {
+                    answer = framed
+                }
+                return Self.nativeDesiredSize(answer)
+            }
             let previousHeight = measurementHeight
             measurementHeight = proposal.height
             defer {
@@ -613,6 +630,13 @@ class WinUILayoutView: WinUIView {
     /// Unspecified axes follow the corrected intrinsic extent. Both a real
     /// MeasureOverride and a cached Measure restore the same completed plan.
     private func prepareNaturalLayout(proposal: ProposedViewSize) -> LayoutSize {
+        // GeometryReader's ideal size (10x10) is independent of its content;
+        // preparing a subtree (such as ScrollViewReader -> LazyVStack) at an
+        // invented 10px width during an unconstrained measure crushes wrapped
+        // text to zero width and explodes line layout.
+        if sourceElement?.isGeometryReader == true, proposal.width == nil {
+            return naturalSize(proposal: proposal)
+        }
         while true {
             let size = naturalSize(proposal: proposal)
             let bounds = planBounds(proposal: proposal, natural: size)
@@ -775,11 +799,19 @@ class WinUILayoutView: WinUIView {
         }
     }
 
-    /// The size this layout is bound for while its own place travels. Its children keep this destination room;
-    /// the native box still travels through the presentation frames.
+    /// The size this layout is bound for while its own place travels.
     private(set) var arrangementRoom: LayoutSize?
 
     var shouldArrangeInDestinationRoom: Bool { false }
+
+    private var followsBottomPlacement: Bool {
+        var view: WinUIView? = self
+        while let current = view {
+            if current.placementBottom != nil { return true }
+            view = current.placingLayout
+        }
+        return false
+    }
 
     func activeArrangementRoom(in bounds: Rect) -> Rect {
         guard let destination = arrangementRoom else { return bounds }
@@ -787,7 +819,13 @@ class WinUILayoutView: WinUIView {
             return bounds
         }
         if shouldArrangeInDestinationRoom {
-            return Rect(x: 0, y: 0, width: destination.width, height: destination.height)
+            // A bottom-aligned branch grows upward. Planning in a taller
+            // room before that space exists would move its contents early.
+            // During collapse, the smaller destination keeps the children's
+            // targets stable while their current frames travel toward them.
+            let height = followsBottomPlacement ? min(bounds.height, destination.height) : destination.height
+            return Rect(x: 0, y: 0, width: destination.width,
+                        height: height)
         }
         arrangementRoom = nil
         return bounds
@@ -825,7 +863,12 @@ class WinUILayoutView: WinUIView {
         .zero
     }
 
-    func backgroundBounds(in bounds: Rect) -> Rect { bounds }
+    func backgroundBounds(in bounds: Rect) -> Rect {
+        guard !box.clips, clipCommands == nil, box.shape == nil, box.stroke == nil else { return bounds }
+        // An unshaped background fills the adjacent safe-area strips while the
+        // layout and its children keep their original allocation.
+        return layoutSafeArea(in: bounds).bounds
+    }
 
     private struct SafeAreaInput: Equatable {
         let bounds: EdgeInsets

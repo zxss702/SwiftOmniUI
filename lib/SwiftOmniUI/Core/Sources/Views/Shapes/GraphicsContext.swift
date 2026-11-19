@@ -131,11 +131,12 @@ extension GraphicsContext {
         horizontalAlignment: TextAlignment = .start,
         verticalAlignment: TextAlignment = .start
     ) {
-        let look = text.drawnLook
+        let text = Carry(text)
+        let (look, words) = onMain { (text.value.drawnLook, text.value.drawnWords) }
         if !look.isEmpty { commands.append(Draw.saveState()) }
         commands += look
         commands.append(Draw.drawText(
-            text.drawnWords,
+            words,
             x: rect.x, y: rect.y, width: rect.width, height: rect.height,
             horizontalAlignment: horizontalAlignment, verticalAlignment: verticalAlignment))
         if !look.isEmpty { commands.append(Draw.restoreState()) }

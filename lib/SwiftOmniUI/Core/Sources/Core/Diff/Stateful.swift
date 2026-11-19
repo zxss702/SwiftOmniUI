@@ -479,7 +479,12 @@ extension Node {
                     return node
                 }
 
-                node.children = node.children.map { landing($0, written: written) }
+                var childWritten = written
+                childWritten.preferenceObservers = []
+                childWritten.preferenceTransforms = []
+                node.preferenceObservers += written.preferenceObservers
+                node.preferenceTransforms += written.preferenceTransforms
+                node.children = node.children.map { landing($0, written: childWritten) }
                 return node
             }
 

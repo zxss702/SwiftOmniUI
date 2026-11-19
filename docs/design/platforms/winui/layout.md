@@ -180,9 +180,11 @@ Custom Button and Menu labels retain a native content-owner link. A label's
 attachment-time font or size correction crosses that link to invalidate the
 control and its logical layout ancestors, without replacing the control.
 
-GeometryReader and frame feeds report committed native geometry on a display
-frame, outside native layout. Unloaded views publish no false zero frame.
-Native Image/Viewbox content is prepared at its intrinsic size.
+GeometryReader and frame feeds report committed native geometry from
+LayoutUpdated before paint (with bounded cascade depth) and on display frames
+for pure scroll motion, always outside Measure and Arrange. Unloaded views
+publish no false zero frame. Native Image/Viewbox content is prepared at its
+intrinsic size.
 
 ## A place between passes
 

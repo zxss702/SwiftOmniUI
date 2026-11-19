@@ -43,6 +43,9 @@
     /// Axes on which this child or its content accepts the remaining proposal.
     public var expandingAxes = Axis.neither
 
+    /// Whether proportional `.fit` content can grow only while neither axis is bounded.
+    public var scalesToFit = false
+
     /// The sole child of a frame, measured with the frame's proposal.
     public var isFrameContent = false
 
@@ -183,20 +186,37 @@
     /// margin, both ways; its stated sizes and bounds applied.
     func size(offered width: Double?) -> LayoutSize
 
+    /// Size under a two-axis proposal, as a frame offers its content.
+    func size(offered proposal: ProposedViewSize) -> LayoutSize
+
     /// The child's first text baseline measured from its top, where it has one;
     /// nil for a child with no text to stand on.
     var firstBaseline: Double? { get }
 
     /// The child's last text baseline measured from its top, where it has one.
     var lastBaseline: Double? { get }
+
+    /// The child's first text baseline in `size`, where its baseline depends on placement.
+    func firstBaseline(in size: LayoutSize) -> Double?
+
+    /// The child's last text baseline in `size`, where its baseline depends on placement.
+    func lastBaseline(in size: LayoutSize) -> Double?
 }
 
 extension LayoutChild {
+    public func size(offered proposal: ProposedViewSize) -> LayoutSize {
+        size(offered: proposal.width)
+    }
+
     /// No baseline: a child that keeps silent about one aligns by its edges.
     public var firstBaseline: Double? { nil }
 
     /// No baseline.
     public var lastBaseline: Double? { nil }
+
+    public func firstBaseline(in size: LayoutSize) -> Double? { firstBaseline }
+
+    public func lastBaseline(in size: LayoutSize) -> Double? { lastBaseline ?? firstBaseline(in: size) }
 }
 
 /// The arithmetic of one child's extent and place along one axis of its slot.

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 @_spi(Host) import SwiftOmniUICore
+@_spi(Host) import SwiftOmniUIHost
 import CSwiftOmniUIWinUI
 
 /// Native key conversion shared by buttons and command menus.
@@ -10,15 +11,11 @@ enum WinUIKeyboardShortcut {
     /// Named keys use VirtualKey; characters use the active Windows keyboard
     /// layout (punctuation's Unicode value is NOT a VirtualKey).
     static func numbers(_ shortcut: KeyboardShortcut) -> (Int32, Int32) {
-        var modifiers: Int32 = 0
-        // Bit 3 remains readable for previously serialized Control shortcuts;
-        // the public Windows/Linux API names this key only as `.command`.
-        if shortcut.modifiers.contains(.command) || shortcut.modifiers.rawValue & (1 << 3) != 0 { modifiers |= 1 }
-        if shortcut.modifiers.contains(.shift) { modifiers |= 4 }
-        if shortcut.modifiers.contains(.option) { modifiers |= 2 }
-        let key: Int32 = switch shortcut.key.name {
-        case "return", "defaultaction": 13
-        case "escape", "cancelaction": 27
+        let mapped = ShortcutMapping.desktopShortcut(for: shortcut)
+        var modifiers = mapped.modifiers.rawValue
+        let key: Int32 = switch mapped.key {
+        case "return": 13
+        case "escape": 27
         case "tab": 9
         case "space": 32
         case "delete": 8

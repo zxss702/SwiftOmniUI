@@ -30,6 +30,42 @@ private struct EquatableInputEditor: View, Equatable {
 }
 
 final class WinUITextEditorViewTests: XCTestCase {
+    func testEdgeReorderKeepsTheFocusedEditorAttached() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running {
+                VStack {
+                    Text("Old title")
+                    Text("Old actions")
+                    TextEditor("").frame(width: 220, height: 80)
+                }.id("welcome-panel")
+            }
+            let panel = try XCTUnwrap(host.view(id: .manual("welcome-panel")) as? WinUIStackView)
+            let editor = try XCTUnwrap(host.views(WinUITextEditorView.self).first)
+            host.settle { editor.isAttached }
+            XCTAssertTrue(swiftomniui_winui_focus(editor.handle, true))
+            host.step()
+
+            let original = panel.items
+            let editorSeat = try XCTUnwrap(original.last)
+            let title = WinUILabelView()
+            title.setText("New title")
+            let transitioning = [WinUILayoutItem(view: title), editorSeat] + Array(original.dropLast())
+            var lostFocus = false
+            editor.setFocusChanged { if !$0 { lostFocus = true } }
+            defer { editor.setFocusChanged(nil) }
+
+            for items in [transitioning, original] {
+                panel.setItems(items)
+                XCTAssertTrue(swiftomniui_winui_focused(editor.handle))
+                host.step()
+                host.frame()
+                XCTAssertFalse(lostFocus, "reordering siblings must preserve native editor focus")
+                XCTAssertTrue(editor.isAttached)
+                XCTAssertTrue(swiftomniui_winui_focused(editor.handle))
+            }
+        }
+    }
+
     /// Every character rebuilds the parent and makes a fresh comparable composer; its owned focus must survive.
     func testTypingIntoAnEquatableComposerKeepsFocusAcrossParentRebuilds() throws {
         try onUIThread {

@@ -35,6 +35,7 @@ final class GTKElement: NativeElement {
         .flex, .isFrameContent, .isLayoutDecoration, .orientation,
         .horizontalAlignmentDefault, .verticalAlignmentDefault,
         .layoutPriority, .horizontalGuide, .verticalGuide,
+        ImageContract.isResizable.token, ImageElementContract.aspect.token, Prop("aspectFit"),
     ])
 
     private static func geometryLanes(affectedBy properties: Set<Prop>) -> AnimationLanes {
@@ -132,6 +133,19 @@ final class GTKElement: NativeElement {
     }
 
     func presentFrame(_ changed: Set<Prop>) {
+        if let view, changed.isSubset(of: MountedElement.fastDrawingFrameProperties) {
+            var transforms = false
+            for property in changed {
+                switch property {
+                case .opacity: view.setOpacity(element.number(.opacity) ?? 1)
+                case .blur: view.setBlur(element.number(.blur) ?? 0)
+                default: transforms = true
+                }
+            }
+            if transforms { view.setTransform(element.drawingTransform) }
+            view.refreshNativeSafeBarDrawing()
+            return
+        }
         if !changed.isDisjoint(with: Self.layoutInputs) {
             notifyLayoutMotion(followingPresentation: true, presentedLanes: Self.geometryLanes(affectedBy: changed))
         }

@@ -11,12 +11,12 @@ public struct NavigationPath: Equatable {
 
     /// Creates a new navigation path from a sequence of hashable elements.
     public init<S: Sequence>(_ elements: S) where S.Element: Hashable {
-        self.elements = elements.map(AnyHashable.init)
+        self.elements = elements.map { AnyHashable($0) }
     }
 
     /// Creates a new navigation path from a sequence of codable, hashable elements.
     public init<S: Sequence>(_ elements: S) where S.Element: Decodable, S.Element: Encodable, S.Element: Hashable {
-        self.elements = elements.map(AnyHashable.init)
+        self.elements = elements.map { AnyHashable($0) }
     }
 
     /// The number of elements in this path.

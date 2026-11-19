@@ -52,6 +52,10 @@ final class GTKWindow {
     /// What the window does when the desktop activates it or takes that away.
     var onActiveChanged: ((Bool) -> Void)?
 
+    /// Built-in macOS-anchored standard shortcut fallback (fires only when no
+    /// widget or menu shortcut claimed the key).
+    var onStandardShortcut: ((StandardShortcut) -> Bool)?
+
     /// The number the window's signals carry, one across the process.
     private let number: Int64
     private static var nextNumber: Int64 = 1
@@ -101,6 +105,17 @@ final class GTKWindow {
                     gtk_window_is_active(widget.assumingMemoryBound(to: GtkWindow.self)) != 0)
             }
         }
+        // Bubble-phase fallback for built-in macOS-anchored standard shortcuts;
+        // focused widgets and GtkShortcutController button/menu shortcuts run first.
+        let keys = gtk_event_controller_key_new()!
+        let keyCallback: @convention(c) (OpaquePointer?, guint, guint, GdkModifierType, gpointer?) -> gboolean = { _, keyval, _, state, data in
+            MainActor.assumeIsolated {
+                GTKWindow.open[viewNumber(data)]?.handleStandardKey(keyval: keyval, state: state) ?? false
+            } ? 1 : 0
+        }
+        g_signal_connect_data(UnsafeMutableRawPointer(keys), "key-pressed", unsafeBitCast(keyCallback, to: GCallback.self),
+            UnsafeMutableRawPointer(bitPattern: Int(number)), nil, GConnectFlags(rawValue: 0))
+        gtk_widget_add_controller(widget, keys)
     }
 
     isolated deinit {
@@ -324,6 +339,38 @@ final class GTKWindow {
     /// says it goes, else GTK takes it down.
     func close() {
         gtk_window_close(widget.of(GtkWindow.self))
+    }
+
+    /// Minimizes the window.
+    func minimize() {
+        gtk_window_minimize(widget.of(GtkWindow.self))
+    }
+
+    /// Toggles fullscreen state on the window.
+    func toggleFullscreen() {
+        let win = widget.of(GtkWindow.self)
+        if gtk_window_is_fullscreen(win) != 0 {
+            gtk_window_unfullscreen(win)
+        } else {
+            gtk_window_fullscreen(win)
+        }
+    }
+
+    private func handleStandardKey(keyval: guint, state: GdkModifierType) -> Bool {
+        guard let onStandardShortcut else { return false }
+        let raw = state.rawValue
+        // Ignore Super/Meta chords so OS-level shortcuts are untouched.
+        if (raw & GDK_SUPER_MASK.rawValue) != 0 || (raw & GDK_META_MASK.rawValue) != 0 { return false }
+        var modifiers: DesktopModifiers = []
+        if (raw & GDK_CONTROL_MASK.rawValue) != 0 { modifiers.insert(.control) }
+        if (raw & GDK_ALT_MASK.rawValue) != 0 { modifiers.insert(.alt) }
+        if (raw & GDK_SHIFT_MASK.rawValue) != 0 { modifiers.insert(.shift) }
+        let scalarValue = gdk_keyval_to_unicode(keyval)
+        guard scalarValue != 0, let scalar = UnicodeScalar(scalarValue) else { return false }
+        guard let shortcut = ShortcutMapping.standardShortcut(key: String(scalar), modifiers: modifiers) else {
+            return false
+        }
+        return onStandardShortcut(shortcut)
     }
 
     /// Takes the window down now - the tree has already let it go.
