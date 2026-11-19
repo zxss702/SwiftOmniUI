@@ -202,7 +202,7 @@ class WinUILayoutView: WinUIView {
     private var cut: (outline: ContainerShape, width: Double, height: Double)?
 
     /// The elements the panel holds, in the order it draws them, back to front.
-    private var held: [WinUIView] = []
+    private(set) var attachedChildren: [WinUIView] = []
     private var heldBox: WinUIShapeView?
     private var nativeArrangePending = false
     private(set) var allocatedBounds = Rect(0, 0, 0, 0)
@@ -265,7 +265,7 @@ class WinUILayoutView: WinUIView {
 
     func setChildren(_ proposed: [WinUIView]) {
         let views = proposed.filter { !$0.isLayoutOnly && (allowsNativeSafeBars || $0.nativeSafeBarOwner == nil) }
-        let childrenChanged = views.count != held.count || !zip(views, held).allSatisfy({ $0 === $1 })
+        let childrenChanged = views.count != attachedChildren.count || !zip(views, attachedChildren).allSatisfy({ $0 === $1 })
         // Compare before deferring: an unchanged proposal completes no work,
         // and a return to the mounted list cancels an older pending replacement.
         guard boxView !== heldBox || childrenChanged else {
@@ -289,7 +289,7 @@ class WinUILayoutView: WinUIView {
         pendingChildren = nil
 
         let handles: [SwiftOmniUIObjectRef?] = (boxView.map { [$0.presentationHandle] } ?? []) + views.map(\.presentationHandle)
-        let previous = held
+        let previous = attachedChildren
         let attachmentObserver = self is WinUILazyView ? WinUIElement.workObserver : nil
         let attachmentStarted = attachmentObserver == nil ? 0 : WinUIFrameClock.monotonic()
         holdNativeChildren(handles)
@@ -314,7 +314,7 @@ class WinUILayoutView: WinUIView {
             for view in previous where !nextNumbers.contains(view.number) { view.nativeParentChanged() }
             for view in views where !previousNumbers.contains(view.number) { view.nativeParentChanged() }
         }
-        held = views
+        attachedChildren = views
         heldBox = boxView
         // Native content must be attached before its size is queried again.
         // Invalidate on an actual child change, never on a deferred no-op.
@@ -363,7 +363,7 @@ class WinUILayoutView: WinUIView {
         }
         // A brush/outline update must preserve the newest structural proposal,
         // including children waiting for the native layout pass to finish.
-        setChildren(pendingChildren ?? held)
+        setChildren(pendingChildren ?? attachedChildren)
     }
 
     /// Asks WinUI to arrange the children again: a place in the air lands in the pass it asks for.

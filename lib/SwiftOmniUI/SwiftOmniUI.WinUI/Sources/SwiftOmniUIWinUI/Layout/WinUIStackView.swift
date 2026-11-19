@@ -25,6 +25,28 @@ final class WinUIStackView: WinUITravellingLayout {
         super.init()
     }
 
+    override func heldViews() -> [WinUIView] {
+        let views = super.heldViews()
+        guard !attachedChildren.isEmpty, items.contains(where: \.departing) else { return views }
+        let departing = Set(items.lazy.filter(\.departing).map { $0.view.number })
+        var unplacedDepartures = departing
+        var current = views.lazy.filter { !departing.contains($0.number) }.makeIterator()
+        var drawing: [WinUIView] = []
+        drawing.reserveCapacity(views.count)
+        // The host lists outgoing items after the active layout items. Keep
+        // their previous native slots so removing one doesn't unload its label.
+        for previous in attachedChildren {
+            if unplacedDepartures.remove(previous.number) != nil {
+                drawing.append(previous)
+            } else if let next = current.next() {
+                drawing.append(next)
+            }
+        }
+        while let next = current.next() { drawing.append(next) }
+        drawing.append(contentsOf: views.filter { unplacedDepartures.contains($0.number) })
+        return drawing
+    }
+
     override func contentSize(width: Double?) -> LayoutSize {
         contentSize(proposal: ProposedViewSize(width: width))
     }
