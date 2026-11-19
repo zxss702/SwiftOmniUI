@@ -777,15 +777,33 @@ extension Differ {
             }
         }
 
-        // Themed values are picked here, which makes this element the color scheme's reader.
+        // Themed values are picked here, which makes this element the color scheme's reader - the scheme its own
+        // environment says, so `.colorScheme(.dark)` on a subtree darkens the colors under it as it does in SwiftUI.
         // Design: docs/design/core/identity-and-diffing.md#themes
         if node.props.values.contains(where: \.isThemed) {
             node.props = ReadScope.collect(into: &reads) {
-                node.props.mapValues { $0.isThemed ? $0.resolvingColorScheme() : $0 }
+                let scheme = envValues.colorScheme
+                return node.props.mapValues { $0.isThemed ? $0.resolvingColorScheme(in: scheme) : $0 }
             }
 
             if placeholder == nil {
                 placeholder = authored
+            }
+        }
+
+        // A subtree set to a color scheme other than the host's has no native theme behind it, so text nobody
+        // colored would keep the host's default - black on a `.colorScheme(.dark)` overlay over a dark page. It takes
+        // that scheme's primary, as SwiftUI's default foreground does.
+        if node.type == .text, node.props[.foregroundStyle] == nil {
+            let scheme: ColorScheme? = ReadScope.collect(into: &reads) {
+                let own = envValues.colorScheme
+                return own == StandardEnvironment.appInfo.colorScheme ? nil : own
+            }
+            if let scheme {
+                node.props[.foregroundStyle] = Color.primary.propValue.resolvingColorScheme(in: scheme)
+                if placeholder == nil {
+                    placeholder = authored
+                }
             }
         }
 

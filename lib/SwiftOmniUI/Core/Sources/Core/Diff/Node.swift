@@ -80,14 +80,16 @@ public enum PropValue: Equatable, Sendable {
         }
     }
 
-    /// This value with the half in force picked - a read of the color scheme.
+    /// This value with the half in force picked - a read of the color scheme. `scheme` is the one an element's own
+    /// environment says (`.colorScheme(.dark)` on a subtree, as SwiftUI resolves its dynamic colors there); nil reads
+    /// the appearance the host reports.
     /// The conformance harness uses the same resolution for its expected native values.
-    @_spi(Host) public func resolvingColorScheme() -> PropValue {
+    @_spi(Host) public func resolvingColorScheme(in scheme: ColorScheme? = nil) -> PropValue {
         switch self {
         case .themed(let light, let dark):
-            (StandardEnvironment.appInfo.colorScheme == .dark ? dark : light).resolvingColorScheme()
+            ((scheme ?? StandardEnvironment.appInfo.colorScheme) == .dark ? dark : light).resolvingColorScheme(in: scheme)
         case .values(let values):
-            .values(values.map { $0.resolvingColorScheme() })
+            .values(values.map { $0.resolvingColorScheme(in: scheme) })
         default:
             self
         }
