@@ -49,6 +49,7 @@ class WinUIView {
     weak var placingLayout: WinUILayoutView? {
         didSet {
             if placingLayout !== oldValue {
+                if oldValue is WinUIZStackView { setZIndex(0) }
                 placementBottom = nil
                 nativeParentChanged()
             }

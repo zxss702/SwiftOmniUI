@@ -15,7 +15,16 @@ class WinUIZStackView: WinUITravellingLayout {
 
     override func heldViews() -> [WinUIView] {
         var views = super.heldViews()
-        guard sourceElement?.safeAreaInsetEdge != nil else { return views }
+        guard sourceElement?.safeAreaInsetEdge != nil else {
+            // Keep the native order of survivors. The logical draw order is
+            // written separately, so restacking never unloads their controls.
+            guard !attachedChildren.isEmpty,
+                  attachedChildren.count != views.count || !zip(attachedChildren, views).allSatisfy({ $0 === $1 }) else { return views }
+            var wanted = Set(views.map(ObjectIdentifier.init))
+            var attached = attachedChildren.filter { wanted.remove(ObjectIdentifier($0)) != nil }
+            attached.append(contentsOf: views.filter { wanted.contains(ObjectIdentifier($0)) })
+            return attached
+        }
         let current = items.filter { !$0.departing }
         guard current.count == 2,
               current[1].view.nativeSafeBarOwner == nil,
@@ -252,7 +261,7 @@ class WinUIZStackView: WinUITravellingLayout {
         }
         let ordered = ZStackArithmetic.drawingOrder(of: items.count, placedBy: placement?.placements ?? [])
         for (rank, index) in ordered.enumerated() {
-            items[index].view.setZIndex(ordered == Array(items.indices) ? 0 : Int32(rank))
+            items[index].view.setZIndex(Int32(rank + 1))
         }
     }
 
