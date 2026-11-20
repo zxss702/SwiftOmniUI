@@ -193,6 +193,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_text_make(void) {
         // including small custom-font captions inside a fixed-height frame.
         block.UseLayoutRounding(false);
         block.TextWrapping(xaml::TextWrapping::Wrap);
+        block.TextTrimming(xaml::TextTrimming::CharacterEllipsis);
         controls::Border label;
         label.Background(clearGround());
         label.Child(block);

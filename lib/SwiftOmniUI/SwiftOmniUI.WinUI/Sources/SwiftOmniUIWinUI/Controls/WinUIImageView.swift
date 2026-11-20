@@ -33,8 +33,8 @@ final class WinUIImageView: WinUIView {
         var folder: UInt64
     }
     private var loaded: Load?
+    // The native FontIcon is reused across source changes and retains its tint.
     private var writtenTint: UInt32?
-    private var hasWrittenTint = false
 
     init() {
         super.init(reportsAllocationFromArrange: true) { swiftomniui_winui_image_make($0) }
@@ -80,7 +80,6 @@ final class WinUIImageView: WinUIView {
             if !found { WinUIRenderer.log.error("no picture \(file) among the application's pictures") }
         }
         declared = size[0] > 0 && size[1] > 0 ? LayoutSize(width: size[0], height: size[1]) : nil
-        hasWrittenTint = false
         writeTint(font.color?.argb)
         picturePlace = nil
         discardMeasurementResults()
@@ -89,10 +88,9 @@ final class WinUIImageView: WinUIView {
     }
 
     private func writeTint(_ tint: UInt32?) {
-        guard symbol, !hasWrittenTint || tint != writtenTint else { return }
+        guard symbol, found, tint != writtenTint else { return }
         swiftomniui_winui_image_set_tint(handle, tint != nil, tint ?? 0)
         writtenTint = tint
-        hasWrittenTint = true
     }
 
     /// A fitted picture uses the proposal and its intrinsic aspect ratio.

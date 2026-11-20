@@ -182,6 +182,8 @@
     /// Whether the child is shown; a hidden child takes no room.
     var isShown: Bool { get }
 
+    var preferredMinimumHeight: Double { get }
+
     /// The child's own size for the width offered to it, its margin already taken out - the layout owns the
     /// margin, both ways; its stated sizes and bounds applied.
     func size(offered width: Double?) -> LayoutSize
@@ -204,6 +206,8 @@
 }
 
 extension LayoutChild {
+    public var preferredMinimumHeight: Double { 0 }
+
     public func size(offered proposal: ProposedViewSize) -> LayoutSize {
         size(offered: proposal.width)
     }

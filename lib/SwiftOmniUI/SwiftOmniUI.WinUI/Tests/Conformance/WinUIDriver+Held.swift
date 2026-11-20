@@ -195,7 +195,7 @@ extension WinUIDriver {
         case "lineBreak":
             let wrapping = Int(try read(view, "wrapping")) ?? 2
             let trimming = Int(try read(view, "trimming")) ?? 0
-            let broken: LineBreak = trimming != 0 ? .tailTruncation : wrapping == 1 ? .noWrap : .wordWrap
+            let broken: LineBreak = wrapping != 1 ? .wordWrap : trimming != 0 ? .tailTruncation : .noWrap
             return broken.propValue
         case "multilineTextAlignment":
             if view is WinUIPickerView {

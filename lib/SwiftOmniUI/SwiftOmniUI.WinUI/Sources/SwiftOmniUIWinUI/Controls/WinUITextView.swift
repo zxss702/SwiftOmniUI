@@ -292,9 +292,7 @@ class WinUITextView: WinUIView {
     /// (`LineBreak.lines`).
     func setLines(breaking: LineBreak, maximum: Int?) {
         let lines = breaking.lines(maximum: maximum)
-        // MaxLines alone clips. A bounded wrapped label must also ask XAML
-        // to indicate omitted text; an unlimited wrapped label stays untrimmed.
-        let trims = breaking.truncates || (breaking.wraps && lines != nil)
+        let trims = breaking.truncates || breaking.wraps
         swiftomniui_winui_text_set_lines(
             handle, breaking.wraps, Int32(lines ?? 0), trims)
         discardMeasurementResults()

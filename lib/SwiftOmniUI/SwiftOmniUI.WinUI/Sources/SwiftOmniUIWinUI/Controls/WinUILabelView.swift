@@ -16,6 +16,11 @@ final class WinUILabelView: WinUITextView {
     private var runs: [TextRun]?
     private var runsLook: TextLook?
 
+    var minimumLineHeight: Double {
+        guard runs == nil, !ownText.isEmpty else { return 0 }
+        return swiftomniui_winui_text_minimum_line_height(handle, look.lineHeight ?? 1)
+    }
+
     // A newly installed rich paragraph can attach after its Border is already
     // loaded. Inline image/baseline metrics still need that paragraph's refresh.
     override var refreshesAttachedInlineMeasurements: Bool {

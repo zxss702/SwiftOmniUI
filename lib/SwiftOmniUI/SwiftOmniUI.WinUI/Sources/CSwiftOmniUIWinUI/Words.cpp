@@ -474,6 +474,14 @@ extern "C" double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRe
     catch (...) { report("reading natural line height"); return 0; }
 }
 
+extern "C" double swiftomniui_winui_text_minimum_line_height(SwiftOmniUIObjectRef handle, double multiple) {
+    try {
+        auto block = labelWords(handle);
+        auto padding = block.Padding();
+        return naturalWordsMetrics(block).height * multiple + padding.Top + padding.Bottom;
+    } catch (...) { report("reading minimum line height"); return 0; }
+}
+
 extern "C" void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef handle, int32_t characterSpacing, double baselineAdvance, double singleLineHeight) {
     try {
         invalidateWordsMeasurement(handle);

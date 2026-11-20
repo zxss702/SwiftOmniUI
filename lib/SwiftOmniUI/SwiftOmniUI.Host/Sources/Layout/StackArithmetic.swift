@@ -357,9 +357,17 @@
                 let group = shown.filter { items[$0].values.priority == priority }
                 deficit = distribute(group.filter { flexibleIndices.contains($0) }, amount: deficit, growing: false)
                 let intrinsic = group.filter { !flexibleIndices.contains($0) }
-                deficit = axis == .horizontal
-                    ? compressIntrinsicRow(intrinsic, amount: deficit)
-                    : distribute(intrinsic, amount: deficit, growing: false)
+                if axis == .horizontal {
+                    deficit = compressIntrinsicRow(intrinsic, amount: deficit)
+                } else if deficit > 0 {
+                    let originalMinima = intrinsic.map { minima[$0] }
+                    for index in intrinsic {
+                        minima[index] = max(minima[index], min(extents[index], items[index].preferredMinimumHeight))
+                    }
+                    deficit = distribute(intrinsic, amount: deficit, growing: false)
+                    for (index, minimum) in zip(intrinsic, originalMinima) { minima[index] = minimum }
+                    if deficit > 0 { deficit = distribute(intrinsic, amount: deficit, growing: false) }
+                }
             }
             return extents
         }

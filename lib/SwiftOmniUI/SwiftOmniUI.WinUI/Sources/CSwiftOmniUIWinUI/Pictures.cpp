@@ -430,15 +430,10 @@ namespace {
         controls::Viewbox box{nullptr};
         winrt::Windows::Foundation::Size placement{};
 
-        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size available) {
+        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size) {
             // Swift owns the image's intrinsic size and its frame. A native
             // desired size would enlarge or clip an unresizable image whose
             // frame is smaller than its glyph (for example a disclosure arrow).
-            auto size = placement.Width > 0 && placement.Height > 0 ? placement : available;
-            if (std::isfinite(available.Width)) size.Width = std::min(size.Width, available.Width);
-            if (std::isfinite(available.Height)) size.Height = std::min(size.Height, available.Height);
-            for (auto const &child : Children())
-                if (child.Visibility() == xaml::Visibility::Visible) child.Measure(size);
             return {0, 0};
         }
 
@@ -447,11 +442,13 @@ namespace {
             for (auto const &child : Children()) {
                 if (child.Visibility() != xaml::Visibility::Visible) continue;
                 auto element = child.as<xaml::FrameworkElement>();
+                if (placement.Width <= 0 || placement.Height <= 0) child.Measure(final);
                 auto desired = child.DesiredSize();
                 auto width = placement.Width > 0 ? placement.Width
                     : std::isfinite(element.Width()) ? static_cast<float>(element.Width()) : desired.Width;
                 auto height = placement.Height > 0 ? placement.Height
                     : std::isfinite(element.Height()) ? static_cast<float>(element.Height()) : desired.Height;
+                child.Measure({width, height});
                 child.Arrange({(final.Width - width) / 2, (final.Height - height) / 2, width, height});
             }
             return final;
@@ -473,6 +470,7 @@ namespace {
         auto state = imageState(grid);
         if (!state->image) {
             state->image = controls::Image();
+            state->image.UseLayoutRounding(false);
             grid.Children().Append(state->image);
         }
         return state->image;
@@ -532,9 +530,20 @@ extern "C" bool swiftomniui_winui_image_set_symbol(
         if (fontSize <= 0 && textStyle >= 0) {
             try { resolvedSize = textFontDefaults(textStyle).size; } catch (...) {}
         }
-        symbol.FontSize(resolvedSize);
-        symbol.Glyph(winrt::to_hstring(glyph));
-        size[0] = size[1] = symbol.FontSize();
+        if (symbol.FontSize() != resolvedSize) symbol.FontSize(resolvedSize);
+        auto nextGlyph = winrt::to_hstring(glyph);
+        auto previousGlyph = symbol.Glyph();
+        if (previousGlyph != nextGlyph) {
+            symbol.Glyph(nextGlyph);
+            if (!previousGlyph.empty()) {
+                // A replacement glyph can keep exactly the same size and slot.
+                // Refresh the existing icon and its panel even in that case.
+                symbol.InvalidateMeasure();
+                grid.InvalidateMeasure();
+                grid.InvalidateArrange();
+            }
+        }
+        size[0] = size[1] = resolvedSize;
         if (auto box = state->box) {
             box.Stretch(aspect == 2 ? xaml::Media::Stretch::Fill
                         : centred ? xaml::Media::Stretch::None : xaml::Media::Stretch::Uniform);
@@ -657,6 +666,24 @@ extern "C" void swiftomniui_winui_image_size(SwiftOmniUIObjectRef handle, double
     } catch (...) {
         report("reading a picture's size");
     }
+}
+
+extern "C" bool swiftomniui_winui_image_content_frame(SwiftOmniUIObjectRef handle, double *frame) {
+    try {
+        for (auto const &child : imageGrid(handle).Children()) {
+            if (child.Visibility() != xaml::Visibility::Visible) continue;
+            auto offset = child.ActualOffset();
+            auto size = child.ActualSize();
+            frame[0] = offset.x;
+            frame[1] = offset.y;
+            frame[2] = size.x;
+            frame[3] = size.y;
+            return true;
+        }
+    } catch (...) {
+        report("reading native picture content geometry");
+    }
+    return false;
 }
 
 extern "C" void swiftomniui_winui_image_place(SwiftOmniUIObjectRef handle, double width, double height) {

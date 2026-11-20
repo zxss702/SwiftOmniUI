@@ -32,6 +32,10 @@ struct WinUILayoutItem: LayoutChild {
     /// Whether the view animates out where it stood: kept in the subviews, taking no room.
     var departing = false
 
+    var preferredMinimumHeight: Double {
+        (view as? WinUILabelView)?.minimumLineHeight ?? 0
+    }
+
     /// The view's size for the width offered it, margin taken out (`LayoutValues.offer`, `sized`).
     func size(offered width: Double?) -> LayoutSize {
         size(offered: ProposedViewSize(width: width))
