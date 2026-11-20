@@ -135,6 +135,7 @@
     let makeNative: (MountedElement) -> any NativeElement
     private var nextMount: UInt64 = 0
     private var patchTime: Double?
+    var motionTime: Double { layoutMotion.insertionStartedAt ?? patchTime ?? now() }
     private(set) var languageDirection: LayoutDirection?
     private var patchReducesMotion: Bool?
 
@@ -242,7 +243,7 @@
             animation: animation,
             landed: landed,
             retainingTarget: retainingTarget,
-            now: patchTime ?? now(),
+            now: motionTime,
             reducesMotion: patchReducesMotion ?? reducesMotion())
         // A static property write does not change the frame subscription.
         // Checking the cycle board for every font, frame and image property

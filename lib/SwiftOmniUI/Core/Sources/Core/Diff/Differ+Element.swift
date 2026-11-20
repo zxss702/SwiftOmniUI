@@ -895,7 +895,8 @@ extension Differ {
         // standing instruction without changing that instruction.
         let animating = { (values: AnimationValues) -> Animation in
             if transacting?.disablesAnimations == true { return .none }
-            if transacting?.isGeometryFeedback == true, !values.isDisjoint(with: .size) { return .none }
+            if transacting?.isGeometryFeedback == true,
+               !values.isDisjoint(with: [.size, .place, .transform, .spacing]) { return .none }
 
             let selected = plan?.animation(for: values, armed: armed) ?? .inherited
             let resolved = selected.resolved(against: standing)
@@ -953,7 +954,9 @@ extension Differ {
                 if animating(.height).isNothing { moving.subtract(.height) }
                 if node.childSizesArrive { moving.subtract([.width, .height]) }
                 if transacting?.isGeometryFeedback == true { moving = [] }
-                patch.layoutTransition = HostLayoutMotion(animation: animating(.place), lanes: moving)
+                patch.layoutTransition = HostLayoutMotion(
+                    animation: animating(.place), lanes: moving,
+                    followsPresentation: transacting?.isGeometryFeedback == true)
             }
         }
 

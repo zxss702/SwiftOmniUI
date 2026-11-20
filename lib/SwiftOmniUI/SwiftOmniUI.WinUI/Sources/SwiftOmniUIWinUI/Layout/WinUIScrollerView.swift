@@ -55,7 +55,9 @@ final class WinUIScrollerView: WinUIView {
     }
 
     init() {
-        super.init { number in swiftomniui_winui_scroller_make(number) }
+        super.init(allocation: { swiftomniui_winui_hosted_viewport_make($0) }) {
+            number in swiftomniui_winui_scroller_make(number)
+        }
     }
 
     /// The document it moves, the ways it scrolls, and its bars.

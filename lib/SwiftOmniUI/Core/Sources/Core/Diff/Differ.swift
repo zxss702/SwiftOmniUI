@@ -364,7 +364,7 @@ final class Differ {
             let plan = rendered.placementPlan
             let write = plan?.transaction(under: transaction) ?? transaction
             func law(for values: AnimationValues) -> Animation {
-                if write.disablesAnimations { return .none }
+                if write.disablesAnimations || write.isGeometryFeedback { return .none }
                 let resolved = (plan?.animation(for: values) ?? .inherited).resolved(against: animation)
                 if let override = write.animation, !resolved.isCustom,
                    plan?.animation(for: values)?.isNothing != true { return override }
@@ -376,7 +376,8 @@ final class Differ {
             if law(for: .height).isNothing { lanes.subtract(.height) }
             if rendered.childSizesArrive { lanes.subtract([.width, .height]) }
             if write.isGeometryFeedback { lanes = [] }
-            patch.layoutTransition = HostLayoutMotion(animation: law(for: .place), lanes: lanes)
+            patch.layoutTransition = HostLayoutMotion(
+                animation: law(for: .place), lanes: lanes, followsPresentation: write.isGeometryFeedback)
         }
 
         // A kept element folds its subtree's preference answers again - a

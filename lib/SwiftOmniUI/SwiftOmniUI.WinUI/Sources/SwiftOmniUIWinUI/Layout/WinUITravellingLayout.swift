@@ -41,7 +41,10 @@ class WinUITravellingLayout: WinUILayoutView {
 
     func takePresentationFrame() -> Bool {
         defer { pendingPresentationFrame = false }
-        return pendingPresentationFrame && WinUIView.allocatingNativeRoom == 0
+        isArrangingPresentation = WinUIView.allocatingNativeRoom == 0
+            && (pendingPresentationFrame || isSamplingAllocatedRoom || receivesPresentedRoom
+                || placingLayout?.isArrangingPresentation == true)
+        return isArrangingPresentation
     }
 
     /// Keeps the motion a patch named. A patch that names none leaves the last one standing:
@@ -65,11 +68,17 @@ class WinUITravellingLayout: WinUILayoutView {
     func beginArrangement(in bounds: Rect) {
         onConsumeTransition?()
         if let motion = takeArrivalMotion() { places.animation = motion }
+        let followsViewport = receivesPresentedRoom
         // Native layout may refine a patch more than once. Only the patch starts
         // a new motion; another arrangement preserves the motion already running.
-        places.begin(width: bounds.width, refining: true, height: bounds.height,
+        places.begin(width: bounds.width, animating: !followsViewport, refining: true, height: bounds.height,
                      followingPresentation: takePresentationFrame(), presentedLanes: takePresentedLanes(),
-                     presentedItems: takePresentedItems())
+                     presentedItems: takePresentedItems(), inheritedStart: inheritedArrangementStart)
+    }
+
+    private var inheritedArrangementStart: Double? {
+        guard let parent = placingLayout as? WinUITravellingLayout, parent.isNativeArranging else { return nil }
+        return parent.places.arrangementStartedAt ?? parent.inheritedArrangementStart
     }
 
     /// Stands `item` at `place`, or on its way there.

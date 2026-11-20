@@ -490,14 +490,16 @@ class WinUILayoutView: WinUIView {
         precondition(!isNativeArranging, "an arranging panel prepares its plan within its own phase")
         guard hasNativeProposals else { return }
         let bounds = Self.nativeRect(bounds)
-        if hasSizing, lastSizingWidth == bounds.width, lastSizingHeight == bounds.height,
-           cachedLayoutPlan(in: bounds) != nil { return }
+        let room = arrangementRoom != nil && keepsDestinationWidth && !usesPresentedRoom
+            ? activeArrangementRoom(in: bounds) : bounds
+        if hasSizing, lastSizingWidth == room.width, lastSizingHeight == room.height,
+           cachedLayoutPlan(in: room) != nil { return }
         let previousHeight = measurementHeight
         measurementHeight = bounds.height
         defer { measurementHeight = previousHeight }
-        _ = prepareLayoutPlan(in: bounds, for: .allocation)
-        lastSizingWidth = bounds.width
-        lastSizingHeight = bounds.height
+        _ = prepareLayoutPlan(in: room, for: .allocation)
+        lastSizingWidth = room.width
+        lastSizingHeight = room.height
         hasSizing = true
     }
 
@@ -772,6 +774,9 @@ class WinUILayoutView: WinUIView {
     /// How many times a layout has sized its children - what a test counts.
     static var sizings = 0
 
+    /// Descendant arrangements in this pass receive the parent's geometry sample.
+    var isArrangingPresentation = false
+
     /// Answers WinUI's arrange: places the box and every child in `width` by `height` DIPs, inside the pass.
     func arrange(width: Double, height: Double) {
         hasNativeArrangement = true
@@ -790,14 +795,18 @@ class WinUILayoutView: WinUIView {
             let previousHeight = measurementHeight
             measurementHeight = bounds.height
             let previousPlan = activeLayoutPlan
-            defer { measurementHeight = previousHeight; activeLayoutPlan = previousPlan }
+            defer {
+                measurementHeight = previousHeight
+                activeLayoutPlan = previousPlan
+                isArrangingPresentation = false
+            }
             if hasNativeProposals {
                 // Final bounds can differ from Measure, including one physical
                 // pixel of native Grid rounding. Prepare descendants' slots
                 // without replacing any SOUI panel's native measure result.
                 activeLayoutPlan = prepareLayoutPlan(in: room, for: .allocation)
-                lastSizingWidth = bounds.width
-                lastSizingHeight = bounds.height
+                lastSizingWidth = room.width
+                lastSizingHeight = room.height
                 hasSizing = true
             }
             boxView?.layout(backgroundBounds(in: bounds))
@@ -810,6 +819,23 @@ class WinUILayoutView: WinUIView {
     /// The size this layout is bound for while its own place travels.
     private(set) var arrangementRoom: LayoutSize?
 
+    /// A GeometryReader in the layout flow needs the room currently on screen.
+    var usesPresentedRoom = false
+
+    var isSamplingAllocatedRoom: Bool {
+        guard usesPresentedRoom, let destination = arrangementRoom else { return false }
+        return destination.width != allocatedBounds.width || destination.height != allocatedBounds.height
+    }
+
+    var receivesPresentedRoom: Bool {
+        placingLayout?.passesPresentedRoom == true || placingLayout?.receivesPresentedRoom == true
+    }
+
+    var passesPresentedRoom: Bool { false }
+
+    /// Whether children stay laid out at the destination width for the entire
+    /// placement animation, including when their own animations have ended.
+    var keepsDestinationWidth: Bool { false }
     var shouldArrangeInDestinationRoom: Bool { false }
 
     private var followsBottomPlacement: Bool {
@@ -822,25 +848,38 @@ class WinUILayoutView: WinUIView {
     }
 
     func activeArrangementRoom(in bounds: Rect) -> Rect {
+        // A reader's closure lays out content from its allocated frame.
+        // Giving its wrappers the destination first can clip the old content
+        // before that frame arrives and updates the reader's drawing.
+        guard !usesPresentedRoom, !receivesPresentedRoom else { return bounds }
+        if keepsDestinationWidth, arrangementRoom == nil,
+           let change = (nativeContentOwner as? WinUIButtonView)?.remainingLabelWidthChange {
+            return Rect(0, 0, max(0, bounds.width + change), bounds.height)
+        }
         guard let destination = arrangementRoom else { return bounds }
-        if abs(destination.width - bounds.width) <= 0.5 && abs(destination.height - bounds.height) <= 0.5 {
-            return bounds
-        }
-        if shouldArrangeInDestinationRoom {
-            // A bottom-aligned branch grows upward. Planning in a taller
-            // room before that space exists would move its contents early.
-            // During collapse, the smaller destination keeps the children's
-            // targets stable while their current frames travel toward them.
+        // A caption can finish its own transition before the enclosing stack
+        // lands. Keep the width that fits the caption for the stack's whole
+        // journey, including when the spring passes through that width.
+        let keepsWidth = keepsDestinationWidth
+        let heightDiffers = abs(destination.height - bounds.height) > 0.5
+        let widthDiffers = abs(destination.width - bounds.width) > 0.5
+        if (heightDiffers || (!keepsWidth && widthDiffers)) && shouldArrangeInDestinationRoom {
+            // A bottom-aligned branch grows upward as its actual room grows.
             let height = followsBottomPlacement ? min(bounds.height, destination.height) : destination.height
-            return Rect(x: 0, y: 0, width: destination.width,
-                        height: height)
+            return Rect(x: 0, y: 0, width: destination.width, height: height)
         }
-        arrangementRoom = nil
+        if keepsWidth {
+            return Rect(x: 0, y: 0, width: destination.width, height: bounds.height)
+        }
+        if widthDiffers || heightDiffers { arrangementRoom = nil }
         return bounds
     }
 
     override func travels(to destination: Rect?) {
-        arrangementRoom = destination.map { LayoutSize(width: $0.width, height: $0.height) }
+        arrangementRoom = destination.map {
+            let room = Self.nativeRect($0)
+            return LayoutSize(width: room.width, height: room.height)
+        }
     }
 
     /// Stands every child riding its removal transition where it last stood: it takes no room, but WinUI

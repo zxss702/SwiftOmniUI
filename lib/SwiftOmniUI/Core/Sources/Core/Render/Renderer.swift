@@ -475,13 +475,13 @@ public final class Renderer: @unchecked Sendable {
                 run(handler)
             }
 
-            let (wrote, wroteUntracked, wroteNames, wroteTextPreferences):
-                (Set<ObjectIdentifier>, Bool, [ObjectIdentifier: String], Set<ObjectIdentifier>) = guarded.withLock {
-                let taken = (changed, untracked, names, textPreferencesChanged)
+            let (wrote, wroteUntracked, wroteNames, wroteTextPreferences, settlingTransaction) = guarded.withLock {
+                let taken = (changed, untracked, names, textPreferencesChanged, pendingTransaction)
                 changed.removeAll()
                 names.removeAll()
                 untracked = false
                 textPreferencesChanged = []
+                pendingTransaction = nil
                 dirty = false
                 rendering = true
                 return taken
@@ -494,6 +494,7 @@ public final class Renderer: @unchecked Sendable {
             }
 
             differ.named = wroteNames
+            differ.transaction = settlingTransaction ?? transactionNow
 
             let settled: (node: RenderedNode, patch: HostPatch)
 

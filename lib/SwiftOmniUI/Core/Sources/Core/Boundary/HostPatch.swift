@@ -122,6 +122,9 @@ extension HostPatch {
 
     /// Which placement coordinates move under that law.
     public let lanes: AnimationLanes
+
+    /// This change consumes a layout sample without interrupting an active placement.
+    public var followsPresentation = false
 }
 
 /// How a sparse patch changes an element's children.

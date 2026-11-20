@@ -42,6 +42,7 @@ extension PlacedView {
     /// Geometry already sampled by another channel. An existing placement
     /// journey yields these lanes as well as refraining from starting them.
     public var presentedLanes: AnimationLanes = []
+    var startedAt: Double?
 
     /// An arrangement that animates `lanes` under `law`, fading in a joining child when `fades`.
     public init(
@@ -69,6 +70,7 @@ extension PlacedView {
     private let animator: Animator
     private let now: () -> Double
     private let reducesMotion: () -> Bool
+    private(set) var insertionStartedAt: Double?
     private var seats: [UInt64: Seat] = [:]
     private var matchedGeometrySources: [String: (frame: Rect, serial: UInt64)] = [:]
     private var matchedGeometrySerial: UInt64 = 0
@@ -138,6 +140,8 @@ extension PlacedView {
         return Self.moves(law) && !reducesMotion() ? law : nil
     }
 
+    func arrangementTime() -> Double { now() }
+
     /// Stands `view` at `target`, or on its way there; `stated` are the sides it sizes itself.
     public func place(
         _ view: any PlacedView,
@@ -164,7 +168,12 @@ extension PlacedView {
             seats[mount] = Seat(view: view, target: target)
             guard let arrivedFrom, !arrangement.lanes.isEmpty, Self.isReal(arrivedFrom) else {
                 view.placedFrame = target
-                if arrangement.fades { fadeIn?(arrangement.law, target) }
+                if arrangement.fades, let fadeIn {
+                    let previous = insertionStartedAt
+                    insertionStartedAt = arrangement.startedAt
+                    defer { insertionStartedAt = previous }
+                    fadeIn(arrangement.law, target)
+                }
                 return
             }
             view.placedFrame = arrivedFrom
@@ -300,7 +309,7 @@ extension PlacedView {
         }
 
         // A running animation bends from where it has reached, at the speed it has.
-        let instant = now()
+        let instant = arrangement.startedAt ?? now()
         let position = running?.position(at: instant)
         var start = position?.value ?? Self.lanes(from)
         var velocity = position?.velocity ?? [0, 0, 0, 0]
@@ -316,12 +325,14 @@ extension PlacedView {
             from: start, destination: destination, velocity: velocity, animation: law,
             began: refining ? running!.began : instant, segmentBegan: instant)
 
-        guard !animation.arrives, !animation.position(at: instant).rested else {
+        let sampleTime = arrangement.startedAt.map { max($0, animator.sampledAt ?? $0) } ?? instant
+        let positionNow = animation.position(at: sampleTime)
+        guard !animation.arrives, !positionNow.rested else {
             arrive(view, at: target, mount: mount)
             return
         }
 
-        let standing = Self.rect(start)
+        let standing = Self.rect(sampleTime == instant ? start : positionNow.value)
         animator.start(animation, for: key)
         seats[mount]?.standing = standing
         view.travels(to: target)

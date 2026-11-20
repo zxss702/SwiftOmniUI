@@ -142,6 +142,7 @@ private struct AnimatorKernelKey: Equatable {
 /// The runtime's one animator: every animation, advanced together in target order.
 /// Design: docs/design/host/animation.md#one-animator
 @_spi(Host) @MainActor public final class Animator {
+    private(set) var sampledAt: Double?
     private var animations: [AnimationTarget: RunningAnimation] = [:]
     private var sortedTargets: [AnimationTarget] = []
     private var targetsDirty = false
@@ -171,6 +172,7 @@ private struct AnimatorKernelKey: Equatable {
 
     /// Advances every animation to `now` in target order; with less animation, each one arrives.
     public func advance(to now: Double, reducesMotion: Bool = false) -> [AnimationStep] {
+        sampledAt = now
         guard !animations.isEmpty else {
             if !sortedTargets.isEmpty {
                 sortedTargets.removeAll(keepingCapacity: true)

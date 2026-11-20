@@ -220,6 +220,15 @@ final class WinUIScrollView: WinUILayoutView {
         box.clips ? bounds : layoutSafeArea(in: bounds).viewport(in: bounds, axes: orientation)
     }
 
+    override func activeArrangementRoom(in bounds: Rect) -> Rect { bounds }
+
+    override func travels(to destination: Rect?) {
+        isTravellingViewport = destination != nil
+        super.travels(to: destination)
+    }
+
+    private(set) var isTravellingViewport = false
+
     override func safeAreaChanged() {
         if let context = safeAreaContext { _ = resolve(in: context.layout) }
         super.safeAreaChanged()

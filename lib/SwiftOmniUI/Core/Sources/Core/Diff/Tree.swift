@@ -365,7 +365,12 @@ extension HostPatch {
         merged.lazyIdentity = later.lazyIdentity ?? lazyIdentity
         merged.lazyRequestGeneration = later.lazyRequestGeneration ?? lazyRequestGeneration
         merged.animation = later.animation ?? animation
-        merged.layoutTransition = later.layoutTransition ?? layoutTransition
+        // Feedback in a settling pass can update the target while the authored
+        // movement is still waiting for its first native arrangement.
+        if let next = later.layoutTransition,
+           !next.followsPresentation || layoutTransition == nil {
+            merged.layoutTransition = next
+        }
         merged.driven = later.driven ?? driven
         merged.events = later.events ?? events
         merged.children = HostChildrenUpdate.merging(children, with: later.children)

@@ -148,8 +148,8 @@ extension WinUIElement {
         }
     }
 
-    /// Forgets affected sizes up to the nearest Lazy boundary. A change to
-    /// that container's own placement still belongs to its parent layout.
+    /// Forgets affected sizes through the layout that measures this view.
+    /// A reader's content cannot change its own parent's layout proposal.
     func invalidateMeasurements(ownPlacementChanged: Bool = false, followingPresentation: Bool = false) {
         var invalidated: Set<ObjectIdentifier> = []
         func invalidate(_ view: WinUIView?) {
@@ -171,6 +171,10 @@ extension WinUIElement {
             if !(each.view is WinUILazyView), !followingPresentation,
                !WinUILayoutUpdates.visitLogicalAncestors(each) { break }
             invalidate(each.view)
+            if each.element.isGeometryReader, each !== self || !ownPlacementChanged {
+                if each === self { return }
+                break
+            }
             // The lazy panel measures its dirty rows and reports only an actual
             // change to its returned extent. Mounting a new visible Text must
             // not invalidate the whole window before that comparison.
@@ -189,7 +193,7 @@ extension WinUIElement {
             // Most placing parents are also mounted ancestors. Only the extra
             // native layouts (notably scroll documents) need another invalidation.
             invalidate(parent)
-            if parent is WinUILazyView { break }
+            if parent is WinUILazyView || parent.sourceElement?.isGeometryReader == true { break }
             layout = (parent as? WinUIScrollDocument)?.scrollView ?? parent.placingLayout
         }
     }

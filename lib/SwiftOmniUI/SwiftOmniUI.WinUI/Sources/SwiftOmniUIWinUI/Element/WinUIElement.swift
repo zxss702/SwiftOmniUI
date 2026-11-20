@@ -109,6 +109,9 @@ final class WinUIElement: NativeElement {
             }
             if each.view != nil { branch = each.element.mount }
             owners.append(each)
+            // A reader's allocation comes from its parent. A frame animated
+            // inside its content cannot own any of that outer allocation.
+            if each.element.isGeometryReader { break }
             owner = each.parent
         }
         guard ProgramWrite.isWriting, !owners.isEmpty else { return }

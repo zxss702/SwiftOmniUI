@@ -85,13 +85,15 @@ import CRT
     private var configuredAnimation: HostLayoutMotion?
     private var placementTransition: HostLayoutMotion?
     private var placementTransitionPending = false
+    public private(set) var departureStartedAt: Double?
 
     /// Marks the pending placement transition as consumed by its layout pass.
     public func consumePlacementTransition() {
         placementTransitionPending = false
+        departureStartedAt = nil
     }
 
-    /// Whether this element's frame, or any frame under it, is read.
+    /// Whether this element or a descendant has an external frame feed that requires immediate placement.
     public private(set) var framesRead = false
     /// Last passive drawing size, independent of the full coordinate report.
     var reportedDrawingSize: Size?
@@ -246,8 +248,11 @@ import CRT
             if type == .app { tree.layoutMotion.applicationMotion = animation.animation }
         }
         if let transition = patch.layoutTransition {
-            placementTransition = transition
-            placementTransitionPending = true
+            // A measurement can arrive before the layout has placed the authored change.
+            if !transition.followsPresentation || !placementTransitionPending {
+                placementTransition = transition
+                placementTransitionPending = true
+            }
         } else if !isLazyRun || patch.lazyContentChanged || patch.lazyRows != nil || changed.contains(.items) {
             let replacesChild: Bool = {
                 if case .changed(let childPatches) = patch.children { return childPatches.contains { $0.replace } }
@@ -424,11 +429,17 @@ import CRT
             } else {
                 recycling = false
             }
-            if !recycling, child.isDeparting || child.depart(
+            guard !recycling else { continue }
+            if child.isDeparting {
+                arranged.append(child)
+            } else if child.depart(
                 room: departingRooms[ObjectIdentifier(child)], under: placementTransition, closed: { [weak self] in
                     self?.departed(child)
                 }
-            ) { arranged.append(child) }
+            ) {
+                departureStartedAt = tree.motionTime
+                arranged.append(child)
+            }
         }
         children = arranged
         leave(before)
@@ -773,6 +784,9 @@ import CRT
         values.isFrameContent = bool(.isFrameContent) ?? false
         values.isLayoutDecoration = bool(.isLayoutDecoration) ?? false
         switch type {
+        case _ where isGeometryReader:
+            // Its content cannot change the reader's ideal size or scroll axes.
+            values.expandingAxes = .both
         case .rectangle, .ellipse, .path, .canvas:
             if values.flex == nil { values.expandingAxes = .both }
         case .image:
@@ -866,12 +880,6 @@ import CRT
             values.scalesToFit = scalesToFit
         default:
             break
-        }
-        if isGeometryReader {
-            // Its content never supplies the reader's ideal size or scroll axes.
-            values.scrollAxes = .neither
-            values.expandingAxes = .both
-            values.scalesToFit = false
         }
         if values.scrollAxes != .neither { values.safeBarSizingAxes = safeBarSizingAxes }
         values.horizontal = value(.horizontalAlignment)?.enumeration

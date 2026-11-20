@@ -13,7 +13,18 @@ final class WinUIButtonView: WinUIView {
     private var hasViewLabel = false
     private var caption = ""
     private weak var labelRoot: WinUIView?
+    private var destinationWidth: Double?
     override var controlStateOpacity: Double { hasViewLabel && !enabled ? 0.5 : 1 }
+
+    var remainingLabelWidthChange: Double? {
+        guard let destinationWidth else { return nil }
+        let minimum = desiredSize.width
+        return max(destinationWidth, minimum) - max(placedFrame.width, minimum)
+    }
+
+    override func travels(to destination: Rect?) {
+        destinationWidth = destination?.width
+    }
 
     override func firstTextBaseline(in size: LayoutSize) -> Double? {
         guard hasViewLabel, let labelRoot else { return nil }

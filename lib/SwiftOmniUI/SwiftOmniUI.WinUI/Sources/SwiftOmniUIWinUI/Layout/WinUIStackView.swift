@@ -51,6 +51,8 @@ final class WinUIStackView: WinUITravellingLayout {
         contentSize(proposal: ProposedViewSize(width: width))
     }
 
+    override var keepsDestinationWidth: Bool { true }
+
     override var contentSizeDependsOnHeight: Bool {
         axis == .horizontal && items.contains { $0.isShown && !$0.departing && ($0.values.scalesToFit || $0.values.isFrameContent) }
     }

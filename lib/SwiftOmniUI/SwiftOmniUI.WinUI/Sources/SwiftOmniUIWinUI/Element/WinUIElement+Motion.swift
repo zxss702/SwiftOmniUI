@@ -12,12 +12,25 @@ extension WinUIElement {
     func configureLayoutMotion() {
         guard let layout = view as? WinUITravellingLayout else { return }
 
+        // Keep this dependency in the regular layout flow. Scrollers and lazy
+        // viewports allocate their own content, and overlays already use the
+        // actual allocation for their decorations.
+        switch layout {
+        case is WinUIGridView, is WinUIStackView, is WinUIZStackView, is WinUICustomLayoutView:
+            layout.usesPresentedRoom = element.isGeometryReader || element.children.contains { child in
+                !child.isDeparting && child.bool(.isLayoutDecoration) != true
+                    && (child.winUI.view as? WinUILayoutView)?.usesPresentedRoom == true
+            }
+        default:
+            break
+        }
+
         layout.places.layoutMotion = host?.runtime.layoutMotion
         layout.places.animation = element.animation
         layout.onConsumeTransition = { [weak element] in element?.consumePlacementTransition() }
         layout.keepArrivalMotion(element.animation)
         layout.places.framesRead = element.framesRead
-        layout.places.patchArrived()
+        layout.places.patchArrived(departureStartedAt: element.departureStartedAt)
     }
 
     /// Whether the element fades in as it joins a standing layout, by the host layer's rule.

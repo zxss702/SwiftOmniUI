@@ -64,6 +64,8 @@ final class WinUIGridView: WinUITravellingLayout {
         items.count == 1 && items[0].values.isFrameContent
     }
 
+    override var keepsDestinationWidth: Bool { contentSizeDependsOnHeight }
+
     override func firstTextBaseline(in size: LayoutSize) -> Double? {
         let places = Self.querySize { childPlaces(in: Rect(0, 0, size.width, size.height)) }
         for (item, place) in zip(items, places) {

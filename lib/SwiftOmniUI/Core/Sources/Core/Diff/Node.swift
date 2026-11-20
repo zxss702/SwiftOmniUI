@@ -397,10 +397,12 @@ public struct Node {
     /// records instead of a value (StateAttachment.swift).
     var driven: [Prop: StateRegistration] = [:]
 
-    /// Whether this element reports its own frame, so its own size never animates.
+    /// Whether an external frame consumer requires the element's size to arrive.
+    /// A GeometryReader instead consumes the current layout sample as input.
     var reportsFrame: Bool {
-        events[.frameChanged] != nil || events[.namedFramesChanged] != nil
-            || events[.safeAreaInsetsChanged] != nil || driven[.frame] != nil
+        events[.frameChanged] != nil || driven[.frame] != nil
+            || (props[.isGeometryReader]?.bool != true
+                && (events[.namedFramesChanged] != nil || events[.safeAreaInsetsChanged] != nil))
     }
 
     /// Whether this layout's children take their sizes at once: it or one of them is

@@ -19,12 +19,14 @@
 
     /// Whether a patch reached the layout since its last arrangement.
     private var patched = false
+    private var departureStartedAt: Double?
 
     /// The width of the last arrangement; nil before the first.
     private var arrangedWidth: Double?
     private var arrangedHeight: Double?
 
     private var arrangement = Arrangement()
+    public var arrangementStartedAt: Double? { arrangement.startedAt }
     private var presentedItems: [UInt64: AnimationLanes] = [:]
     private var commitsArrangement = true
     private var anchorOffset = Point.zero
@@ -33,8 +35,9 @@
     public init() {}
 
     /// Notes that a patch reached the layout: its next arrangement places what the patch changed.
-    public func patchArrived() {
+    public func patchArrived(departureStartedAt: Double? = nil) {
         patched = true
+        if let departureStartedAt { self.departureStartedAt = departureStartedAt }
     }
 
     /// Whether a patch has queued an animating layout transition for the next arrangement.
@@ -52,13 +55,17 @@
     /// An unfinished layout places native views without consuming its patch or registering animation seats.
     public func begin(width: Double, animating: Bool = true, anchorOffset: Point = .zero, refining: Bool = false,
                       consumingPatch: Bool = true, height: Double? = nil, followingPresentation: Bool = false,
-                      presentedLanes: AnimationLanes = [], presentedItems: [UInt64: AnimationLanes] = [:]) {
-        let said = consumingPatch && patched && arrangedWidth != nil
+                      presentedLanes: AnimationLanes = [], presentedItems: [UInt64: AnimationLanes] = [:],
+                      inheritedStart: Double? = nil) {
+        let samplesGeometry = consumingPatch && patched && animation?.followsPresentation == true
+        let said = consumingPatch && patched && arrangedWidth != nil && !samplesGeometry
+        let startedAt = said ? departureStartedAt : nil
         commitsArrangement = consumingPatch
         let resized = (arrangedWidth.map { abs($0 - width) > 0.5 } ?? false)
             || (height.flatMap { height in arrangedHeight.map { abs($0 - height) > 0.5 } } ?? false)
         if consumingPatch {
             patched = false
+            departureStartedAt = nil
             arrangedWidth = width
             arrangedHeight = height
         }
@@ -67,15 +74,19 @@
 
         arrangement = layoutMotion?.arrangement(
             said: said && animating, resized: resized, animation: animation, framesRead: framesRead) ?? Arrangement()
+        if arrangement.fades {
+            arrangement.startedAt = startedAt ?? inheritedStart ?? layoutMotion?.arrangementTime()
+        }
         // Described geometry owns only the axes that depend on it. The same
         // business patch can still animate unrelated layout lanes and fades.
         arrangement.lanes.subtract(presentedLanes)
         arrangement.presentedLanes = presentedLanes
         arrangement.refines = refining && !(said && animating) && !resized && !framesRead && presentedLanes.isEmpty
-        // A business patch can move other children independently of a
-        // described geometry channel. Only its subsequent samples translate
-        // those journeys without starting a second animation.
-        arrangement.followsPresentation = followingPresentation && !said
+        // A passive patch can reach a layout in the same pass as its parent's
+        // next animated allocation. Keep following that allocation when the
+        // patch brings no motion of its own. An explicit snap still wins.
+        let followsSample = !said || (!arrangement.fades && animation?.animation.isInherited != false)
+        arrangement.followsPresentation = samplesGeometry || (followingPresentation && followsSample)
     }
 
     /// Stands `view`, the mounted element `mount`'s, at `place`, or on its way there; its `values` say which sides
