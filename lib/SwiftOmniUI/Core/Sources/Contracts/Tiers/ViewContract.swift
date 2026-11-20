@@ -51,6 +51,10 @@ public enum ViewContract: Contract {
     /// three numbers for stable anchor resolution: scroll-document identity, x, y.
     public static let frameChanged = ElementEvent<Self, [Double]>("frameChanged", layer: .native)
 
+    /// Internal layout feedback for readers and anchors, using the frame report payload.
+    @_spi(Host) public static let layoutFrameChanged = ElementEvent<Self, [Double]>(
+        "layoutFrameChanged", layer: .native)
+
     /// Internal drawing feedback: width and height, independent of scroll position.
     @_spi(Host) public static let drawingSizeChanged = ElementEvent<Self, [Double]>("drawingSizeChanged", layer: .native)
 
@@ -194,7 +198,8 @@ public enum ViewContract: Contract {
     /// The tier's own members.
     public static let members: [any ContractMember] = [
         allowDrop, area, canDrag, coordinateSpaceName, dragLeave,
-        dragOver, dragStarting, dragText, drop, dropCompleted, dropPaths, flex, frameChanged, drawingSizeChanged, gridColumn,
+        dragOver, dragStarting, dragText, drop, dropCompleted, dropPaths, flex, frameChanged, layoutFrameChanged,
+        drawingSizeChanged, gridColumn,
         gridColumnSpan, gridRow, gridRowSpan, horizontalAlignment, horizontalContentAlignment, horizontalGuide,
         layoutPriority,
         namedFramesChanged, safeAreaInsetsChanged, padding, panTouchCount,

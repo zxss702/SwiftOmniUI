@@ -43,10 +43,10 @@ extension MountedElement {
         return insets
     }
 
-    /// Whether this element receives its position, including Text's passive
-    /// origin report. Only business geometry reads set `framesRead`.
+    /// Whether this element receives its position, including internal layout
+    /// and text reports. Only external frame feeds set `framesRead`.
     public var readsOwnFrame: Bool {
-        driven[.frame] != nil || events[.frameChanged] != nil
+        driven[.frame] != nil || events[.frameChanged] != nil || events[.layoutFrameChanged] != nil
             || events[.namedFramesChanged] != nil || events[.safeAreaInsetsChanged] != nil
             || events[.scrollGeometryChanged] != nil
             || events[.textFrameChanged] != nil || events[.drawingSizeChanged] != nil
@@ -55,7 +55,8 @@ extension MountedElement {
     /// Canvas and Shape need local allocation sizes, not window coordinates or named spaces.
     public var readsOnlyDrawingSize: Bool {
         events[.drawingSizeChanged] != nil && driven[.frame] == nil
-            && events[.frameChanged] == nil && events[.namedFramesChanged] == nil
+            && events[.frameChanged] == nil && events[.layoutFrameChanged] == nil
+            && events[.namedFramesChanged] == nil
             && events[.safeAreaInsetsChanged] == nil && events[.scrollGeometryChanged] == nil
             && events[.textFrameChanged] == nil
     }
@@ -113,6 +114,9 @@ extension MountedElement {
         reportedFrame = numbers
         if let binding = driven[.frame] {
             runtime.report(.lanes(Array(numbers.prefix(4))), through: binding)
+        }
+        if let handler = handler(.layoutFrameChanged) {
+            runtime.dispatch(handler, payload: [.numbers(numbers)])
         }
         if let handler = handler(.frameChanged) {
             runtime.dispatch(handler, payload: [.numbers(numbers)])

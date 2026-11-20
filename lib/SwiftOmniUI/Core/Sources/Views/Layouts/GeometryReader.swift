@@ -306,7 +306,7 @@ public struct GeometryReader: View, DistributableView {
             transaction.isGeometryFeedback = true
             withTransaction(transaction) { self.insets = insets }
         }
-        .hearing(ViewContract.frameChanged) { numbers in
+        .hearing(ViewContract.layoutFrameChanged) { numbers in
             guard let report = FrameReport(numbers) else { return }
             let nextSize = Size(report.frame.width, report.frame.height)
             let sizeChanged = self.size != nextSize

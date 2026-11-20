@@ -111,7 +111,7 @@ import XCTest
         Renderer.shared.clearInvalidation()
         renders.fire(grid?.events?["namedFramesChanged"] ?? -1, with: [
             .values([.values([.string("Page"), .numbers([100, 200, 800, 600])])])])
-        renders.fire(grid?.events?["frameChanged"] ?? -1, with: payload)
+        renders.fire(grid?.events?[.layoutFrameChanged] ?? -1, with: payload)
         let second = renders.render(tree(), changed: Renderer.shared.pendingChanges)
 
         XCTAssertEqual(
@@ -140,7 +140,7 @@ import XCTest
 
         Renderer.shared.clearInvalidation()
         // A full-window view, its safe area starting 44 down and ending 56 up.
-        renders.fire(grid?.events?["frameChanged"] ?? -1,
+        renders.fire(grid?.events?[.layoutFrameChanged] ?? -1,
             with: [.numbers([0, 0, 400, 800, 0, 0, 0, 44, 400, 700])])
         let second = renders.render(tree(), changed: Renderer.shared.pendingChanges)
 
@@ -278,7 +278,7 @@ import XCTest
         XCTAssertEqual(grid?.children.first?.props["text"], .string("0 wide"))
 
         Renderer.shared.clearInvalidation()
-        renders.fire(grid?.events?["frameChanged"] ?? -1, with: payload)
+        renders.fire(grid?.events?[.layoutFrameChanged] ?? -1, with: payload)
 
         // The report wrote the reader's @State; the next render builds the
         // content from the measured frame.
@@ -313,7 +313,7 @@ import XCTest
         let grid = first.children.first?.children.first
 
         Renderer.shared.clearInvalidation()
-        renders.fire(grid?.events?["frameChanged"] ?? -1, with: payload)
+        renders.fire(grid?.events?[.layoutFrameChanged] ?? -1, with: payload)
 
         // The tracked path, exactly what the host takes after the handler's
         // write: only the views whose recorded reads moved are built again.
@@ -352,12 +352,12 @@ import XCTest
         let grid = first.children.first?.children.first
 
         Renderer.shared.clearInvalidation()
-        renders.fire(grid?.events?["frameChanged"] ?? -1, with: [.numbers([0, 0, 300, 120, 16, 80, 0, 0, 800, 600])])
+        renders.fire(grid?.events?[.layoutFrameChanged] ?? -1, with: [.numbers([0, 0, 300, 120, 16, 80, 0, 0, 800, 600])])
         _ = renders.render(tree(), changed: Renderer.shared.pendingChanges)
 
         Renderer.shared.clearInvalidation()
         // Scroll moves global y from 80 to 40 while local size stays 300x120.
-        renders.fire(grid?.events?["frameChanged"] ?? -1, with: [.numbers([0, 0, 300, 120, 16, 40, 0, 0, 800, 600])])
+        renders.fire(grid?.events?[.layoutFrameChanged] ?? -1, with: [.numbers([0, 0, 300, 120, 16, 40, 0, 0, 800, 600])])
 
         XCTAssertTrue(Renderer.shared.pendingChanges.isEmpty,
             "a size-only GeometryReader should not schedule a render for pure scroll origin changes")

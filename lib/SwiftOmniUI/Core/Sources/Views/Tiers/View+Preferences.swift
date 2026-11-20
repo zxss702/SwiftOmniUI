@@ -79,9 +79,9 @@ extension View {
         func installAnchor(on node: inout Node) {
             let box = AnchorBox()
             node.anchorBoxes.append(box)
-            node.addHandler(.frameChanged) {
+            node.addHandler(.layoutFrameChanged) {
                 let raw = EventBuffer.current
-                let numbers = MemberValues.carried(raw, by: "frameChanged", as: [Double].self)
+                let numbers = MemberValues.carried(raw, by: ViewContract.layoutFrameChanged.name, as: [Double].self)
                 let report = numbers.flatMap { FrameReport($0) }
                 guard let report else { return }
                 let changed = box.update(report)

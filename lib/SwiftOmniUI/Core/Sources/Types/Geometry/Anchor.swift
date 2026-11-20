@@ -59,7 +59,7 @@ extension AnchorSource where Value == Rect {
     public static var bounds: AnchorSource<Rect> { AnchorSource(kind: .bounds) }
 }
 
-/// The element frame an `Anchor` watches, written by the `frameChanged` event
+/// The element frame an `Anchor` watches, written by the `layoutFrameChanged` event
 /// the anchor's modifier hears; `@unchecked Sendable` as every write and read
 /// happens on the render's own thread.
 final class AnchorBox: @unchecked Sendable {

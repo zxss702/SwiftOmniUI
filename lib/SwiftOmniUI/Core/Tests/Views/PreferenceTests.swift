@@ -234,7 +234,7 @@ private struct Ear: View {
 
         // The host's frame report for the anchored child: parent frame
         // (0,0,10,20), window frame (100,200,10,20), safe area (0,0,500,600).
-        guard let id = findEvent(patch, "frameChanged")
+        guard let id = findEvent(patch, "layoutFrameChanged")
         else { return XCTFail("the anchored view heard no frame event") }
         XCTAssertTrue(renders.fire(
             id, with: [.numbers([0, 0, 10, 20, 100, 200, 0, 0, 500, 600])]))

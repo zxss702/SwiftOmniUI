@@ -404,6 +404,7 @@ extension NodeType {
     static let dropCompleted = ViewContract.dropCompleted.token
     static let dropPaths = ViewContract.dropPaths.token
     static let frameChanged = ViewContract.frameChanged.token
+    static let layoutFrameChanged = ViewContract.layoutFrameChanged.token
     static let windowPointerPressed = ViewContract.windowPointerPressed.token
     static let copyRequested = ViewContract.copyRequested.token
     static let selectAllRequested = ViewContract.selectAllRequested.token
