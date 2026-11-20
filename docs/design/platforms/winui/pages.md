@@ -17,11 +17,17 @@ normal layout markers, including the sidebar and trailing expert selector.
 `ChromeAcrylic` partitions content sampling by the outer NavigationSplitView's
 semantic sidebar, content and auxiliary detail pages. The nested native
 SplitViews implementing those pages are not material domains. Each column's
-native horizontal bounds extend to the top of the window, so that slice of
-toolbar and all of the column's SafeBar markers share one filter and region.
+native horizontal bounds extend to the top of the window. Within a column,
+each outer vertical ScrollView owns the parts of the toolbar and SafeBars
+that lie over its own insets. Its top region is clear at the top of the
+document. Its bottom region is clear at the bottom. During overpan, either
+edge can temporarily acquire material, even when the resting scroll range
+is zero. Two side-by-side
+viewports control and sample their regions independently. Bars outside a
+scroll inset retain their native material.
 Changing column widths or hiding detail updates those bounds at the existing
-post-layout commit. No neighbouring column enters the filter input: the clean
-scene is cropped to its column **before** downsampling and filtering.
+post-layout commit. The clean scene is cropped to the viewport's horizontal
+bounds **before** downsampling and filtering.
 Sampling and region masks use the native column slot's own coordinates, before
 PaneRoot/ContentRoot animation. A wholly offscreen opening frame must not
 publish an empty input/mask that stays empty throughout a compositor-only
@@ -48,23 +54,23 @@ put through the content visual surface.
 
 `AcrylicScene` retains a content-only frontier of live visual surfaces,
 excluding fixed controls and every material output in that scope. It splits
-at outer scroll viewports and inset ancestors, never at document rows. A
-scope owns one shared native Direct2D Gaussian effect through Composition;
-its input is reduced to one quarter of the width and height, with the blur
-radius adjusted accordingly. The column filters together cover approximately
-the window's area, rather than each filtering a full window. Within a column,
-consumers crop that shared result after filtering.
+at outer scroll viewports and inset ancestors. Material keeps the horizontal
+boundaries of those bands and joins touching vertical intervals within each
+lane. The same resulting rectangles clip the material and crop the input to
+each native Direct2D Gaussian effect. The input is reduced to one quarter of
+the width and height, with the blur radius adjusted accordingly.
+The filter mirrors pixels at its crop boundary. The blur ends at the bar's
+content boundary without a second gradient layer.
 The graph has no previous-frame input and no `CompositionBackdropBrush`.
 Fixed local controls are redirected above the union inside its mask; their
 native identity still owns input, focus, hover, automation and popup menus.
 Native toolbar and promoted controls already stand above this layer.
 
-Local markers whose owning subtree is fading, transformed, projected, blurred,
-or masked retain their native subtree presentation instead of redirecting its
-controls into a stationary overlay. They sample the same shared filtered
-texture through the inverse presentation transform; the native ancestor applies
-opacity/motion to both material and controls. At rest they rejoin the column
-union. Redirected control opacity stops at the native column slot: opacity
+Pure horizontal slides keep the marker in the column material; its bounds
+and the scroll viewport move together in presentation coordinates. Markers
+whose subtree fades, scales, projects, blurs, masks or otherwise changes its
+drawing retain their local presentation so the ancestor effect also applies
+to the material. Redirected control opacity stops at the native column slot: opacity
 above it is inherited by the material, rather than being applied a second time.
 A bar's own content opacity remains distinct from its container's opacity.
 Captured content and redirected controls restore ancestor opacity together,
@@ -87,7 +93,9 @@ column and viewport placement. Regions and sources are resolved from the
 actual attached tree on initial layout and subsequent layout changes. No
 per-frontier Loaded/SizeChanged watcher, retry dispatcher, timer, or
 Rendering/Rendered subscription repairs first-load placement. Ordinary
-scroll motion remains a live compositor input. Independent popup and nested
+scroll motion remains a live compositor input. Crossing a scroll edge or
+changing the scroll insets queues a material commit through the native
+dispatcher. Independent popup and nested
 scrolling-bar scopes retain their own acyclic content/effect graph. Optional
 material connection failures are reported without failing window creation.
 The resting native caption buttons remain transparent.
@@ -105,8 +113,8 @@ match the source inset's logical proposal: measuring a detail bar at full
 window width would both cover the sidebar and alternate layout proposals.
 Source placement queues a coalesced layout update; unchanged geometry does not
 write XAML layout properties again. This layout bookkeeping never samples or
-refreshes material pixels. The lower scroll edge uses a native theme brush;
-sheets and authored window overlays remain above it.
+refreshes material pixels. Sheets and authored window overlays remain above
+the scroll edge effect.
 
 Only a navigation stack or split view's uninterrupted page-root modifier chain
 is promoted. Outside navigation, top bars use the same local inset path as
@@ -155,6 +163,13 @@ An explicit translucency request selects `DesktopAcrylicBackdrop`; removing that
 request restores Mica. The in-app material above scrolling content samples the
 clean application content over this native foundation. An explicit opaque page/root
 background remains opaque.
+
+`toolbarBackground(.automatic, for: .windowToolbar)` leaves the native
+title bar clear until a viewport scrolls underneath it. Each column uses its
+own viewport and the page's existing background can continue beneath the
+caption buttons. `.hidden` leaves the title bar clear through scrolling.
+`.visible` keeps the material present. An authored title-bar brush still
+supplies the background when the toolbar requests it.
 
 Hiding `.windowToolbar` removes the XAML title bar and its layout row. Content
 then reaches the window's top edge, beneath Windows' native caption buttons,

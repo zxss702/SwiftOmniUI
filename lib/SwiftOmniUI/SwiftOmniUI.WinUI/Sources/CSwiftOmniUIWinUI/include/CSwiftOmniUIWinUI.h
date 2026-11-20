@@ -281,7 +281,7 @@ SwiftOmniUIObjectRef swiftomniui_winui_retain(SwiftOmniUIObjectRef object);
 void swiftomniui_winui_release(SwiftOmniUIObjectRef object);
 
 /// A window, its activation and its minimizing told through `phaseChanged` under the number `window`.
-SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t window);
+SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t window, bool transparent);
 void swiftomniui_winui_window_set_title(SwiftOmniUIObjectRef window, char const *title);
 /// A solid colour on the complete client root; false restores the system backdrop.
 void swiftomniui_winui_window_set_background(SwiftOmniUIObjectRef window, bool hasBackground, uint32_t background);
@@ -296,7 +296,8 @@ void swiftomniui_winui_window_set_safe_area_bars(SwiftOmniUIObjectRef window,
 /// the shared chrome union, while popup scopes keep their own live source.
 SwiftOmniUIObjectRef swiftomniui_winui_safe_area_background_make(void);
 void swiftomniui_winui_safe_area_background_source(SwiftOmniUIObjectRef background, SwiftOmniUIObjectRef source);
-void swiftomniui_winui_safe_area_register(SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef bar, SwiftOmniUIObjectRef material);
+void swiftomniui_winui_safe_area_register(SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef bar,
+    SwiftOmniUIObjectRef material, int32_t verticalEdge);
 void swiftomniui_winui_material_columns(SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef const *columns, int32_t count);
 void swiftomniui_winui_safe_area_host_set_background(SwiftOmniUIObjectRef host, bool shown);
 /// Commit material/control presentation with the host's existing animation sample.
@@ -369,6 +370,11 @@ double swiftomniui_winui_window_title_bar_height(SwiftOmniUIObjectRef window);
 void swiftomniui_winui_window_set_traits(SwiftOmniUIObjectRef window, bool maximizable, bool minimizable, bool resizable,
                                      bool translucent, bool floats, bool alwaysOnTop, bool ignoresMouse,
                                      bool excludesCapture, bool transparent);
+
+/// Begins or ends excluding the process's own windows during a screen capture. Call on the UI thread and balance
+/// each successful begin (returns zero) with an end after capture stops.
+int32_t swiftomniui_winui_begin_excluding_app_windows_from_capture(void);
+void swiftomniui_winui_end_excluding_app_windows_from_capture(void);
 
 /// What a test reads of a window, into 13 values: x, y, width, height, the four limits in the order they are set,
 /// maximizable, minimizable, translucent, floating and shown as 1 or 0.
@@ -608,6 +614,7 @@ void swiftomniui_winui_text_set_alignment(SwiftOmniUIObjectRef text, int32_t hor
 /// Larger inline fonts/images retain their height through WinUI's MaxHeight stacking strategy.
 void swiftomniui_winui_text_set_spacing(SwiftOmniUIObjectRef text, int32_t characterSpacing, double baselineAdvance, double singleLineHeight);
 double swiftomniui_winui_text_natural_line_height(SwiftOmniUIObjectRef text);
+double swiftomniui_winui_text_minimum_line_height(SwiftOmniUIObjectRef text, double multiple);
 void swiftomniui_winui_text_set_decorations(SwiftOmniUIObjectRef text, bool underline, bool strikethrough);
 
 SwiftOmniUIObjectRef swiftomniui_winui_button_make(int64_t view);
@@ -1088,8 +1095,8 @@ double swiftomniui_winui_title_bar_layout_height(SwiftOmniUIObjectRef bar);
 /// `words` stand light (1) or dark (2) on a bar the tree paints, the bar's buttons and commands with them; 0 for
 /// the theme's own.
 void swiftomniui_winui_title_bar_set(SwiftOmniUIObjectRef bar, char const *title, bool back, bool paneToggle,
-                                 bool hasBackground, uint32_t background, bool hasForeground, uint32_t foreground,
-                                 int32_t words);
+                                 bool hasBackground, uint32_t background, int32_t backgroundVisibility,
+                                 bool hasForeground, uint32_t foreground, int32_t words);
 
 /// The native title bar's subtitle; an empty string clears the previous value.
 void swiftomniui_winui_title_bar_set_subtitle(SwiftOmniUIObjectRef bar, char const *subtitle);
@@ -1132,8 +1139,8 @@ double swiftomniui_winui_split_minimum_width(SwiftOmniUIObjectRef split);
 
 /// Width bounds apply to the pane and remaining content. The native drag handle retains the user's width.
 void swiftomniui_winui_split_set(SwiftOmniUIObjectRef split, SwiftOmniUIObjectRef pane, SwiftOmniUIObjectRef content,
-                             SwiftOmniUIObjectRef row, bool open, double minimum, double ideal, double maximum,
-                             bool contentShown, double contentMinimum, double contentMaximum);
+                                SwiftOmniUIObjectRef row, bool open, double minimum, double ideal, double maximum,
+                                bool contentShown, double contentMinimum, double contentMaximum, bool animated);
 
 /// A tabbed view's row of tabs: a SelectorBar, `selected` chosen.
 SwiftOmniUIObjectRef swiftomniui_winui_tabs_make(int64_t view);
@@ -1307,6 +1314,7 @@ void swiftomniui_winui_image_set_tint(SwiftOmniUIObjectRef image, bool has, uint
 
 /// The synchronously decoded bitmap size, or an SVG's declared intrinsic size, in DIPs.
 void swiftomniui_winui_image_size(SwiftOmniUIObjectRef image, double *size);
+bool swiftomniui_winui_image_content_frame(SwiftOmniUIObjectRef image, double *frame);
 
 /// Places the picture or symbol at its rendered size, centred in the image's layout frame.
 void swiftomniui_winui_image_place(SwiftOmniUIObjectRef image, double width, double height);

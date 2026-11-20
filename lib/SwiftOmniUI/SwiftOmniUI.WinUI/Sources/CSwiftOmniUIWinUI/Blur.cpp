@@ -32,6 +32,9 @@ namespace {
         effects::IGraphicsEffectSource, effectABI::IGraphicsEffectD2D1Interop> {
         winrt::hstring name = L"Blur";
         effects::IGraphicsEffectSource source = composition::CompositionEffectSourceParameter(L"Source");
+        D2D1_BORDER_MODE borderMode;
+
+        explicit GaussianBlur(D2D1_BORDER_MODE borderMode = D2D1_BORDER_MODE_SOFT) : borderMode(borderMode) {}
 
         winrt::hstring Name() { return name; }
         void Name(winrt::hstring const &value) { name = value; }
@@ -65,7 +68,7 @@ namespace {
                 case D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION:
                     property = PropertyValue::CreateUInt32(D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED); break;
                 case D2D1_GAUSSIANBLUR_PROP_BORDER_MODE:
-                    property = PropertyValue::CreateUInt32(D2D1_BORDER_MODE_SOFT); break;
+                    property = PropertyValue::CreateUInt32(borderMode); break;
                 default: return E_INVALIDARG;
                 }
                 property.as<ABI::Windows::Foundation::IPropertyValue>().copy_to(value);
@@ -88,12 +91,14 @@ namespace {
         }
     };
 
-    composition::CompositionEffectFactory blurFactory(composition::Compositor const &compositor) {
+    composition::CompositionEffectFactory blurFactory(composition::Compositor const &compositor,
+        D2D1_BORDER_MODE borderMode = D2D1_BORDER_MODE_SOFT) {
         // Rows using a blur transition share the compiled effect graph. Each
         // presenter still owns its brush, radius and live source independently.
-        static composition::CompositionEffectFactory held{nullptr};
+        static composition::CompositionEffectFactory soft{nullptr}, hard{nullptr};
+        auto &held = borderMode == D2D1_BORDER_MODE_HARD ? hard : soft;
         if (!held || held.Compositor() != compositor) {
-            held = compositor.CreateEffectFactory(winrt::make<GaussianBlur>(), {L"Blur.StandardDeviation"});
+            held = compositor.CreateEffectFactory(winrt::make<GaussianBlur>(borderMode), {L"Blur.StandardDeviation"});
         }
         return held;
     }
@@ -411,7 +416,9 @@ namespace {
 namespace swiftomniui {
     composition::CompositionEffectBrush contentBlur(composition::Compositor const &compositor,
         composition::CompositionBrush const &source, float sigma) {
-        auto brush = blurFactory(compositor).CreateBrush();
+        // Mirror the pixels at the viewport boundary. Sampling transparent
+        // black here would wash out the sides of narrow columns.
+        auto brush = blurFactory(compositor, D2D1_BORDER_MODE_HARD).CreateBrush();
         brush.SetSourceParameter(L"Source", source);
         brush.Properties().InsertScalar(L"Blur.StandardDeviation", sigma);
         return brush;

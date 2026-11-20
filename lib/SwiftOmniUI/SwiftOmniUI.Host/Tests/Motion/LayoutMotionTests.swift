@@ -85,6 +85,23 @@ final class LayoutMotionTests: XCTestCase {
         XCTAssertEqual(moved.placedFrame, Self.row(0, x: 30, y: -15))
     }
 
+    func testPassivePatchDuringParentResizeKeepsChildWidthAnimating() throws {
+        let layout = HandWoundLayout()
+        let moved = Placed()
+        layout.arrange([(moved, 1, Rect(0, 0, 800, 400))], width: 800)
+        layout.arrange([(moved, 1, Rect(0, 0, 640, 400))], width: 800)
+        layout.frame(at: 50)
+        XCTAssertEqual(moved.placedFrame.width, 760, accuracy: 1e-6)
+
+        layout.places.animation = nil
+        layout.arrange([(moved, 1, Rect(0, 0, 632, 400))], width: 792, followingPresentation: true)
+        XCTAssertEqual(moved.placedFrame.width, 752, accuracy: 1e-6)
+        let running = try XCTUnwrap(layout.animator.animation(for: .placed(1)))
+        XCTAssertEqual(running.began, 0)
+        layout.frame(at: 200)
+        XCTAssertEqual(moved.placedFrame.width, 632, accuracy: 1e-6)
+    }
+
     func testPresentationContractionNeverAllocatesNegativeSizes() throws {
         let layout = HandWoundLayout()
         let moved = Placed()
@@ -321,8 +338,8 @@ final class LayoutMotionTests: XCTestCase {
         XCTAssertFalse(layout.animator.isMoving)
     }
 
-    func testTextOriginReportsKeepLayoutMotionWhileGeometryReadsStillArrive() throws {
-        for event in [Event.textFrameChanged, .frameChanged] {
+    func testInternalFrameReportsKeepLayoutMotionWhileExternalReadsStillArrive() throws {
+        for event in [Event.textFrameChanged, .layoutFrameChanged, .frameChanged] {
             let runtime = HostRuntime.still()
             var text = HostPatch(id: .manual("text"), type: .text)
             text.events = .replace([event: 1])

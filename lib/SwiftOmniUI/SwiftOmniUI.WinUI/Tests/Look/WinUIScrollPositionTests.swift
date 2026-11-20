@@ -122,4 +122,58 @@ final class WinUIScrollPositionTests: XCTestCase {
                 "growing content while pinned to .bottom must keep following the bottom edge")
         }
     }
+
+    func testReplacingABottomPinnedConversationShowsItsFirstContentAtTheBottom() throws {
+        try onUIThread {
+            struct Conversation: View {
+                let selection: Int
+                @State private var position = ScrollPosition(edge: .bottom)
+
+                var body: some View {
+                    ScrollView {
+                        LazyVStack {
+                            ForEach(0..<(selection == 2 ? 1 : 40)) { row in
+                                Text("Conversation \(selection), message \(row)")
+                                    .frame(height: 28)
+                                    .transition(.offset(y: 80))
+                            }
+                        }
+                    }
+                    .scrollPosition($position, anchor: .bottom)
+                    .task { position.scrollTo(edge: .bottom) }
+                }
+            }
+
+            let selection = State(wrappedValue: 0)
+            let host = WinUIRenderer.running {
+                VStack {
+                    Conversation(selection: selection.wrappedValue)
+                        .id(selection.wrappedValue)
+                }
+                .overlay(alignment: .top) {
+                    Text("Selected \(selection.wrappedValue)")
+                        .offset(x: Double(selection.wrappedValue) * 12)
+                        .animation(.snappy, value: selection.wrappedValue)
+                }
+            }
+            for value in [1, 2] {
+                let previous = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+                selection.wrappedValue = value
+                var visible = false
+                for _ in 0..<40 {
+                    host.step()
+                    host.frame()
+                    guard let scroll = host.views(WinUIScrollView.self).first,
+                          scroll !== previous, scroll.scroller.laidOutFrame.height > 0,
+                          scroll.scroller.drawnOpacity > 0 else { continue }
+                    let standing = scroll.scroller.standing
+                    if value == 1 { XCTAssertGreaterThan(standing.reach.y, 0) }
+                    XCTAssertEqual(standing.offset.y, standing.reach.y, accuracy: 1)
+                    visible = true
+                    break
+                }
+                XCTAssertTrue(visible, "the new conversation must become visible, including when it fits")
+            }
+        }
+    }
 }

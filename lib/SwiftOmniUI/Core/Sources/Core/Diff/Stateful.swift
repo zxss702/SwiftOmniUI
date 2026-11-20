@@ -423,6 +423,9 @@ extension Node {
         func expand(over written: Node) -> Node {
             var node = build()
             if node.type == .fragment { node.materialize() }
+            if node.id != nil {
+                node = Node(type: .fragment, children: [node])
+            }
             if node.type == .fragment, node.children.count > 1, written.lazyIdentity != nil,
                let stack = written.props[.lazyRowStack]?.numbers, !stack.isEmpty {
                 let isHorizontal = stack[0] == 1
@@ -467,7 +470,7 @@ extension Node {
                 // child, under what the placeholder wrote. A fragment of
                 // several stays a fragment: the differ lands its writes on
                 // the children when it splices them in.
-                if node.children.count == 1 {
+                if node.children.count == 1, node.children[0].id == nil {
                     var child = node.children[0]
                     child.absorbFragmentWrites(of: node, environments: false)
                     child = landing(child, written: written)
@@ -480,6 +483,14 @@ extension Node {
                 }
 
                 var childWritten = written
+                if node.children.count == 1 {
+                    // A key in this body belongs to its child. The composed
+                    // view itself keeps the identity its parent gave it.
+                    node.id = written.id
+                    node.key = written.key
+                    childWritten.id = nil
+                    childWritten.key = nil
+                }
                 childWritten.preferenceObservers = []
                 childWritten.preferenceTransforms = []
                 node.preferenceObservers += written.preferenceObservers

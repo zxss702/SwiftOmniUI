@@ -450,6 +450,48 @@ extension DiffTests {
 
 
 extension DiffTests {
+    func testIdentityInsideAComposedBodyResetsOnlyTheIdentifiedView() {
+        struct Inner: View {
+            @State private var count = 0
+            let outerCount: Int
+            let increaseOuterCount: () -> Void
+
+            var body: some View {
+                Button("\(outerCount):\(count)").onClicked {
+                    count += 1
+                    increaseOuterCount()
+                }
+            }
+        }
+
+        struct Outer: View {
+            @State private var count = 0
+            let selection: Int?
+
+            var body: some View {
+                if let selection {
+                    Inner(outerCount: count, increaseOuterCount: { count += 1 })
+                        .id(selection)
+                }
+            }
+        }
+
+        let renders = Renders()
+        func render(_ selection: Int?) -> HostPatch {
+            renders.render(VStack { Outer(selection: selection) }.node,
+                           changed: Renderer.shared.pendingChanges)
+        }
+
+        let initial = render(1).child("1")
+        let click = initial?.events?["clicked"] ?? -1
+        XCTAssertTrue(renders.fire(click))
+        XCTAssertEqual(render(1).child("1")?.props["text"], .string("1:1"))
+        XCTAssertEqual(render(2).child("2")?.props["text"], .string("1:0"))
+        XCTAssertFalse(renders.fire(click), "the old identity takes its handler with it")
+        XCTAssertTrue(render(nil).children.isEmpty)
+        XCTAssertEqual(render(1).child("1")?.props["text"], .string("1:0"))
+    }
+
     /// Two siblings written with the same `.id()` are a mistake, but a STABLE
     /// one: the repeat keeps its own identity every render rather than being
     /// handed a fresh one and rebuilt each time. So a change to the FIRST does

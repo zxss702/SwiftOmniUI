@@ -30,6 +30,18 @@ public enum SwiftOmniUIWinUI {
         initialize?()
     }
 
+    /// Keeps this process's windows out of screen capture while the application captures the desktop.
+    /// Begin before starting capture and balance every successful begin (zero) with an end after capture stops.
+    @MainActor
+    public static func beginExcludingAppWindowsFromCapture() -> Int32 {
+        swiftomniui_winui_begin_excluding_app_windows_from_capture()
+    }
+
+    @MainActor
+    public static func endExcludingAppWindowsFromCapture() {
+        swiftomniui_winui_end_excluding_app_windows_from_capture()
+    }
+
     /// Starts WinUI on this thread and runs the application until its last window closes.
     ///
     /// - Parameters:

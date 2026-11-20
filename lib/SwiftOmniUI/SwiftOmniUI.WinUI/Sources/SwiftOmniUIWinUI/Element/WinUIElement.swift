@@ -43,7 +43,7 @@ final class WinUIElement: NativeElement {
     /// Every property read by MountedElement.layoutValues, including derived
     /// expansion/scroll axes inherited from children.
     private static let layoutInputs = MountedElement.arrangedProperties.union([
-        .flex, .isFrameContent, .isLayoutDecoration, .orientation,
+        .backgroundExtendsSafeArea, .flex, .isFrameContent, .isLayoutDecoration, .orientation,
         .horizontalAlignmentDefault, .verticalAlignmentDefault,
         .layoutPriority, .horizontalGuide, .verticalGuide,
         ImageContract.isResizable.token, ImageElementContract.aspect.token, Prop("aspectFit"),

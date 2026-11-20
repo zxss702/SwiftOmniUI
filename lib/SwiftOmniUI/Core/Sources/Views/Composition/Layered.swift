@@ -103,6 +103,9 @@ public struct Layered<Base: View, Content: View>: View {
     public var body: some View {
         var layerNode = layer.node
         layerNode.props[.isLayoutDecoration] = true.propValue
+        if !over, Content.self == Color.self {
+            layerNode.props[.backgroundExtendsSafeArea] = true.propValue
+        }
         if layerNode.props[.horizontalAlignment] == nil
             && layerNode.props[.horizontalAlignmentDefault] == nil {
             layerNode.props[.horizontalAlignmentDefault] = alignment.horizontal.axis.propValue

@@ -190,7 +190,7 @@ case "WinUI"?:
             linkerSettings: [
                 .linkedLibrary("shcore"), .linkedLibrary("shlwapi"), .linkedLibrary("icu"), .linkedLibrary("shell32"),
                 .linkedLibrary("ole32"), .linkedLibrary("d2d1"), .linkedLibrary("d3d11"), .linkedLibrary("dwrite"),
-                .linkedLibrary("windowscodecs"), .linkedLibrary("gdi32"),
+                .linkedLibrary("windowscodecs"), .linkedLibrary("gdi32"), .linkedLibrary("comctl32"), .linkedLibrary("dwmapi"),
             ]
         ),
         .target(

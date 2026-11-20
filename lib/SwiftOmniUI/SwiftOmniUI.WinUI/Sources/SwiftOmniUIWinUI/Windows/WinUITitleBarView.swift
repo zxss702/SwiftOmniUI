@@ -41,10 +41,12 @@ final class WinUITitleBarView: WinUIView {
         let light = chrome.background.flatMap(BandWords.light(on:))
         if previous.title != chrome.title || (previous.back == nil) != (chrome.back == nil)
             || (previous.sidebarToggle == nil) != (chrome.sidebarToggle == nil)
-            || previous.background != chrome.background || previous.foreground != chrome.foreground {
+            || previous.background != chrome.background || previous.backgroundVisibility != chrome.backgroundVisibility
+            || previous.foreground != chrome.foreground {
             swiftomniui_winui_title_bar_set(
                 handle, chrome.title, chrome.back != nil, chrome.sidebarToggle != nil,
-                background != nil, background ?? 0, foreground != nil, foreground ?? 0, light.map { $0 ? 1 : 2 } ?? 0)
+                background != nil, background ?? 0, chrome.backgroundVisibility.rawValue,
+                foreground != nil, foreground ?? 0, light.map { $0 ? 1 : 2 } ?? 0)
         }
 
         let actions = chrome.leadingActions + chrome.actions + chrome.overflow

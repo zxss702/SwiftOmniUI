@@ -10,6 +10,183 @@ import XCTest
 
 /// A stack's children travel to the places a patch gives them; one that joins fades in, one hidden fades out first.
 final class WinUILayoutMotionTests: XCTestCase {
+    func testSlidingSidebarKeepsConversationAlignedWithItsAnimatedViewport() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let sidebar = State(wrappedValue: false)
+            let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
+                GeometryReader { _ in
+                    HStack(spacing: 0) {
+                        VStack {
+                            ScrollView {
+                                LazyVStack {
+                                    Text("Leading message").id("leading")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Text("Trailing message").id("trailing")
+                                        .padding(12)
+                                        .background {
+                                            GeometryReader { geometry in
+                                                RoundedRectangle(cornerRadius: geometry.size.height / 4)
+                                                    .fill(Color.blue)
+                                            }
+                                        }
+                                        .frame(maxWidth: 640, alignment: .trailing)
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                }
+                            }
+                            .id("conversation")
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.white)
+                        .safeAreaInset(edge: .bottom, spacing: 0) { Text("Composer").frame(height: 40) }
+                        .hiddenSafeBarBackground(true)
+                        .overlay(alignment: .topTrailing) { EmptyView() }
+                        if sidebar.wrappedValue {
+                            ScrollView {
+                                LazyVStack {
+                                    ForEach(0..<12, id: \.self) { row in
+                                        Text("Group chat message \(row)").padding(8)
+                                    }
+                                }
+                            }
+                                .safeAreaInset(edge: .top, spacing: 0) { Text("Group chat").frame(height: 40) }
+                                .frame(width: 240)
+                                .overlay(alignment: .leading) { Color.clear.frame(width: 16).offset(x: -8) }
+                                .background(Color.gray)
+                                .transition(.offset(x: 240))
+                                .id("group-sidebar")
+                        }
+                    }
+                }
+                .frame(width: 800, height: 400)
+            }
+            host.settle { host.views(WinUILabelView.self).contains { $0.text == "Trailing message" } }
+            host.frame()
+            let scroll = try XCTUnwrap(host.view(id: .manual("conversation")) as? WinUIScrollView)
+            let leading = try XCTUnwrap(host.view(id: .manual("leading")))
+            let trailing = try XCTUnwrap(host.views(WinUILabelView.self).first { $0.text == "Trailing message" })
+            let initialLeading = leading.origin.x - scroll.origin.x
+            let trailingInset = scroll.placedFrame.width - (trailing.origin.x - scroll.origin.x + trailing.laidOutFrame.width)
+            XCTAssertEqual(scroll.placedFrame.width, 800, accuracy: 1)
+
+            for opening in [true, false] {
+                let start = clock.now
+                withAnimation(.linear(duration: 0.2)) { sidebar.wrappedValue = opening }
+                host.runtime.pump.turn()
+                for elapsed in [0.0, 16, 50, 100, 150, 200, 250] {
+                    clock.now = start + elapsed
+                    host.frame()
+                    host.step()
+                    host.frame()
+                    let progress = min(1, elapsed / 200)
+                    let width = 800 - 240 * (opening ? progress : 1 - progress)
+                    XCTAssertEqual(scroll.placedFrame.width, width, accuracy: 2, "viewport at \(elapsed) ms, opening: \(opening)")
+                    XCTAssertEqual(leading.origin.x - scroll.origin.x, initialLeading, accuracy: 2,
+                                   "leading edge at \(elapsed) ms, opening: \(opening)")
+                    let trailingEdge = trailing.origin.x - scroll.origin.x + trailing.laidOutFrame.width
+                    XCTAssertEqual(trailingEdge, width - trailingInset, accuracy: 2,
+                                   "trailing edge at \(elapsed) ms, opening: \(opening)")
+                    if opening {
+                        let panel = try XCTUnwrap(host.view(id: .manual("group-sidebar")))
+                        XCTAssertEqual(scroll.placedFrame.width, panel.placedFrame.x + panel.drawing.translationX,
+                                       accuracy: 2, "opening panel and conversation must agree at \(elapsed) ms")
+                    }
+                }
+            }
+
+            withAnimation(.linear(duration: 0.2)) { sidebar.wrappedValue = true }
+            host.runtime.pump.turn()
+            host.frame()
+            clock.now += 250
+            host.frame()
+            let panel = try XCTUnwrap(host.view(id: .manual("group-sidebar")))
+            let panelEdge = panel.placedFrame.x
+            withAnimation(.linear(duration: 0.2)) { sidebar.wrappedValue = false }
+            host.runtime.pump.turn()
+            clock.now += 80
+            host.frame()
+            for _ in 0..<5 {
+                XCTAssertEqual(scroll.placedFrame.width, panelEdge + panel.drawing.translationX,
+                               accuracy: 2, "closing panel and conversation must agree after a late first frame")
+                let trailingEdge = trailing.origin.x - scroll.origin.x + trailing.laidOutFrame.width
+                XCTAssertEqual(trailingEdge, scroll.placedFrame.width - trailingInset, accuracy: 2)
+                clock.now += 16
+                host.frame()
+            }
+            clock.now += 100
+            host.frame()
+            XCTAssertNil(host.view(id: .manual("group-sidebar")))
+            XCTAssertEqual(scroll.placedFrame.width, 800, accuracy: 2)
+        }
+    }
+
+    func testGeometryReaderKeepsScaleAndClipInStepDuringSidebarInsertion() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let compact = State(wrappedValue: false)
+            let clockOpacity = State(wrappedValue: 1.0)
+            let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
+                GeometryReader { full in
+                    HStack(spacing: 0) {
+                        GeometryReader { room in
+                            let scale = min(room.size.width / full.size.width, room.size.height / full.size.height)
+                            ZStack {
+                                Color.blue
+                                    .frame(width: full.size.width, height: full.size.height)
+                                    .scaleEffect(scale)
+                                    .frame(width: full.size.width * scale, height: full.size.height * scale)
+                                    .clipShape(RoundedRectangle(cornerRadius: compact.wrappedValue ? 16 : 0))
+                                    .id("clip")
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .padding(.vertical, compact.wrappedValue ? 24 : 0)
+                        .overlay(alignment: .top) { Text("12:00").opacity(clockOpacity.wrappedValue) }
+                        .id("preview")
+                        if compact.wrappedValue {
+                            Color.red.frame(width: 160).transition(.offset(x: 160))
+                        }
+                    }
+                    .padding(.horizontal, compact.wrappedValue ? 16 : 0)
+                }
+                .frame(width: 800, height: 400)
+            }
+            host.frame()
+            let preview = try XCTUnwrap(host.view(id: .manual("preview")) as? WinUILayoutView)
+            let readers = host.views(WinUIGridView.self).filter { $0.sourceElement?.isGeometryReader == true }
+            XCTAssertEqual(readers.count, 2)
+            let reader = try XCTUnwrap(readers.last)
+            let clip = try XCTUnwrap(host.view(id: .manual("clip")))
+            let surface = try XCTUnwrap(host.views(WinUIGridView.self).first {
+                $0.sourceElement?.value(.scale) != nil
+            })
+            let surfaceElement = try XCTUnwrap(surface.sourceElement)
+            XCTAssertTrue(preview.usesPresentedRoom)
+            XCTAssertEqual(clip.placedFrame.width, 800, accuracy: 1)
+
+            withAnimation(.linear(duration: 0.2)) { compact.wrappedValue = true }
+            host.runtime.pump.turn()
+            // A size animation inside the reader can start alongside the
+            // sidebar insertion, just like the cursor changing size.
+            surfaceElement.winUI.layoutItemChanged(presentedLanes: [.width, .height])
+            for time in [0.0, 10.0, 50.0, 100.0, 150.0, 200.0, 250.0] {
+                clock.now = time
+                if time == 50 {
+                    clockOpacity.wrappedValue = 0.8
+                    host.runtime.pump.turn()
+                }
+                host.frame()
+                let width = 800 - 192 * min(1, time / 200)
+                XCTAssertTrue(host.view(id: .manual("clip")) === clip)
+                XCTAssertEqual(preview.placedFrame.width, width, accuracy: 2)
+                XCTAssertEqual(reader.placedFrame.width, preview.placedFrame.width, accuracy: 1)
+                XCTAssertEqual(clip.placedFrame.width, width, accuracy: 2)
+                XCTAssertEqual(surface.placedFrame.width, 800, accuracy: 1)
+                XCTAssertEqual(surface.drawing.scaleX * 800, clip.placedFrame.width, accuracy: 2)
+            }
+        }
+    }
+
     func testAStackSiblingFollowsTheAnimatedInsertionBeforeItsFinalPosition() throws {
         try onUIThread {
             let clock = TestClock()

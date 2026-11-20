@@ -140,6 +140,19 @@ import XCTest
         XCTAssertEqual(name.get(), "Grace")
     }
 
+    func testSettlingGeometryPreservesTheUncommittedLayoutAnimation() {
+        let law = Animation.eased(200, .linear)
+        var authored = HostPatch(id: .manual("stack"), type: .hStack)
+        authored.layoutTransition = HostLayoutMotion(animation: law, lanes: .all)
+        var feedback = HostPatch(id: authored.id, type: authored.type)
+        feedback.layoutTransition = HostLayoutMotion(animation: .none, lanes: [], followsPresentation: true)
+        XCTAssertEqual(authored.merging(feedback).layoutTransition, authored.layoutTransition)
+
+        var snap = feedback
+        snap.layoutTransition = HostLayoutMotion(animation: .none, lanes: [])
+        XCTAssertEqual(authored.merging(snap).layoutTransition, snap.layoutTransition)
+    }
+
     func testANativeHostRefusesAReportThroughAnOutOnlyAttachment() throws {
         let caption = State("Waiting")
         let renders = Renders()

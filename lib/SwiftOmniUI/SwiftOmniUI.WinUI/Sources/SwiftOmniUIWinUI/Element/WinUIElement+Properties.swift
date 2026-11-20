@@ -76,7 +76,10 @@ extension WinUIElement {
         switch type {
         case .page, .overlay: return WinUISingleChildView()
         case .navigationStack: return WinUINavigationView()
-        case .navigationSplitView: return WinUISplitView()
+        case .navigationSplitView:
+            return WinUISplitView(reducesMotion: { [weak self] in
+                self?.host?.runtime.reducesMotion() ?? false
+            })
         case .tabView: return WinUITabbedView()
         default: return WinUIUnsupportedView(type)
         }

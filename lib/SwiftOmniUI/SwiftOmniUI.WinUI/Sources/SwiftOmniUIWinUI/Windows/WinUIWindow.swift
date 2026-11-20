@@ -56,9 +56,10 @@ final class WinUIWindow {
     /// Whether the window was closed: what it tells after that is its closing's, and no one's to hear.
     private(set) var isClosed = false
 
-    init() {
-        handle = swiftomniui_winui_window_make(titleBar.number)!
-        swiftomniui_winui_window_set_chrome(handle, titleBar.handle, nil, nil)
+    init(transparent: Bool = false) {
+        handle = swiftomniui_winui_window_make(titleBar.number, transparent)!
+        titleBarStands = !transparent
+        if titleBarStands { swiftomniui_winui_window_set_chrome(handle, titleBar.handle, nil, nil) }
         let rows: [WinUIView] = [titleBar, menuBar, tabRow]
         for row in rows {
             row.watchNativeHeight { [weak self] in self?.refreshSafeAreaEnvironment() }

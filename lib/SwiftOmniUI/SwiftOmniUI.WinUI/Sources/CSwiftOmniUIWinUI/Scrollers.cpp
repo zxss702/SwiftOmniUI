@@ -283,7 +283,6 @@ namespace {
             for (int32_t index = 0, count = xaml::Media::VisualTreeHelper::GetChildrenCount(at);
                  index < count; ++index) pending.push_back(xaml::Media::VisualTreeHelper::GetChild(at, index));
         }
-        if (state.region.Top > 0) refreshSafeAreaScrollEdge(scroller);
     }
 
     void queueInsets(controls::ScrollView const &scroller, std::shared_ptr<ScrollerInsets> const &state) {
@@ -451,6 +450,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
         scroller.Loaded(guarded("preparing scroller margins", [insets](IInspectable const &sender, auto const &) {
             auto scroller = sender.as<controls::ScrollView>();
             queueInsets(scroller, insets);
+            updateAcrylicScroller(scroller, insets->region);
             resumeViewportRequests(scroller, insets);
         }));
         scroller.RegisterPropertyChangedCallback(controls::Control::TemplateProperty(),
@@ -465,12 +465,16 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
         // The InteractionTracker's word of the view, every frame it moves: the
         // ear hears where it stands now paired with where an animation lands.
         scroller.ViewChanged(guarded("handling ViewChanged",
-            [view, flight](controls::ScrollView const &scroller, IInspectable const &) {
-            refreshSafeAreaScrollEdge(scroller);
+            [view, flight, insets](controls::ScrollView const &scroller, IInspectable const &) {
+            updateAcrylicScroller(scroller, insets->region);
             double x = scroller.HorizontalOffset(), y = scroller.VerticalOffset();
             callbacks.scrolling(view, x, y,
                 std::isnan(flight->x) ? x : flight->x, std::isnan(flight->y) ? y : flight->y);
         }));
+        scroller.ExtentChanged(guarded("updating scroll edge material",
+            [insets](controls::ScrollView const &scroller, IInspectable const &) {
+                updateAcrylicScroller(scroller, insets->region);
+            }));
         // An animation - inertia's or a move the program animated - names its
         // landing as it starts. That endpoint is metadata, not a visible window.
         scroller.ScrollAnimationStarting(guarded("handling ScrollAnimationStarting",
@@ -733,6 +737,7 @@ extern "C" void swiftomniui_winui_scroller_insets(
             auto region = xaml::Thickness{left, top, right, bottom};
             if (sameMargin(state->region, region)) return;
             state->region = region;
+            updateAcrylicScroller(scroller, region);
             queueInsets(scroller, state);
         }
     } catch (...) {

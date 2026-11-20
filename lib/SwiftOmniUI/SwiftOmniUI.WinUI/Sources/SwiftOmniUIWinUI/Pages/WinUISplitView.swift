@@ -54,6 +54,7 @@ final class WinUISplitView: WinUILayoutView {
     private(set) weak var detailRow: WinUIView?
 
     private var adaptation = SidebarAdaptation()
+    private let reducesMotion: () -> Bool
     private var configurationPending = false
     private struct NativeSlot {
         let owner: WinUISidebarView
@@ -62,7 +63,8 @@ final class WinUISplitView: WinUILayoutView {
     }
     private var ownedSlots: [NativeSlot] = []
 
-    override init() {
+    init(reducesMotion: @escaping () -> Bool = { !swiftomniui_winui_animations_enabled() }) {
+        self.reducesMotion = reducesMotion
         super.init()
         sidebar.placingLayout = self
         middle.nativeLayoutOwner = self
@@ -297,12 +299,12 @@ final class WinUISplitView: WinUILayoutView {
                 sidebar.set(
                     sidebar: pages.first?.view, detail: middle, row: nil,
                     open: isPresented, widths: SplitColumnWidth(sidebarPaneLength),
-                    contentWidths: SplitColumnWidth([middle.minimumRoom, -1, -1]))
+                    contentWidths: SplitColumnWidth([middle.minimumRoom, -1, -1]), animated: !reducesMotion())
             } else {
                 sidebar.set(
                     sidebar: pages.first?.view, detail: pages.dropFirst().first?.view, row: detailRow,
                     open: isPresented, widths: SplitColumnWidth(sidebarPaneLength),
-                    contentWidths: SplitColumnWidth(contentPaneLength))
+                    contentWidths: SplitColumnWidth(contentPaneLength), animated: !reducesMotion())
             }
             // Register semantic pages, not the nested native SplitView wrappers:
             // main content and trailing detail must remain separate blur sources.

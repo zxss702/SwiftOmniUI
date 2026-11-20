@@ -3,12 +3,179 @@
 
 import CSwiftOmniUIWinUI
 import Foundation
+import SwiftOmniUIConformance
 @_spi(Host) import SwiftOmniUICore
 @_spi(Host) import SwiftOmniUIHost
 @testable import SwiftOmniUIWinUI
 import XCTest
 
 final class WinUIImageViewTests: XCTestCase {
+    func testFittedImageStaysCenteredWhileItsInnerFrameResizes() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let selected = State(wrappedValue: true)
+            let host = WinUIRenderer.running(clock: clock) {
+                HStack(spacing: 0) {
+                    let size = selected.wrappedValue ? 24.0 : 32.0
+                    Image("test_large_halves.png").resizable().scaledToFit()
+                        .frame(width: size, height: size)
+                        .frame(width: 32, height: 32)
+                        .id("icon-slot")
+                    if selected.wrappedValue {
+                        Text("Caption").lineLimit(1).transition(.blur)
+                    }
+                }
+                .animation(.eased(240, .linear), value: selected.wrappedValue)
+            }
+            let image = try XCTUnwrap(host.views(WinUIImageView.self).first)
+            let inner = try XCTUnwrap(image.placingLayout)
+            let slot = try XCTUnwrap(host.view(id: .manual("icon-slot")))
+            host.settle { image.laidOutFrame.width > 0 }
+            XCTAssertTrue(inner.placingLayout === slot)
+            XCTAssertEqual(image.laidOutFrame.width, 24, accuracy: 0.5)
+
+            for selection in [false, true] {
+                let start = clock.now
+                selected.wrappedValue = selection
+                host.step()
+                host.frame()
+                for elapsed in [0.0, 60, 120, 180, 240] {
+                    clock.now = start + elapsed
+                    host.frame()
+                    let frame = image.laidOutFrame
+                    let offset = try XCTUnwrap(image.layoutOffset(relativeTo: slot))
+                    XCTAssertEqual(frame.width, inner.laidOutFrame.width, accuracy: 0.5)
+                    XCTAssertEqual(frame.height, frame.width / 2, accuracy: 0.5)
+                    XCTAssertEqual(offset.x + frame.width / 2, 16, accuracy: 0.5)
+                    XCTAssertEqual(offset.y + frame.height / 2, 16, accuracy: 0.5)
+                    if elapsed == 120 {
+                        XCTAssertEqual(frame.width, 28, accuracy: 0.5)
+                        // Give XAML a paint turn at the same test-clock time
+                        // before reading the pixels of this layout sample.
+                        WinUITestHost.pump(0.04)
+                        let coordinates = stride(from: 0.25, to: 32, by: 0.5).map { $0 }
+                        let pixels = slot.pixels(at: coordinates.map { ($0, 16) } + coordinates.map { (8, $0) })
+                        let axes = [pixels.prefix(coordinates.count), pixels.suffix(coordinates.count)]
+                        let extents = zip(axes, [28.0, 14.0])
+                        for (axis, extent) in extents {
+                            let colored = zip(coordinates, axis).compactMap { point, pixel in pixel >> 24 > 127 ? point : nil }
+                            let first = try XCTUnwrap(colored.first)
+                            let last = try XCTUnwrap(colored.last)
+                            let note = "selection \(selection), expected \(extent) DIP, bitmap sampled from \(first) to \(last)"
+                            XCTAssertEqual((first + last) / 2, 16, accuracy: 0.75, note)
+                            XCTAssertEqual(last - first + 0.5, extent, accuracy: 1, note)
+                        }
+                    }
+                }
+                XCTAssertEqual(image.laidOutFrame.width, selection ? 24 : 32, accuracy: 0.5)
+            }
+        }
+    }
+
+    func testTabIconsStayCenteredThroughRepeatedSelectionChanges() throws {
+        try onUIThread {
+            let tracePath = ProcessInfo.processInfo.environment["SOUI_TAB_GEOMETRY_TRACE"]
+            var trace: [TabGeometrySample] = []
+            for (usesButtons, usesSafeBar) in [(false, false), (true, false), (true, true)] {
+                let clock = TestClock()
+                let selection = State(wrappedValue: 0)
+                let host = WinUIRenderer.running(clock: clock) {
+                    AnimatedIconTabs(selection: selection, usesButtons: usesButtons, usesSafeBar: usesSafeBar)
+                }
+                let icons = host.views(WinUIImageView.self)
+                guard icons.count == (usesSafeBar ? 3 : 2) else {
+                    XCTFail("unexpected tab icon count: \(icons.count)")
+                    return
+                }
+                let slots = try icons.map { try XCTUnwrap($0.placingLayout?.placingLayout) }
+                let buttons = host.views(WinUIButtonView.self)
+                guard !usesButtons || buttons.count == icons.count else {
+                    XCTFail("each icon must have one native button")
+                    return
+                }
+                host.frame()
+                let rowCenters = slots.map { $0.origin.y + $0.laidOutFrame.height / 2 }
+                let scenario = usesSafeBar ? "safe-bar" : usesButtons ? "scroll-buttons" : "plain-stack"
+
+                @MainActor func capture(_ phase: String, from previous: Int, to next: Int, elapsed: Double) {
+                    guard tracePath != nil else { return }
+                    for (index, (icon, slot)) in zip(icons, slots).enumerated() {
+                        let button = usesButtons ? buttons[index] : nil
+                        trace.append(TabGeometrySample(
+                            scenario: scenario, phase: phase, from: previous, to: next, icon: index,
+                            elapsedMS: elapsed, image: .init(icon), innerFrame: icon.placingLayout.map { TabGeometry($0) },
+                            slot: .init(slot), button: button.map { TabGeometry($0) },
+                            imageOffsetInSlot: icon.layoutOffset(relativeTo: slot).map { [$0.x, $0.y] },
+                            imageOffsetInButton: button.flatMap { icon.layoutOffset(relativeTo: $0) }.map { [$0.x, $0.y] },
+                            nativePictureFrame: Self.nativePictureFrame(icon)))
+                    }
+                }
+
+                var previous = 0
+                for next in usesSafeBar ? [1, 2, 0, 2, 1] : [1, 0, 1] {
+                    let start = clock.now
+                    capture("before-click", from: previous, to: next, elapsed: 0)
+                    if usesButtons {
+                        let button = try XCTUnwrap(buttons.indices.contains(next) ? buttons[next] : nil)
+                        swiftomniui_winui_button_invoke(button.handle)
+                    } else {
+                        selection.wrappedValue = next
+                    }
+                    host.runtime.pump.turn()
+                    host.layOut()
+                    capture("after-layout", from: previous, to: next, elapsed: 0)
+                    XCTAssertEqual(icons[next].laidOutFrame.width, 32, accuracy: 0.5,
+                                   "laying out the state change before the first tick must preserve the incoming size")
+                    XCTAssertEqual(icons[previous].laidOutFrame.width, 24, accuracy: 0.5,
+                                   "laying out the state change before the first tick must preserve the outgoing size")
+                    var sawIntermediateSize = false
+                    for elapsed in stride(from: 0.0, through: 720, by: 16) {
+                        clock.now = start + elapsed
+                        host.frame()
+                        capture("frame", from: previous, to: next, elapsed: elapsed)
+                        for (index, (icon, slot)) in zip(icons, slots).enumerated() {
+                            let frame = icon.laidOutFrame
+                            let offset = try XCTUnwrap(icon.layoutOffset(relativeTo: slot))
+                            let note = "buttons \(usesButtons), safe bar \(usesSafeBar), icon \(index), tab \(next), frame at \(elapsed)ms"
+                            XCTAssertEqual(slot.laidOutFrame.width, 32, accuracy: 0.5, note)
+                            XCTAssertEqual(slot.laidOutFrame.height, 32, accuracy: 0.5, note)
+                            XCTAssertEqual(offset.x + frame.width / 2, 16, accuracy: 0.5, note)
+                            XCTAssertEqual(offset.y + frame.height / 2, 16, accuracy: 0.5, note)
+                            let native = try XCTUnwrap(Self.nativePictureFrame(icon))
+                            XCTAssertEqual(native[0] + native[2] / 2, frame.width / 2, accuracy: 0.5, note)
+                            XCTAssertEqual(native[1] + native[3] / 2, frame.height / 2, accuracy: 0.5, note)
+                            XCTAssertEqual(native[2], frame.width, accuracy: 0.5, note)
+                            XCTAssertEqual(native[3], frame.height, accuracy: 0.5, note)
+                            XCTAssertEqual(slot.origin.y + offset.y + frame.height / 2,
+                                           rowCenters[index], accuracy: 0.5, note)
+                            if usesButtons {
+                                let offsetInButton = try XCTUnwrap(icon.layoutOffset(relativeTo: buttons[index]))
+                                let horizontalCenter = offsetInButton.x + frame.width / 2
+                                XCTAssertGreaterThanOrEqual(horizontalCenter, 15.5, note)
+                                XCTAssertLessThanOrEqual(horizontalCenter, 21.0, note)
+                            }
+                            sawIntermediateSize = sawIntermediateSize || (frame.width > 25 && frame.width < 31)
+                        }
+                    }
+                    XCTAssertTrue(sawIntermediateSize, "the icon size must animate on tab \(next)")
+                    XCTAssertEqual(icons[next].laidOutFrame.width, 24, accuracy: 0.5)
+                    XCTAssertEqual(icons[previous].laidOutFrame.width, 32, accuracy: 0.5)
+                    previous = next
+                }
+            }
+            if let tracePath {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                try encoder.encode(trace).write(to: URL(fileURLWithPath: tracePath), options: .atomic)
+            }
+        }
+    }
+
+    @MainActor private static func nativePictureFrame(_ image: WinUIImageView) -> [Double]? {
+        var frame = [Double](repeating: 0, count: 4)
+        return swiftomniui_winui_image_content_frame(image.handle, &frame) ? frame : nil
+    }
+
     func testHeightOnlyFittedIconKeepsTheButtonLabelCompact() throws {
         try onUIThread {
             struct ToolFileIcon: View {
@@ -237,7 +404,10 @@ final class WinUIImageViewTests: XCTestCase {
             let image = try XCTUnwrap(host.views(WinUIImageView.self).first)
             host.settle { image.laidOutFrame.width > 0 }
             host.layOut()
-            let colors = image.pixels(at: [(10, 20), (30, 20)])
+            let frame = image.laidOutFrame
+            XCTAssertEqual(frame.width, 40, accuracy: 0.5)
+            XCTAssertEqual(frame.height, 20, accuracy: 0.5)
+            let colors = image.pixels(at: [(10, frame.height / 2), (30, frame.height / 2)])
             XCTAssertEqual(colors.map { $0 & 0x00FF_FFFF }, [0x00FF_0000, 0x0000_00FF])
         }
     }
@@ -370,6 +540,48 @@ final class WinUIImageViewTests: XCTestCase {
             host.layOut()
             try visible("\u{E70D}", width: 8, height: 8)
             try visible("\u{E723}", width: 40, height: 40)
+        }
+    }
+
+    func testSymbolInFixedButtonLabelRepaintsWhenItsSourceChanges() throws {
+        try onUIThread {
+            let paused = State(wrappedValue: false)
+            let pause = "\u{E769}"
+            let play = "\u{E768}"
+            let host = WinUIRenderer.running {
+                Button {} label: {
+                    Image(systemName: paused.wrappedValue ? play : pause)
+                        .contentTransition(.symbolEffect)
+                        .font(.title3)
+                        .frame(width: 40, height: 40)
+                        .background(.white, in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+            let image = try XCTUnwrap(host.views(WinUIImageView.self).first)
+            host.settle { image.laidOutFrame.width > 0 }
+            host.layOut()
+            let width = Int(ceil(image.laidOutFrame.width))
+            let height = Int(ceil(image.laidOutFrame.height))
+            XCTAssertGreaterThan(width, 0)
+            XCTAssertGreaterThan(height, 0)
+            let points = (0..<height).flatMap { y in
+                (0..<width).map { x in (Double(x) + 0.5, Double(y) + 0.5) }
+            }
+            var last = image.pixels(at: points)
+            XCTAssertTrue(last.contains { ($0 >> 24) != 0 })
+
+            for isPaused in [true, false, true, false] {
+                withAnimation(.snappy) { paused.wrappedValue = isPaused }
+                host.step()
+                host.frame()
+                XCTAssertTrue(host.views(WinUIImageView.self).first === image)
+                XCTAssertEqual(image.sourceElement?.value(ImageContract.source.token), .name(isPaused ? play : pause))
+                let pixels = image.pixels(at: points)
+                XCTAssertTrue(pixels.contains { ($0 >> 24) != 0 })
+                XCTAssertNotEqual(pixels, last)
+                last = pixels
+            }
         }
     }
 
@@ -507,5 +719,127 @@ final class WinUIImageViewTests: XCTestCase {
                 XCTAssertTrue(row.frame == (0, 0, picture.width, picture.height), "\(picture.name): \(row.frame)")
             }
         }
+    }
+}
+
+private struct TabGeometrySample: Encodable {
+    var scenario: String
+    var phase: String
+    var from: Int
+    var to: Int
+    var icon: Int
+    var elapsedMS: Double
+    var image: TabGeometry
+    var innerFrame: TabGeometry?
+    var slot: TabGeometry
+    var button: TabGeometry?
+    var imageOffsetInSlot: [Double]?
+    var imageOffsetInButton: [Double]?
+    var nativePictureFrame: [Double]?
+}
+
+private struct TabGeometry: Encodable {
+    var actualOffset: [Double]
+    var actualSize: [Double]
+    var desiredSize: [Double]
+    var rootCenter: [Double]?
+    var soUIPlacement: [Double]
+
+    @MainActor init(_ view: WinUIView) {
+        let actual = view.laidOutFrame
+        let desired = view.desiredSize
+        let placement = view.placedFrame
+        actualOffset = [actual.x, actual.y]
+        actualSize = [actual.width, actual.height]
+        desiredSize = [desired.width, desired.height]
+        soUIPlacement = [placement.x, placement.y, placement.width, placement.height]
+        var matrix = [Double](repeating: 0, count: 6)
+        if swiftomniui_winui_matrix_to_root(view.handle, &matrix) {
+            let centerX = actual.width / 2
+            let centerY = actual.height / 2
+            rootCenter = [
+                matrix[4] + centerX * matrix[0] + centerY * matrix[2],
+                matrix[5] + centerX * matrix[1] + centerY * matrix[3],
+            ]
+        }
+    }
+}
+
+private struct AnimatedIconTabs: View {
+    let selection: State<Int>
+    let usesButtons: Bool
+    let usesSafeBar: Bool
+    @Namespace private var namespace
+
+    var body: some View {
+        if usesSafeBar {
+            VStack {
+                ScrollView { Text("Conversation \(selection.wrappedValue)") }
+                    .id(selection.wrappedValue)
+                    .transition(.identity)
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                ScrollView(.horizontal) { tabs.buttonStyle(.plain) }
+                    .scrollIndicators(.hidden)
+            }
+            .frame(width: 320)
+        } else if usesButtons {
+            ScrollView(.horizontal) { tabs.buttonStyle(.plain) }
+                .frame(width: 320, height: 64)
+        } else {
+            tabs.animation(.snappy, value: selection.wrappedValue)
+        }
+    }
+
+    private var tabs: some View {
+        HStack {
+            ForEach(0..<(usesSafeBar ? 3 : 2)) { index in
+                let selected = selection.wrappedValue == index
+                tab(index, selected: selected)
+                    .background {
+                        if selected {
+                            Capsule().fill(Color.black).matchedGeometryEffect(id: "selected-tab", in: namespace)
+                        }
+                    }
+            }
+        }
+        .padding(8)
+    }
+
+    @ViewBuilder private func tab(_ index: Int, selected: Bool) -> some View {
+        if usesButtons {
+            Button {
+                withAnimation(.snappy) { selection.wrappedValue = index }
+            } label: {
+                if usesSafeBar, index == 0 {
+                    icon(selected: selected)
+                        .contentShape(Rectangle())
+                } else {
+                    face(index, selected: selected)
+                }
+            }
+        } else {
+            face(index, selected: selected)
+        }
+    }
+
+    private func face(_ index: Int, selected: Bool) -> some View {
+        HStack(spacing: 0) {
+            icon(selected: selected)
+                .padding(.leading, selected ? 4 : 0)
+            if selected {
+                Text(index == 0 ? "负责人" : "操控")
+                    .lineLimit(1)
+                    .padding(.trailing, 12)
+                    .transition(.blur.combined(with: .scale(anchor: .leading)).combined(with: .offset(x: -32)))
+            }
+        }
+        .frame(height: 32)
+    }
+
+    private func icon(selected: Bool) -> some View {
+        Image("test_large_halves.png").resizable().scaledToFit()
+            .frame(width: selected ? 24 : 32, height: selected ? 24 : 32)
+            .frame(width: 32, height: 32)
     }
 }

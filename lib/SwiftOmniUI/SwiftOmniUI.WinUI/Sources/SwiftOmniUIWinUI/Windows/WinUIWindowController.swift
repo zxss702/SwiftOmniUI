@@ -13,7 +13,7 @@ final class WinUIWindowController {
     private(set) weak var element: MountedElement?
 
     /// The WinUI window it is shown in.
-    let window = WinUIWindow()
+    let window: WinUIWindow
 
     /// What the window shows, by the host layer's rule.
     private let presentation = WindowPresentation()
@@ -24,6 +24,7 @@ final class WinUIWindowController {
 
     init(_ element: MountedElement) {
         self.element = element
+        window = WinUIWindow(transparent: element.value(.isTransparent)?.bool == true)
     }
 
     /// Shows what the element asks for now, the window it belongs to found by `windowOf`. The host layer tells
@@ -183,8 +184,9 @@ final class WinUIWindowController {
         chrome.leadingActions = composed.leadingActions.map(Self.action)
         chrome.actions = composed.primaryActions.map(Self.action)
         chrome.overflow = composed.overflowActions.map(Self.action)
-        chrome.background = composed.toolbarBackground?.enumeration == Visibility.hidden.rawValue
-            ? Color.clear.propValue : composed.background
+        chrome.backgroundVisibility = (composed.toolbarBackground?.enumeration).flatMap(Visibility.init(rawValue:))
+            ?? .automatic
+        chrome.background = chrome.backgroundVisibility == .hidden ? nil : composed.background
         chrome.foreground = composed.foreground
         // A placement group's entries stand for the platform's own menus: the app menu's button carries them.
         // A scene's own command menus stand beside the page's in the bar.

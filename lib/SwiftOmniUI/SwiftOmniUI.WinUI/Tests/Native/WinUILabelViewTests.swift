@@ -136,6 +136,34 @@ final class WinUILabelViewTests: XCTestCase {
         }
     }
 
+    func testFixedHeightTextColumnPreservesTheTitleAndTrimsTheDescription() {
+        onUIThread {
+            let heading = WinUILabelView()
+            heading.setText("文档专家")
+            heading.setFont(size: nil, attributes: nil, family: nil, textStyle: .headline)
+            let description = WinUILabelView()
+            description.setText("该模型用于通过 HTML 工作稿创建与编辑 Word 文档。")
+            description.setFont(size: nil, attributes: nil, family: nil, textStyle: .subheadline)
+            let column = WinUIStackView(axis: .vertical)
+            column.spacing = 4
+            column.setItems([WinUILayoutItem(view: heading), WinUILayoutItem(view: description)])
+
+            let narrowWidth = 120.0
+            let titleHeight = heading.measure(width: narrowWidth, height: nil).height
+            let rowHeight = ceil(titleHeight + description.minimumLineHeight + 4)
+            XCTAssertGreaterThan(column.naturalSize(width: narrowWidth).height, rowHeight)
+            for (width, expectedTrimming) in [(narrowWidth, "1"), (640.0, "0")] {
+                column.prepareMeasure(width: width, height: rowHeight)
+                swiftomniui_winui_arrange(column.handle, 0, 0, width, rowHeight)
+                XCTAssertGreaterThanOrEqual(heading.placedFrame.height, titleHeight)
+                let trimming = WinUIStrings.read {
+                    swiftomniui_winui_read(description.handle, "isTextTrimmed", $0, $1)
+                }
+                XCTAssertEqual(trimming, expectedTrimming)
+            }
+        }
+    }
+
     func testForegroundPatchDoesNotReadOrResetTypography() throws {
         try onUIThread {
             let host = WinUIRenderer.running { Text("words") }

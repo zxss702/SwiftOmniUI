@@ -23,10 +23,10 @@ final class WinUISidebarView: WinUIView {
     /// The pane and content pages, their width constraints, and a row above the content.
     func set(sidebar: WinUIView?, detail: WinUIView?, row: WinUIView?, open: Bool,
              widths: SplitColumnWidth = SplitColumnWidth(nil), contentShown: Bool = true,
-             contentWidths: SplitColumnWidth = SplitColumnWidth(nil)) {
+             contentWidths: SplitColumnWidth = SplitColumnWidth(nil), animated: Bool = false) {
         swiftomniui_winui_split_set(handle, sidebar?.presentationHandle, detail?.presentationHandle, row?.presentationHandle, open,
                                    widths.minimum, widths.ideal, widths.maximum,
-                                   contentShown, contentWidths.minimum, contentWidths.maximum)
+                                   contentShown, contentWidths.minimum, contentWidths.maximum, animated)
         invalidateMeasure()
     }
 

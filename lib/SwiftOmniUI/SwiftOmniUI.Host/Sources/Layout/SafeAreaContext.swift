@@ -219,13 +219,23 @@ extension MountedElement {
               number(.width) == nil, number(.height) == nil,
               number(.maximumWidth).map({ !$0.isFinite || $0 < 0 }) ?? true,
               number(.maximumHeight).map({ !$0.isFinite || $0 < 0 }) ?? true,
-              insets(.padding) == EdgeInsets(0), insets(.contentPadding) == EdgeInsets(0),
-              currentChildren.count == 1,
+              insets(.padding) == EdgeInsets(0), insets(.contentPadding) == EdgeInsets(0)
+        else { return nil }
+
+        let children = currentChildren
+        // An overlay or background takes its size from the base. Its
+        // decoration must not consume the safe area before the base sees it.
+        if type == .zStack, children.count == 2 {
+            let firstDecorates = children[0].value(.isLayoutDecoration)?.bool == true
+            let secondDecorates = children[1].value(.isLayoutDecoration)?.bool == true
+            if firstDecorates != secondDecorates { return firstDecorates ? children[1] : children[0] }
+        }
+        guard children.count == 1,
               type == .page || !native.presentsView
                 || type == .vStack || type == .hStack || type == .zStack
-                || (type == .grid && currentChildren[0].value(.isFrameContent)?.bool == true)
+                || (type == .grid && children[0].value(.isFrameContent)?.bool == true)
         else { return nil }
-        return currentChildren[0]
+        return children[0]
     }
 
     public var safeBarAllowsInput: Bool {

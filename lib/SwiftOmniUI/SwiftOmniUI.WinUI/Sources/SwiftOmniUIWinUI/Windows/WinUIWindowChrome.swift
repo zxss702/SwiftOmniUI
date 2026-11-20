@@ -25,6 +25,7 @@ struct WinUIWindowChrome {
     var actions: [WinUIToolbarAction] = []
     var overflow: [WinUIToolbarAction] = []
     var background: HostValue?
+    var backgroundVisibility: SwiftOmniUICore.Visibility = .automatic
     var foreground: HostValue?
     var menuBar = WinUIMenu()
 

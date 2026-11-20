@@ -5,6 +5,7 @@
 #include <winrt/Microsoft.UI.Composition.h>
 #include <memory>
 #include <functional>
+#include <optional>
 #include <vector>
 
 namespace swiftomniui {
@@ -44,7 +45,20 @@ namespace swiftomniui {
     winrt::Windows::Foundation::Rect acrylicLayoutBounds(xaml::FrameworkElement const &element, xaml::FrameworkElement const &root);
     bool acrylicSceneContains(std::shared_ptr<AcrylicScene> const &scene, xaml::FrameworkElement const &element);
     std::vector<xaml::FrameworkElement> acrylicSceneBars(std::shared_ptr<AcrylicScene> const &scene);
-    std::vector<winrt::Windows::Foundation::Rect> acrylicSceneRegions(std::shared_ptr<AcrylicScene> const &scene);
+    enum class AcrylicEdge { fixed, top, bottom };
+    struct AcrylicBand {
+        winrt::Windows::Foundation::Rect rect{};
+        bool active = true;
+    };
+    std::vector<AcrylicBand> acrylicSceneRegions(std::shared_ptr<AcrylicScene> const &scene);
+    std::vector<winrt::Windows::Foundation::Rect> acrylicMaterialRegions(std::vector<AcrylicBand> const &bands);
+    std::vector<AcrylicBand> acrylicLocalRegions(std::shared_ptr<AcrylicScene> const &scene,
+        xaml::FrameworkElement const &marker, winrt::Windows::Foundation::Rect const &bounds);
+    enum class AcrylicChromeMode { safeBar, automatic, visible, hidden };
+    AcrylicChromeMode acrylicTitleBarMode(xaml::FrameworkElement const &titleBar);
+    void setAcrylicTitleBarMode(xaml::FrameworkElement const &titleBar, AcrylicChromeMode mode);
+    std::vector<AcrylicBand> acrylicChromeRegions(std::shared_ptr<AcrylicScene> const &scene,
+        winrt::Windows::Foundation::Rect const &bounds, AcrylicChromeMode mode);
     xaml::Media::SystemBackdrop acrylicFoundationBackdrop(xaml::FrameworkElement const &target);
     xaml::Media::Brush acrylicFoundationFill(xaml::FrameworkElement const &target);
     void setAcrylicWindowBackdrop(xaml::FrameworkElement const &root, xaml::Media::SystemBackdrop const &backdrop);
@@ -52,6 +66,7 @@ namespace swiftomniui {
     // every crop only after the scene's final native coordinates are available.
     void observeAcrylicScene(std::shared_ptr<AcrylicScene> const &scene, std::function<bool()> observer);
     void registerAcrylicScroller(xaml::FrameworkElement const &scroller);
+    void updateAcrylicScroller(xaml::FrameworkElement const &scroller, std::optional<xaml::Thickness> insets = {});
     void setAcrylicContentRoot(xaml::FrameworkElement const &root, xaml::FrameworkElement const &content);
     void acrylicStructureChanged(xaml::FrameworkElement const &element) noexcept;
 }

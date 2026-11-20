@@ -17,7 +17,79 @@ import XCTest
     }
 }
 
+private struct TitleBarBackgroundScrollPane: View {
+    var body: some View {
+        ScrollView { Color.clear.frame(height: 1800) }
+            .id("title-background-detail-scroll")
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Text("Header").frame(height: 44)
+            }
+            .frame(width: 220)
+    }
+}
+
 final class WinUISafeBarColumnTests: XCTestCase {
+    func testClearTitleBarContinuesEachScrollBackgroundAtTheTop() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(Binding(get: { true }, set: { _ in })) {
+                    Color.clear.navigationSplitViewColumnWidth(220)
+                } detail: {
+                    NavigationStack {
+                        GeometryReader { _ in
+                            HStack(spacing: 0) {
+                                ScrollView { Color.clear.frame(height: 1800) }
+                                    .background(Color("#FF0000"))
+                                    .id("title-background-main-scroll")
+                                TitleBarBackgroundScrollPane()
+                                    .overlay(alignment: .leading) { Color.clear.frame(width: 1) }
+                                    .background(Color("#0000FF"))
+                            }
+                        }
+                    }
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            let title = "SOUI clear title bar regression"
+            window.setTitle(title)
+            let nativeTitle = Array(title.utf16) + [0]
+            let hwnd = try XCTUnwrap(nativeTitle.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+            let flags = UINT(SWP_NOACTIVATE | SWP_NOSIZE)
+            XCTAssertTrue(SetWindowPos(hwnd, HWND(bitPattern: -1), 32, 32, 0, 0, flags))
+            defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 32, 32, 0, 0, flags) }
+            let main = try XCTUnwrap(host.view(id: .manual("title-background-main-scroll")) as? WinUIScrollView)
+            let detail = try XCTUnwrap(host.view(id: .manual("title-background-detail-scroll")) as? WinUIScrollView)
+            let expected: [UInt32] = [0xFFFF_0000, 0xFF00_00FF]
+            let points: [(Double, Double)] = [(450, 15), (825, 15)]
+            host.settle { window.titleBar.presentedPixels(at: points, in: window) == expected }
+            XCTAssertEqual(main.scroller.standing.offset.y, 0, accuracy: 0.01)
+            XCTAssertEqual(detail.scroller.standing.offset.y, 0, accuracy: 0.01)
+            XCTAssertEqual(window.titleBar.presentedPixels(at: points, in: window), expected)
+            XCTAssertEqual(window.titleBar.presentedPixels(at: points.map { ($0.0, $0.1 + 110) }, in: window), expected)
+            XCTAssertFalse(swiftomniui_winui_window_material_covers(window.handle, window.titleBar.handle))
+        }
+    }
+
+    func testTitleBarBackgroundVisibilityControlsNativeMaterial() throws {
+        try onUIThread {
+            let visibility = State(wrappedValue: SwiftOmniUICore.Visibility.automatic)
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                NavigationStack {
+                    Text("No scrolling content")
+                        .toolbarBackground(visibility.wrappedValue, for: .windowToolbar)
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            for value in [SwiftOmniUICore.Visibility.automatic, .visible, .hidden, .automatic] {
+                visibility.wrappedValue = value
+                for _ in 0..<8 { host.step(); host.frame() }
+                XCTAssertEqual(window.titleBar.chrome.backgroundVisibility, value)
+                XCTAssertEqual(swiftomniui_winui_window_material_covers(window.handle, window.titleBar.handle),
+                               value == .visible)
+            }
+        }
+    }
+
     func testPopoverSafeBarSharesTheCardBackground() throws {
         try onUIThread {
             let open = State(wrappedValue: false)
@@ -87,6 +159,14 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 detailShown.wrappedValue = shown
                 for _ in 0..<8 { host.step(); host.frame() }
                 let window = try XCTUnwrap(host.window)
+                @MainActor func followsColumn(_ id: String) -> Bool {
+                    guard let view = host.view(id: .manual(id)) else { return false }
+                    return swiftomniui_winui_window_material_follows_column(window.handle, view.handle)
+                }
+                host.settle {
+                    followsColumn("partition-sidebar") && followsColumn("partition-content")
+                        && followsColumn("partition-detail") == shown
+                }
                 @MainActor func crop(_ id: String) throws -> [Double] {
                     let view = try XCTUnwrap(host.view(id: .manual(id)))
                     var rect = [Double](repeating: 0, count: 4)
@@ -101,8 +181,6 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 XCTAssertEqual(try crop("partition-inner-bar"), sidebar)
                 XCTAssertEqual(try crop("partition-outer-bar"), sidebar)
                 let content = try crop("partition-content")
-                XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, window.titleBar.handle),
-                              "column masks must cover the complete toolbar after each detail toggle")
                 XCTAssertLessThanOrEqual(sidebar[0] + sidebar[2], content[0] + 1,
                                          "the sidebar must be cropped out of the main column's filter input")
                 if shown {
@@ -150,6 +228,68 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 XCTAssertTrue(swiftomniui_winui_window_material_follows_column(window.handle, main.handle),
                               "main toolbar slice must follow ContentRoot rather than a stationary window overlay")
             }
+        }
+    }
+
+    func testSlidingAuxiliarySafeBarStaysInWindowMaterial() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let shown = State(wrappedValue: false)
+            let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
+                NavigationSplitView(Binding(get: { true }, set: { _ in })) {
+                    Text("Files").navigationSplitViewColumnWidth(220)
+                } detail: {
+                    NavigationStack {
+                        GeometryReader { _ in
+                            HStack(spacing: 0) {
+                                ScrollView { Color.red.frame(height: 1800) }
+                                if shown.wrappedValue {
+                                    ScrollView { Color.blue.frame(height: 1800) }
+                                        .id("sliding-group-scroll")
+                                        .safeAreaInset(edge: .top, spacing: 0) {
+                                            Text("Group chat")
+                                                .frame(height: 40)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .id("sliding-group-bar")
+                                        }
+                                        .frame(width: 240)
+                                        .transition(.offset(x: 240))
+                                        .id("sliding-group")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            host.frame()
+            let start = clock.now
+            withAnimation(.linear(duration: 0.2)) { shown.wrappedValue = true }
+            host.runtime.pump.turn()
+            host.frame()
+            for elapsed in [64.0, 112, 160, 240] {
+                clock.now = start + elapsed
+                host.frame()
+                let panel = try XCTUnwrap(host.view(id: .manual("sliding-group")))
+                let bar = try XCTUnwrap(host.view(id: .manual("sliding-group-bar")))
+                let scroll = try XCTUnwrap(host.view(id: .manual("sliding-group-scroll")) as? WinUIScrollView)
+                if elapsed == 64 { scroll.scroller.move(to: Point(0, 200)) }
+                host.settle {
+                    scroll.scroller.standing.offset.y > 0
+                        && swiftomniui_winui_window_material_redirects(window.handle, bar.presentationHandle)
+                }
+                if elapsed < 200 {
+                    XCTAssertGreaterThan(panel.drawing.translationX, 0)
+                    XCTAssertLessThan(panel.drawing.translationX, 240)
+                } else {
+                    XCTAssertEqual(panel.drawing.translationX, 0, accuracy: 0.01)
+                }
+                XCTAssertGreaterThan(scroll.scroller.standing.offset.y, 0)
+                let redirected = swiftomniui_winui_window_material_redirects(window.handle, bar.presentationHandle)
+                XCTAssertTrue(redirected, "The moving SafeBar must join the window material at \(elapsed) ms.")
+            }
+            let bar = try XCTUnwrap(host.view(id: .manual("sliding-group-bar")))
+            XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, bar.presentationHandle))
         }
     }
 
@@ -207,6 +347,9 @@ final class WinUISafeBarColumnTests: XCTestCase {
             clock.now = start + 600
             host.frame()
             let current = try XCTUnwrap(host.view(id: .manual("history-material-bar")))
+            let historyScroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            historyScroll.scroller.move(to: Point(0, 160))
+            host.settle { swiftomniui_winui_window_material_redirects(window.handle, current.presentationHandle) }
             XCTAssertTrue(oldBar.isDetached)
             XCTAssertFalse(swiftomniui_winui_window_material_redirects(window.handle, oldBar.presentationHandle))
             XCTAssertTrue(swiftomniui_winui_window_material_redirects(window.handle, current.presentationHandle),
@@ -223,8 +366,10 @@ final class WinUISafeBarColumnTests: XCTestCase {
                     Group {
                         if sidebarPage.wrappedValue {
                             ScrollView { Text("History").frame(height: 1800) }
+                                .frame(maxHeight: 620, alignment: .top)
                         } else {
                             ScrollView { Text("Files").frame(height: 1800) }
+                                .frame(maxHeight: 620, alignment: .top)
                         }
                     }
                     .safeAreaInset(edge: .top, spacing: 0) {
@@ -234,9 +379,11 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 } content: {
                     NavigationStack {
                         ScrollView { Text("Conversation").frame(height: 1800) }
+                            .frame(maxHeight: 620, alignment: .top)
                     }
                 } detail: {
                     ScrollView { Text("Expert actions").frame(height: 1800) }
+                        .frame(maxHeight: 620, alignment: .top)
                         .safeAreaInset(edge: .top, spacing: 0) {
                             Button("Expert") {}.frame(height: 48).id("material-experts")
                         }
@@ -250,13 +397,18 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 // or invoke a diagnostic which creates/refreshes a material.
                 for _ in 0..<12 { host.step(); host.frame() }
                 let window = try XCTUnwrap(host.window)
+                for scroll in host.views(WinUIScrollView.self) where scroll.isAttached {
+                    scroll.scroller.move(to: Point(0, 200))
+                }
                 let tabs = try XCTUnwrap(host.view(id: .manual("material-sidebar-tabs")))
+                host.settle { swiftomniui_winui_window_material_covers(window.handle, tabs.presentationHandle) }
                 XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, tabs.presentationHandle),
                               "initial mount and sidebar replacement must commit the complete material region")
                 XCTAssertFalse(swiftomniui_winui_window_acrylic_samples(window.handle, tabs.presentationHandle),
                                "fixed sidebar controls must never feed the content blur")
                 if detail {
                     let experts = try XCTUnwrap(host.view(id: .manual("material-experts")))
+                    host.settle { swiftomniui_winui_window_material_covers(window.handle, experts.presentationHandle) }
                     XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, experts.presentationHandle),
                                   "the auxiliary detail's local selector joins the same region")
                     XCTAssertFalse(swiftomniui_winui_window_acrylic_samples(window.handle, experts.presentationHandle),
@@ -264,7 +416,7 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 }
                 if detail {
                     for scroll in host.views(WinUIScrollView.self) {
-                        XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.presentationHandle),
+                        XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle),
                                       "the committed source must contain live outer viewports on first display")
                     }
                 }
@@ -294,6 +446,11 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 for _ in 0..<12 { host.step(); host.frame() }
                 let window = try XCTUnwrap(host.window)
                 let header = try XCTUnwrap(host.view(id: .manual("hidden-material-header")))
+                let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+                scroll.scroller.move(to: Point(0, 160))
+                host.settle {
+                    swiftomniui_winui_window_material_covers(window.handle, header.presentationHandle) == !hides
+                }
                 XCTAssertEqual(swiftomniui_winui_window_material_covers(window.handle, header.presentationHandle), !hides)
                 if let initialY { XCTAssertEqual(header.origin.y, initialY, accuracy: 1) }
                 else { initialY = header.origin.y }
@@ -416,6 +573,54 @@ final class WinUISafeBarColumnTests: XCTestCase {
         }
     }
 
+    func testSideBySideScrollViewsControlTheirOwnSafeBarRegions() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                NavigationStack {
+                    HStack(spacing: 20) {
+                        ScrollView { Color.red.frame(height: 1800) }
+                            .id("left-scroll")
+                        ScrollView { Color.blue.frame(height: 1800) }
+                            .id("right-scroll")
+                    }
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        HStack(spacing: 20) {
+                            Text("L").frame(width: 20).id("left-top").frame(maxWidth: .infinity)
+                            Text("R").frame(width: 20).id("right-top").frame(maxWidth: .infinity)
+                        }.frame(height: 48)
+                    }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        HStack(spacing: 20) {
+                            Text("L").frame(width: 20).id("left-bottom").frame(maxWidth: .infinity)
+                            Text("R").frame(width: 20).id("right-bottom").frame(maxWidth: .infinity)
+                        }.frame(height: 48)
+                    }
+                }
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let window = try XCTUnwrap(host.window)
+            let left = try XCTUnwrap(host.view(id: .manual("left-scroll")) as? WinUIScrollView)
+            let right = try XCTUnwrap(host.view(id: .manual("right-scroll")) as? WinUIScrollView)
+            let probes = try ["left-top", "right-top", "left-bottom", "right-bottom"].map {
+                try XCTUnwrap(host.view(id: .manual($0)))
+            }
+            @MainActor func expect(_ expected: [Bool]) {
+                let read = {
+                    probes.map { swiftomniui_winui_window_material_covers(window.handle, $0.presentationHandle) }
+                }
+                host.settle { read() == expected }
+                XCTAssertEqual(read(), expected)
+            }
+            expect([false, false, true, true])
+            left.scroller.move(to: Point(0, 200))
+            expect([true, false, true, true])
+            right.scroller.move(to: Point(0, 1800))
+            expect([true, true, true, false])
+            left.scroller.move(to: .zero)
+            expect([false, true, true, false])
+        }
+    }
+
     func testToolbarMaterialSamplesPushedPageBackgroundAndReturnsToRoot() throws {
         try onUIThread {
             let path = State(wrappedValue: [Int]())
@@ -438,8 +643,8 @@ final class WinUISafeBarColumnTests: XCTestCase {
             }
             let window = try XCTUnwrap(host.window)
             let scroll = try XCTUnwrap(host.view(id: .manual("material-root-scroll")) as? WinUIScrollView)
-            host.settle { swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.presentationHandle) }
-            XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.presentationHandle))
+            host.settle { swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle) }
+            XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle))
 
             path.wrappedValue = [1]
             host.settle {
@@ -453,8 +658,8 @@ final class WinUISafeBarColumnTests: XCTestCase {
             XCTAssertTrue(swiftomniui_winui_window_acrylic_samples(window.handle, background.presentationHandle))
 
             path.wrappedValue = []
-            host.settle { swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.presentationHandle) }
-            XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.presentationHandle))
+            host.settle { swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle) }
+            XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle))
         }
     }
 

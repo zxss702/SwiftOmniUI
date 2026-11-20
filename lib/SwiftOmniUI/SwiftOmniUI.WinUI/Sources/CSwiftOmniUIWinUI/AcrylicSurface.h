@@ -15,8 +15,16 @@ namespace swiftomniui {
         void reset();
         std::shared_ptr<AcrylicScene> scene() const;
         winrt::Windows::Foundation::Rect samplingBounds() const;
-        xaml::Media::Brush update(xaml::FrameworkElement const &target,
-                                 winrt::Windows::Foundation::Size size);
+        void resolve(xaml::FrameworkElement const &target);
+    };
+
+    struct FilteredContent;
+    struct AcrylicStrip {
+        std::shared_ptr<FilteredContent> filter;
+        winrt::Microsoft::UI::Composition::CompositionSurfaceBrush crop{nullptr};
+        winrt::Microsoft::UI::Composition::SpriteVisual visual{nullptr};
+        void paint(xaml::FrameworkElement const &target, std::shared_ptr<AcrylicScene> const &scene,
+                   winrt::Windows::Foundation::Rect const &rect);
     };
 
     winrt::Microsoft::UI::Composition::CompositionEffectBrush contentBlur(
@@ -28,10 +36,12 @@ namespace swiftomniui {
     // never captured or replaced by an approximate white/grey colour.
     struct AcrylicLayer {
         controls::SystemBackdropElement foundation{nullptr};
-        controls::Grid backing;
+        controls::Grid backing, base;
         controls::Border fill, surface;
         std::vector<winrt::Windows::Foundation::Rect> regions;
         winrt::Microsoft::UI::Composition::CompositionGeometricClip regionClip{nullptr}, controlsClip{nullptr};
+        winrt::Microsoft::UI::Composition::ContainerVisual output{nullptr};
+        std::vector<AcrylicStrip> strips;
         bool foundationFailed = false;
 
         bool usesFoundation = true;
@@ -48,10 +58,12 @@ namespace swiftomniui {
                 report("creating the optional bar Mica foundation");
             }
             backing.IsHitTestVisible(false);
+            base.IsHitTestVisible(false);
             fill.IsHitTestVisible(false);
             surface.IsHitTestVisible(false);
-            if (foundation) backing.Children().Append(foundation);
-            backing.Children().Append(fill);
+            if (foundation) base.Children().Append(foundation);
+            base.Children().Append(fill);
+            backing.Children().Append(base);
             backing.Children().Append(surface);
             owner.Children().Append(backing);
         }
@@ -60,7 +72,8 @@ namespace swiftomniui {
             close();
             backing.Opacity(0);
             fill.Background(nullptr);
-            surface.Background(nullptr);
+            if (output) output.Children().RemoveAll();
+            strips.clear();
             regions.clear();
             regionClip = nullptr;
             controlsClip = nullptr;
@@ -68,9 +81,10 @@ namespace swiftomniui {
         void measure(winrt::Windows::Foundation::Size available) { backing.Measure(available); }
         void arrange(winrt::Windows::Foundation::Size size) { backing.Arrange({0, 0, size.Width, size.Height}); }
         void paint(xaml::FrameworkElement const &self,
-                   std::vector<winrt::Windows::Foundation::Rect> const &next,
-                   xaml::Media::Brush const &brush, bool useFoundation = true) {
+                   std::vector<AcrylicBand> const &bands,
+                   std::shared_ptr<AcrylicScene> const &scene, bool useFoundation = true) {
             namespace composition = winrt::Microsoft::UI::Composition;
+            auto next = acrylicMaterialRegions(bands);
             // A post-layout commit must not rewrite XAML Path.Data. If a
             // subsequent native operation fails, rewriting that Data at the
             // next LayoutUpdated creates a self-sustaining layout cycle.
@@ -82,7 +96,7 @@ namespace swiftomniui {
                         1, rect.X + rect.Width, rect.Y, 1, rect.X + rect.Width, rect.Y + rect.Height,
                         1, rect.X, rect.Y + rect.Height, 4});
                 }
-                auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(backing);
+                auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(base);
                 auto compositor = visual.Compositor();
                 auto path = compositionPath(pathGeometry(commands.data(), static_cast<int32_t>(commands.size()), false).as<ID2D1Geometry>(), false);
                 auto geometry = compositor.CreatePathGeometry(path);
@@ -98,8 +112,29 @@ namespace swiftomniui {
             // FlyoutPresenter already owns the popover's acrylic. A second
             // content blur here would sample the card below and tint the bar
             // differently from the presenter behind the rest of the card.
-            auto material = hasFoundation ? brush : nullptr;
-            if (surface.Background() != material) surface.Background(material);
+            if (hasFoundation && scene && !next.empty()) {
+                if (!output) {
+                    auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(surface).Compositor();
+                    output = compositor.CreateContainerVisual();
+                    output.IsHitTestVisible(false);
+                    xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(surface, output);
+                }
+                size_t index = 0;
+                for (auto const &rect : next) {
+                    if (index == strips.size()) strips.emplace_back();
+                    auto &strip = strips[index++];
+                    const bool add = !strip.visual;
+                    strip.paint(self, scene, rect);
+                    if (add && strip.visual) output.Children().InsertAtTop(strip.visual);
+                }
+                while (strips.size() > index) {
+                    if (strips.back().visual) output.Children().Remove(strips.back().visual);
+                    strips.pop_back();
+                }
+            } else if (!strips.empty()) {
+                output.Children().RemoveAll();
+                strips.clear();
+            }
             auto background = hasFoundation ? acrylicFoundationFill(self) : nullptr;
             if (fill.Background() != background) fill.Background(background);
             if (foundation && !foundationFailed && self.IsLoaded() && (!hasFoundation || !next.empty())) {
@@ -130,13 +165,13 @@ namespace swiftomniui {
             IInspectable self = *this;
             drawing.mount(self.as<controls::Panel>());
             Loaded([this](auto const &, auto const &) { refresh(); });
-            Unloaded([this](auto const &, auto const &) { material.reset(); drawing.close(); observed.reset(); });
+            Unloaded([this](auto const &, auto const &) { material.reset(); drawing.clear(); observed.reset(); });
         }
         void refresh() {
             try {
                 IInspectable projected = *this;
                 auto self = projected.as<xaml::FrameworkElement>();
-                auto brush = material.update(self, extent);
+                material.resolve(self);
                 auto scene = material.scene();
                 if (scene && observed.lock() != scene) {
                     observed = scene;
@@ -149,14 +184,21 @@ namespace swiftomniui {
                         return true;
                     });
                 }
-                // Resting markers join the window union. A transitioning
-                // ancestor owns this native layer again, so background and
-                // controls move/fade together without a second animation.
-                std::vector<winrt::Windows::Foundation::Rect> next;
+                // Window markers join the shared surface unless their subtree
+                // owns an effect that must also apply to the material.
+                std::vector<AcrylicBand> next;
                 const bool local = scene && (!acrylicSceneIsWindow(scene)
                     || acrylicUsesLocalPresentation(self, acrylicSceneRoot(scene)));
-                if (local && extent.Width > 0 && extent.Height > 0)
-                    next.push_back({0, 0, extent.Width, extent.Height});
+                if (local && extent.Width > 0 && extent.Height > 0) {
+                    auto root = acrylicSceneRoot(scene);
+                    auto mapping = self.TransformToVisual(root);
+                    if (auto inverse = mapping.Inverse()) {
+                        next = acrylicLocalRegions(scene, self, mapping.TransformBounds({0, 0, extent.Width, extent.Height}));
+                        for (auto &band : next) {
+                            band.rect = inverse.TransformBounds(band.rect);
+                        }
+                    }
+                }
                 // A popover supplies one background behind both its bar and body,
                 // even though the presenter can share the window's XamlRoot.
                 bool useFoundation = true;
@@ -169,7 +211,7 @@ namespace swiftomniui {
                         }
                     }
                 }
-                drawing.paint(self, next, next.empty() ? nullptr : brush, useFoundation);
+                drawing.paint(self, next, scene, useFoundation);
             } catch (...) { report("updating a safe bar material"); }
         }
         winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size available) {

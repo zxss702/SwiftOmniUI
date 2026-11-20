@@ -193,6 +193,7 @@ final class WinUISidebarLifecycleTests: XCTestCase {
                 shown.wrappedValue = open
                 host.step()
                 XCTAssertEqual(Self.read("paneOpen", from: split.sidebar), open ? "1" : "0")
+                if !open { WinUITestHost.pump(0.35) }
                 if open {
                     // Reopening the same native pane keeps its existing rows.
                     // No scroll or transition completion repair supplies them.
@@ -240,6 +241,51 @@ final class WinUISidebarLifecycleTests: XCTestCase {
                 XCTAssertEqual(row.laidOutFrame.width, width, accuracy: 1)
                 XCTAssertGreaterThan(composer.laidOutFrame.width, width - 120)
                 XCTAssertTrue(host.view(id: .manual("composer")) === composer)
+            }
+        }
+    }
+
+    func testInlineSidebarKeepsTheDetailTrailingEdgeFixedThroughoutOpenAndClose() throws {
+        try onUIThread {
+            try XCTSkipUnless(swiftomniui_winui_animations_enabled())
+            let shown = State(wrappedValue: false)
+            let host = WinUIRenderer.running(room: WinUITestHost.wideRoom) {
+                NavigationSplitView(shown.projectedValue) {
+                    Color.red.id("pane").navigationSplitViewColumnWidth(256)
+                } detail: {
+                    Color.blue.id("detail")
+                }
+            }
+            let pane = try XCTUnwrap(host.view(id: .manual("pane")))
+            let detail = try XCTUnwrap(host.view(id: .manual("detail")))
+            let split = try XCTUnwrap(host.views(WinUISplitView.self).first).sidebar
+            let left = split.origin.x
+            let right = left + split.laidOutFrame.width
+            XCTAssertGreaterThan(right, left + 256)
+            for open in [true, false] {
+                shown.wrappedValue = open
+                var previous = open ? 0.0 : 256.0
+                var passedThroughIntermediateWidth = false
+                for _ in 0..<36 {
+                    host.step()
+                    host.layOut()
+                    let leading = detail.origin.x - left
+                    XCTAssertEqual(detail.origin.x + detail.laidOutFrame.width, right, accuracy: 1)
+                    if leading > 1 {
+                        XCTAssertEqual(pane.laidOutFrame.width, 256, accuracy: 1)
+                        XCTAssertEqual(pane.origin.x + pane.laidOutFrame.width, detail.origin.x, accuracy: 1)
+                    }
+                    if open {
+                        XCTAssertGreaterThanOrEqual(leading, previous - 1)
+                    } else {
+                        XCTAssertLessThanOrEqual(leading, previous + 1)
+                    }
+                    passedThroughIntermediateWidth = passedThroughIntermediateWidth || (leading > 1 && leading < 255)
+                    previous = leading
+                }
+                XCTAssertTrue(passedThroughIntermediateWidth)
+                XCTAssertEqual(previous, open ? 256 : 0, accuracy: 1)
+                XCTAssertTrue(host.view(id: .manual("detail")) === detail)
             }
         }
     }

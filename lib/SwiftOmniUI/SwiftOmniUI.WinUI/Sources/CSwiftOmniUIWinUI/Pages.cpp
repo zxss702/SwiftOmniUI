@@ -12,13 +12,16 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 #include <winrt/Microsoft.UI.Content.h>
+#include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Input.h>
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <vector>
 #include <winrt/Microsoft.UI.Windowing.h>
@@ -118,6 +121,118 @@ namespace {
 
     using SplitWidths = winrt::Windows::Foundation::Collections::IVector<double>;
 
+    controls::ControlTemplate inlineSplitTemplate() {
+        return xaml::Markup::XamlReader::Load(
+            LR"(<ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="SplitView">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Border Width="0"/>
+                    <ContentControl x:Name="PaneRoot" Grid.ColumnSpan="2" Width="{TemplateBinding OpenPaneLength}"
+                                    HorizontalAlignment="Left"
+                                    HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                    IsTabStop="False" IsEnabled="False">
+                        <Border Child="{TemplateBinding Pane}"/>
+                    </ContentControl>
+                    <Border x:Name="ContentRoot" Grid.Column="1" Child="{TemplateBinding Content}"/>
+                </Grid>
+            </ControlTemplate>)").as<controls::ControlTemplate>();
+    }
+
+    void positionInlinePane(controls::ContentControl const &pane, winrt::Windows::Foundation::Size viewport) {
+        auto length = static_cast<float>(pane.Width());
+        auto width = std::min(length, viewport.Width);
+        auto hidden = length - width;
+        if (!std::isfinite(hidden)) return;
+        auto slide = pane.Tag().try_as<media::TranslateTransform>();
+        if (!slide) return;
+        if (slide.X() != -hidden) slide.X(-hidden);
+        auto clip = pane.Clip().try_as<media::RectangleGeometry>();
+        if (!clip) return;
+        winrt::Windows::Foundation::Rect rect{hidden, 0, width, viewport.Height};
+        if (clip.Rect() != rect) clip.Rect(rect);
+    }
+
+    void setInlineSplitWidth(controls::Border const &track, controls::ContentControl const &pane, double target, bool animate) {
+        namespace animation = media::Animation;
+        auto previous = track.Tag().try_as<animation::Storyboard>();
+        auto destination = previous
+            ? previous.Children().GetAt(0).as<animation::DoubleAnimation>().To().Value()
+            : track.Width();
+        if (destination == target) return;
+        auto from = track.ActualWidth();
+        if (previous) previous.Stop();
+        track.Tag(nullptr);
+        if (!animate || from == target) {
+            track.Width(target);
+            pane.IsEnabled(target > 0);
+            return;
+        }
+
+        track.Width(from);
+        if (target > 0) pane.IsEnabled(true);
+        animation::DoubleAnimation width;
+        width.From(from);
+        width.To(target);
+        width.Duration({std::chrono::milliseconds(240), xaml::DurationType::TimeSpan});
+        width.EnableDependentAnimation(true);
+        animation::CubicEase ease;
+        ease.EasingMode(animation::EasingMode::EaseOut);
+        width.EasingFunction(ease);
+        animation::Storyboard::SetTarget(width, track);
+        animation::Storyboard::SetTargetProperty(width, L"Width");
+        animation::Storyboard motion;
+        motion.Children().Append(width);
+        motion.Completed(guarded("finishing a split column transition",
+            [weakTrack = winrt::make_weak(track), weakPane = winrt::make_weak(pane), target]
+            (IInspectable const &sender, IInspectable const &) {
+                auto track = weakTrack.get();
+                if (!track || track.Tag() != sender) return;
+                track.Width(target);
+                if (auto pane = weakPane.get(); pane && target == 0) pane.IsEnabled(false);
+                sender.as<animation::Storyboard>().Stop();
+                track.Tag(nullptr);
+            }));
+        track.Tag(motion);
+        motion.Begin();
+    }
+
+    void updateInlineSplit(controls::SplitView const &split, bool beside, double length, bool animate) {
+        auto templateProperty = controls::Control::TemplateProperty();
+        bool hasInlineTemplate = !!split.ReadLocalValue(templateProperty).try_as<controls::ControlTemplate>();
+        if (hasInlineTemplate != beside) {
+            auto replacement = beside ? inlineSplitTemplate() : controls::ControlTemplate{nullptr};
+            for (auto const &slot : {split.Pane(), split.Content()}) {
+                if (!slot) continue;
+                auto parent = media::VisualTreeHelper::GetParent(slot).try_as<controls::Border>();
+                if (parent && parent.Child() == slot) parent.Child(nullptr);
+            }
+            if (replacement) split.Template(replacement);
+            else split.ClearValue(templateProperty);
+            split.ApplyTemplate();
+            acrylicStructureChanged(split);
+        }
+        if (!beside) return;
+        split.ApplyTemplate();
+        if (media::VisualTreeHelper::GetChildrenCount(split) == 0) return;
+        auto root = media::VisualTreeHelper::GetChild(split, 0).as<controls::Grid>();
+        auto track = root.Children().GetAt(0).as<controls::Border>();
+        auto pane = root.Children().GetAt(1).as<controls::ContentControl>();
+        if (!pane.Clip()) pane.Clip(media::RectangleGeometry());
+        if (!pane.Tag().try_as<media::TranslateTransform>()) {
+            auto slide = media::TranslateTransform();
+            pane.RenderTransform(slide);
+            track.SizeChanged(guarded("positioning a split column",
+                [weak = winrt::make_weak(pane)](IInspectable const &, xaml::SizeChangedEventArgs const &args) {
+                    if (auto pane = weak.get()) positionInlinePane(pane, args.NewSize());
+                }));
+            pane.Tag(slide);
+        }
+        auto size = track.ActualSize();
+        positionInlinePane(pane, {size.x, size.y});
+        setInlineSplitWidth(track, pane, split.IsPaneOpen() ? length : 0, animate && hasInlineTemplate && split.IsLoaded());
+    }
+
     // Only the transparent Thumb is a hit target. Its overlay contributes no
     // desired size, and the cursor follows native hit testing and drag capture.
     struct SplitGrip : controls::PanelT<SplitGrip> {
@@ -166,7 +281,7 @@ namespace {
         return {beside, length};
     }
 
-    void sizeSplit(controls::SplitView const &split, double width) {
+    void sizeSplit(controls::SplitView const &split, double width, bool animate = false) {
         auto widths = split.Tag().as<SplitWidths>();
         bool alone = split.Content().as<controls::Grid>().Visibility() == xaml::Visibility::Collapsed;
         auto pane = split.Pane().as<controls::Grid>();
@@ -195,6 +310,8 @@ namespace {
         // declared width even while the native template clips it away.
         // Keep its Measure and Arrange proposals on the same native boundary.
         if (pane.Width() != length) pane.Width(length);
+        if (split.PanePlacement() == controls::SplitViewPanePlacement::Left)
+            updateInlineSplit(split, beside, length, animate);
     }
 
     void sizeSplit(controls::SplitView const &split) { sizeSplit(split, split.ActualWidth()); }
@@ -282,6 +399,7 @@ extern "C" double swiftomniui_winui_title_bar_layout_height(SwiftOmniUIObjectRef
 
 extern "C" void swiftomniui_winui_title_bar_set(
     SwiftOmniUIObjectRef handle, char const *title, bool back, bool paneToggle, bool hasBackground, uint32_t background,
+    int32_t backgroundVisibility,
     bool hasForeground, uint32_t foreground, int32_t words
 ) {
     try {
@@ -291,6 +409,9 @@ extern "C" void swiftomniui_winui_title_bar_set(
         bar.IsPaneToggleButtonVisible(paneToggle);
         if (hasBackground) bar.Background(media::SolidColorBrush(color(background)));
         else bar.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+        const auto mode = hasBackground || backgroundVisibility == 2 ? AcrylicChromeMode::hidden
+            : backgroundVisibility == 1 ? AcrylicChromeMode::visible : AcrylicChromeMode::automatic;
+        setAcrylicTitleBarMode(bar, mode);
         if (hasForeground) bar.Foreground(media::SolidColorBrush(color(foreground)));
         else bar.ClearValue(controls::Control::ForegroundProperty());
         auto theme = words == 1 ? xaml::ElementTheme::Dark
@@ -568,8 +689,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
             // OpenInlineRight storyboard temporarily restores the left-pane
             // column widths whenever OpenPaneLength changes, measuring the
             // conversation at the auxiliary width before correcting next frame.
-            // Bind these two columns directly; the outer split retains WinUI's
-            // adaptive/overlay template and its presentation transitions.
+            // Bind these two columns directly.
             split.Template(xaml::Markup::XamlReader::Load(
                 LR"(<ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="SplitView">
                     <Grid>
@@ -616,8 +736,20 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_split_make(int64_t view, doubl
             [weak](IInspectable const &, controls::Primitives::DragDeltaEventArgs const &args) {
                 if (auto split = weak.get()) resizeSplit(split, args.HorizontalChange());
             }));
-        split.SizeChanged(guarded("sizing a split view", [](IInspectable const &sender, xaml::SizeChangedEventArgs const &) {
-            sizeSplit(sender.as<controls::SplitView>());
+        split.SizeChanged(guarded("sizing a split view", [weak, trailing](IInspectable const &sender, xaml::SizeChangedEventArgs const &) {
+            auto split = sender.as<controls::SplitView>();
+            auto detail = split.Content().try_as<controls::Grid>();
+            if (!detail) return;
+            bool alone = detail.Visibility() == xaml::Visibility::Collapsed;
+            auto [beside, length] = splitRoom(split, split.ActualWidth(), alone);
+            auto hasInlineTemplate = split.ReadLocalValue(controls::Control::TemplateProperty()).try_as<controls::ControlTemplate>();
+            if (!trailing && beside != static_cast<bool>(hasInlineTemplate)) {
+                split.DispatcherQueue().TryEnqueue(guarded("switching a split view's template", [weak] {
+                    if (auto split = weak.get(); split && split.IsLoaded()) sizeSplit(split);
+                }));
+                return;
+            }
+            sizeSplit(split);
         }));
         split.PaneOpening(guarded("handling PaneOpening",
             [view](controls::SplitView const &, IInspectable const &) {
@@ -680,7 +812,7 @@ extern "C" void swiftomniui_winui_split_remove(SwiftOmniUIObjectRef handle, Swif
 
 extern "C" void swiftomniui_winui_split_set(
     SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef pane, SwiftOmniUIObjectRef content, SwiftOmniUIObjectRef row, bool open,
-    double minimum, double ideal, double maximum, bool contentShown, double contentMinimum, double contentMaximum
+    double minimum, double ideal, double maximum, bool contentShown, double contentMinimum, double contentMaximum, bool animated
 ) {
     try {
         auto split = borrow<controls::SplitView>(handle);
@@ -704,8 +836,9 @@ extern "C" void swiftomniui_winui_split_set(
         standInRow(detail, 0, row);
         standInRow(detail, 1, content);
         acrylicStructureChanged(split);
-        if (split.IsPaneOpen() != open) split.IsPaneOpen(open);
-        sizeSplit(split);
+        bool toggled = split.IsPaneOpen() != open;
+        if (toggled) split.IsPaneOpen(open);
+        sizeSplit(split, split.ActualWidth(), toggled && animated && swiftomniui_winui_animations_enabled());
     } catch (...) {
         report("setting a split view");
     }

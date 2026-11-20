@@ -18,6 +18,7 @@ namespace swiftomniui {
     namespace {
         struct Inset {
             winrt::weak_ref<Element> owner, bar, material;
+            AcrylicEdge edge = AcrylicEdge::fixed;
         };
         std::vector<Inset> insets;
         struct WindowRoot { winrt::weak_ref<Element> root, content; xaml::Media::SystemBackdrop backdrop{nullptr}; };
@@ -27,11 +28,28 @@ namespace swiftomniui {
             std::vector<winrt::weak_ref<Element>> pages;
         };
         std::vector<Columns> columnGroups;
-        std::vector<winrt::weak_ref<Element>> scrollers;
+        struct Scroller {
+            winrt::weak_ref<Element> element;
+            xaml::Thickness insets{};
+            bool top = false, bottom = false;
+            winrt::event_token viewChanged{};
+        };
+        std::vector<Scroller> scrollers;
         std::vector<std::weak_ptr<AcrylicScene>> scenes;
         std::unordered_set<void *> localPresentations;
         uint64_t generation = 0;
         bool materialDirty = true;
+        bool materialCommitPending = false;
+        constexpr float edgeTolerance = 0.5f;
+
+        constexpr bool showsScrollEdge(double distance, bool wasVisible) {
+            return distance > (wasVisible ? edgeTolerance : 2 * edgeTolerance);
+        }
+
+        // A document can have zero resting range and still overpan.
+        static_assert(showsScrollEdge(12, false) && !showsScrollEdge(-12, false));
+        static_assert(showsScrollEdge(0.75, true) && !showsScrollEdge(0.75, false));
+        static_assert(!showsScrollEdge(0, true));
 
         void *identity(IInspectable const &value) { return value ? value.as<::IUnknown>().get() : nullptr; }
         bool descendant(xaml::DependencyObject element, xaml::DependencyObject const &root) {
@@ -44,7 +62,7 @@ namespace swiftomniui {
             for (auto at = xaml::Media::VisualTreeHelper::GetParent(element); at;
                  at = xaml::Media::VisualTreeHelper::GetParent(at)) {
                 if (at == scope) break;
-                if (at.try_as<controls::ScrollView>()) return true;
+                if (at.try_as<controls::ScrollView>() || at.try_as<controls::ScrollViewer>()) return true;
             }
             return false;
         }
@@ -52,6 +70,57 @@ namespace swiftomniui {
             auto x = std::max(a.X, b.X), y = std::max(a.Y, b.Y);
             return {x, y, std::max(0.0f, std::min(a.X + a.Width, b.X + b.Width) - x),
                           std::max(0.0f, std::min(a.Y + a.Height, b.Y + b.Height) - y)};
+        }
+
+        void queueMaterialCommit(Element const &element) {
+            markAcrylicMaterialDirty();
+            if (materialCommitPending) return;
+            if (auto queue = element.DispatcherQueue()) {
+                materialCommitPending = queue.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low, [] {
+                    materialCommitPending = false;
+                    swiftomniui_winui_material_present_if_needed();
+                });
+            }
+        }
+
+        double verticalOffset(Element const &element) {
+            if (auto scroller = element.try_as<controls::ScrollView>()) return scroller.VerticalOffset();
+            if (auto viewer = element.try_as<controls::ScrollViewer>()) return viewer.VerticalOffset();
+            return 0;
+        }
+
+        double scrollableHeight(Element const &element) {
+            if (auto scroller = element.try_as<controls::ScrollView>()) return scroller.ScrollableHeight();
+            if (auto viewer = element.try_as<controls::ScrollViewer>()) return viewer.ScrollableHeight();
+            return 0;
+        }
+
+        void observeNativeScroller(Scroller &state, Element const &element) {
+            auto weak = winrt::make_weak(element);
+            if (auto scroller = element.try_as<controls::ScrollView>()) {
+                state.viewChanged = scroller.ViewChanged([weak](auto const &, auto const &) {
+                    if (auto element = weak.get()) updateAcrylicScroller(element);
+                });
+            } else if (auto viewer = element.try_as<controls::ScrollViewer>()) {
+                state.viewChanged = viewer.ViewChanged([weak](auto const &, auto const &) {
+                    if (auto element = weak.get()) updateAcrylicScroller(element);
+                });
+            }
+        }
+
+        bool discoverNativeScrollers(xaml::DependencyObject const &node) {
+            if (!node) return false;
+            bool found = false;
+            if (auto element = node.try_as<Element>()) {
+                if (element.try_as<controls::ScrollView>() || element.try_as<controls::ScrollViewer>()) {
+                    registerAcrylicScroller(element);
+                    found = true;
+                }
+            }
+            for (int32_t index = 0, count = xaml::Media::VisualTreeHelper::GetChildrenCount(node);
+                 index < count; ++index)
+                found = discoverNativeScrollers(xaml::Media::VisualTreeHelper::GetChild(node, index)) || found;
+            return found;
         }
     }
 
@@ -152,9 +221,9 @@ namespace swiftomniui {
         return static_cast<float>(std::clamp(opacity, 0.0, 1.0));
     }
     bool acrylicUsesLocalPresentation(Element const &element, Element const &root) {
-        // During an ancestor transition, the original native subtree already
-        // owns the complete opacity, transform, clipping and removal lifetime.
-        // Keep its material/controls there, sharing only the filtered texture.
+        // A horizontal slide changes only the lane's position, which the
+        // window scene already reads in presentation coordinates. Opacity
+        // and effects that change the drawing still belong to the subtree.
         const bool hasLocalSet = !localPresentations.empty();
         for (xaml::DependencyObject at = element; at && at != root; at = xaml::Media::VisualTreeHelper::GetParent(at)) {
             auto parent = at.try_as<Element>();
@@ -163,13 +232,14 @@ namespace swiftomniui {
             if (hasLocalSet && localPresentations.contains(identity(parent))) return true;
             if (auto transform = parent.RenderTransform()) {
                 if (auto composite = transform.try_as<xaml::Media::CompositeTransform>()) {
-                    if (composite.TranslateX() != 0 || composite.TranslateY() != 0 || composite.Rotation() != 0
-                        || composite.ScaleX() != 1 || composite.ScaleY() != 1) return true;
+                    if (composite.TranslateY() != 0 || composite.Rotation() != 0
+                        || composite.ScaleX() != 1 || composite.ScaleY() != 1
+                        || composite.SkewX() != 0 || composite.SkewY() != 0) return true;
                 } else {
                     auto origin = transform.TransformPoint({0, 0});
                     auto x = transform.TransformPoint({1, 0});
                     auto y = transform.TransformPoint({0, 1});
-                    if (origin.X != 0 || origin.Y != 0 || x.X != 1 || x.Y != 0 || y.X != 0 || y.Y != 1) return true;
+                    if (origin.Y != 0 || x.X != origin.X + 1 || x.Y != 0 || y.X != origin.X || y.Y != 1) return true;
                 }
             }
         }
@@ -225,6 +295,7 @@ namespace swiftomniui {
         winrt::weak_ref<Element> content, root, window;
         composition::ContainerVisual visual{nullptr};
         uint64_t revision = std::numeric_limits<uint64_t>::max();
+        bool nativeScrollersDiscovered = false;
         bool committing = false;
         xaml::FrameworkElement::LayoutUpdated_revoker layoutCommitted;
         std::vector<std::function<bool()>> observers;
@@ -268,6 +339,7 @@ namespace swiftomniui {
         }
 
         void rebuild(Element const &source, composition::Compositor const &compositor) {
+            (void)discoverNativeScrollers(source);
             std::unordered_set<void *> excluded, split;
             auto path = [&](xaml::DependencyObject const &element) {
                 if (!element || !descendant(element, source)) return;
@@ -286,10 +358,10 @@ namespace swiftomniui {
                     path(element);
                 }
             }
-            std::erase_if(scrollers, [](auto const &entry) { return !entry.get(); });
+            std::erase_if(scrollers, [](auto const &entry) { return !entry.element.get(); });
             // Split only ancestors of scrollers, not their documents/rows. This
             // retains the real viewport extending outside a safe layout slot.
-            for (auto const &entry : scrollers) if (auto element = entry.get()) {
+            for (auto const &entry : scrollers) if (auto element = entry.element.get()) {
                 if (!descendant(element, source)) continue;
                 bool nested = false;
                 for (auto at = xaml::Media::VisualTreeHelper::GetParent(element); at;
@@ -369,6 +441,8 @@ namespace swiftomniui {
         void refresh() {
             auto source = content.get(), coordinates = root.get();
             if (!source || !coordinates) return;
+            if (!nativeScrollersDiscovered)
+                nativeScrollersDiscovered = discoverNativeScrollers(source);
             auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(coordinates).Compositor();
             if (!visual) visual = compositor.CreateContainerVisual();
             if (revision != generation) rebuild(source, compositor);
@@ -604,13 +678,99 @@ namespace swiftomniui {
             if (!owner || !bar || !bar.IsLoaded() || !descendant(bar, source)
                 || bar.Visibility() != xaml::Visibility::Visible
                 || bar.ActualWidth() <= 0 || bar.ActualHeight() <= 0) continue;
-            if (acrylicUsesLocalPresentation(owner, scene->root.get())) continue;
+            auto marker = entry.material.get();
+            if (acrylicUsesLocalPresentation(marker ? marker : owner, scene->root.get())) continue;
             if (acrylicScene(owner, bar) == scene) result.push_back(bar);
         }
         return result;
     }
-    std::vector<Rect> acrylicSceneRegions(std::shared_ptr<AcrylicScene> const &scene) {
-        std::vector<Rect> result;
+    namespace {
+        std::vector<AcrylicBand> scrollBands(Element const &source, Element const &root,
+                                             Rect const &bounds, AcrylicEdge edge, bool allowsFixed = true) {
+            if (bounds.Width <= 0 || bounds.Height <= 0) return {};
+            if (edge == AcrylicEdge::fixed) return {{bounds}};
+            const bool top = edge == AcrylicEdge::top;
+            bool owned = false;
+            std::vector<AcrylicBand> result;
+            for (auto const &entry : scrollers) {
+                auto scroller = entry.element.get();
+                if (!scroller || !descendant(scroller, source) || insideScroller(scroller, source)) continue;
+                if (auto native = scroller.try_as<controls::ScrollView>()) {
+                    if (native.VerticalScrollMode() == controls::ScrollingScrollMode::Disabled) continue;
+                } else if (auto native = scroller.try_as<controls::ScrollViewer>()) {
+                    if (native.VerticalScrollMode() == controls::ScrollMode::Disabled) continue;
+                }
+                // Scroll views in the controls (for example, toolbar tabs) do
+                // not supply the edge effect for the page behind those controls.
+                if (std::any_of(insets.begin(), insets.end(), [&](auto const &inset) {
+                    auto bar = inset.bar.get();
+                    return inset.owner.get() && bar && !descendant(source, bar) && descendant(scroller, bar);
+                })) continue;
+                auto viewport = acrylicVisibleBounds(scroller, root);
+                if (viewport.Width <= 0 || viewport.Height <= 0) continue;
+                auto size = scroller.ActualSize();
+                const float inset = static_cast<float>(top ? entry.insets.Top : entry.insets.Bottom);
+                const float depth = std::clamp(inset, 0.0f, size.y);
+                auto transform = scroller.TransformToVisual(root);
+                auto edgePoint = transform.TransformPoint({0, top ? depth : size.y - depth});
+                const auto end = viewport.Y + viewport.Height;
+                const float boundary = std::clamp(edgePoint.Y, viewport.Y, end);
+                auto strip = top ? Rect{viewport.X, viewport.Y, viewport.Width, boundary - viewport.Y}
+                                 : Rect{viewport.X, boundary, viewport.Width, end - boundary};
+                // The safe geometry and native inset writes commit separately.
+                // The viewport itself still identifies a bar flush to its edge.
+                if (depth <= edgeTolerance) {
+                    const auto viewportEdge = top ? viewport.Y : end;
+                    if (viewportEdge < bounds.Y - edgeTolerance
+                        || viewportEdge > bounds.Y + bounds.Height + edgeTolerance) continue;
+                    strip = viewport;
+                }
+                auto rect = intersect(bounds, strip);
+                if (rect.Width <= edgeTolerance) continue;
+                if (rect.Height <= edgeTolerance) {
+                    if (depth <= edgeTolerance) owned = true;
+                    continue;
+                }
+                owned = true;
+                result.push_back({rect, top ? entry.top : entry.bottom});
+            }
+            if (!owned && allowsFixed) result.push_back({bounds});
+            return result;
+        }
+    }
+    AcrylicChromeMode acrylicTitleBarMode(Element const &titleBar) {
+        auto value = titleBar.Resources().TryLookup(winrt::box_value(L"swiftomniuiTitleBarMaterial"));
+        return static_cast<AcrylicChromeMode>(winrt::unbox_value_or<int32_t>(
+            value, static_cast<int32_t>(AcrylicChromeMode::automatic)));
+    }
+    void setAcrylicTitleBarMode(Element const &titleBar, AcrylicChromeMode mode) {
+        if (acrylicTitleBarMode(titleBar) == mode) return;
+        titleBar.Resources().Insert(winrt::box_value(L"swiftomniuiTitleBarMaterial"),
+            winrt::box_value(static_cast<int32_t>(mode)));
+        queueMaterialCommit(titleBar);
+    }
+    std::vector<AcrylicBand> acrylicChromeRegions(std::shared_ptr<AcrylicScene> const &scene, Rect const &bounds,
+                                                  AcrylicChromeMode mode) {
+        if (mode == AcrylicChromeMode::hidden) return {};
+        auto bands = scrollBands(scene->content.get(), scene->root.get(), bounds,
+            AcrylicEdge::top, mode != AcrylicChromeMode::automatic);
+        if (mode == AcrylicChromeMode::visible) {
+            if (bands.empty()) return {{bounds}};
+            for (auto &band : bands) band.active = true;
+        }
+        return bands;
+    }
+    std::vector<AcrylicBand> acrylicLocalRegions(std::shared_ptr<AcrylicScene> const &scene,
+                                                Element const &marker, Rect const &bounds) {
+        auto root = scene->root.get();
+        if (!root) return {};
+        for (auto const &entry : insets) if (entry.material.get() == marker) {
+            if (auto owner = entry.owner.get()) return scrollBands(owner, root, bounds, entry.edge);
+        }
+        return {};
+    }
+    std::vector<AcrylicBand> acrylicSceneRegions(std::shared_ptr<AcrylicScene> const &scene) {
+        std::vector<AcrylicBand> result;
         if (!scene) return result;
         auto root = scene->root.get();
         if (!root) return result;
@@ -620,19 +780,76 @@ namespace swiftomniui {
                 || marker.ActualWidth() <= 0 || marker.ActualHeight() <= 0) continue;
             // Resolve actual ownership after native parenting has settled.
             // This includes trailing detail bars as well as nested sidebar bars.
-            if (acrylicScene(owner, marker) != scene || acrylicUsesLocalPresentation(owner, root)) continue;
-            auto rect = acrylicVisibleBounds(marker, root);
-            if (rect.Width > 0 && rect.Height > 0) result.push_back(rect);
+            if (acrylicScene(owner, marker) != scene || acrylicUsesLocalPresentation(marker, root)) continue;
+            auto bands = scrollBands(owner, root, acrylicVisibleBounds(marker, root), entry.edge);
+            result.insert(result.end(), bands.begin(), bands.end());
         }
         return result;
+    }
+
+    std::vector<Rect> acrylicMaterialRegions(std::vector<AcrylicBand> const &bands) {
+        std::vector<float> edges;
+        std::vector<Rect> active;
+        for (auto const &band : bands) {
+            const auto &rect = band.rect;
+            if (rect.Width <= 0 || rect.Height <= 0) continue;
+            edges.push_back(rect.X);
+            edges.push_back(rect.X + rect.Width);
+            if (band.active) active.push_back(rect);
+        }
+        std::sort(edges.begin(), edges.end());
+        edges.erase(std::unique(edges.begin(), edges.end()), edges.end());
+        std::sort(active.begin(), active.end(), [](Rect const &a, Rect const &b) { return a.Y < b.Y; });
+
+        // Every horizontal boundary stays in place, including those of
+        // transparent lanes. Within a lane, union only the covered intervals
+        // so a narrower bar can join a wider one without widening its mask.
+        std::vector<Rect> regions;
+        for (size_t i = 1; i < edges.size(); ++i) {
+            const auto left = edges[i - 1], right = edges[i];
+            const auto start = regions.size();
+            for (auto const &rect : active) {
+                if (rect.X > left || rect.X + rect.Width < right) continue;
+                if (regions.size() > start && rect.Y <= regions.back().Y + regions.back().Height) {
+                    auto &last = regions.back();
+                    last.Height = std::max(last.Y + last.Height, rect.Y + rect.Height) - last.Y;
+                } else {
+                    regions.push_back({left, rect.Y, right - left, rect.Height});
+                }
+            }
+        }
+        return regions;
     }
     void observeAcrylicScene(std::shared_ptr<AcrylicScene> const &scene, std::function<bool()> observer) {
         scene->observers.push_back(std::move(observer));
     }
     void registerAcrylicScroller(Element const &scroller) {
-        std::erase_if(scrollers, [](auto const &entry) { return !entry.get(); });
-        for (auto const &entry : scrollers) if (entry.get() == scroller) return;
-        scrollers.push_back(winrt::make_weak(scroller));
+        std::erase_if(scrollers, [](auto const &entry) { return !entry.element.get(); });
+        for (auto const &entry : scrollers) if (entry.element.get() == scroller) return;
+        scrollers.push_back({winrt::make_weak(scroller)});
+        observeNativeScroller(scrollers.back(), scroller);
+        updateAcrylicScroller(scroller);
+    }
+    void updateAcrylicScroller(Element const &scroller, std::optional<xaml::Thickness> region) {
+        auto found = std::find_if(scrollers.begin(), scrollers.end(),
+            [&](auto const &entry) { return entry.element.get() == scroller; });
+        if (found == scrollers.end()) return;
+        const auto reach = std::max(0.0, scrollableHeight(scroller));
+        // WinUI reports the live overpan in VerticalOffset. In a short
+        // document the resting range is zero, but the drag can still move
+        // content beneath either bar before the viewport springs back.
+        const auto offset = verticalOffset(scroller);
+        // Keep subpixel motion near a resting edge from toggling material.
+        const bool top = showsScrollEdge(offset, found->top);
+        const bool bottom = showsScrollEdge(reach - offset, found->bottom);
+        const auto insets = region.value_or(found->insets);
+        if (found->top == top && found->bottom == bottom && found->insets == insets) return;
+        found->top = top;
+        found->bottom = bottom;
+        found->insets = insets;
+        // ViewChanged already follows every compositor scroll. Only crossing
+        // an edge or changing insets needs geometry and brush work.
+        queueMaterialCommit(scroller);
     }
 
     void acrylicStructureChanged(Element const &element) noexcept {
@@ -675,7 +892,7 @@ extern "C" void swiftomniui_winui_material_columns(
             return entry.owner.get() == element;
         });
         if (count == 0) {
-            if (found != columnGroups.end()) { columnGroups.erase(found); ++generation; markAcrylicMaterialDirty(); }
+            if (found != columnGroups.end()) { columnGroups.erase(found); ++generation; queueMaterialCommit(element); }
             return;
         }
         if (found != columnGroups.end() && found->pages.size() == static_cast<size_t>(count)) {
@@ -688,26 +905,30 @@ extern "C" void swiftomniui_winui_material_columns(
         if (found == columnGroups.end()) columnGroups.push_back(std::move(next));
         else *found = std::move(next);
         ++generation;
-        markAcrylicMaterialDirty();
+        // A retained page can change native slots while its scroll offset
+        // stays put. Resolve its material after the reparenting settles.
+        queueMaterialCommit(element);
     } catch (...) { report("registering navigation material columns"); }
 }
 
 extern "C" void swiftomniui_winui_safe_area_register(
-    SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef bar, SwiftOmniUIObjectRef material
+    SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef bar, SwiftOmniUIObjectRef material, int32_t verticalEdge
 ) {
     using namespace swiftomniui;
     try {
         auto element = as<xaml::FrameworkElement>(owner);
         auto controls = bar ? as<xaml::FrameworkElement>(bar) : xaml::FrameworkElement{nullptr};
         auto surface = material ? as<xaml::FrameworkElement>(material) : xaml::FrameworkElement{nullptr};
+        const auto edge = static_cast<AcrylicEdge>(verticalEdge);
         std::erase_if(insets, [](auto const &entry) { return !entry.owner.get(); });
         for (auto &entry : insets) if (entry.owner.get() == element) {
-            if (entry.bar.get() == controls && entry.material.get() == surface) return;
+            if (entry.bar.get() == controls && entry.material.get() == surface && entry.edge == edge) return;
             if (!bar) {
                 entry.owner = {};
             } else {
                 entry.bar = winrt::make_weak(controls);
                 entry.material = surface ? winrt::make_weak(surface) : winrt::weak_ref<xaml::FrameworkElement>{};
+                entry.edge = edge;
             }
             ++generation;
             markAcrylicMaterialDirty();
@@ -715,7 +936,7 @@ extern "C" void swiftomniui_winui_safe_area_register(
         }
         if (bar) {
             insets.push_back({winrt::make_weak(element), winrt::make_weak(controls),
-                surface ? winrt::make_weak(surface) : winrt::weak_ref<xaml::FrameworkElement>{}});
+                surface ? winrt::make_weak(surface) : winrt::weak_ref<xaml::FrameworkElement>{}, edge});
             ++generation;
             markAcrylicMaterialDirty();
         }

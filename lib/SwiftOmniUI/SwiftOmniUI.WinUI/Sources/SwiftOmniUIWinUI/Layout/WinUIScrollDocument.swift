@@ -57,7 +57,6 @@ final class WinUIScrollDocument: WinUILayoutView {
 
     /// Its own size is the document's: never smaller than the viewport, which the scroller sees to.
     override func arrange(in bounds: Rect) {
-        if passesPresentedRoom { print("document", bounds.width, preparedLayoutPlan(in: bounds).first?.place.width as Any) }
         for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
         scrollView?.onGeometryChanged?()
     }

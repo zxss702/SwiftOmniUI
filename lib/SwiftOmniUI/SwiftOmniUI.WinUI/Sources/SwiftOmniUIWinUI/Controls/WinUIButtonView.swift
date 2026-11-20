@@ -22,6 +22,28 @@ final class WinUIButtonView: WinUIView {
         return max(destinationWidth, minimum) - max(placedFrame.width, minimum)
     }
 
+    /// A custom SwiftUI label owns its intrinsic size. The native image panel
+    /// intentionally reports no desired size because Swift places it itself,
+    /// so asking WinUI's Button to measure that panel would make an image-only
+    /// label collapse to zero. Measure the label through SOUI's layout model
+    /// whenever this button owns the label directly.
+    override func measure(width: Double?, height: Double?) -> LayoutSize {
+        guard hasViewLabel, let labelRoot else {
+            return super.measure(width: width, height: height)
+        }
+        let native = super.measure(width: width, height: height)
+        let label: LayoutSize
+        if let layout = labelRoot as? WinUILayoutView {
+            let proposal = ProposedViewSize(width: width, height: height)
+            label = height == nil
+                ? layout.naturalSize(width: width)
+                : layout.naturalSize(proposal: proposal)
+        } else {
+            label = labelRoot.measure(width: width, height: height)
+        }
+        return LayoutSize(width: max(native.width, label.width), height: max(native.height, label.height))
+    }
+
     override func travels(to destination: Rect?) {
         destinationWidth = destination?.width
     }

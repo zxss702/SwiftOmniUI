@@ -5,6 +5,10 @@
 #include <array>
 
 namespace swiftomniui {
+    struct ChromeMaterialRegion {
+        winrt::Windows::Foundation::Rect rect{};
+        AcrylicChromeMode mode = AcrylicChromeMode::safeBar;
+    };
     // Lives INSIDE the real native column slot. SplitView's template owns its
     // visibility, translation, opacity and moving clip, including the toolbar
     // slice. No second animation or per-frame geometry mirroring is needed.
@@ -118,15 +122,15 @@ namespace swiftomniui {
             drawing.arrange(final); return final;
         }
         void refresh(xaml::FrameworkElement const &root, xaml::FrameworkElement const &source,
-                     std::vector<winrt::Windows::Foundation::Rect> const &chrome) {
+                     std::vector<ChromeMaterialRegion> const &chrome) {
             IInspectable projected = *this;
             auto self = projected.as<xaml::FrameworkElement>();
             material.source(source);
             auto size = self.ActualSize();
             if (!self.IsLoaded() || size.x <= 0 || size.y <= 0) return;
-            auto brush = material.update(self, {size.x, size.y});
+            material.resolve(self);
             auto scope = material.scene();
-            std::vector<winrt::Windows::Foundation::Rect> regions;
+            std::vector<AcrylicBand> regions;
             if (scope) {
                 const auto bounds = acrylicSceneBounds(scope);
                 auto local = acrylicSceneRegions(scope);
@@ -135,19 +139,23 @@ namespace swiftomniui {
                 // PaneTransform's current animation sample: the native parent
                 // will move/clip the complete column layer itself.
                 const auto slot = acrylicLayoutBounds(scopeRoot, root);
-                for (auto rect : chrome) {
+                for (auto const &region : chrome) {
+                    auto rect = region.rect;
                     rect.X -= slot.X; rect.Y -= slot.Y;
-                    local.push_back(rect);
-                }
-                auto mapping = scopeRoot.TransformToVisual(self);
-                for (auto const &rect : local) {
                     auto x = std::max(rect.X, bounds.X), y = std::max(rect.Y, bounds.Y);
                     auto right = std::min(rect.X + rect.Width, bounds.X + bounds.Width);
                     auto bottom = std::min(rect.Y + rect.Height, bounds.Y + bounds.Height);
-                    if (right > x && bottom > y) regions.push_back(mapping.TransformBounds({x, y, right - x, bottom - y}));
+                    if (right <= x || bottom <= y) continue;
+                    auto bands = acrylicChromeRegions(scope, {x, y, right - x, bottom - y}, region.mode);
+                    local.insert(local.end(), bands.begin(), bands.end());
                 }
+                auto mapping = scopeRoot.TransformToVisual(self);
+                for (auto &band : local) {
+                    band.rect = mapping.TransformBounds(band.rect);
+                }
+                regions = std::move(local);
             }
-            drawing.paint(self, regions, brush);
+            drawing.paint(self, regions, scope);
             paintControls(self);
         }
     };
@@ -220,13 +228,16 @@ namespace swiftomniui {
                 auto self = projected.as<xaml::FrameworkElement>();
                 auto grid = xaml::Media::VisualTreeHelper::GetParent(self).try_as<controls::Grid>();
                 if (grid && self.IsLoaded()) {
-                    std::vector<winrt::Windows::Foundation::Rect> chrome;
+                    std::vector<ChromeMaterialRegion> chrome;
                     auto append = [&](xaml::FrameworkElement const &element) {
                         if (!element.IsLoaded() || element.Visibility() != xaml::Visibility::Visible) return;
                         auto visible = element.Resources().TryLookup(winrt::box_value(L"safeBarAcrylic"));
                         if (visible && !winrt::unbox_value<bool>(visible)) return;
+                        const auto mode = element.try_as<controls::TitleBar>()
+                            ? acrylicTitleBarMode(element) : AcrylicChromeMode::safeBar;
+                        if (mode == AcrylicChromeMode::hidden) return;
                         auto rect = acrylicVisibleBounds(element, grid);
-                        if (rect.Width > 0 && rect.Height > 0) chrome.push_back(rect);
+                        if (rect.Width > 0 && rect.Height > 0) chrome.push_back({rect, mode});
                     };
                     for (auto const &child : grid.Children()) {
                         auto element = child.as<xaml::FrameworkElement>();

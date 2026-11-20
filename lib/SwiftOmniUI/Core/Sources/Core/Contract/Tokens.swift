@@ -175,6 +175,7 @@ extension NodeType {
     static let frame = VisualElementContract.frame.token
     static let isFrameContent = VisualElementContract.isFrameContent.token
     static let isLayoutDecoration = VisualElementContract.isLayoutDecoration.token
+    static let backgroundExtendsSafeArea = VisualElementContract.backgroundExtendsSafeArea.token
     static let isGeometryReader = VisualElementContract.isGeometryReader.token
     static let lazyRowStack = PipelineMarksContract.lazyRowStack.token
     static let safeAreaInsetEdge = VisualElementContract.safeAreaInsetEdge.token

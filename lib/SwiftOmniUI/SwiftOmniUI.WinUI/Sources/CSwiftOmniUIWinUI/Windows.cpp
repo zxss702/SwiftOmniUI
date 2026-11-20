@@ -11,8 +11,14 @@
 #include "ChromeAcrylic.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
+#include <commctrl.h>
+#include <dwmapi.h>
 
 #include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.Composition.h>
@@ -28,6 +34,7 @@ using winrt::Windows::System::VirtualKey;
 using winrt::Windows::System::VirtualKeyModifiers;
 
 namespace windowing = winrt::Microsoft::UI::Windowing;
+namespace dispatching = winrt::Microsoft::UI::Dispatching;
 
 namespace {
     controls::Grid root(xaml::Window const &window) {
@@ -127,14 +134,337 @@ namespace {
         for (auto const &entry : transparentBackdrops) if (entry.get() == backdrop) return true;
         return false;
     }
+
+    // Layered + transparent removes the entire HWND from desktop mouse hit
+    // testing, including when the next window belongs to another process.
+    constexpr LONG_PTR mousePassthroughStyle = WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
+    constexpr wchar_t addedMousePassthroughStyles[] = L"SwiftOmniUI.AddedMousePassthroughStyles";
+    void setWindowMousePassthrough(HWND hwnd, bool ignoresMouse) {
+        auto saved = GetPropW(hwnd, addedMousePassthroughStyles);
+        if (!ignoresMouse && !saved) return;
+        auto current = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        auto added = saved ? static_cast<LONG_PTR>(reinterpret_cast<ULONG_PTR>(saved) - 1)
+                           : mousePassthroughStyle & ~current;
+        auto wanted = ignoresMouse ? current | mousePassthroughStyle : current & ~added;
+        if (ignoresMouse && !saved &&
+            !SetPropW(hwnd, addedMousePassthroughStyles, reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(added) + 1))) {
+            winrt::throw_last_error();
+        }
+        if (current != wanted) {
+            SetLastError(ERROR_SUCCESS);
+            if (!SetWindowLongPtrW(hwnd, GWL_EXSTYLE, wanted) && GetLastError()) winrt::throw_last_error();
+            if (ignoresMouse && !(current & WS_EX_LAYERED) && !SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA)) {
+                auto error = GetLastError();
+                SetWindowLongPtrW(hwnd, GWL_EXSTYLE, current);
+                winrt::throw_hresult(error ? HRESULT_FROM_WIN32(error) : E_FAIL);
+            }
+            SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        if (!ignoresMouse) RemovePropW(hwnd, addedMousePassthroughStyles);
+    }
+
+    // The property holds the affinity to restore, plus one to distinguish WDA_NONE from an absent property.
+    // It belongs to the HWND, so destroying a window also discards its saved affinity.
+    constexpr wchar_t captureAffinityToRestore[] = L"SwiftOmniUI.CaptureAffinityToRestore";
+    unsigned appCaptureExclusions = 0;
+    HWINEVENTHOOK windowShowEvents = nullptr;
+
+    HANDLE savedAffinity(DWORD affinity) {
+        return reinterpret_cast<HANDLE>(static_cast<ULONG_PTR>(affinity) + 1);
+    }
+
+    // All calls are on the UI thread. Only touch a window that is visible or is about to be shown by WinUI.
+    void updateCaptureAffinityForShow(HWND hwnd) {
+        auto saved = GetPropW(hwnd, captureAffinityToRestore);
+        if (appCaptureExclusions) {
+            if (saved) return;
+            DWORD affinity = WDA_NONE;
+            GetWindowDisplayAffinity(hwnd, &affinity);
+            if (!SetPropW(hwnd, captureAffinityToRestore, savedAffinity(affinity))) return;
+            if (affinity != WDA_EXCLUDEFROMCAPTURE && !SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)) {
+                auto error = GetLastError();
+                RemovePropW(hwnd, captureAffinityToRestore);
+                std::fprintf(stderr, "SwiftOmniUI WinUI: excluding a window from capture failed: %lu\n", error);
+            }
+        } else if (saved) {
+            auto affinity = static_cast<DWORD>(reinterpret_cast<ULONG_PTR>(saved) - 1);
+            if (affinity == WDA_EXCLUDEFROMCAPTURE || SetWindowDisplayAffinity(hwnd, affinity)) {
+                RemovePropW(hwnd, captureAffinityToRestore);
+            }
+        }
+    }
+
+    bool isVisibleAppWindow(HWND hwnd) {
+        DWORD pid = 0;
+        GetWindowThreadProcessId(hwnd, &pid);
+        return pid == GetCurrentProcessId() && GetAncestor(hwnd, GA_ROOT) == hwnd && IsWindowVisible(hwnd);
+    }
+
+    void CALLBACK appWindowShown(HWINEVENTHOOK, DWORD, HWND hwnd, LONG object, LONG child, DWORD, DWORD) {
+        if (object == OBJID_WINDOW && child == CHILDID_SELF && hwnd &&
+            (appCaptureExclusions || GetPropW(hwnd, captureAffinityToRestore)) && isVisibleAppWindow(hwnd)) {
+            updateCaptureAffinityForShow(hwnd);
+        }
+    }
+
+    void updateVisibleAppWindowsForCapture() {
+        EnumWindows([](HWND hwnd, LPARAM) -> BOOL {
+            if (isVisibleAppWindow(hwnd)) updateCaptureAffinityForShow(hwnd);
+            return TRUE;
+        }, 0);
+    }
+
+    void setWindowCapturePreference(HWND hwnd, bool excludesCapture) {
+        auto wanted = excludesCapture ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE;
+        bool visible = IsWindowVisible(hwnd);
+        if (appCaptureExclusions && visible) updateCaptureAffinityForShow(hwnd);
+        if (GetPropW(hwnd, captureAffinityToRestore)) {
+            // A traits update changes what we will restore. The active capture still excludes this window.
+            SetPropW(hwnd, captureAffinityToRestore, savedAffinity(wanted));
+            if (!appCaptureExclusions && visible) updateCaptureAffinityForShow(hwnd);
+            return;
+        }
+        DWORD affinity = WDA_NONE;
+        GetWindowDisplayAffinity(hwnd, &affinity);
+        if (affinity != wanted) SetWindowDisplayAffinity(hwnd, wanted);
+    }
+
+    bool clearWindowBacking(HWND hwnd, HDC dc) {
+        RECT client{};
+        // DWM interprets GDI's all-zero pixels as transparent once it is
+        // configured to composite the backing with alpha.
+        return dc && GetClientRect(hwnd, &client)
+            && FillRect(dc, &client, reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+    }
+
+    HRESULT configureTransparentBacking(HWND hwnd, bool transparent) {
+        DWM_BLURBEHIND backing{};
+        backing.dwFlags = DWM_BB_ENABLE;
+        backing.fEnable = transparent ? TRUE : FALSE;
+        // Keep the region outside the client so DWM composites the alpha
+        // without adding a visible effect behind the window.
+        auto region = transparent ? CreateRectRgn(-2, -2, -1, -1) : nullptr;
+        if (transparent && !region) return E_OUTOFMEMORY;
+        if (region) {
+            backing.dwFlags |= DWM_BB_BLURREGION;
+            backing.hRgnBlur = region;
+        }
+        auto result = DwmEnableBlurBehindWindow(hwnd, &backing);
+        if (region) DeleteObject(region);
+        return result;
+    }
+
+    LRESULT CALLBACK transparentWindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
+                                           UINT_PTR id, DWORD_PTR clearBacking) {
+        if (message == WM_ERASEBKGND) {
+            if (!clearBacking || clearWindowBacking(hwnd, reinterpret_cast<HDC>(wparam))) return 1;
+        }
+        if (message == WM_NCDESTROY) RemoveWindowSubclass(hwnd, transparentWindowProc, id);
+        return DefSubclassProc(hwnd, message, wparam, lparam);
+    }
+
+    void setTransparentWindowPainting(HWND hwnd, bool transparent) {
+        if (transparent) {
+            const MARGINS margins{};
+            DwmExtendFrameIntoClientArea(hwnd, &margins);
+        } else if (!RemoveWindowSubclass(hwnd, transparentWindowProc, 0)) {
+            return;
+        }
+        if (auto result = configureTransparentBacking(hwnd, transparent); FAILED(result)) {
+            std::fprintf(stderr, "SwiftOmniUI WinUI: setting native window alpha failed: 0x%08x\n",
+                static_cast<unsigned>(result));
+            if (transparent) return;
+        }
+        if (transparent) SetWindowSubclass(hwnd, transparentWindowProc, 0, 1);
+        // The XAML site has its own HWND. Treat only this window's native
+        // composition host, leaving embedded controls and other windows alone.
+        EnumChildWindows(hwnd, [](HWND child, LPARAM suppress) -> BOOL {
+            if (GetWindowThreadProcessId(child, nullptr) != GetCurrentThreadId()) return TRUE;
+            wchar_t name[64]{};
+            if (GetClassNameW(child, name, 64) &&
+                std::wstring_view(name) == L"Microsoft.UI.Content.DesktopChildSiteBridge") {
+                if (suppress) SetWindowSubclass(child, transparentWindowProc, 0, 0);
+                else RemoveWindowSubclass(child, transparentWindowProc, 0);
+            }
+            return TRUE;
+        }, transparent);
+
+        if (transparent) {
+            // A white backing may already have been painted by WinUI before
+            // the window or its content acquired the transparent backdrop.
+            if (auto dc = GetDC(hwnd)) {
+                clearWindowBacking(hwnd, dc);
+                ReleaseDC(hwnd, dc);
+            }
+        }
+    }
+
+    xaml::Media::SystemBackdrop makeTransparentBackdrop() {
+        auto backdrop = winrt::make<TransparentBackdrop>().as<xaml::Media::SystemBackdrop>();
+        transparentBackdrops.push_back(winrt::make_weak(backdrop));
+        return backdrop;
+    }
+
+    std::unordered_set<HWND> firstShownWindows;
+
+    void prepareFirstMica(xaml::Window const &window, HWND hwnd) {
+        if (isTransparentBackdrop(window.SystemBackdrop()) || !firstShownWindows.insert(hwnd).second) return;
+        if (window.SystemBackdrop().try_as<xaml::Media::MicaBackdrop>()) return;
+        auto grid = root(window);
+        window.SystemBackdrop(xaml::Media::MicaBackdrop());
+        grid.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
+        setAcrylicWindowBackdrop(grid, window.SystemBackdrop());
+        refreshWindowMaterial(grid);
+    }
+
+    void showWindow(xaml::Window const &window, bool activate) {
+        auto app = window.AppWindow();
+        auto hwnd = reinterpret_cast<HWND>(app.Id().Value);
+        prepareFirstMica(window, hwnd);
+        updateCaptureAffinityForShow(hwnd);
+        if (activate && minimized(app)) app.Presenter().as<windowing::OverlappedPresenter>().Restore();
+        if (isTransparentBackdrop(window.SystemBackdrop())) setTransparentWindowPainting(hwnd, true);
+
+        const bool focus = activate && !(GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_NOACTIVATE);
+        app.Show(focus);
+        if (focus) {
+            window.Activate();
+            // A redirected launch can have foreground permission even when XAML alone won't raise the window.
+            SetForegroundWindow(hwnd);
+        }
+    }
+
+    // WinUI can render before the HWND's first show. Keep that first native
+    // show for the moment when DWM can animate the window with its content.
+    struct WindowStartup : std::enable_shared_from_this<WindowStartup> {
+        winrt::weak_ref<xaml::Window> window;
+        xaml::Media::CompositionTarget::Rendered_revoker rendered;
+        dispatching::DispatcherQueueTimer deadline{nullptr};
+        uint64_t attempt = 0;
+        bool activate = false;
+
+        explicit WindowStartup(xaml::Window const &window) : window(window) {}
+
+        void cancel() {
+            rendered.revoke();
+            if (deadline) deadline.Stop();
+            deadline = nullptr;
+        }
+
+        bool pending(uint64_t generation) const { return deadline && attempt == generation; }
+
+        void start(bool requestActivation) {
+            if (deadline) {
+                activate |= requestActivation;
+                return;
+            }
+            activate = requestActivation;
+            auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
+            auto weak = weak_from_this();
+            const auto generation = ++attempt;
+            deadline = queue.CreateTimer();
+            deadline.IsRepeating(false);
+            deadline.Interval(std::chrono::milliseconds(500));
+            deadline.Tick(guarded("showing a window when its first frame is unavailable",
+                [weak, generation](auto const &, auto const &) {
+                    if (auto startup = weak.lock()) startup->show(generation);
+                }));
+            rendered = xaml::Media::CompositionTarget::Rendered(winrt::auto_revoke,
+                guarded("waiting for a window's first frame", [weak, generation](auto const &, auto const &) {
+                    auto startup = weak.lock();
+                    if (!startup || !startup->pending(generation)) return;
+                    auto window = startup->window.get();
+                    if (!window) return;
+                    auto grid = root(window);
+                    // Rendered is shared across windows. This window's XAML root must have been laid out.
+                    if (!grid.IsLoaded() || grid.ActualWidth() <= 0 || grid.ActualHeight() <= 0) return;
+                    startup->show(generation);
+                }));
+            deadline.Start();
+            // The hidden site may already be idle if a previous show was canceled.
+            if (auto window = this->window.get()) root(window).InvalidateArrange();
+        }
+
+        void show(uint64_t generation);
+    };
+
+    // Only windows that have yet to be shown need startup state.
+    std::unordered_map<HWND, std::shared_ptr<WindowStartup>> windowStartups;
+
+    void WindowStartup::show(uint64_t generation) {
+        if (!pending(generation)) return;
+        cancel();
+        if (auto window = this->window.get()) {
+            windowStartups.erase(reinterpret_cast<HWND>(window.AppWindow().Id().Value));
+            showWindow(window, activate);
+        }
+    }
+
+    void requestWindowShow(xaml::Window const &window, bool activate) {
+        auto hwnd = reinterpret_cast<HWND>(window.AppWindow().Id().Value);
+        auto grid = root(window);
+        if (grid.IsLoaded() && grid.ActualWidth() > 0 && grid.ActualHeight() > 0) {
+            showWindow(window, activate);
+            return;
+        }
+        if (auto found = windowStartups.find(hwnd); found != windowStartups.end()) {
+            auto startup = found->second;
+            try {
+                startup->start(activate);
+                return;
+            } catch (...) {
+                report("preparing a window's first frame");
+                startup->cancel();
+                windowStartups.erase(hwnd);
+            }
+        }
+        showWindow(window, activate);
+    }
 }
 
-extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number) {
+extern "C" int32_t swiftomniui_winui_begin_excluding_app_windows_from_capture() {
+    // Native dialogs and popup windows may be shown without going through the WinUI window host.
+    // Keep the show observer so windows that were hidden at the end can safely restore on their next show.
+    if (!windowShowEvents) {
+        windowShowEvents = SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW, nullptr, appWindowShown,
+            GetCurrentProcessId(), 0, WINEVENT_OUTOFCONTEXT);
+        if (!windowShowEvents) {
+            auto error = GetLastError();
+            return error ? HRESULT_FROM_WIN32(error) : E_FAIL;
+        }
+    }
+    if (++appCaptureExclusions == 1) updateVisibleAppWindowsForCapture();
+    return S_OK;
+}
+
+extern "C" void swiftomniui_winui_end_excluding_app_windows_from_capture() {
+    if (appCaptureExclusions && --appCaptureExclusions == 0) updateVisibleAppWindowsForCapture();
+}
+
+extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number, bool transparent) {
     try {
         xaml::Window window;
-        window.SystemBackdrop(xaml::Media::MicaBackdrop());
         auto grid = rows({true, true, true, false});
+        if (transparent) {
+            // Set a clear XAML backdrop while the native window is hidden.
+            auto app = window.AppWindow();
+            if (auto presenter = app.Presenter().try_as<windowing::OverlappedPresenter>())
+                presenter.SetBorderAndTitleBar(false, false);
+            // Custom title-bar mode can inset the XAML site by one physical
+            // pixel. A borderless window already has the full client area.
+            window.SystemBackdrop(makeTransparentBackdrop());
+            grid.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
+        } else {
+            window.SystemBackdrop(xaml::Media::MicaBackdrop());
+            // Keep the XAML root itself clear while a window is being closed.
+            // The page owns its visible surfaces and the system backdrop remains
+            // underneath them during the native transition.
+            grid.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
+        }
         window.Content(grid);
+        auto hwnd = reinterpret_cast<HWND>(window.AppWindow().Id().Value);
+        takeTheWayBack(grid, number);
         setAcrylicWindowBackdrop(grid, window.SystemBackdrop());
         try {
             auto material = winrt::make<ChromeAcrylic>().as<xaml::FrameworkElement>();
@@ -178,7 +508,10 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number) {
                 if (!args.DidPresenterChange() && !args.DidSizeChange()) return;
                 if (minimized(sender)) callbacks.windowStateChanged(number, true, false);
             }));
-        window.Closed(guarded("handling Closed", [number, weakGrid = winrt::make_weak(grid), layoutToken, shortcutToken](IInspectable const &sender, xaml::WindowEventArgs const &) {
+        window.Closed(guarded("handling Closed", [number, hwnd, weakGrid = winrt::make_weak(grid), layoutToken, shortcutToken](IInspectable const &, xaml::WindowEventArgs const &) {
+            if (auto startup = windowStartups.extract(hwnd)) startup.mapped()->cancel();
+            firstShownWindows.erase(hwnd);
+            if (IsWindowVisible(hwnd)) ShowWindow(hwnd, SW_HIDE);
             if (auto grid = weakGrid.get()) {
                 if (layoutToken->value) {
                     grid.LayoutUpdated(*layoutToken);
@@ -189,12 +522,13 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number) {
                     *shortcutToken = {};
                 }
             }
-            releaseOwned(reinterpret_cast<HWND>(sender.as<xaml::Window>().AppWindow().Id().Value));
+            releaseOwned(hwnd);
             // windowClosed renders - and a render inside XAML's teardown of this very window touches what is
             // dying, so the tree hears of the close once the event is through.
             winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue(
                 guarded("handling Closed", [number] { callbacks.windowClosed(number); }));
         }));
+        windowStartups.emplace(hwnd, std::make_shared<WindowStartup>(window));
         return detach(window);
     } catch (...) {
         report("making a window");
@@ -400,17 +734,6 @@ extern "C" void swiftomniui_winui_window_set_safe_area_bars(
             controls::StackPanel stack;
             stack.Tag(winrt::box_value(L"safeAreaBarContent"));
             layer.Children().Append(stack);
-            controls::Border edge;
-            edge.Tag(winrt::box_value(L"safeAreaBarEdge"));
-            edge.Height(1);
-            edge.VerticalAlignment(xaml::VerticalAlignment::Bottom);
-            edge.IsHitTestVisible(false);
-            edge.Opacity(0);
-            auto resources = xaml::Application::Current().Resources();
-            auto key = winrt::box_value(L"ControlStrokeColorDefaultBrush");
-            if (resources.HasKey(key)) edge.Background(resources.Lookup(key).try_as<xaml::Media::Brush>());
-            else edge.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{48, 128, 128, 128}));
-            layer.Children().Append(edge);
             // Controls stand above the one shared window material.
             children.Append(layer);
         }
@@ -450,26 +773,6 @@ extern "C" void swiftomniui_winui_window_set_safe_area_bar_frame(
             return;
         }
     } catch (...) { report("placing the page's safe area bars"); }
-}
-
-void swiftomniui::refreshSafeAreaScrollEdge(controls::ScrollView const &scroller) {
-    // A nested document has its own edge effects; it cannot change the
-    // page-level chrome. Walk native ancestors, never unrelated windows.
-    auto ancestor = xaml::Media::VisualTreeHelper::GetParent(scroller);
-    while (ancestor) {
-        if (ancestor.try_as<controls::ScrollView>() || ancestor.try_as<controls::ScrollViewer>()) return;
-        if (auto grid = ancestor.try_as<controls::Grid>()) {
-            for (auto const &child : grid.Children()) {
-                auto layer = child.try_as<controls::Grid>();
-                if (!layer || winrt::unbox_value_or<winrt::hstring>(layer.Tag(), L"") != L"safeAreaBars") continue;
-                auto edge = layer.Children().GetAt(1).as<controls::Border>();
-                auto opacity = scroller.VerticalOffset() > 0.5 ? 1.0 : 0.0;
-                if (edge.Opacity() != opacity) edge.Opacity(opacity);
-                return;
-            }
-        }
-        ancestor = xaml::Media::VisualTreeHelper::GetParent(ancestor);
-    }
 }
 
 extern "C" void swiftomniui_winui_window_set_background(
@@ -529,9 +832,7 @@ extern "C" void swiftomniui_winui_window_set_chrome(
             if (handle) controls::Canvas::SetZIndex(as<xaml::UIElement>(handle), 2);
         }
         if (titleBar && !window.ExtendsContentIntoTitleBar()) {
-            auto bar = as<controls::TitleBar>(titleBar);
             window.ExtendsContentIntoTitleBar(true);
-            takeTheWayBack(grid, winrt::unbox_value<int64_t>(bar.Tag()));
         }
         if (previous != next) {
             // Removing the XAML toolbar releases its layout row. The system still owns the caption buttons,
@@ -562,21 +863,7 @@ extern "C" void swiftomniui_winui_window_set_chrome(
 
 extern "C" void swiftomniui_winui_window_activate(SwiftOmniUIObjectRef handle) {
     try {
-        auto window = borrow<xaml::Window>(handle);
-        auto app = window.AppWindow();
-        if (auto presenter = app.Presenter().try_as<windowing::OverlappedPresenter>(); presenter && minimized(app)) {
-            presenter.Restore();
-        }
-        // A window the user works through is shown without taking focus: it stands shown, never activated.
-        if (GetWindowLongPtrW(reinterpret_cast<HWND>(app.Id().Value), GWL_EXSTYLE) & WS_EX_NOACTIVATE) {
-            app.Show(false);
-            return;
-        }
-        app.Show();
-        window.Activate();
-        // XAML activation alone can leave an existing window behind another process. A redirected launch's
-        // sender has granted this process foreground permission; let Windows activate and raise the window.
-        SetForegroundWindow(reinterpret_cast<HWND>(app.Id().Value));
+        requestWindowShow(borrow<xaml::Window>(handle), true);
     } catch (...) {
         report("showing a window");
     }
@@ -587,9 +874,11 @@ extern "C" void swiftomniui_winui_window_close(SwiftOmniUIObjectRef handle) {
         auto window = borrow<xaml::Window>(handle);
         auto app = window.AppWindow();
         auto hwnd = reinterpret_cast<HWND>(app.Id().Value);
+        if (auto startup = windowStartups.find(hwnd); startup != windowStartups.end()) startup->second->cancel();
+        firstShownWindows.erase(hwnd);
         // Remove the transparent window from the desktop before closing can
         // disconnect its backdrop or tear down the content.
-        if (isTransparentBackdrop(window.SystemBackdrop())) ShowWindow(hwnd, SW_HIDE);
+        if (IsWindowVisible(hwnd)) ShowWindow(hwnd, SW_HIDE);
         releaseOwned(hwnd);
         window.Close();
     } catch (...) {
@@ -654,9 +943,15 @@ extern "C" void swiftomniui_winui_window_show_as_user(SwiftOmniUIObjectRef handl
 
 extern "C" void swiftomniui_winui_window_set_shown(SwiftOmniUIObjectRef handle, bool shown) {
     try {
-        auto app = borrow<xaml::Window>(handle).AppWindow();
-        if (shown) app.Show(false);
-        else app.Hide();
+        auto window = borrow<xaml::Window>(handle);
+        if (shown) {
+            requestWindowShow(window, false);
+            return;
+        }
+        auto app = window.AppWindow();
+        auto hwnd = reinterpret_cast<HWND>(app.Id().Value);
+        if (auto found = windowStartups.find(hwnd); found != windowStartups.end()) found->second->cancel();
+        if (app.IsVisible()) app.Hide();
     } catch (...) {
         report("showing or hiding a window");
     }
@@ -717,16 +1012,13 @@ extern "C" void swiftomniui_winui_window_set_screen_frame(SwiftOmniUIObjectRef h
         auto style = GetWindowLongPtrW(hwnd, GWL_STYLE);
         auto bare = style & ~static_cast<LONG_PTR>(WS_CAPTION | WS_THICKFRAME);
         if (bare != style) SetWindowLongPtrW(hwnd, GWL_STYLE, bare);
-        if (auto dwm = LoadLibraryW(L"dwmapi.dll")) {
-            using SetAttribute = HRESULT(WINAPI *)(HWND, DWORD, LPCVOID, DWORD);
-            if (auto set = reinterpret_cast<SetAttribute>(GetProcAddress(dwm, "DwmSetWindowAttribute"))) {
-                DWORD corners = 1;          // DWMWCP_DONOTROUND
-                DWORD noBorder = 0xFFFFFFFE; // DWMWA_COLOR_NONE
-                set(hwnd, 33, &corners, sizeof(corners));   // DWMWA_WINDOW_CORNER_PREFERENCE
-                set(hwnd, 34, &noBorder, sizeof(noBorder)); // DWMWA_BORDER_COLOR
-            }
-            FreeLibrary(dwm);
-        }
+        auto extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        auto noFrame = extended & ~static_cast<LONG_PTR>(WS_EX_DLGMODALFRAME);
+        if (noFrame != extended) SetWindowLongPtrW(hwnd, GWL_EXSTYLE, noFrame);
+        const DWM_WINDOW_CORNER_PREFERENCE corners = DWMWCP_DONOTROUND;
+        const COLORREF noBorder = DWMWA_COLOR_NONE;
+        DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corners, sizeof(corners));
+        DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &noBorder, sizeof(noBorder));
         auto onTop = (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
         SetWindowPos(hwnd, onTop ? HWND_TOPMOST : nullptr, pixels(0), pixels(1), pixels(2), pixels(3),
             SWP_FRAMECHANGED | SWP_NOACTIVATE | (onTop ? 0 : SWP_NOZORDER));
@@ -798,42 +1090,46 @@ extern "C" void swiftomniui_winui_window_set_traits(
                 presenter.SetBorderAndTitleBar(!transparent, !transparent);
         }
         auto hwnd = reinterpret_cast<HWND>(app.Id().Value);
-        // Presses pass through a window the user works past: it never takes focus and stands out of the switchers.
-        constexpr LONG_PTR throughStyle = WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
-        auto extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        auto wanted = ignoresMouse ? (extended | throughStyle) : (extended & ~throughStyle);
-        if (wanted != extended) {
-            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, wanted);
-            SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
-                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        auto previousBackdrop = window.SystemBackdrop();
+        const auto wasTransparent = isTransparentBackdrop(previousBackdrop);
+        auto grid = root(window);
+        if (transparent && window.ExtendsContentIntoTitleBar()) {
+            window.ExtendsContentIntoTitleBar(false);
+        } else if (!transparent && wasTransparent) {
+            bool hasToolbar = false;
+            for (auto const &child : grid.Children()) {
+                if (auto titleBar = child.try_as<controls::TitleBar>(); titleBar && controls::Grid::GetRow(titleBar) == 0) {
+                    hasToolbar = true;
+                    break;
+                }
+            }
+            window.ExtendsContentIntoTitleBar(hasToolbar);
         }
-        // What the system captures sees through a window kept out of it.
-        DWORD affinity = 0;
-        GetWindowDisplayAffinity(hwnd, &affinity);
-        auto wantedAffinity = excludesCapture ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE;
-        if (affinity != wantedAffinity) SetWindowDisplayAffinity(hwnd, wantedAffinity);
         // Ordinary windows use the system Mica foundation. An explicit
         // translucency request retains the native Desktop Acrylic option.
         // A transparent window keeps no material at all: its pages' own alpha shows the desktop exactly.
-        auto previousBackdrop = window.SystemBackdrop();
         if (transparent) {
-            if (!isTransparentBackdrop(window.SystemBackdrop())) {
-                auto made = winrt::make<TransparentBackdrop>().as<xaml::Media::SystemBackdrop>();
-                transparentBackdrops.push_back(winrt::make_weak(made));
-                window.SystemBackdrop(made);
-            }
+            if (!wasTransparent)
+                window.SystemBackdrop(makeTransparentBackdrop());
         } else if (translucent) {
             if (!window.SystemBackdrop().try_as<xaml::Media::DesktopAcrylicBackdrop>())
                 window.SystemBackdrop(xaml::Media::DesktopAcrylicBackdrop());
         } else if (!window.SystemBackdrop().try_as<xaml::Media::MicaBackdrop>()) {
             window.SystemBackdrop(xaml::Media::MicaBackdrop());
         }
-        auto grid = root(window);
         if (transparent && !grid.Background()) {
             grid.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
         }
         setAcrylicWindowBackdrop(grid, window.SystemBackdrop());
+        if (wasTransparent && !transparent) setTransparentWindowPainting(hwnd, false);
+        if (transparent && !wasTransparent && app.IsVisible()) setTransparentWindowPainting(hwnd, true);
         if (previousBackdrop != window.SystemBackdrop()) refreshWindowMaterial(grid);
+        try {
+            setWindowMousePassthrough(hwnd, ignoresMouse);
+        } catch (...) {
+            report("setting window mouse passthrough");
+        }
+        setWindowCapturePreference(hwnd, excludesCapture);
     } catch (...) {
         report("setting what a window is");
     }

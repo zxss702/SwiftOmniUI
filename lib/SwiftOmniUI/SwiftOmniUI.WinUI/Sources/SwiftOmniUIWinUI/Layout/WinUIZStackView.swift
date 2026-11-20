@@ -15,7 +15,7 @@ class WinUIZStackView: WinUITravellingLayout {
 
     override func heldViews() -> [WinUIView] {
         var views = super.heldViews()
-        guard sourceElement?.safeAreaInsetEdge != nil else {
+        guard let edge = sourceElement?.safeAreaInsetEdge else {
             // Keep the native order of survivors. The logical draw order is
             // written separately, so restacking never unloads their controls.
             guard !attachedChildren.isEmpty,
@@ -38,7 +38,9 @@ class WinUIZStackView: WinUITravellingLayout {
         // Source identity belongs to mounting, independently of whether a
         // cached native placement plan needs to be rebuilt on this pass.
         swiftomniui_winui_safe_area_background_source(safeAreaBackground!.handle, current[0].view.presentationHandle)
-        swiftomniui_winui_safe_area_register(handle, current[1].view.presentationHandle, safeAreaBackground?.presentationHandle)
+        swiftomniui_winui_safe_area_register(
+            handle, current[1].view.presentationHandle, safeAreaBackground?.presentationHandle,
+            edge == .top ? 1 : edge == .bottom ? 2 : 0)
         views.insert(safeAreaBackground!, at: index)
         holdInDrawingOrder()
         return views
@@ -99,6 +101,10 @@ class WinUIZStackView: WinUITravellingLayout {
     override var hasNativeProposals: Bool { true }
     override var retainsArithmeticOnNativeMeasure: Bool { true }
 
+    override var keepsDestinationWidth: Bool {
+        sourceElement?.type == .zStack && sourceElement?.safeAreaInsetEdge == nil && placement == nil
+    }
+
     override func prepareLayoutContent(in bounds: Rect, measuringNative: Bool) {
         super.prepareLayoutContent(in: bounds, measuringNative: measuringNative)
         guard sourceElement?.safeAreaInsetEdge != nil else { return }
@@ -132,6 +138,20 @@ class WinUIZStackView: WinUITravellingLayout {
         return proposals
     }
 
+    /// Generic `.background {}` content is a decoration, so it does not take
+    /// part in the base view's size. Its drawing rectangle still follows the
+    /// base into the inherited safe-area strips.
+    private func placesWithBackgroundSafeArea(in bounds: Rect) -> [Rect?] {
+        var places = ZStackArithmetic.places(of: items, in: bounds, padding: padding, direction: direction)
+        let extended = layoutSafeArea(in: bounds).bounds
+        for index in items.indices where items[index].element?.bool(.backgroundExtendsSafeArea) == true {
+            places[index] = ZStackArithmetic.places(
+                of: [items[index]], in: bounds, decorationRoom: extended,
+                padding: padding, direction: direction).first ?? places[index]
+        }
+        return places
+    }
+
     override func arrange(in bounds: Rect) {
         if let placements = placement?.placements, !placements.isEmpty {
             return apply(placements, in: bounds)
@@ -157,11 +177,17 @@ class WinUIZStackView: WinUITravellingLayout {
             }
             guard let view = proposal.view, let item = byView[view.number] else { continue }
             let place: Rect
-            if useAllocatedDecorations, item.values.isLayoutDecoration,
+            if item.element?.bool(.backgroundExtendsSafeArea) == true {
+                let room = useAllocatedDecorations ? allocatedBounds : bounds
+                place = ZStackArithmetic.places(
+                    of: [item], in: room, decorationRoom: layoutSafeArea(in: room).bounds,
+                    padding: padding, direction: direction).first.flatMap { $0 } ?? proposal.place
+            } else if insetEdge == nil, useAllocatedDecorations, item.values.isLayoutDecoration,
                let decorated = ZStackArithmetic.places(
                 of: [item], in: allocatedBounds, padding: padding, direction: direction).first ?? nil {
                 place = decorated
             } else {
+                // An inset bar's proposal already accounts for the inherited safe edge.
                 place = proposal.place
             }
             if item.view.nativeSafeBarOwner != nil, item.view !== insetBase, insetEdge != nil {
@@ -190,7 +216,9 @@ class WinUIZStackView: WinUITravellingLayout {
         let current = items.filter { !$0.departing }
         guard let edge = sourceElement?.safeAreaInsetEdge, current.count == 2 else { return }
         let base = current[0], bar = current[1]
-        swiftomniui_winui_safe_area_register(handle, bar.view.presentationHandle, safeAreaBackground?.presentationHandle)
+        swiftomniui_winui_safe_area_register(
+            handle, bar.view.presentationHandle, safeAreaBackground?.presentationHandle,
+            edge == .top ? 1 : edge == .bottom ? 2 : 0)
         let context = layoutSafeArea(in: bounds)
         let physicalEdge = SafeAreaArithmetic.physicalEdge(edge, direction: direction)
         let barPlace = proposals.first(where: { $0.view === bar.view })?.place ?? Rect(0, 0, 0, 0)
@@ -217,7 +245,7 @@ class WinUIZStackView: WinUITravellingLayout {
                 return nil
             }
         }
-        return ZStackArithmetic.places(of: items, in: bounds, padding: padding, direction: direction)
+        return placesWithBackgroundSafeArea(in: bounds)
     }
 
     /// An animated placement still needs the current inset as layout input.
@@ -336,9 +364,15 @@ class WinUIZStackView: WinUITravellingLayout {
         for item in items[count...] { item.view.setPlacedDrawing(nil, opacity: 1) }
     }
     override func context(for child: WinUIView, at place: Rect) -> SafeAreaContext {
-        if sourceElement?.safeAreaInsetEdge != nil {
+        if let edge = sourceElement?.safeAreaInsetEdge {
             if insetBase === child, let insetContext {
-                return insetContext.child(in: place, preservingOutsets: child.carriesSafeAreaOutsets)
+                let room = insetContext.layout
+                let followsWidth = (edge == .top || edge == .bottom)
+                    && (child as? WinUILayoutView)?.arrangementRoom?.width == room.width
+                    && place.width != room.width
+                let current = followsWidth
+                    ? insetContext.resizedLayout(to: Rect(room.x, room.y, place.width, room.height)) : insetContext
+                return current.child(in: place, preservingOutsets: child.carriesSafeAreaOutsets)
             }
             // The inset's content receives the incoming edge proposal, not its
             // own contribution, so GeometryReader inside a bar cannot loop.
@@ -348,7 +382,7 @@ class WinUIZStackView: WinUITravellingLayout {
     }
 
     override func detach() {
-        swiftomniui_winui_safe_area_register(handle, nil, nil)
+        swiftomniui_winui_safe_area_register(handle, nil, nil, 0)
         safeAreaBackground?.detach()
         safeAreaBackground = nil
         super.detach()

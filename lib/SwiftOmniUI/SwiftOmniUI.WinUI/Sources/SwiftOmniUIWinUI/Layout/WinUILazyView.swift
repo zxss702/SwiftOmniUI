@@ -1178,7 +1178,8 @@ class WinUILazyView: WinUITravellingLayout {
         }
         let motion = takeArrivalMotion()
         if cells.animatesChanges, let motion { places.animation = motion }
-        places.begin(width: axis == .vertical ? bounds.width : bounds.height, animating: cells.animatesChanges,
+        places.begin(width: axis == .vertical ? bounds.width : bounds.height,
+                     animating: cells.animatesChanges && !receivesPresentedRoom,
                      anchorOffset: Point(axis == .horizontal ? cells.anchorShift : 0,
                                          axis == .vertical ? cells.anchorShift : 0), refining: true,
                      // The scroll-axis extent changes when rows grow, arrive or

@@ -150,6 +150,11 @@ public enum VisualElementContract: Contract {
     public static let isLayoutDecoration = ElementProperty<Self, Bool>(
         "isLayoutDecoration", layer: .structure, travels: false)
 
+    /// Whether a generic background decoration follows the base view into the
+    /// safe-area strips, as SwiftUI's default background does.
+    public static let backgroundExtendsSafeArea = ElementProperty<Self, Bool>(
+        "backgroundExtendsSafeArea", layer: .structure, travels: false)
+
     /// Whether the element is the framed content a `.frame` modifier wrapped.
     public static let isFrameContent = ElementProperty<Self, Bool>(
         "isFrameContent", layer: .structure, travels: false)
@@ -251,7 +256,7 @@ public enum VisualElementContract: Contract {
         compositingGroup, drawingGroup, focus, frame, height, hint, hintKey,
         horizontalAlignmentDefault, ignoresInput,
         isAccessibilityHidden, isEnabled, isFocusedChanged, isFrameContent, isGeometryReader,
-        isLayoutDecoration, isVisible, layoutDirection,
+        backgroundExtendsSafeArea, isLayoutDecoration, isVisible, layoutDirection,
         matchedGeometry, matchedGeometrySource, maximumHeight, maximumWidth, minimumHeight,
         minimumWidth, opacity, pivotX, pivotY,
         rotation, rotationX, rotationY, safeAreaInsetEdge, safeAreaPadding, scale, scaleX, scaleY, shadow, style, symbolEffect,
