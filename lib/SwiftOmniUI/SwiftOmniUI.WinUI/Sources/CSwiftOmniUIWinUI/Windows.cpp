@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <iterator>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -308,13 +309,82 @@ namespace {
 
     std::unordered_set<HWND> firstShownWindows;
 
+    // Screen overlays are click-through, unowned tool windows. Explorer keeps
+    // them outside its per-virtual-desktop window list. Maintain their order
+    // against the taskbar and other topmost windows in the desktop band.
+    std::unordered_set<HWND> screenOverlays;
+    constexpr DWORD overlayOrderEvents[] = {
+        EVENT_SYSTEM_FOREGROUND, EVENT_OBJECT_SHOW, EVENT_OBJECT_REORDER, EVENT_OBJECT_UNCLOAKED
+    };
+    HWINEVENTHOOK overlayOrderHooks[std::size(overlayOrderEvents)]{};
+
+    void raiseScreenOverlay(HWND hwnd) {
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    }
+
+    bool screenOverlayIsCovered(HWND overlay) {
+        if (!(GetWindowLongPtrW(overlay, GWL_EXSTYLE) & WS_EX_TOPMOST)) return true;
+        RECT screen{};
+        if (!GetWindowRect(overlay, &screen)) return false;
+
+        // Reading the band avoids trying to reorder windows that Windows placed in a separate layer.
+        using GetWindowBand = BOOL (WINAPI *)(HWND, DWORD *);
+        static const auto getWindowBand = reinterpret_cast<GetWindowBand>(
+            GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetWindowBand"));
+        DWORD overlayBand = 0;
+        const bool hasOverlayBand = getWindowBand && getWindowBand(overlay, &overlayBand);
+        for (auto above = GetWindow(overlay, GW_HWNDPREV); above; above = GetWindow(above, GW_HWNDPREV)) {
+            if (screenOverlays.contains(above) || !IsWindowVisible(above) || IsIconic(above)) continue;
+            if (!(GetWindowLongPtrW(above, GWL_EXSTYLE) & WS_EX_TOPMOST)) continue;
+            RECT bounds{}, overlap{};
+            if (!GetWindowRect(above, &bounds) || !IntersectRect(&overlap, &screen, &bounds)) continue;
+            DWORD band = 0;
+            if (hasOverlayBand && getWindowBand(above, &band) && band != overlayBand) continue;
+            DWORD cloaked = 0;
+            DwmGetWindowAttribute(above, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
+            if (!cloaked) return true;
+        }
+        return false;
+    }
+
+    void CALLBACK screenOverlayOrderChanged(HWINEVENTHOOK, DWORD event, HWND hwnd, LONG object, LONG child, DWORD, DWORD) {
+        if (!hwnd || child != CHILDID_SELF || screenOverlays.contains(hwnd)) return;
+        // Moving an existing top-level window in Z order is reported on the desktop's client object.
+        const bool reorderedDesktop = event == EVENT_OBJECT_REORDER && object == OBJID_CLIENT && hwnd == GetDesktopWindow();
+        if (!reorderedDesktop && (object != OBJID_WINDOW || GetAncestor(hwnd, GA_ROOT) != hwnd)) return;
+        if (event == EVENT_OBJECT_SHOW && !(GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST)) return;
+        for (auto overlay : screenOverlays) {
+            if (IsWindowVisible(overlay) && screenOverlayIsCovered(overlay)) raiseScreenOverlay(overlay);
+        }
+    }
+
+    void setScreenOverlayOrder(HWND hwnd, bool enabled) {
+        if (enabled) {
+            if (!screenOverlays.insert(hwnd).second) return;
+        } else if (!screenOverlays.erase(hwnd)) {
+            return;
+        }
+        // Out-of-context hooks run on the registering UI thread. No work is
+        // scheduled or performed when the last screen overlay closes.
+        for (size_t index = 0; index < std::size(overlayOrderEvents); ++index) {
+            auto &hook = overlayOrderHooks[index];
+            if (enabled && !hook) {
+                auto event = overlayOrderEvents[index];
+                hook = SetWinEventHook(event, event, nullptr, screenOverlayOrderChanged, 0, 0, WINEVENT_OUTOFCONTEXT);
+            } else if (screenOverlays.empty() && hook) {
+                UnhookWinEvent(hook);
+                hook = nullptr;
+            }
+        }
+    }
+
     void prepareFirstMica(xaml::Window const &window, HWND hwnd) {
         if (isTransparentBackdrop(window.SystemBackdrop()) || !firstShownWindows.insert(hwnd).second) return;
         if (window.SystemBackdrop().try_as<xaml::Media::MicaBackdrop>()) return;
         auto grid = root(window);
         window.SystemBackdrop(xaml::Media::MicaBackdrop());
         grid.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
-        setAcrylicWindowBackdrop(grid, window.SystemBackdrop());
         refreshWindowMaterial(grid);
     }
 
@@ -328,6 +398,7 @@ namespace {
 
         const bool focus = activate && !(GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_NOACTIVATE);
         app.Show(focus);
+        if (screenOverlays.contains(hwnd)) raiseScreenOverlay(hwnd);
         if (focus) {
             window.Activate();
             // A redirected launch can have foreground permission even when XAML alone won't raise the window.
@@ -465,7 +536,6 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number, bo
         window.Content(grid);
         auto hwnd = reinterpret_cast<HWND>(window.AppWindow().Id().Value);
         takeTheWayBack(grid, number);
-        setAcrylicWindowBackdrop(grid, window.SystemBackdrop());
         try {
             auto material = winrt::make<ChromeAcrylic>().as<xaml::FrameworkElement>();
             controls::Grid::SetRowSpan(material, 4);
@@ -511,6 +581,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_window_make(int64_t number, bo
         window.Closed(guarded("handling Closed", [number, hwnd, weakGrid = winrt::make_weak(grid), layoutToken, shortcutToken](IInspectable const &, xaml::WindowEventArgs const &) {
             if (auto startup = windowStartups.extract(hwnd)) startup.mapped()->cancel();
             firstShownWindows.erase(hwnd);
+            setScreenOverlayOrder(hwnd, false);
             if (IsWindowVisible(hwnd)) ShowWindow(hwnd, SW_HIDE);
             if (auto grid = weakGrid.get()) {
                 if (layoutToken->value) {
@@ -618,25 +689,6 @@ extern "C" bool swiftomniui_winui_material_has_scroller_insets(void) {
     catch (...) { report("reading scroller material insets"); return false; }
 }
 
-extern "C" bool swiftomniui_winui_window_material_redirects(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element) {
-    try {
-        auto grid = root(borrow<xaml::Window>(window));
-        for (auto const &child : grid.Children()) {
-            auto host = child.as<xaml::FrameworkElement>();
-            if (winrt::unbox_value_or<winrt::hstring>(host.Tag(), L"") != L"chromeAcrylic") continue;
-            auto layer = winrt::get_self<ChromeAcrylic>(host.as<xaml::IFrameworkElementOverrides>());
-            for (auto const &column : layer->columns) for (auto const &bar : column->bars) {
-                auto source = bar.element.get();
-                if (!source || !bar.visual.IsVisible()) continue;
-                for (xaml::DependencyObject at = as<xaml::UIElement>(element); at; at = xaml::Media::VisualTreeHelper::GetParent(at))
-                    if (at == source) return true;
-            }
-            break;
-        }
-        return false;
-    } catch (...) { report("reading a material control's committed presentation owner"); return false; }
-}
-
 extern "C" bool swiftomniui_winui_window_material_sampling_bounds(
     SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element, double *rect
 ) {
@@ -691,7 +743,13 @@ extern "C" bool swiftomniui_winui_window_material_covers(SwiftOmniUIObjectRef wi
             if (size.x <= 0 || size.y <= 0) return false;
             using Rect = winrt::Windows::Foundation::Rect;
             std::vector<Rect> uncovered{target.TransformToVisual(host).TransformBounds({0, 0, size.x, size.y})};
-            for (auto const &cover : layer->regions) {
+            auto covers = layer->regions;
+            for (auto const &marker : acrylicMarkersForBar(target)) {
+                auto local = winrt::get_self<LocalAcrylic>(marker.as<xaml::IFrameworkElementOverrides>());
+                auto mapping = marker.TransformToVisual(host);
+                for (auto const &rect : local->drawing.regions) covers.push_back(mapping.TransformBounds(rect));
+            }
+            for (auto const &cover : covers) {
                 std::vector<Rect> next;
                 for (auto const &rect : uncovered) {
                     auto x = std::max(rect.X, cover.X), y = std::max(rect.Y, cover.Y);
@@ -878,6 +936,7 @@ extern "C" void swiftomniui_winui_window_close(SwiftOmniUIObjectRef handle) {
         firstShownWindows.erase(hwnd);
         // Remove the transparent window from the desktop before closing can
         // disconnect its backdrop or tear down the content.
+        setScreenOverlayOrder(hwnd, false);
         if (IsWindowVisible(hwnd)) ShowWindow(hwnd, SW_HIDE);
         releaseOwned(hwnd);
         window.Close();
@@ -1000,7 +1059,8 @@ extern "C" void swiftomniui_winui_window_set_frame(SwiftOmniUIObjectRef handle, 
 
 extern "C" void swiftomniui_winui_window_set_screen_frame(SwiftOmniUIObjectRef handle, double const *rect) {
     try {
-        auto app = borrow<xaml::Window>(handle).AppWindow();
+        auto window = borrow<xaml::Window>(handle);
+        auto hwnd = reinterpret_cast<HWND>(window.AppWindow().Id().Value);
         auto pixels = [&](int index) { return static_cast<int32_t>(std::lround(rect[index])); };
         // The rectangle is the desktop's own and already in pixels: no work area to add, no DIPs to convert, and a
         // window with no frame of its own is the size it is placed at.
@@ -1008,7 +1068,6 @@ extern "C" void swiftomniui_winui_window_set_screen_frame(SwiftOmniUIObjectRef h
         // resize frame (invisible borders the window is inset by), the system's 1px accent border and rounded
         // corners: a lit band along the screen's edge, and a window smaller than the screen. Take them all away and
         // place the HWND itself, so the rectangle is exact whatever the presenter or the monitor's scale did.
-        auto hwnd = reinterpret_cast<HWND>(app.Id().Value);
         auto style = GetWindowLongPtrW(hwnd, GWL_STYLE);
         auto bare = style & ~static_cast<LONG_PTR>(WS_CAPTION | WS_THICKFRAME);
         if (bare != style) SetWindowLongPtrW(hwnd, GWL_STYLE, bare);
@@ -1019,7 +1078,9 @@ extern "C" void swiftomniui_winui_window_set_screen_frame(SwiftOmniUIObjectRef h
         const COLORREF noBorder = DWMWA_COLOR_NONE;
         DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corners, sizeof(corners));
         DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &noBorder, sizeof(noBorder));
-        auto onTop = (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
+        auto onTop = (extended & WS_EX_TOPMOST) != 0;
+        setScreenOverlayOrder(hwnd, onTop && !GetWindow(hwnd, GW_OWNER) &&
+            (extended & mousePassthroughStyle) == mousePassthroughStyle && isTransparentBackdrop(window.SystemBackdrop()));
         SetWindowPos(hwnd, onTop ? HWND_TOPMOST : nullptr, pixels(0), pixels(1), pixels(2), pixels(3),
             SWP_FRAMECHANGED | SWP_NOACTIVATE | (onTop ? 0 : SWP_NOZORDER));
     } catch (...) {
@@ -1120,7 +1181,6 @@ extern "C" void swiftomniui_winui_window_set_traits(
         if (transparent && !grid.Background()) {
             grid.Background(xaml::Media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
         }
-        setAcrylicWindowBackdrop(grid, window.SystemBackdrop());
         if (wasTransparent && !transparent) setTransparentWindowPainting(hwnd, false);
         if (transparent && !wasTransparent && app.IsVisible()) setTransparentWindowPainting(hwnd, true);
         if (previousBackdrop != window.SystemBackdrop()) refreshWindowMaterial(grid);

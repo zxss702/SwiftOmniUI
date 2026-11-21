@@ -465,8 +465,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_scroller_make(int64_t view) {
         // The InteractionTracker's word of the view, every frame it moves: the
         // ear hears where it stands now paired with where an animation lands.
         scroller.ViewChanged(guarded("handling ViewChanged",
-            [view, flight, insets](controls::ScrollView const &scroller, IInspectable const &) {
-            updateAcrylicScroller(scroller, insets->region);
+            [view, flight](controls::ScrollView const &scroller, IInspectable const &) {
             double x = scroller.HorizontalOffset(), y = scroller.VerticalOffset();
             callbacks.scrolling(view, x, y,
                 std::isnan(flight->x) ? x : flight->x, std::isnan(flight->y) ? y : flight->y);

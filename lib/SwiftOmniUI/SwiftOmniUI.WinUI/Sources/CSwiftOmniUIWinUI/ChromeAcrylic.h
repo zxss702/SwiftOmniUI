@@ -16,113 +16,19 @@ namespace swiftomniui {
         AcrylicLayer drawing;
         AcrylicSource material;
         winrt::weak_ref<controls::Panel> nativeOwner;
-        winrt::Microsoft::UI::Composition::ContainerVisual fixedControls{nullptr};
-        struct Bar {
-            winrt::weak_ref<xaml::FrameworkElement> element;
-            winrt::Microsoft::UI::Composition::CompositionVisualSurface capture{nullptr};
-            winrt::Microsoft::UI::Composition::CompositionSurfaceBrush brush{nullptr};
-            winrt::Microsoft::UI::Composition::SpriteVisual visual{nullptr};
-        };
-        std::vector<Bar> bars;
-        void paintControls(xaml::FrameworkElement const &self) {
-            namespace composition = winrt::Microsoft::UI::Composition;
-            auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(self).Compositor();
-            if (!fixedControls) {
-                fixedControls = compositor.CreateContainerVisual();
-                fixedControls.BorderMode(composition::CompositionBorderMode::Soft);
-                xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(self, fixedControls);
-            }
-            auto elements = drawing.regions.empty() ? std::vector<xaml::FrameworkElement>{}
-                : acrylicSceneBars(material.scene());
-            auto previous = std::move(bars);
-            bars.clear();
-            for (auto const &element : elements) {
-                auto old = std::find_if(previous.begin(), previous.end(), [&](auto const &bar) { return bar.element.get() == element; });
-                Bar bar;
-                if (old != previous.end()) { bar = std::move(*old); previous.erase(old); }
-                else {
-                    bar.element = winrt::make_weak(element);
-                    bar.capture = compositor.CreateVisualSurface();
-                    auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(element);
-                    bar.capture.SourceVisual(visual);
-                    bar.brush = compositor.CreateSurfaceBrush(bar.capture);
-                    // Fixed controls are full-detail content, not the reduced
-                    // blur input. Preserve antialiased alpha during fractional
-                    // placement/scaling of the captured labels and capsules.
-                    bar.brush.BitmapInterpolationMode(composition::CompositionBitmapInterpolationMode::Linear);
-                    bar.brush.Stretch(composition::CompositionStretch::None);
-                    bar.brush.HorizontalAlignmentRatio(0);
-                    bar.brush.VerticalAlignmentRatio(0);
-                    bar.visual = compositor.CreateSpriteVisual();
-                    bar.visual.BorderMode(composition::CompositionBorderMode::Soft);
-                    bar.visual.Brush(bar.brush);
-                    bar.visual.IsHitTestVisible(false);
-                }
-                const auto size = element.ActualSize();
-                const auto owner = nativeOwner.get();
-                const auto ownerPart = acrylicPartGeometry(element, owner);
-                const auto visible = owner.TransformToVisual(self).TransformBounds(ownerPart.visible);
-                const auto clipped = acrylicLocalClip(element, self, visible);
-                const auto opacity = ownerPart.opacity;
-                const bool shown = clipped.Width > 0 && clipped.Height > 0 && opacity > 0;
-                if (bar.visual.IsVisible() != shown) bar.visual.IsVisible(shown);
-                if (bar.visual.Opacity() != opacity) bar.visual.Opacity(opacity);
-                auto clip = bar.visual.Clip().try_as<composition::InsetClip>();
-                if (!clip) { clip = compositor.CreateInsetClip(); bar.visual.Clip(clip); }
-                const float left = std::max(0.0f, clipped.X);
-                const float top = std::max(0.0f, clipped.Y);
-                const float right = std::max(0.0f, size.x - clipped.X - clipped.Width);
-                const float bottom = std::max(0.0f, size.y - clipped.Y - clipped.Height);
-                if (clip.LeftInset() != left) clip.LeftInset(left);
-                if (clip.TopInset() != top) clip.TopInset(top);
-                if (clip.RightInset() != right) clip.RightInset(right);
-                if (clip.BottomInset() != bottom) clip.BottomInset(bottom);
-                if (bar.capture.SourceSize() != size) bar.capture.SourceSize(size);
-                const auto matrix = acrylicPresentationMatrix(element, self);
-                if (bar.visual.TransformMatrix() != matrix) bar.visual.TransformMatrix(matrix);
-                if (bar.visual.Size() != size) bar.visual.Size(size);
-                bars.push_back(std::move(bar));
-            }
-            bool changed = fixedControls.Children().Count() != bars.size();
-            if (!changed) {
-                auto at = fixedControls.Children().First();
-                for (auto const &bar : bars) {
-                    if (!at.HasCurrent() || at.Current() != bar.visual) { changed = true; break; }
-                    at.MoveNext();
-                }
-            }
-            if (changed) {
-                fixedControls.Children().RemoveAll();
-                for (auto const &bar : bars) fixedControls.Children().InsertAtTop(bar.visual);
-            }
-            // Native controls keep input, focus and automation in their real
-            // tree. Redirection draws them above the unified material only
-            // inside its mask; outside it they retain their native drawing.
-            if (fixedControls.Clip() != drawing.controlsClip) fixedControls.Clip(drawing.controlsClip);
-            for (auto &old : previous) old.capture.SourceVisual(nullptr);
-        }
         ColumnAcrylic() {
             Tag(winrt::box_value(L"columnAcrylic"));
             IsHitTestVisible(false);
             UseLayoutRounding(false);
-            IInspectable self = *this;
-            drawing.mount(self.as<controls::Panel>());
             Unloaded([this](auto const &, auto const &) { clear(); });
         }
         void clear() {
             material.reset(); drawing.clear();
-            for (auto &bar : bars) bar.capture.SourceVisual(nullptr);
-            bars.clear();
-            if (fixedControls) fixedControls.Children().RemoveAll();
         }
-        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size available) {
-            drawing.measure(available); return {0, 0};
-        }
-        winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) {
-            drawing.arrange(final); return final;
-        }
+        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size) { return {0, 0}; }
+        winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) { return final; }
         void refresh(xaml::FrameworkElement const &root, xaml::FrameworkElement const &source,
-                     std::vector<ChromeMaterialRegion> const &chrome) {
+                     std::vector<ChromeMaterialRegion> const &chrome, bool afterLayout) {
             IInspectable projected = *this;
             auto self = projected.as<xaml::FrameworkElement>();
             material.source(source);
@@ -132,8 +38,10 @@ namespace swiftomniui {
             auto scope = material.scene();
             std::vector<AcrylicBand> regions;
             if (scope) {
+                // Resolve scroll edges after the same layout used for the column bounds.
+                commitAcrylicScene(scope, afterLayout);
+                regions = acrylicColumnInsets(scope);
                 const auto bounds = acrylicSceneBounds(scope);
-                auto local = acrylicSceneRegions(scope);
                 const auto scopeRoot = acrylicSceneRoot(scope);
                 // Window toolbar geometry is layout input. Do not subtract
                 // PaneTransform's current animation sample: the native parent
@@ -147,16 +55,14 @@ namespace swiftomniui {
                     auto bottom = std::min(rect.Y + rect.Height, bounds.Y + bounds.Height);
                     if (right <= x || bottom <= y) continue;
                     auto bands = acrylicChromeRegions(scope, {x, y, right - x, bottom - y}, region.mode);
-                    local.insert(local.end(), bands.begin(), bands.end());
+                    regions.insert(regions.end(), bands.begin(), bands.end());
                 }
                 auto mapping = scopeRoot.TransformToVisual(self);
-                for (auto &band : local) {
+                for (auto &band : regions) {
                     band.rect = mapping.TransformBounds(band.rect);
                 }
-                regions = std::move(local);
             }
-            drawing.paint(self, regions, scope);
-            paintControls(self);
+            drawing.paint(self, regions);
         }
     };
 
@@ -179,7 +85,7 @@ namespace swiftomniui {
                 auto weak = get_weak();
                 layoutCommitted = self.LayoutUpdated(winrt::auto_revoke, [weak](auto const &, auto const &) {
                     auto self = weak.get();
-                    if (self) self->refresh();
+                    if (self) self->refresh(true);
                 });
             });
             Unloaded([this](auto const &, auto const &) {
@@ -220,7 +126,7 @@ namespace swiftomniui {
             for (auto const &child : Children()) child.Arrange({0, 0, final.Width, final.Height});
             return final;
         }
-        void refresh() {
+        void refresh(bool afterLayout = false) {
             if (committing) return;
             committing = true;
             try {
@@ -236,7 +142,17 @@ namespace swiftomniui {
                         const auto mode = element.try_as<controls::TitleBar>()
                             ? acrylicTitleBarMode(element) : AcrylicChromeMode::safeBar;
                         if (mode == AcrylicChromeMode::hidden) return;
-                        auto rect = acrylicVisibleBounds(element, grid);
+                        // Use layout coordinates here. Visible bounds include
+                        // the current SplitView clip, so the material briefly
+                        // disappears while a sidebar is entering. The column
+                        // host supplies the real clip and animation later.
+                        auto rect = acrylicLayoutBounds(element, grid);
+                        const auto room = grid.ActualSize();
+                        const float left = std::max(0.0f, rect.X);
+                        const float top = std::max(0.0f, rect.Y);
+                        const float right = std::min(static_cast<float>(room.x), rect.X + rect.Width);
+                        const float bottom = std::min(static_cast<float>(room.y), rect.Y + rect.Height);
+                        rect = {left, top, std::max(0.0f, right - left), std::max(0.0f, bottom - top)};
                         if (rect.Width > 0 && rect.Height > 0) chrome.push_back({rect, mode});
                     };
                     for (auto const &child : grid.Children()) {
@@ -256,7 +172,7 @@ namespace swiftomniui {
                         if (!owner && source) owner = projected.as<controls::Panel>(); // standalone NavigationStack
                         if (!owner) { unmount(column); continue; }
                         mount(column, owner);
-                        column.refresh(grid, source, chrome);
+                        column.refresh(grid, source, chrome, afterLayout);
                         if (!column.drawing.regions.empty()) {
                             IInspectable surface = column;
                             auto mapping = surface.as<xaml::FrameworkElement>().TransformToVisual(self);

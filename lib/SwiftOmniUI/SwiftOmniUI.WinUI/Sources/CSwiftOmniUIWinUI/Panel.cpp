@@ -6,7 +6,7 @@
 // Design: docs/design/platforms/winui/layout.md#a-layout-is-a-panel
 
 #include "Relay.h"
-#include "AcrylicScene.h"
+#include "AcrylicSurface.h"
 
 #include <algorithm>
 #include <unordered_set>
@@ -37,17 +37,45 @@ namespace {
     struct HostedViewport : controls::PanelT<HostedViewport> {
         xaml::FrameworkElement control;
         xaml::Thickness outsets{};
+        controls::Grid sharp{nullptr};
+        controls::Border surface{nullptr};
+        ViewportAcrylic material;
         explicit HostedViewport(xaml::FrameworkElement const &element) : control(element) {
             UseLayoutRounding(false);
-            Children().Append(control);
+            Tag(winrt::box_value(L"acrylicViewport"));
+            surface = controls::Border();
+            surface.IsHitTestVisible(false);
+            surface.UseLayoutRounding(false);
+            sharp = controls::Grid();
+            sharp.UseLayoutRounding(false);
+            sharp.Children().Append(control);
+            Children().Append(surface);
+            Children().Append(sharp);
+            Unloaded([this](auto const &, auto const &) {
+                material.requests.clear();
+                material.clear(sharp, surface);
+            });
+            ActualThemeChanged([this](auto const &, auto const &) {
+                if (!material.requests.empty() && IsLoaded()) {
+                    try { material.paint(control, sharp, surface); }
+                    catch (...) { report("updating the toolbar material theme"); }
+                }
+            });
             registerAcrylicScroller(control);
         }
         Size MeasureOverride(Size) { return {0, 0}; }
         Size ArrangeOverride(Size final) {
             const Size room{static_cast<float>(final.Width + outsets.Left + outsets.Right),
                             static_cast<float>(final.Height + outsets.Top + outsets.Bottom)};
-            control.Measure(room);
-            control.Arrange({static_cast<float>(-outsets.Left), static_cast<float>(-outsets.Top), room.Width, room.Height});
+            const Rect frame{static_cast<float>(-outsets.Left), static_cast<float>(-outsets.Top), room.Width, room.Height};
+            for (auto const &child : Children()) {
+                child.Measure(room);
+                child.Arrange(frame);
+            }
+            if (sharp && !material.requests.empty()) {
+                try { material.paint(control, sharp, surface); }
+                catch (...) { report("resizing the scroll-edge blur"); }
+            }
             return final;
         }
     };
@@ -248,8 +276,6 @@ namespace {
         composition::SpriteVisual output{nullptr};
 
         explicit AlphaMask(controls::Panel const &owner) {
-            setAcrylicLocalPresentation(content, true);
-            setAcrylicLocalPresentation(mask, true);
             auto contentVisual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(content);
             auto maskVisual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(mask);
             auto compositor = contentVisual.Compositor();
@@ -309,14 +335,7 @@ namespace {
             output.Size(size);
         }
 
-        ~AlphaMask() {
-            if (content) setAcrylicLocalPresentation(content, false);
-            if (mask) setAcrylicLocalPresentation(mask, false);
-        }
-
         void close(controls::Panel const &owner) {
-            if (content) setAcrylicLocalPresentation(content, false);
-            if (mask) setAcrylicLocalPresentation(mask, false);
             xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(owner, nullptr);
             output.Brush(nullptr);
             brush.Source(nullptr);
@@ -368,6 +387,7 @@ namespace {
         }
 
         Size ArrangeOverride(Size final) {
+            EditorLayoutPass editors;
             if (alphaMask) alphaMask->arrange(final);
             callbacks.arrange(view, final.Width, final.Height);
             if (navigationViewport) {
@@ -407,6 +427,35 @@ namespace {
     }
 }
 
+bool swiftomniui::setViewportMaterial(xaml::FrameworkElement const &viewport, void const *key,
+    std::vector<MaterialSection> rects) {
+    auto parent = xaml::Media::VisualTreeHelper::GetParent(viewport);
+    if (!parent) return false;
+    auto owner = xaml::Media::VisualTreeHelper::GetParent(parent).try_as<xaml::FrameworkElement>();
+    if (!owner || winrt::unbox_value_or<winrt::hstring>(owner.Tag(), L"") != L"acrylicViewport") return false;
+    auto host = winrt::get_self<HostedViewport>(owner.as<xaml::IFrameworkElementOverrides>());
+    if (host->control != viewport) return false;
+    auto &requests = host->material.requests;
+    if (rects.empty()) {
+        if (requests.erase(key)) host->material.requestsChanged = true;
+    } else {
+        auto found = requests.find(key);
+        if (found == requests.end() || found->second != rects) {
+            requests.insert_or_assign(key, std::move(rects));
+            host->material.requestsChanged = true;
+        }
+    }
+    try {
+        host->material.paint(viewport, host->sharp, host->surface);
+        return true;
+    } catch (...) {
+        report("setting the live scroll-edge material");
+        requests.erase(key);
+        host->material.clear(host->sharp, host->surface);
+        return false;
+    }
+}
+
 extern "C" SwiftOmniUIObjectRef swiftomniui_winui_panel_make(int64_t view) {
     try {
         return detach(winrt::make<SwiftOmniUIPanel>(view).as<controls::Panel>());
@@ -429,6 +478,9 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view) 
         owner->navigation.IsNavigationStackEnabled(false);
         owner->navigation.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
         owner->navigation.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
+        xaml::Media::Animation::TransitionCollection transitions;
+        transitions.Append(xaml::Media::Animation::NavigationThemeTransition());
+        owner->navigation.ContentTransitions(transitions);
         owner->navigation.Navigated(guarded("hosting a navigated page",
             [navigation = winrt::make_weak(held)](IInspectable const &, xaml::Navigation::NavigationEventArgs const &args) {
                 auto page = args.Content().as<controls::Page>();
@@ -436,28 +488,28 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view) 
                 page.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
                 page.VerticalContentAlignment(xaml::VerticalAlignment::Stretch);
                 page.Background(nullptr);
-                // Put the theme transition on every Page shell explicitly.
-                // Its unload storyboard keeps the old shell visible until
-                // the exit completes, as well as animating the entering page.
-                xaml::Media::Animation::TransitionCollection transitions;
-                transitions.Append(xaml::Media::Animation::NavigationThemeTransition());
-                page.Transitions(transitions);
+                // Give the departing Page an unload transition as well.
+                // Its inset bars stay in the same subtree as its body.
+                xaml::Media::Animation::TransitionCollection pageTransitions;
+                pageTransitions.Append(xaml::Media::Animation::NavigationThemeTransition());
+                page.Transitions(pageTransitions);
                 page.Content(args.Parameter().as<xaml::UIElement>());
-                // Frame swaps pages outside the panel child reconciliation.
-                // Rebuild the Acrylic inputs once the new page is in the tree.
                 page.Loaded([navigation](auto const &, auto const &) {
+                    if (auto owner = navigation.get()) acrylicStructureChanged(owner);
+                });
+                page.Unloaded([navigation](auto const &, auto const &) {
                     if (auto owner = navigation.get()) acrylicStructureChanged(owner);
                 });
             }));
         held.Children().Append(owner->navigationViewport);
         return detach(held);
     } catch (...) {
-        report("making a navigation frame");
+        report("making a navigation viewport");
         return nullptr;
     }
 }
 
-extern "C" void swiftomniui_winui_navigation_set(
+extern "C" int32_t swiftomniui_winui_navigation_set(
     SwiftOmniUIObjectRef handle, SwiftOmniUIObjectRef background, SwiftOmniUIObjectRef content,
     bool animated, bool back
 ) {
@@ -465,28 +517,26 @@ extern "C" void swiftomniui_winui_navigation_set(
         auto held = as<controls::Panel>(handle);
         auto owner = panel(held);
         auto frame = owner->navigation;
-        if (!frame) return;
+        if (!frame) return 0;
         std::vector<xaml::UIElement> children;
         if (background) children.push_back(as<xaml::UIElement>(background));
         children.push_back(owner->navigationViewport);
         removeUnused(held.Children(), children);
         insertInOrder(held.Children(), children);
         auto next = content ? as<xaml::UIElement>(content) : xaml::UIElement{nullptr};
-        if (next == owner->navigationContent) return;
-        // Adding a drawing boundary can replace the current page's native
-        // content without changing its logical page or navigation depth.
+        if (next == owner->navigationContent) return 0;
+        // A drawing presenter can already have replaced the Page's child.
+        // Refresh the handle without starting another native navigation.
         if (auto page = frame.Content().try_as<controls::Page>(); page && page.Content() == next) {
             owner->navigationContent = next;
-            return;
+            return 0;
         }
         if (!next) {
             frame.Content(nullptr);
             owner->navigationContent = nullptr;
             acrylicStructureChanged(held);
-            return;
+            return 0;
         }
-        // A rapid return may find the retained Swift view in a Page whose
-        // native transition is still finishing. It must have only one parent.
         for (auto parent = xaml::Media::VisualTreeHelper::GetParent(next); parent;
              parent = xaml::Media::VisualTreeHelper::GetParent(parent)) {
             if (auto page = parent.try_as<controls::Page>(); page && page.Content() == next) {
@@ -496,33 +546,36 @@ extern "C" void swiftomniui_winui_navigation_set(
         }
         using namespace xaml::Media::Animation;
         NavigationTransitionInfo transition{nullptr};
-        if (animated && swiftomniui_winui_animations_enabled()) {
+        const bool useAnimation = animated && swiftomniui_winui_animations_enabled()
+            && frame.Content() != nullptr && frame.IsLoaded();
+        if (useAnimation) {
             SlideNavigationTransitionInfo slide;
             slide.Effect(back ? SlideNavigationTransitionEffect::FromLeft : SlideNavigationTransitionEffect::FromRight);
             transition = slide;
         } else {
             transition = SuppressNavigationTransitionInfo();
         }
-        if (!frame.Navigate(winrt::xaml_typename<controls::Page>(), next, transition))
-            throw winrt::hresult_error(E_FAIL, L"WinUI refused the navigation page");
+        if (!frame.Navigate(winrt::xaml_typename<controls::Page>(), next, transition)) return 0;
         owner->navigationContent = next;
         acrylicStructureChanged(held);
+        return useAnimation ? (back ? -1 : 1) : 0;
     } catch (...) {
         report("navigating the retained page");
+        return 0;
     }
 }
 
 extern "C" void swiftomniui_winui_navigation_clear(SwiftOmniUIObjectRef handle) {
     try {
         auto owner = panel(as<xaml::UIElement>(handle));
+        auto held = as<controls::Panel>(handle);
         if (owner->navigation) owner->navigation.Content(nullptr);
         owner->navigationContent = nullptr;
         owner->navigation = nullptr;
-        if (owner->navigationViewport) owner->navigationViewport.Children().Clear();
         owner->navigationViewport = nullptr;
         owner->navigationClip = nullptr;
-        as<controls::Panel>(handle).Children().Clear();
-    } catch (...) { report("releasing a navigation frame"); }
+        held.Children().Clear();
+    } catch (...) { report("releasing a navigation viewport"); }
 }
 
 extern "C" void swiftomniui_winui_navigation_set_vertical_outsets(

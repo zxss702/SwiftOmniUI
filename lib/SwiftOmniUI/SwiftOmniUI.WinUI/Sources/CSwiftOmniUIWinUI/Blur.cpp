@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 #include <initguid.h>
+#include <d2d1_1.h>
 #include <d2d1effects.h>
 #include <windows.graphics.effects.interop.h>
 #include <winrt/Windows.Graphics.Effects.h>
@@ -210,10 +211,6 @@ namespace {
             Children().Append(source);
         }
 
-        ~BlurPresenter() {
-            if (active && source) setAcrylicLocalPresentation(source, false);
-        }
-
         Size MeasureOverride(Size available) {
             source.Measure(available);
             return source.DesiredSize();
@@ -330,7 +327,6 @@ namespace {
                     active = true;
                     resizeSurface();
                     output.IsVisible(true);
-                    setAcrylicLocalPresentation(source, true);
                     // As in Gallery's OpacityMaskView, VisualSurface omits only its
                     // source root's opacity. Descendant opacity and input stay intact.
                     sourceVisual.Opacity(0);
@@ -347,7 +343,6 @@ namespace {
                     surface.SourceSize({0, 0});
                 }
                 writtenBounds = Rect(0, 0, -1, -1);
-                setAcrylicLocalPresentation(source, false);
             }
         }
 
@@ -356,7 +351,6 @@ namespace {
             viewport = Rect(0, 0, -1, -1);
             if (active) {
                 active = false;
-                setAcrylicLocalPresentation(source, false);
             }
             if (!surface) return;
             IInspectable self = *this;
@@ -414,6 +408,29 @@ namespace {
 }
 
 namespace swiftomniui {
+    composition::CompositionEffectBrush viewportBlur(composition::Compositor const &compositor,
+        composition::CompositionBrush const &content) {
+        // Sample the page below the viewport, then place its live scroll pixels
+        // over that input. The normal scroller and the fixed controls draw later.
+        static composition::CompositionEffectFactory factory{nullptr};
+        if (!factory || factory.Compositor() != compositor) {
+            using winrt::Windows::Foundation::IPropertyValue;
+            auto combined = winrt::make<FixedEffect>(CLSID_D2D1Composite,
+                std::vector<IPropertyValue>{winrt::Windows::Foundation::PropertyValue::CreateUInt32(
+                    D2D1_COMPOSITE_MODE_SOURCE_OVER).as<IPropertyValue>()},
+                std::vector<effects::IGraphicsEffectSource>{composition::CompositionEffectSourceParameter(L"Page"),
+                    composition::CompositionEffectSourceParameter(L"Viewport")});
+            auto gaussian = winrt::make_self<GaussianBlur>(D2D1_BORDER_MODE_HARD);
+            gaussian->source = combined.as<effects::IGraphicsEffectSource>();
+            factory = compositor.CreateEffectFactory(gaussian.as<effects::IGraphicsEffect>(), {L"Blur.StandardDeviation"});
+        }
+        auto brush = factory.CreateBrush();
+        brush.SetSourceParameter(L"Viewport", content);
+        brush.SetSourceParameter(L"Page", compositor.CreateBackdropBrush());
+        brush.Properties().InsertScalar(L"Blur.StandardDeviation", 4.0f);
+        return brush;
+    }
+
     composition::CompositionEffectBrush contentBlur(composition::Compositor const &compositor,
         composition::CompositionBrush const &source, float sigma) {
         // Mirror the pixels at the viewport boundary. Sampling transparent

@@ -11,9 +11,12 @@ import CSwiftOmniUIWinUI
 final class WinUIHostedView<Control: WinUIControl>: WinUIView {
     /// The application's control.
     let control: Control
-    private var pendingInsets: EdgeInsets?
-    private var committedInsets: EdgeInsets?
-    private var insetCommitPending = false
+    private struct ViewportGeometry: Equatable {
+        var outsets: EdgeInsets
+        var insets: EdgeInsets
+    }
+    private var pendingViewport: ViewportGeometry?
+    private var committedViewport: ViewportGeometry?
 
     override var registeredPropertiesAffectSize: Bool { control.contentAffectsSize }
 
@@ -28,11 +31,6 @@ final class WinUIHostedView<Control: WinUIControl>: WinUIView {
 
     override var carriesSafeAreaOutsets: Bool { control.scrollsUnderSafeArea || super.carriesSafeAreaOutsets }
 
-    override func safeAreaChanged() {
-        if control.scrollsUnderSafeArea, let context = safeAreaContext { resolve(in: context.layout) }
-        super.safeAreaChanged()
-    }
-
     override func prepareAllocation(in bounds: Rect) {
         if control.scrollsUnderSafeArea { resolve(in: bounds) }
         super.prepareAllocation(in: bounds)
@@ -41,17 +39,28 @@ final class WinUIHostedView<Control: WinUIControl>: WinUIView {
     private func resolve(in bounds: Rect) {
         let context = layoutSafeArea(in: bounds)
         let viewport = context.bounds
-        let outsets = SafeAreaContext.insets(of: bounds, in: viewport)
-        swiftomniui_winui_hosted_viewport_set(layoutHandle, outsets.top, outsets.right, outsets.bottom, outsets.left)
-        pendingInsets = SafeAreaContext.insets(of: context.safe, in: viewport)
-        guard !insetCommitPending, pendingInsets != committedInsets else { return }
-        insetCommitPending = true
+        let geometry = ViewportGeometry(outsets: SafeAreaContext.insets(of: bounds, in: viewport),
+                                        insets: SafeAreaContext.insets(of: context.safe, in: viewport))
+        let alreadyQueued = pendingViewport != nil
+        guard alreadyQueued || geometry != committedViewport else { return }
+        pendingViewport = geometry
+        guard !alreadyQueued else { return }
+        // A measure can visit a destination while a transition is still arranging
+        // the current slot. Use that slot, and change the viewport and document
+        // margins together so a frame cannot show the top inset twice.
         WinUIDoorbell.afterPass { [weak self] in
-            guard let self else { return }
-            self.insetCommitPending = false
-            guard !self.isDetached, let insets = self.pendingInsets, insets != self.committedInsets else { return }
-            self.committedInsets = insets
-            self.control.safeAreaInsetsDidChange(top: insets.top, right: insets.right, bottom: insets.bottom, left: insets.left)
+            guard let self, let geometry = self.pendingViewport else { return }
+            self.pendingViewport = nil
+            guard !self.isDetached, geometry != self.committedViewport else { return }
+            let insets = geometry.insets
+            if insets != self.committedViewport?.insets {
+                self.control.safeAreaInsetsDidChange(top: insets.top, right: insets.right,
+                                                     bottom: insets.bottom, left: insets.left)
+            }
+            self.committedViewport = geometry
+            let outsets = geometry.outsets
+            swiftomniui_winui_hosted_viewport_set(self.layoutHandle, outsets.top, outsets.right,
+                                                 outsets.bottom, outsets.left)
         }
     }
 

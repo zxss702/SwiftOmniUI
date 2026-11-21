@@ -297,7 +297,7 @@ void swiftomniui_winui_window_set_safe_area_bars(SwiftOmniUIObjectRef window,
 SwiftOmniUIObjectRef swiftomniui_winui_safe_area_background_make(void);
 void swiftomniui_winui_safe_area_background_source(SwiftOmniUIObjectRef background, SwiftOmniUIObjectRef source);
 void swiftomniui_winui_safe_area_register(SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef bar,
-    SwiftOmniUIObjectRef material, int32_t verticalEdge);
+    SwiftOmniUIObjectRef material, int32_t verticalEdge, bool localMaterial);
 void swiftomniui_winui_material_columns(SwiftOmniUIObjectRef owner, SwiftOmniUIObjectRef const *columns, int32_t count);
 void swiftomniui_winui_safe_area_host_set_background(SwiftOmniUIObjectRef host, bool shown);
 /// Commit material/control presentation with the host's existing animation sample.
@@ -307,11 +307,7 @@ void swiftomniui_winui_material_mark_dirty(void);
 bool swiftomniui_winui_material_has_scroller_insets(void);
 /// Diagnostics inspect the committed state without repairing/refreshing it.
 bool swiftomniui_winui_window_material_covers(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
-/// Whether the current shared overlay redirects this control or an ancestor.
-bool swiftomniui_winui_window_material_redirects(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
-bool swiftomniui_winui_window_acrylic_samples(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
-bool swiftomniui_winui_window_acrylic_captures_viewport(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef viewport);
-/// Reads the committed pre-filter crop for the column containing element; never refreshes it.
+/// Reads the attached column bounds used to place its toolbar backdrop.
 bool swiftomniui_winui_window_material_sampling_bounds(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element, double *rect);
 /// The committed material is a sibling of the page in its native animated split slot.
 bool swiftomniui_winui_window_material_follows_column(SwiftOmniUIObjectRef window, SwiftOmniUIObjectRef element);
@@ -497,9 +493,9 @@ bool swiftomniui_winui_animations_enabled(void);
 int32_t swiftomniui_winui_text(SwiftOmniUIObjectRef element, char *utf8, int32_t capacity);
 
 SwiftOmniUIObjectRef swiftomniui_winui_panel_make(int64_t view);
-/// A layout panel whose native Frame owns page transitions; Swift owns the path.
+/// A layout panel whose native Frame owns Page transitions; Swift owns the path.
 SwiftOmniUIObjectRef swiftomniui_winui_navigation_make(int64_t view);
-void swiftomniui_winui_navigation_set(
+int32_t swiftomniui_winui_navigation_set(
     SwiftOmniUIObjectRef panel, SwiftOmniUIObjectRef background, SwiftOmniUIObjectRef content,
     bool animated, bool back
 );
@@ -547,6 +543,8 @@ void swiftomniui_winui_set_pointer_style(SwiftOmniUIObjectRef element, int32_t s
 void swiftomniui_winui_text_set_selectable(SwiftOmniUIObjectRef element, bool selectable);
 int32_t swiftomniui_winui_text_character_rects(SwiftOmniUIObjectRef element, double *rectangles, int32_t capacity);
 int32_t swiftomniui_winui_text_character_geometry(SwiftOmniUIObjectRef element, double *rectangles, int32_t capacity, int32_t *lineCount);
+int32_t swiftomniui_winui_text_selection_geometry(SwiftOmniUIObjectRef element, double *rectangles, int32_t capacity, bool *isNative);
+void swiftomniui_winui_text_prepare_geometry(SwiftOmniUIObjectRef element);
 /// The measured first-line baseline, including the label's vertical alignment.
 double swiftomniui_winui_text_baseline(SwiftOmniUIObjectRef element, double height);
 /// Width of an all-whitespace label, whose XAML DesiredSize can be zero.
@@ -1094,12 +1092,13 @@ double swiftomniui_winui_title_bar_layout_height(SwiftOmniUIObjectRef bar);
 
 /// `words` stand light (1) or dark (2) on a bar the tree paints, the bar's buttons and commands with them; 0 for
 /// the theme's own.
-void swiftomniui_winui_title_bar_set(SwiftOmniUIObjectRef bar, char const *title, bool back, bool paneToggle,
+void swiftomniui_winui_title_bar_set(SwiftOmniUIObjectRef bar, bool back, bool paneToggle,
                                  bool hasBackground, uint32_t background, int32_t backgroundVisibility,
                                  bool hasForeground, uint32_t foreground, int32_t words);
 
-/// The native title bar's subtitle; an empty string clears the previous value.
-void swiftomniui_winui_title_bar_set_subtitle(SwiftOmniUIObjectRef bar, char const *subtitle);
+/// The title and subtitle each use a native Frame and keep their own previous width while sliding.
+void swiftomniui_winui_title_bar_set_words(SwiftOmniUIObjectRef bar, char const *title,
+                                          char const *subtitle, int32_t direction);
 
 /// The page's actions on a window's chrome: each one's words, the identifier automation finds it by (empty for
 /// none), the files its picture may stand in - each ended by a line feed, empty for none - the Segoe Fluent glyph
@@ -1110,7 +1109,7 @@ void swiftomniui_winui_title_bar_set_actions(SwiftOmniUIObjectRef bar, char cons
                                          char const *const *identifiers, char const *const *icons,
                                          char const *const *symbols, bool const *overflows, bool const *enabled,
                                          SwiftOmniUIObjectRef const *contents, int32_t const *kinds,
-                                         int32_t count, int32_t leadingCount);
+                                         int32_t count, int32_t leadingCount, bool animate);
 
 /// What a test reads: whether a title bar's words stand light (1), dark (2), or as the theme has them (0).
 int32_t swiftomniui_winui_title_bar_words(SwiftOmniUIObjectRef bar);

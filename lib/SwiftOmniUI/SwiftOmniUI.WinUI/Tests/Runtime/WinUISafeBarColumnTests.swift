@@ -231,10 +231,12 @@ final class WinUISafeBarColumnTests: XCTestCase {
         }
     }
 
-    func testSlidingAuxiliarySafeBarStaysInWindowMaterial() throws {
+    func testSlidingSafeBarBlursThePresentedContent() throws {
         try onUIThread {
             let clock = TestClock()
             let shown = State(wrappedValue: false)
+            let blue = State(wrappedValue: false)
+            let position = State(wrappedValue: ScrollPosition(edge: .bottom))
             let host = WinUIRenderer.running(clock: clock, room: WinUITestHost.wideRoom) {
                 NavigationSplitView(Binding(get: { true }, set: { _ in })) {
                     Text("Files").navigationSplitViewColumnWidth(220)
@@ -244,13 +246,29 @@ final class WinUISafeBarColumnTests: XCTestCase {
                             HStack(spacing: 0) {
                                 ScrollView { Color.red.frame(height: 1800) }
                                 if shown.wrappedValue {
-                                    ScrollView { Color.blue.frame(height: 1800) }
+                                    VStack {
+                                        ScrollView {
+                                            LazyVStack(spacing: 0) {
+                                                ForEach(0..<80, id: \.self) { _ in
+                                                    HStack(spacing: 0) {
+                                                        Color(blue.wrappedValue ? "#0000FF" : "#FF0000").frame(width: 16)
+                                                        Color.black
+                                                    }.frame(height: 28)
+                                                }
+                                            }
+                                        }
+                                        .scrollPosition(position.projectedValue, anchor: .bottom)
+                                        .onAppear { position.wrappedValue.scrollTo(edge: .bottom) }
                                         .id("sliding-group-scroll")
+                                    }
                                         .safeAreaInset(edge: .top, spacing: 0) {
-                                            Text("Group chat")
-                                                .frame(height: 40)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                                .id("sliding-group-bar")
+                                            ScrollView(.horizontal) {
+                                                HStack(spacing: 0) {
+                                                    Color.clear.frame(width: 64)
+                                                    Text("Group chat")
+                                                }.frame(height: 40)
+                                            }
+                                            .id("sliding-group-bar")
                                         }
                                         .frame(width: 240)
                                         .transition(.offset(x: 240))
@@ -267,29 +285,134 @@ final class WinUISafeBarColumnTests: XCTestCase {
             withAnimation(.linear(duration: 0.2)) { shown.wrappedValue = true }
             host.runtime.pump.turn()
             host.frame()
-            for elapsed in [64.0, 112, 160, 240] {
+            func edgeIsBlurred(_ pixels: [UInt32], blue: Bool = false) -> Bool {
+                guard pixels.count == 2 else { return false }
+                let shift = blue ? 0 : 16
+                let channel = pixels.map { Int(($0 >> shift) & 255) }
+                let neutralShift = blue ? 16 : 0
+                return channel[0] < 248 && channel[1] > 8 && channel[0] > channel[1]
+                    && pixels.allSatisfy {
+                        let neutral = Int(($0 >> neutralShift) & 255)
+                        return (0...68).contains(neutral) && abs(neutral - Int(($0 >> 8) & 255)) <= 1
+                    }
+            }
+            var movingSamples = 0
+            var didSeePane = false
+            for elapsed in [32.0, 64, 96, 128, 160, 192, 224, 256, 320] {
                 clock.now = start + elapsed
                 host.frame()
                 let panel = try XCTUnwrap(host.view(id: .manual("sliding-group")))
                 let bar = try XCTUnwrap(host.view(id: .manual("sliding-group-bar")))
                 let scroll = try XCTUnwrap(host.view(id: .manual("sliding-group-scroll")) as? WinUIScrollView)
-                if elapsed == 64 { scroll.scroller.move(to: Point(0, 200)) }
-                host.settle {
-                    scroll.scroller.standing.offset.y > 0
-                        && swiftomniui_winui_window_material_redirects(window.handle, bar.presentationHandle)
+                let room = try XCTUnwrap(window.content).laidOutFrame.width
+                if room - scroll.scroller.origin.x <= 1 { continue }
+                if !didSeePane {
+                    didSeePane = true
+                    host.settle {
+                        let standing = scroll.scroller.standing
+                        return standing.reach.y > 0 && abs(standing.reach.y - standing.offset.y) < 1
+                    }
                 }
-                if elapsed < 200 {
-                    XCTAssertGreaterThan(panel.drawing.translationX, 0)
-                    XCTAssertLessThan(panel.drawing.translationX, 240)
-                } else {
-                    XCTAssertEqual(panel.drawing.translationX, 0, accuracy: 0.01)
+                let standing = scroll.scroller.standing
+                XCTAssertGreaterThan(standing.reach.y, 0)
+                XCTAssertEqual(standing.offset.y, standing.reach.y, accuracy: 1)
+                let visible = room - scroll.scroller.origin.x
+                let sample = "\(elapsed) ms, visible width \(visible), panel \(panel.origin), viewport \(scroll.scroller.origin), offset \(standing.offset.y)"
+                if visible > 36 {
+                    if panel.drawing.translationX > 1 { movingSamples += 1 }
+                    let points = [(14.0, 20.0), (18.0, 20.0)]
+                    WinUITestHost.pump(0.035) // Present this sample while the test animation clock is held.
+                    XCTAssertTrue(edgeIsBlurred(bar.presentedPixels(at: points, in: window)), sample)
+                    // Stay clear of the window caption buttons when sampling the toolbar.
+                    if visible > 180 {
+                        let edgeX = scroll.scroller.origin.x - window.titleBar.origin.x
+                        let titlePoints = [(edgeX + 14, 20.0), (edgeX + 18, 20.0)]
+                        XCTAssertTrue(edgeIsBlurred(window.titleBar.presentedPixels(at: titlePoints, in: window)), sample)
+                    }
+                    XCTAssertEqual(scroll.scroller.presentedPixels(at: [(14, 140), (18, 140)], in: window),
+                                   [0xffff0000, 0xff000000], sample)
                 }
-                XCTAssertGreaterThan(scroll.scroller.standing.offset.y, 0)
-                let redirected = swiftomniui_winui_window_material_redirects(window.handle, bar.presentationHandle)
-                XCTAssertTrue(redirected, "The moving SafeBar must join the window material at \(elapsed) ms.")
             }
+            XCTAssertGreaterThan(movingSamples, 1, "Exercise the material while the pane is visible and still sliding.")
             let bar = try XCTUnwrap(host.view(id: .manual("sliding-group-bar")))
             XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, bar.presentationHandle))
+            let scroll = try XCTUnwrap(host.view(id: .manual("sliding-group-scroll")) as? WinUIScrollView)
+            blue.wrappedValue = true // Change just the pixels beneath the stationary bar.
+            let points = [(14.0, 20.0), (18.0, 20.0)]
+            host.settle { edgeIsBlurred(bar.presentedPixels(at: points, in: window), blue: true) }
+            XCTAssertTrue(edgeIsBlurred(bar.presentedPixels(at: points, in: window), blue: true))
+            position.wrappedValue.scrollTo(edge: .top)
+            host.settle {
+                abs(scroll.scroller.standing.offset.y) < 0.5
+                    && swiftomniui_winui_window_material_covers(window.handle, bar.presentationHandle)
+            }
+            XCTAssertEqual(scroll.scroller.standing.offset.y, 0, accuracy: 0.5)
+            XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, bar.presentationHandle))
+        }
+    }
+
+    func testNestedBarsKeepTheSameTranslucentSourceAcrossScrollCycles() throws {
+        try onUIThread {
+            let host = WinUIRenderer.running(reducesMotion: true, room: WinUITestHost.wideRoom) {
+                NavigationStack {
+                    ScrollView {
+                        HStack(spacing: 0) {
+                            Color("#FF0000").opacity(0.5).frame(width: 120)
+                            Color("#0000FF").opacity(0.5).frame(width: 120)
+                        }.frame(height: 1800)
+                    }
+                    .id("translucent-scroll")
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Color.clear.frame(height: 36).id("history-search-bar")
+                    }
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Color.clear.frame(height: 36).id("history-tabs-bar")
+                    }
+                    .frame(width: 240)
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            let scroll = try XCTUnwrap(host.view(id: .manual("translucent-scroll")) as? WinUIScrollView)
+            let search = try XCTUnwrap(host.view(id: .manual("history-search-bar")))
+            let tabs = try XCTUnwrap(host.view(id: .manual("history-tabs-bar")))
+            func blueMinusRed(_ pixel: UInt32) -> Int {
+                Int(pixel & 255) - Int((pixel >> 16) & 255)
+            }
+            // Both probes straddle the same hard edge. The flat patches also
+            // expose a second source-over pass on the half-transparent column.
+            let xs = [94.0, 118.0, 122.0, 146.0]
+            for offset in [180.0, 0, 220, 0, 180] {
+                scroll.scroller.move(to: Point(0, offset))
+                host.settle {
+                    abs(scroll.scroller.standing.offset.y - offset) < 1
+                        && [search, tabs].allSatisfy {
+                            swiftomniui_winui_window_material_covers(window.handle, $0.presentationHandle)
+                        }
+                }
+                XCTAssertEqual(scroll.scroller.standing.offset.y, offset, accuracy: 1)
+                for bar in [search, tabs] {
+                    XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, bar.presentationHandle))
+                }
+                // At rest the safe inset can put the first row below both bars.
+                guard offset > 0 else { continue }
+                // Sample the settled tint after the native opacity transition.
+                WinUITestHost.pump(0.30)
+                let base = scroll.scroller.presentedPixels(at: xs.map { ($0, 160) }, in: window).map(blueMinusRed)
+                XCTAssertEqual(base.count, 4)
+                guard base.count == 4 else { return }
+                XCTAssertGreaterThan(base[2] - base[1], 32)
+                for bar in [search, tabs] {
+                    let dx = scroll.scroller.origin.x - bar.origin.x
+                    let pixels = bar.presentedPixels(at: xs.map { ($0 + dx, 18) }, in: window).map(blueMinusRed)
+                    XCTAssertEqual(pixels.count, 4)
+                    guard pixels.count == 4 else { return }
+                    // Subtract the local background to tolerate a gradient in the native Mica.
+                    let relativeContrast = Double(pixels[3] - pixels[0]) / Double(base[3] - base[0])
+                    XCTAssertTrue((0.71...0.79).contains(relativeContrast) || (0.90...0.97).contains(relativeContrast),
+                                  "Joined bars should apply one translucent white tint")
+                    XCTAssertLessThan(pixels[2] - pixels[1], base[2] - base[1] - 4)
+                }
+            }
         }
     }
 
@@ -329,7 +452,7 @@ final class WinUISafeBarColumnTests: XCTestCase {
             let oldBar = try XCTUnwrap(host.view(id: .manual("git-material-bar")))
             let height = oldBar.laidOutFrame.height
             XCTAssertGreaterThan(height, 0)
-            XCTAssertTrue(swiftomniui_winui_window_material_redirects(window.handle, oldBar.presentationHandle))
+            XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, oldBar.presentationHandle))
             let start = clock.now
             withAnimation(.eased(240, .linear)) { history.wrappedValue = true }
             host.step()
@@ -339,8 +462,7 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 host.runtime.displayCycle.frame(now: clock.now)
                 XCTAssertEqual(swiftomniui_winui_opacity(oldBar.presentationHandle), 1, accuracy: 0.001,
                                "the opacity transition belongs to the ancestor, not the bar itself")
-                XCTAssertFalse(swiftomniui_winui_window_material_redirects(window.handle, oldBar.presentationHandle),
-                               "the shared overlay must not revive a departing ancestor's fixed controls")
+                XCTAssertTrue(oldBar.isAttached, "the original bar stays in the fading subtree")
                 XCTAssertEqual(oldBar.laidOutFrame.height, height, accuracy: 1,
                                "leaving content keeps its layout allocation while its presentation fades")
             }
@@ -349,11 +471,11 @@ final class WinUISafeBarColumnTests: XCTestCase {
             let current = try XCTUnwrap(host.view(id: .manual("history-material-bar")))
             let historyScroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
             historyScroll.scroller.move(to: Point(0, 160))
-            host.settle { swiftomniui_winui_window_material_redirects(window.handle, current.presentationHandle) }
+            host.settle { swiftomniui_winui_window_material_covers(window.handle, current.presentationHandle) }
             XCTAssertTrue(oldBar.isDetached)
-            XCTAssertFalse(swiftomniui_winui_window_material_redirects(window.handle, oldBar.presentationHandle))
-            XCTAssertTrue(swiftomniui_winui_window_material_redirects(window.handle, current.presentationHandle),
-                          "the new resting branch rejoins the same shared material")
+            XCTAssertFalse(swiftomniui_winui_window_material_covers(window.handle, oldBar.presentationHandle))
+            XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, current.presentationHandle),
+                          "the new bar shows its backdrop over scrolled content")
         }
     }
 
@@ -404,21 +526,11 @@ final class WinUISafeBarColumnTests: XCTestCase {
                 host.settle { swiftomniui_winui_window_material_covers(window.handle, tabs.presentationHandle) }
                 XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, tabs.presentationHandle),
                               "initial mount and sidebar replacement must commit the complete material region")
-                XCTAssertFalse(swiftomniui_winui_window_acrylic_samples(window.handle, tabs.presentationHandle),
-                               "fixed sidebar controls must never feed the content blur")
                 if detail {
                     let experts = try XCTUnwrap(host.view(id: .manual("material-experts")))
                     host.settle { swiftomniui_winui_window_material_covers(window.handle, experts.presentationHandle) }
                     XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, experts.presentationHandle),
                                   "the auxiliary detail's local selector joins the same region")
-                    XCTAssertFalse(swiftomniui_winui_window_acrylic_samples(window.handle, experts.presentationHandle),
-                                   "expert controls must remain outside the material input")
-                }
-                if detail {
-                    for scroll in host.views(WinUIScrollView.self) {
-                        XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle),
-                                      "the committed source must contain live outer viewports on first display")
-                    }
                 }
             }
         }
@@ -630,12 +742,14 @@ final class WinUISafeBarColumnTests: XCTestCase {
                     Text("Sidebar").navigationSplitViewColumnWidth(220)
                 } detail: {
                     NavigationStack(path: path.projectedValue) {
-                        ScrollView { Color.red.frame(height: 1600) }
+                        ScrollView { Color("#FF0000").frame(height: 1600) }
                             .id("material-root-scroll")
+                            .toolbarBackground(.visible, for: .windowToolbar)
                             .navigationDestination(for: Int.self) { _ in
                                 Text("Preview")
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .background(Color.green)
+                                    .background(Color("#00FF00"))
+                                    .toolbarBackground(.visible, for: .windowToolbar)
                                     .id("material-preview")
                             }
                     }
@@ -643,23 +757,140 @@ final class WinUISafeBarColumnTests: XCTestCase {
             }
             let window = try XCTUnwrap(host.window)
             let scroll = try XCTUnwrap(host.view(id: .manual("material-root-scroll")) as? WinUIScrollView)
-            host.settle { swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle) }
-            XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle))
+            scroll.scroller.move(to: Point(0, 180))
+            @MainActor func pixels() -> [UInt32] { window.titleBar.presentedPixels(at: [(520, 18)], in: window) }
+            host.settle { pixels() == [0xffff0000] }
+            XCTAssertEqual(pixels(), [0xffff0000])
 
             path.wrappedValue = [1]
-            host.settle {
-                guard let preview = host.view(id: .manual("material-preview")) as? WinUILayoutView,
-                      let background = preview.boxView else { return false }
-                return swiftomniui_winui_window_acrylic_samples(window.handle, background.presentationHandle)
-            }
+            host.settle { pixels() == [0xff00ff00] }
+            XCTAssertEqual(pixels(), [0xff00ff00])
             let preview = try XCTUnwrap(host.view(id: .manual("material-preview")) as? WinUILayoutView)
             let background = try XCTUnwrap(preview.boxView)
             XCTAssertEqual(background.origin.y, window.titleBar.origin.y, accuracy: 1)
-            XCTAssertTrue(swiftomniui_winui_window_acrylic_samples(window.handle, background.presentationHandle))
 
             path.wrappedValue = []
-            host.settle { swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle) }
-            XCTAssertTrue(swiftomniui_winui_window_acrylic_captures_viewport(window.handle, scroll.scroller.handle))
+            host.settle { pixels() == [0xffff0000] }
+            XCTAssertEqual(pixels(), [0xffff0000])
+        }
+    }
+
+    func testNavigationSlideKeepsSafeBarWithItsPage() throws {
+        try onUIThread {
+            guard swiftomniui_winui_animations_enabled() else { throw XCTSkip("System animations are off") }
+            let path = State(wrappedValue: [Int]())
+            let sourcePosition = State(wrappedValue: ScrollPosition(edge: .bottom))
+            let host = WinUIRenderer.running(room: WinUITestHost.wideRoom) {
+                NavigationSplitView(Binding(get: { true }, set: { _ in })) {
+                    Text("Files").navigationSplitViewColumnWidth(220)
+                } detail: {
+                    NavigationStack(path: path.projectedValue) {
+                        ScrollView { Color.red.frame(height: 1800) }
+                            .scrollPosition(sourcePosition.projectedValue)
+                            .frame(maxHeight: 620, alignment: .top)
+                            .safeAreaInset(edge: .top, spacing: 0) {
+                                Text("Source").frame(height: 40).frame(maxWidth: .infinity).id("slide-source-bar")
+                            }
+                            .navigationDestination(for: Int.self) { _ in
+                                ScrollView { Color.blue.frame(height: 1800) }
+                                    .frame(maxHeight: 620, alignment: .top)
+                                    .safeAreaInset(edge: .top, spacing: 0) {
+                                        Text("Destination").frame(height: 40).frame(maxWidth: .infinity).id("slide-destination-bar")
+                                    }
+                            }
+                    }
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            let old = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            let oldBar = try XCTUnwrap(host.view(id: .manual("slide-source-bar")))
+            let landing = old.scroller.origin.x
+            host.settle { swiftomniui_winui_window_material_covers(window.handle, oldBar.presentationHandle) }
+            XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, oldBar.presentationHandle),
+                          "Source offset: \(old.scroller.standing.offset), bar: \(oldBar.origin) \(oldBar.frame)")
+
+            path.wrappedValue = [1]
+            host.runtime.pump.turn()
+            let next = try XCTUnwrap(host.views(WinUIScrollView.self).first { $0 !== old })
+            let nextBar = try XCTUnwrap(host.view(id: .manual("slide-destination-bar")))
+            host.settle {
+                next.scroller.origin.x - landing > 30
+                    && next.scroller.isAttached
+            }
+            XCTAssertGreaterThan(next.scroller.origin.x - landing, 30, "Sample the page before it lands.")
+            XCTAssertTrue(next.scroller.isAttached)
+            XCTAssertTrue(old.scroller.isAttached)
+            XCTAssertEqual(nextBar.origin.x, next.scroller.origin.x, accuracy: 1)
+
+            host.settle { !old.scroller.isAttached }
+            XCTAssertEqual(next.scroller.origin.x, landing, accuracy: 1)
+            XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, nextBar.presentationHandle))
+            XCTAssertFalse(old.scroller.isAttached)
+        }
+    }
+
+    func testScrolledNavigationDestinationDrawsItsPathBarWithItsBody() throws {
+        try onUIThread {
+            guard swiftomniui_winui_animations_enabled() else { throw XCTSkip("System animations are off") }
+            let path = State(wrappedValue: [Int]())
+            let position = State(wrappedValue: ScrollPosition(edge: .bottom))
+            let host = WinUIRenderer.running(room: WinUITestHost.wideRoom) {
+                NavigationSplitView(Binding(get: { true }, set: { _ in })) {
+                    Text("Files").navigationSplitViewColumnWidth(220)
+                } detail: {
+                    NavigationStack(path: path.projectedValue) {
+                        Color("#FF0000")
+                            .navigationDestination(for: Int.self) { _ in
+                                ScrollView {
+                                    LazyVStack(spacing: 0) {
+                                        ForEach(0..<200, id: \.self) { _ in Color("#0000FF").frame(height: 24) }
+                                    }
+                                }
+                                .scrollPosition(position.projectedValue, anchor: .bottom)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .safeAreaInset(edge: .top, spacing: 0) {
+                                    ScrollView(.horizontal) {
+                                        Color("#00FF00").frame(width: 900, height: 32)
+                                    }
+                                    .frame(height: 32)
+                                }
+                            }
+                    }
+                }
+            }
+            let window = try XCTUnwrap(host.window)
+            let navigation = try XCTUnwrap(host.views(WinUINavigationView.self).first)
+            let title = Array("SOUI scrolling path bar".utf16) + [0]
+            window.setTitle("SOUI scrolling path bar")
+            let hwnd = try XCTUnwrap(title.withUnsafeBufferPointer { FindWindowW(nil, $0.baseAddress) })
+            let flags = UINT(SWP_NOACTIVATE | SWP_NOSIZE)
+            XCTAssertTrue(SetWindowPos(hwnd, HWND(bitPattern: -1), 32, 32, 0, 0, flags))
+            defer { _ = SetWindowPos(hwnd, HWND(bitPattern: -2), 32, 32, 0, 0, flags) }
+            path.wrappedValue = [1]
+            host.runtime.pump.turn()
+            let scrollers = host.views(WinUIScrollView.self)
+            let bar = try XCTUnwrap(scrollers.first { $0.orientation == .horizontal })
+            let body = try XCTUnwrap(scrollers.first { $0.orientation == .vertical })
+            XCTAssertNil(bar.nativeSafeBarOwner)
+            var sampledSlide = false
+            let xs: [Double] = [20, 75, 130, 185, 240, 295]
+            for _ in 0..<40 {
+                host.step()
+                guard bar.scroller.isAttached, bar.scroller.frame.height > 0 else { continue }
+                let y = bar.scroller.origin.y - navigation.origin.y + bar.scroller.frame.height / 2
+                let pixels = navigation.presentedPixels(at: xs.flatMap { [($0, y), ($0, y + 80)] }, in: window)
+                guard pixels.count == 2 * xs.count else { continue }
+                let bodyEdge = xs.indices.first { pixels[2 * $0 + 1] == 0xff0000ff }
+                guard let bodyEdge, bodyEdge > 0 else { continue }
+                let barEdge = try XCTUnwrap(xs.indices.first { pixels[2 * $0] == 0xff00ff00 },
+                    "The scrolling page's path bar should be visible in the same transition sample.")
+                XCTAssertLessThanOrEqual(abs(bodyEdge - barEdge), 1)
+                sampledSlide = true
+                break
+            }
+            XCTAssertTrue(sampledSlide, "The test sampled a native navigation slide before it landed.")
+            host.settle { body.scroller.standing.offset.y > 0 }
+            XCTAssertGreaterThan(body.scroller.standing.offset.y, 0)
         }
     }
 

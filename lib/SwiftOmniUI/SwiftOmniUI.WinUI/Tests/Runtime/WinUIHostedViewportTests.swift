@@ -59,6 +59,15 @@ final class WinUIHostedViewportTests: XCTestCase {
                 let writes = view.control.insetWrites
                 for _ in 0..<4 { host.step(); host.frame() }
                 XCTAssertEqual(view.control.insetWrites, writes, "unchanged layout must not rewrite the document's margins")
+
+                // A transition can measure a branch before selecting its presented slot.
+                // That temporary proposal must not move the visible native document.
+                let placedContext = view.safeAreaContext
+                view.setLayoutContext(SafeAreaContext(bounds: context.layout))
+                WinUIDoorbell.commitPending()
+                XCTAssertEqual(view.control.insetWrites, writes)
+                XCTAssertEqual(view.control.insets, expected)
+                view.setLayoutContext(placedContext)
             }
         }
     }

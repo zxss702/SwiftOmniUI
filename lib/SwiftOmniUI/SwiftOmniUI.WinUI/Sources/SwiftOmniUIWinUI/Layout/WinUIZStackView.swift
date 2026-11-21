@@ -40,7 +40,7 @@ class WinUIZStackView: WinUITravellingLayout {
         swiftomniui_winui_safe_area_background_source(safeAreaBackground!.handle, current[0].view.presentationHandle)
         swiftomniui_winui_safe_area_register(
             handle, current[1].view.presentationHandle, safeAreaBackground?.presentationHandle,
-            edge == .top ? 1 : edge == .bottom ? 2 : 0)
+            edge == .top ? 1 : edge == .bottom ? 2 : 0, true)
         views.insert(safeAreaBackground!, at: index)
         holdInDrawingOrder()
         return views
@@ -218,7 +218,8 @@ class WinUIZStackView: WinUITravellingLayout {
         let base = current[0], bar = current[1]
         swiftomniui_winui_safe_area_register(
             handle, bar.view.presentationHandle, safeAreaBackground?.presentationHandle,
-            edge == .top ? 1 : edge == .bottom ? 2 : 0)
+            edge == .top ? 1 : edge == .bottom ? 2 : 0,
+            bar.isShown && bar.view.nativeSafeBarOwner == nil && bar.element?.safeBarBackgroundHidden != true)
         let context = layoutSafeArea(in: bounds)
         let physicalEdge = SafeAreaArithmetic.physicalEdge(edge, direction: direction)
         let barPlace = proposals.first(where: { $0.view === bar.view })?.place ?? Rect(0, 0, 0, 0)
@@ -382,7 +383,7 @@ class WinUIZStackView: WinUITravellingLayout {
     }
 
     override func detach() {
-        swiftomniui_winui_safe_area_register(handle, nil, nil, 0)
+        swiftomniui_winui_safe_area_register(handle, nil, nil, 0, false)
         safeAreaBackground?.detach()
         safeAreaBackground = nil
         super.detach()

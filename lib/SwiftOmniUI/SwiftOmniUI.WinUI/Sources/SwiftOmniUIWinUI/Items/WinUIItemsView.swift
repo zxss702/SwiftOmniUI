@@ -289,7 +289,7 @@ final class WinUIItemsList: WinUIView {
     override var takesDirection: Bool { true }
 
     init() {
-        super.init { number in swiftomniui_winui_items_make(number) }
+        super.init(allocation: { swiftomniui_winui_hosted_viewport_make($0) }) { number in swiftomniui_winui_items_make(number) }
     }
 
     /// The List holding the list a callback names; nil once it has left.

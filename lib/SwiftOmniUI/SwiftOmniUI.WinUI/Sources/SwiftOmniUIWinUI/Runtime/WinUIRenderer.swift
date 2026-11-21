@@ -262,7 +262,11 @@ extension WinUIRenderer: TurnPresenter {
         if runtime.tree.chromeMayChange { showWindows() }
         LazyCells.realizing = false
         if WinUIView.arranging == 0, WinUIView.measuring == 0 {
-            swiftomniui_winui_material_present()
+            // Native layout commits material geometry from its post-layout
+            // callback. The render transaction only needs to publish a
+            // changed material state, otherwise a single animation frame
+            // refreshes the same acrylic twice.
+            swiftomniui_winui_material_present_if_needed()
         }
     }
 

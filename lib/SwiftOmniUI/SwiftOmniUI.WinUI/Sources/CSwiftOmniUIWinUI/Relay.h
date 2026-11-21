@@ -13,6 +13,7 @@
 #undef GetCurrentTime
 
 #include <cstdio>
+#include <chrono>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -32,9 +33,20 @@ namespace swiftomniui {
     namespace xaml = winrt::Microsoft::UI::Xaml;
     namespace controls = winrt::Microsoft::UI::Xaml::Controls;
     using winrt::Windows::Foundation::IInspectable;
+    inline constexpr std::chrono::milliseconds navigationSlideDuration{450};
+    winrt::hstring navigationTitleWord(controls::TitleBar const &bar, bool subtitle);
 
     /// The host's callbacks, set once by run or embed.
     extern SwiftOmniUIWinUICallbacks callbacks;
+
+    // Finish resizing retained text controls after the outer SOUI panel has
+    // given every sibling its slot, within the same native layout pass.
+    struct EditorLayoutPass {
+        EditorLayoutPass();
+        ~EditorLayoutPass();
+        EditorLayoutPass(EditorLayoutPass const &) = delete;
+        EditorLayoutPass &operator=(EditorLayoutPass const &) = delete;
+    };
 
     /// Runs `work` on the UI thread, in its turn; from any thread.
     void post(void (*work)());
@@ -217,18 +229,21 @@ namespace swiftomniui {
             || name == L"chromeAcrylic" || name == L"columnAcrylic";
     }
 
-    /// Stands `element` in `row` of `grid` in place of what stood there; nothing for null.
-    inline void standInRow(controls::Grid const &grid, int32_t row, SwiftOmniUIObjectRef element) {
+    /// Stands `element` in `row` of `grid` in place of what stood there; returns whether the row changed.
+    inline bool standInRow(controls::Grid const &grid, int32_t row, SwiftOmniUIObjectRef element) {
         auto children = grid.Children();
         auto next = element ? as<xaml::FrameworkElement>(element) : xaml::FrameworkElement{nullptr};
+        bool changed = false;
         for (uint32_t index = children.Size(); index-- > 0;) {
             auto child = children.GetAt(index).as<xaml::FrameworkElement>();
             if (isLayer(child) || controls::Grid::GetRow(child) != row) continue;
-            if (child == next) return;
+            if (child == next) return changed;
             children.RemoveAt(index);
+            changed = true;
         }
-        if (!next) return;
+        if (!next) return changed;
         controls::Grid::SetRow(next, row);
         children.Append(next);
+        return true;
     }
 }

@@ -10,7 +10,7 @@ import XCTest
 /// Composition drawing must be sampled on screen, over a known backdrop.
 /// RenderTargetBitmap excludes child visuals and cannot verify these vectors.
 final class WinUICompositionPathTests: XCTestCase {
-    func testCapsuleKeepsAntialiasedEdgesInsideRedirectedSafeBar() throws {
+    func testCapsuleKeepsAntialiasedEdgesInsideSafeBar() throws {
         try onUIThread {
             let width = State(wrappedValue: 96.0)
             let offset = State(wrappedValue: 0.0)
@@ -33,7 +33,7 @@ final class WinUICompositionPathTests: XCTestCase {
                                         Text("Expert").foregroundStyle(.white)
                                             .frame(width: width.wrappedValue, height: 32)
                                             .background {
-                                                Capsule().fill(.black).id("redirected-pill")
+                                                Capsule().fill(.black).id("safe-bar-pill")
                                             }
                                     }.buttonStyle(.plain)
                                         .offset(x: offset.wrappedValue, y: offset.wrappedValue)
@@ -48,18 +48,16 @@ final class WinUICompositionPathTests: XCTestCase {
             }
             let window = try XCTUnwrap(host.window)
             let ordinary = try XCTUnwrap(host.view(id: .manual("ordinary-pill")))
-            let redirected = try XCTUnwrap(host.view(id: .manual("redirected-pill")))
+            let insetPill = try XCTUnwrap(host.view(id: .manual("safe-bar-pill")))
             let bar = try XCTUnwrap(host.view(id: .manual("expert-pill-bar")))
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first { $0.scroller.standing.reach.y > 0 })
+            scroll.scroller.move(to: Point(0, 160))
             for (nextWidth, nextOffset) in [(96.0, 0.0), (138, 0.35), (96, 0)] {
                 width.wrappedValue = nextWidth
                 offset.wrappedValue = nextOffset
                 for _ in 0..<8 { host.step(); host.frame() }
-                XCTAssertTrue(swiftomniui_winui_window_material_redirects(window.handle, bar.presentationHandle),
-                              "this must exercise the captured fixed-control path, not just the ordinary shape")
-                // Sample along both curved edges. Pure black/white alone is an
-                // aliased silhouette; fractional coverage must survive capture.
-                // Presented pixels are required: RenderTargetBitmap omits the
-                // Composition ShapeVisual and SafeBar redirection entirely.
+                XCTAssertTrue(swiftomniui_winui_window_material_covers(window.handle, bar.presentationHandle))
+                // Sample both curved edges above the local backdrop.
                 var edge: [(Double, Double)] = []
                 for row in 0..<32 {
                     let y = (Double(row) + 0.5) / 2
@@ -69,7 +67,7 @@ final class WinUICompositionPathTests: XCTestCase {
                         edge.append((min(nextWidth - 0.125, nextWidth - x - delta), y))
                     }
                 }
-                for pill in [ordinary, redirected] {
+                for pill in [ordinary, insetPill] {
                     host.settle {
                         pill.presentedPixels(at: [(nextWidth / 2, 28)], in: window) == [0xFF00_0000]
                     }

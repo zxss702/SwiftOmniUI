@@ -3,8 +3,11 @@
 
 #include "AcrylicScene.h"
 #include "PathGeometry.h"
+#include <algorithm>
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <memory>
+#include <map>
+#include <utility>
 
 namespace swiftomniui {
     struct AcrylicSourceState;
@@ -18,139 +21,149 @@ namespace swiftomniui {
         void resolve(xaml::FrameworkElement const &target);
     };
 
-    struct FilteredContent;
-    struct AcrylicStrip {
-        std::shared_ptr<FilteredContent> filter;
-        winrt::Microsoft::UI::Composition::CompositionSurfaceBrush crop{nullptr};
-        winrt::Microsoft::UI::Composition::SpriteVisual visual{nullptr};
-        void paint(xaml::FrameworkElement const &target, std::shared_ptr<AcrylicScene> const &scene,
-                   winrt::Windows::Foundation::Rect const &rect);
-    };
-
     winrt::Microsoft::UI::Composition::CompositionEffectBrush contentBlur(
         winrt::Microsoft::UI::Composition::Compositor const &compositor,
         winrt::Microsoft::UI::Composition::CompositionBrush const &source, float sigma);
 
-    // Mica replaces the sharp drawing inside the material region. Only clean
-    // content enters the transparent blur above it. The external Mica link is
-    // never captured or replaced by an approximate white/grey colour.
-    struct AcrylicLayer {
-        controls::SystemBackdropElement foundation{nullptr};
-        controls::Grid backing, base;
-        controls::Border fill, surface;
-        std::vector<winrt::Windows::Foundation::Rect> regions;
-        winrt::Microsoft::UI::Composition::CompositionGeometricClip regionClip{nullptr}, controlsClip{nullptr};
-        winrt::Microsoft::UI::Composition::ContainerVisual output{nullptr};
-        std::vector<AcrylicStrip> strips;
-        bool foundationFailed = false;
+    using MaterialRect = winrt::Windows::Foundation::Rect;
+    namespace composition = winrt::Microsoft::UI::Composition;
 
-        bool usesFoundation = true;
-        void mount(controls::Panel const &owner, bool withFoundation = true) {
-            usesFoundation = withFoundation;
-            try {
-                if (withFoundation) {
-                    foundation = controls::SystemBackdropElement();
-                    foundation.IsHitTestVisible(false);
-                    foundation.Opacity(0);
-                }
-            } catch (...) {
-                foundationFailed = true;
-                report("creating the optional bar Mica foundation");
-            }
-            backing.IsHitTestVisible(false);
-            base.IsHitTestVisible(false);
-            fill.IsHitTestVisible(false);
-            surface.IsHitTestVisible(false);
-            if (foundation) base.Children().Append(foundation);
-            base.Children().Append(fill);
-            backing.Children().Append(base);
-            backing.Children().Append(surface);
-            owner.Children().Append(backing);
-        }
-        void close() { if (foundation) foundation.SystemBackdrop(nullptr); }
+    // The sharp subtree and the backdrop output are siblings. Only the original
+    // scroller feeds the surface; neither the output nor the bar controls can feed it.
+    struct MaterialSection {
+        MaterialRect rect;
+        AcrylicEdge edge;
+        bool operator==(MaterialSection const &) const = default;
+    };
+    struct AcrylicEdgeOverlay {
+        composition::SpriteVisual tint{nullptr}, line{nullptr};
+        std::vector<MaterialRect> regions;
+        bool visible = false;
+        void update(composition::ContainerVisual const &tints, composition::ContainerVisual const &lines,
+            std::vector<MaterialRect> next, bool upper, bool show, float lineHeight, bool scaleChanged);
+    };
+    struct ViewportAcrylic {
+        std::map<void const *, std::vector<MaterialSection>> requests;
+        std::vector<MaterialRect> displayed;
+        winrt::Windows::Foundation::Numerics::float2 size{};
+        composition::CompositionVisualSurface source{nullptr};
+        composition::SpriteVisual output{nullptr};
+        composition::LayerVisual tints{nullptr};
+        composition::ContainerVisual lines{nullptr};
+        AcrylicEdgeOverlay upper, lower;
+        bool dark = false, requestsChanged = true;
+        std::pair<bool, bool> lastScrollEdges{};
+        double lastScale = 0;
+        winrt::weak_ref<xaml::FrameworkElement> scrollSource;
+        void paint(xaml::FrameworkElement const &scroller, controls::Grid const &sharp, controls::Border const &surface);
+        void clear(controls::Grid const &sharp, controls::Border const &surface);
+    };
+    composition::CompositionEffectBrush viewportBlur(composition::Compositor const &compositor,
+        composition::CompositionBrush const &content);
+    bool setViewportMaterial(xaml::FrameworkElement const &viewport, void const *key,
+        std::vector<MaterialSection> rects);
+
+    // One backdrop per material, including when the visible mask has multiple lanes.
+    struct AcrylicLayer {
+        using Rect = winrt::Windows::Foundation::Rect;
+        std::vector<Rect> regions;
+        winrt::Microsoft::UI::Composition::SpriteVisual visual{nullptr};
+
+        std::vector<winrt::weak_ref<xaml::FrameworkElement>> viewports;
+
         void clear() {
-            close();
-            backing.Opacity(0);
-            fill.Background(nullptr);
-            if (output) output.Children().RemoveAll();
-            strips.clear();
+            for (auto const &entry : viewports)
+                if (auto viewport = entry.get()) setViewportMaterial(viewport, this, {});
+            viewports.clear();
+            fallbackRegions.clear();
+            if (visual) {
+                visual.Brush(nullptr);
+                visual.Clip(nullptr);
+                visual = nullptr;
+            }
             regions.clear();
-            regionClip = nullptr;
-            controlsClip = nullptr;
         }
-        void measure(winrt::Windows::Foundation::Size available) { backing.Measure(available); }
-        void arrange(winrt::Windows::Foundation::Size size) { backing.Arrange({0, 0, size.Width, size.Height}); }
-        void paint(xaml::FrameworkElement const &self,
-                   std::vector<AcrylicBand> const &bands,
-                   std::shared_ptr<AcrylicScene> const &scene, bool useFoundation = true) {
-            namespace composition = winrt::Microsoft::UI::Composition;
-            auto next = acrylicMaterialRegions(bands);
-            // A post-layout commit must not rewrite XAML Path.Data. If a
-            // subsequent native operation fails, rewriting that Data at the
-            // next LayoutUpdated creates a self-sustaining layout cycle.
-            // Prepare a replacement entirely in Composition, then publish it.
-            if (next != regions || !regionClip || !controlsClip) {
+        void paint(xaml::FrameworkElement const &owner, std::vector<AcrylicBand> const &bands) {
+            struct Request { xaml::FrameworkElement viewport; std::vector<AcrylicBand const *> bands; };
+            std::vector<Request> requests;
+            std::vector<AcrylicBand> fallback;
+            for (auto const &band : bands) {
+                if (!band.active) continue;
+                if (!band.viewport) { fallback.push_back(band); continue; }
+                auto it = std::find_if(requests.begin(), requests.end(),
+                    [&](auto const &r) { return r.viewport == band.viewport; });
+                if (it == requests.end()) requests.push_back({band.viewport, {&band}});
+                else it->bands.push_back(&band);
+            }
+            std::vector<winrt::weak_ref<xaml::FrameworkElement>> nextViewports;
+            for (auto const &request : requests) {
+                auto mapping = owner.TransformToVisual(request.viewport);
+                std::vector<MaterialSection> local;
+                for (auto const *band : request.bands) {
+                    auto rect = mapping.TransformBounds(band->rect);
+                    // A full-width toolbar covers the incoming viewport throughout a horizontal
+                    // slide. Its native parent clips the moving edge on each compositor frame.
+                    if (band->spansViewport) { rect.X = 0; rect.Width = request.viewport.ActualSize().x; }
+                    local.push_back({rect, band->edge});
+                }
+                if (setViewportMaterial(request.viewport, this, std::move(local))) {
+                    nextViewports.push_back(winrt::make_weak(request.viewport));
+                } else {
+                    for (auto const *band : request.bands) fallback.push_back({band->rect});
+                }
+            }
+            for (auto const &entry : viewports) if (auto viewport = entry.get()) {
+                if (std::none_of(nextViewports.begin(), nextViewports.end(),
+                    [&](auto const &v) { return v.get() == viewport; })) setViewportMaterial(viewport, this, {});
+            }
+            viewports = std::move(nextViewports);
+            regions = acrylicMaterialRegions(bands);
+            paintFallback(owner, acrylicMaterialRegions(fallback));
+        }
+    private:
+        std::vector<Rect> fallbackRegions;
+        void paintFallback(xaml::FrameworkElement const &owner, std::vector<Rect> next) {
+            if (next == fallbackRegions) return;
+            if (next.empty()) {
+                if (visual) visual.IsVisible(false);
+                fallbackRegions.clear();
+                return;
+            }
+            auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(owner).Compositor();
+            if (!visual) {
+                auto sprite = compositor.CreateSpriteVisual();
+                sprite.IsHitTestVisible(false);
+                sprite.IsVisible(false);
+                sprite.Brush(contentBlur(compositor, compositor.CreateBackdropBrush(), 4.0f));
+                xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(owner, sprite);
+                visual = sprite;
+            }
+            auto first = next.front();
+            float left = first.X, top = first.Y;
+            float right = left + first.Width, bottom = top + first.Height;
+            for (auto const &rect : next) {
+                left = std::min(left, rect.X);
+                top = std::min(top, rect.Y);
+                right = std::max(right, rect.X + rect.Width);
+                bottom = std::max(bottom, rect.Y + rect.Height);
+            }
+            if (next.size() > 1) {
                 std::vector<double> commands;
                 for (auto const &rect : next) {
-                    commands.insert(commands.end(), {0, rect.X, rect.Y,
-                        1, rect.X + rect.Width, rect.Y, 1, rect.X + rect.Width, rect.Y + rect.Height,
-                        1, rect.X, rect.Y + rect.Height, 4});
+                    const auto x = rect.X - left, y = rect.Y - top;
+                    commands.insert(commands.end(), {0, x, y, 1, x + rect.Width, y,
+                        1, x + rect.Width, y + rect.Height, 1, x, y + rect.Height, 4});
                 }
-                auto visual = xaml::Hosting::ElementCompositionPreview::GetElementVisual(base);
-                auto compositor = visual.Compositor();
-                auto path = compositionPath(pathGeometry(commands.data(), static_cast<int32_t>(commands.size()), false).as<ID2D1Geometry>(), false);
-                auto geometry = compositor.CreatePathGeometry(path);
-                auto materialClip = compositor.CreateGeometricClip(geometry);
-                // Each visual owns its clip; the immutable geometry is shared.
-                auto fixedClip = compositor.CreateGeometricClip(geometry);
-                visual.Clip(materialClip);
-                regionClip = materialClip;
-                controlsClip = fixedClip;
-                regions = next;
+                auto path = compositionPath(pathGeometry(commands.data(), static_cast<int32_t>(commands.size()),
+                    false).as<ID2D1Geometry>(), false);
+                visual.Clip(compositor.CreateGeometricClip(compositor.CreatePathGeometry(path)));
+            } else if (visual.Clip()) {
+                visual.Clip(nullptr);
             }
-            const bool hasFoundation = usesFoundation && useFoundation;
-            // FlyoutPresenter already owns the popover's acrylic. A second
-            // content blur here would sample the card below and tint the bar
-            // differently from the presenter behind the rest of the card.
-            if (hasFoundation && scene && !next.empty()) {
-                if (!output) {
-                    auto compositor = xaml::Hosting::ElementCompositionPreview::GetElementVisual(surface).Compositor();
-                    output = compositor.CreateContainerVisual();
-                    output.IsHitTestVisible(false);
-                    xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(surface, output);
-                }
-                size_t index = 0;
-                for (auto const &rect : next) {
-                    if (index == strips.size()) strips.emplace_back();
-                    auto &strip = strips[index++];
-                    const bool add = !strip.visual;
-                    strip.paint(self, scene, rect);
-                    if (add && strip.visual) output.Children().InsertAtTop(strip.visual);
-                }
-                while (strips.size() > index) {
-                    if (strips.back().visual) output.Children().Remove(strips.back().visual);
-                    strips.pop_back();
-                }
-            } else if (!strips.empty()) {
-                output.Children().RemoveAll();
-                strips.clear();
-            }
-            auto background = hasFoundation ? acrylicFoundationFill(self) : nullptr;
-            if (fill.Background() != background) fill.Background(background);
-            if (foundation && !foundationFailed && self.IsLoaded() && (!hasFoundation || !next.empty())) {
-                try {
-                    auto backdrop = hasFoundation ? acrylicFoundationBackdrop(self) : nullptr;
-                    if (foundation.SystemBackdrop() != backdrop) foundation.SystemBackdrop(backdrop);
-                } catch (...) {
-                    foundationFailed = true;
-                    report("connecting a bar's native Mica foundation");
-                }
-            }
-            // Underlay stays in ordinary Measure/Arrange while empty. Opacity
-            // changes rendering only and never defers its first real size.
-            const double opacity = hasFoundation && !next.empty() && !foundationFailed ? 1 : 0;
-            if (foundation && foundation.Opacity() != opacity) foundation.Opacity(opacity);
-            if (backing.Opacity() != 1) backing.Opacity(1);
+            visual.Offset({left, top, 0});
+            visual.Size({right - left, bottom - top});
+            visual.IsVisible(true);
+            fallbackRegions = std::move(next);
         }
     };
 
@@ -162,8 +175,6 @@ namespace swiftomniui {
         LocalAcrylic() {
             IsHitTestVisible(false);
             UseLayoutRounding(false);
-            IInspectable self = *this;
-            drawing.mount(self.as<controls::Panel>());
             Loaded([this](auto const &, auto const &) { refresh(); });
             Unloaded([this](auto const &, auto const &) { material.reset(); drawing.clear(); observed.reset(); });
         }
@@ -184,41 +195,25 @@ namespace swiftomniui {
                         return true;
                     });
                 }
-                // Window markers join the shared surface unless their subtree
-                // owns an effect that must also apply to the material.
-                std::vector<AcrylicBand> next;
-                const bool local = scene && (!acrylicSceneIsWindow(scene)
-                    || acrylicUsesLocalPresentation(self, acrylicSceneRoot(scene)));
-                if (local && extent.Width > 0 && extent.Height > 0) {
-                    auto root = acrylicSceneRoot(scene);
-                    auto mapping = self.TransformToVisual(root);
-                    if (auto inverse = mapping.Inverse()) {
-                        next = acrylicLocalRegions(scene, self, mapping.TransformBounds({0, 0, extent.Width, extent.Height}));
-                        for (auto &band : next) {
-                            band.rect = inverse.TransformBounds(band.rect);
+                std::vector<AcrylicBand> bands;
+                if (scene && extent.Width > 0 && extent.Height > 0) {
+                    bool inFlyout = false;
+                    if (!acrylicSceneIsWindow(scene)) {
+                        for (auto at = xaml::Media::VisualTreeHelper::GetParent(self); at;
+                             at = xaml::Media::VisualTreeHelper::GetParent(at)) {
+                            if (at.try_as<controls::FlyoutPresenter>()) { inFlyout = true; break; }
                         }
                     }
+                    if (!inFlyout) bands = acrylicLocalRegions(self, {0, 0, extent.Width, extent.Height});
                 }
-                // A popover supplies one background behind both its bar and body,
-                // even though the presenter can share the window's XamlRoot.
-                bool useFoundation = true;
-                if (scene && !acrylicSceneIsWindow(scene)) {
-                    for (auto parent = xaml::Media::VisualTreeHelper::GetParent(self); parent;
-                         parent = xaml::Media::VisualTreeHelper::GetParent(parent)) {
-                        if (parent.try_as<controls::FlyoutPresenter>()) {
-                            useFoundation = false;
-                            break;
-                        }
-                    }
-                }
-                drawing.paint(self, next, scene, useFoundation);
+                drawing.paint(self, bands);
             } catch (...) { report("updating a safe bar material"); }
         }
-        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size available) {
-            drawing.measure(available); return {0, 0};
+        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size) {
+            return {0, 0};
         }
         winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) {
-            extent = final; drawing.arrange(final);
+            extent = final;
             if (IsLoaded()) refresh();
             return final;
         }
