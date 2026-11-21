@@ -2702,6 +2702,78 @@ final class WinUILazyTests: XCTestCase {
             XCTAssertEqual(settled40.frame.y, 15.0 * 30.0, accuracy: 1.5)
         }
     }
+
+    func testCollapsingFolderAboveBottomBarKeepsDepartingRowInPlace() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let rows = State(wrappedValue: Array(0..<80))
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue, id: \.self) { row in
+                            Text("Row \(row)").frame(height: 28).id("file-\(row)")
+                                .transition(.blur.combined(with: .offset(y: -48)))
+                        }
+                    }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) { Text("History").frame(height: 112) }
+                .frame(width: 280, height: 340)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            scroll.scroller.move(to: Point(0, scroll.scroller.standing.reach.y - 80))
+            host.settle { !swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle) }
+            for _ in 0..<12 { host.step(); host.frame() }
+
+            let outgoing = try XCTUnwrap(host.view(id: .manual("file-74")))
+            let offset = scroll.scroller.standing.offset.y
+            let localY = outgoing.placedFrame.y - offset
+            withAnimation(.eased(200, .linear)) { rows.wrappedValue.removeSubrange(74..<76) }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let after = scroll.scroller.standing.offset.y
+            XCTAssertEqual(after, offset, accuracy: 1, "the viewport still fits above the bottom bar")
+            XCTAssertEqual(outgoing.placedFrame.y - after, localY, accuracy: 2,
+                           "seeing the last row must not pin the animation to the scroll end")
+            clock.now += 75
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertLessThan(outgoing.drawing.translationY, -1)
+        }
+    }
+
+    func testCollapsingFolderAtScrollEndKeepsDepartingRowInPlace() throws {
+        try onUIThread {
+            let clock = TestClock()
+            let rows = State(wrappedValue: Array(0..<80))
+            let host = WinUIRenderer.running(clock: clock) {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows.wrappedValue, id: \.self) { row in
+                            Text("Row \(row)").frame(height: 28).id("file-\(row)")
+                                .transition(.blur.combined(with: .offset(y: -48)))
+                        }
+                    }
+                }.frame(width: 280, height: 240)
+            }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            scroll.scroller.move(to: Point(0, scroll.scroller.standing.reach.y))
+            host.settle { !swiftomniui_winui_scroller_jump_pending(scroll.scroller.handle) }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let outgoing = try XCTUnwrap(host.view(id: .manual("file-76")))
+            let offset = scroll.scroller.standing.offset.y
+            let localY = outgoing.placedFrame.y - offset
+
+            withAnimation(.eased(200, .linear)) { rows.wrappedValue.removeSubrange(73..<77) }
+            for _ in 0..<12 { host.step(); host.frame() }
+            let after = scroll.scroller.standing.offset.y
+            XCTAssertLessThan(after, offset)
+            XCTAssertEqual(outgoing.placedFrame.y - after, localY, accuracy: 2,
+                           "the disappearing row should start where it was drawn before the scroll range shrank")
+            clock.now += 75
+            for _ in 0..<4 { host.frame(); host.step() }
+            XCTAssertLessThan(outgoing.drawing.translationY, -1)
+        }
+    }
 }
 
 /// Reads displayed pixels off the UI thread during scrolling and layout; polling does not cover every frame.

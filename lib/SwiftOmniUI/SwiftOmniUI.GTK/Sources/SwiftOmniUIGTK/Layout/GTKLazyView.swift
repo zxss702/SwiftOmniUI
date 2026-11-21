@@ -539,7 +539,7 @@ final class GTKLazyGridView: GTKLazyView {
     private var perRun: Int { max(1, columns.count) }
 
     /// The runs the cells make.
-    private var runCount: Int { (cells.orderedIdentities.count + perRun - 1) / perRun }
+    private var runCount: Int { cells.runs.count(items: cells.orderedIdentities.count, perRun: perRun) }
 
     /// As wide as offered and as long as the runs measure.
     override func contentSize(width: Double?) -> LayoutSize {
@@ -547,7 +547,7 @@ final class GTKLazyGridView: GTKLazyView {
             ? (width.map { $0 - padding.left - padding.right } ?? acrossRoom)
             : acrossRoom)
         let proposed = LazyGridTracks.resolve(tracks, width: room, spacing: trackSpacing)
-        let count = (cells.orderedIdentities.count + max(1, proposed.count) - 1) / max(1, proposed.count)
+        let count = cells.runs.count(items: cells.orderedIdentities.count, perRun: max(1, proposed.count))
         let total = cells.runs.total(count: count)
         return axis == .vertical
             ? LayoutSize(width: width ?? 0, height: total)
@@ -568,13 +568,17 @@ final class GTKLazyGridView: GTKLazyView {
         let widths = columns
         guard !widths.isEmpty else { return }
         let revision = cells.runs.revision
+        _ = cells.updateGridSections(mounted.compactMap { identity, item in
+            item.departing ? nil : (identity, item.values.columnSpan == LazyVGridContract.sectionColumnSpan)
+        }, perRun: perRun)
         var runExtents: [Int: Double] = [:]
         for (identity, item) in mounted {
-            guard let place = cells.position(of: identity) else { continue }
-            let run = place / widths.count, track = place % widths.count
+            guard !item.departing, let place = cells.position(of: identity) else { continue }
+            let (run, track) = cells.runs.location(of: place)
+            let trackWidth = track.map { widths[$0] } ?? room
             let margin = item.values.margin
             let proposal: Double? = axis == .vertical
-                ? max(0, widths[track] - margin.left - margin.right) : nil
+                ? max(0, trackWidth - margin.left - margin.right) : nil
             let cached = measured[identity]
             let size: LayoutSize
             if let cached, cached.proposal == proposal,
@@ -612,20 +616,22 @@ final class GTKLazyGridView: GTKLazyView {
         for (identity, item) in mounted {
             guard !item.departing, let place = cells.position(of: identity),
                   let size = measured[identity]?.size else { continue }
-            let run = place / widths.count, track = place % widths.count
+            let (run, track) = cells.runs.location(of: place)
+            let trackWidth = track.map { widths[$0] } ?? room
+            let trackOrigin = track.map { trackOrigins[$0] } ?? padding.left
             let margin = item.values.margin
             let origin = cells.runs.offset(of: run, count: runCount)
             let runExtent = cells.runs.extent(of: run)
             let frame: Rect
             if axis == .vertical {
-                let open = widths[track] - margin.left - margin.right
-                let expands = item.values.expandingAxes == .horizontal || item.values.expandingAxes == .both
+                let open = trackWidth - margin.left - margin.right
+                let expands = track == nil || item.values.expandingAxes == .horizontal || item.values.expandingAxes == .both
                 let width = Extent.of(
                     option: expands ? 3 : item.values.horizontal, stated: item.values.width,
                     natural: size.width,
                     available: max(0, open), minimum: item.values.minimumWidth,
                     maximum: item.values.maximumWidth)
-                let x = trackOrigins[track] + margin.left + Extent.start(
+                let x = trackOrigin + margin.left + Extent.start(
                     option: item.values.horizontal, extent: width, start: 0,
                     available: max(0, open),
                     guide: item.values.horizontalGuide?.slot == item.values.horizontal
@@ -633,14 +639,14 @@ final class GTKLazyGridView: GTKLazyView {
                 frame = Rect(x: x, y: origin + margin.top, width: width,
                              height: runExtent - margin.top - margin.bottom)
             } else {
-                let open = widths[track] - margin.top - margin.bottom
+                let open = trackWidth - margin.top - margin.bottom
                 let expands = item.values.expandingAxes == .vertical || item.values.expandingAxes == .both
                 let height = Extent.of(
                     option: expands ? 3 : item.values.vertical, stated: item.values.height,
                     natural: size.height,
                     available: max(0, open), minimum: item.values.minimumHeight,
                     maximum: item.values.maximumHeight)
-                let y = trackOrigins[track] + margin.top + Extent.start(
+                let y = trackOrigin + margin.top + Extent.start(
                     option: item.values.vertical, extent: height, start: 0,
                     available: max(0, open),
                     guide: item.values.verticalGuide?.slot == item.values.vertical
@@ -672,8 +678,8 @@ final class GTKLazyGridView: GTKLazyView {
     override func tellWindow(_ span: Range<Double>) {
         let target = readerTarget.flatMap { identity -> Range<Double>? in
             guard let place = cells.position(of: identity) else { return nil }
-            let count = (cells.orderedIdentities.count + perRun - 1) / perRun
-            let run = place / perRun
+            let count = runCount
+            let run = cells.runs.location(of: place).run
             let start = cells.runs.offset(of: run, count: count)
             return start..<(start + max(1, cells.runs.extent(of: run)))
         }

@@ -43,6 +43,7 @@
     private var prefetchPlan: (demand: Range<Double>, target: Range<Double>, perRun: Int, grid: Bool)?
     private var prefetchInvalidated = false
     private var lastPerRun = 1
+    private var gridSections: Set<String> = []
     /// Native hosts can hold optional work until the requested rows have been
     /// measured. The callback must not keep the native layout alive.
     public var prefetchReady: (() -> Bool)?
@@ -160,7 +161,8 @@
                 positions = [:]
                 directIdentities = []
                 orderedIdentities = next.sequence
-                runs.adopt(next, perRun: lastPerRun)
+                gridSections = gridSections.filter { next.position(of: $0) != nil }
+                runs.adopt(next, perRun: lastPerRun, sections: gridSectionPositions())
                 built = 0..<0
                 window = nil
                 needsMeasurement = false
@@ -184,6 +186,8 @@
                     window = nil
                     needsMeasurement = false
                     runs.resetSource()
+                    gridSections = gridSections.filter { next[$0] != nil }
+                    runs.setSections(gridSectionPositions(), items: next.count, perRun: lastPerRun)
                 }
             }
         }
@@ -198,6 +202,31 @@
     /// The place `identity` shows at; nil where it is none of them.
     public func position(of identity: String) -> Int? {
         source?.position(of: identity) ?? positions[identity]
+    }
+
+    /// Learn section rows when their views are realized. Keep the breaks when a
+    /// section leaves the viewport so previously measured rows keep their place.
+    public func updateGridSections(_ realized: [(identity: String, isSection: Bool)], perRun: Int) -> Bool {
+        lastPerRun = perRun
+        var changed = false
+        for (identity, isSection) in realized {
+            if isSection {
+                guard position(of: identity) != nil else { continue }
+                if gridSections.insert(identity).inserted { changed = true }
+            } else if gridSections.remove(identity) != nil {
+                changed = true
+            }
+        }
+        if changed {
+            runs.setSections(gridSectionPositions(), items: orderedIdentities.count, perRun: perRun)
+        } else {
+            runs.group(perRun: perRun, items: orderedIdentities.count)
+        }
+        return changed
+    }
+
+    private func gridSectionPositions() -> [Int] {
+        gridSections.compactMap { position(of: $0) }.sorted()
     }
 
     /// The mounted subtree of `identity`, where there is one.
@@ -258,7 +287,7 @@
         prefetchInvalidated = false
         window = (span, revision, perRun, realize)
         searches += 1
-        let runCount = (identities.count + perRun - 1) / perRun
+        let runCount = grid ? runs.count(items: identities.count, perRun: perRun) : identities.count
         let wanted = grid
             ? runs.places(in: realize, overscan: 0, count: runCount)
             : extents.places(in: realize, overscan: 0, in: identities)
@@ -267,12 +296,12 @@
             : extents.places(in: span, overscan: 0, in: identities)
         if !shown.isEmpty, anchor == nil || moved {
             if span.lowerBound > 0 {
-                let place = shown.lowerBound * perRun
+                let place = grid ? runs.start(of: shown.lowerBound, items: identities.count) : shown.lowerBound
                 let origin = grid
-                    ? runs.offset(of: shown.lowerBound, count: (identities.count + perRun - 1) / perRun)
+                    ? runs.offset(of: shown.lowerBound, count: runCount)
                     : extents.offset(of: place, in: identities)
                 let total = grid
-                    ? runs.total(count: (identities.count + perRun - 1) / perRun)
+                    ? runs.total(count: runCount)
                     : extents.total(in: identities)
                 anchor = (identities[place], place, span.lowerBound - origin, span.lowerBound,
                           span.upperBound - span.lowerBound, span.lowerBound > 0 && abs(span.upperBound - total) < 1)
@@ -281,13 +310,16 @@
             }
         }
         guard let element else { return }
-        var lower = min(identities.count, max(0, wanted.lowerBound - 1) * perRun)
-        var upper = min(identities.count, (wanted.upperBound + 1) * perRun)
+        let neighbours = max(0, wanted.lowerBound - 1)..<(wanted.upperBound + 1)
+        let demandItems = grid ? runs.items(in: neighbours, count: identities.count)
+            : neighbours.clamped(to: 0..<identities.count)
+        var lower = demandItems.lowerBound
+        var upper = demandItems.upperBound
         if measureBeforeExpanding, unknownRuns > 1, lower < built.upperBound, built.lowerBound <= lower {
             // The host has measured dense rows in this same visible window.
             // Keep the unseen rows' geometry at 44, but do not force a series
             // of tiny renders solely because that estimate overstates them.
-            upper = max(upper, min(identities.count, built.upperBound + unknownRuns * perRun))
+            upper = max(upper, movedBoundary(built.upperBound, by: unknownRuns, grid: grid))
         }
         let requestedUpper = upper
         needsMeasurement = false
@@ -297,13 +329,15 @@
             // run; a host with measured density can supply a bounded batch.
             // Let native measurement correct the range before continuing.
             var remaining = max(1, unknownRuns)
-            for run in (lower / perRun)..<((upper + perRun - 1) / perRun) {
+            let first = grid ? runs.location(of: lower).run : lower
+            let last = grid ? runs.location(of: upper - 1).run : upper - 1
+            for run in first...last {
                 let known = grid ? runs.hasMeasurement(for: run)
                     : extents.hasMeasurement(for: identities[run])
                 if !known {
                     remaining -= 1
                     if remaining > 0 { continue }
-                    let end = min(identities.count, (run + 1) * perRun)
+                    let end = grid ? runs.start(of: run + 1, items: identities.count) : run + 1
                     needsMeasurement = end < upper
                     upper = end
                     break
@@ -316,7 +350,8 @@
                 guard case .manual(let identity) = child.id,
                       let place = position(of: child.lazyIdentity ?? identity),
                       place >= lower, place < requestedUpper else { continue }
-                upper = max(upper, min(requestedUpper, (place / perRun + 1) * perRun))
+                let end = grid ? runs.start(of: runs.location(of: place).run + 1, items: identities.count) : place + 1
+                upper = max(upper, min(requestedUpper, end))
             }
             needsMeasurement = upper < requestedUpper
             if let retaining, lower < upper {
@@ -386,12 +421,13 @@
 
     private func requestedRange(in span: Range<Double>, perRun: Int, grid: Bool) -> Range<Int> {
         let identities = orderedIdentities
-        let count = (identities.count + perRun - 1) / perRun
+        let count = runs.count(items: identities.count, perRun: perRun)
         let places = grid ? runs.places(in: span, overscan: 0, count: count)
             : extents.places(in: span, overscan: 0, in: identities)
         guard !places.isEmpty else { return 0..<0 }
-        let lower = min(identities.count, max(0, places.lowerBound - 1) * perRun)
-        return lower..<min(identities.count, (places.upperBound + 1) * perRun)
+        let neighbours = max(0, places.lowerBound - 1)..<(places.upperBound + 1)
+        return grid ? runs.items(in: neighbours, count: identities.count)
+            : neighbours.clamped(to: 0..<identities.count)
     }
 
     /// Convert the physical lead to rows using the density already measured
@@ -409,27 +445,37 @@
         if grid ? runs.usesMeasuredEstimate : extents.usesMeasuredEstimate { return estimated }
         let visible = requestedRange(in: demand, perRun: perRun, grid: grid)
         guard !estimated.isEmpty, !visible.isEmpty else { return estimated }
-        let count = orderedIdentities.count
         let extent = nearbyMeasuredRunExtent(perRun: perRun, grid: grid,
                                              forward: target.upperBound > demand.upperBound,
                                              visible: visible)
         if target.upperBound > demand.upperBound {
             let runs = predictedRuns(for: target.upperBound - demand.upperBound,
                                      extent: extent, perRun: perRun)
-            return visible.lowerBound..<min(count, visible.upperBound + runs * perRun)
+            return visible.lowerBound..<movedBoundary(visible.upperBound, by: runs, grid: grid)
         }
         if target.lowerBound < demand.lowerBound {
             let runs = predictedRuns(for: demand.lowerBound - target.lowerBound,
                                      extent: extent, perRun: perRun)
-            return max(0, visible.lowerBound - runs * perRun)..<visible.upperBound
+            return movedBoundary(visible.lowerBound, by: -runs, grid: grid)..<visible.upperBound
         }
         return estimated
     }
 
     private func predictedRuns(for distance: Double, extent: Double, perRun: Int) -> Int {
-        guard distance.isFinite else { return orderedIdentities.count / perRun }
-        return Int(min(Double(orderedIdentities.count / perRun),
-                       max(0, (distance / extent).rounded(.up))))
+        let items = orderedIdentities.count
+        let count = runs.hasSections ? runs.count(items: items, perRun: perRun) : items / perRun
+        guard distance.isFinite else { return count }
+        return Int(min(Double(count), max(0, (distance / extent).rounded(.up))))
+    }
+
+    private func movedBoundary(_ boundary: Int, by distance: Int, grid: Bool) -> Int {
+        let count = orderedIdentities.count
+        guard distance != 0 else { return boundary }
+        guard grid, runs.hasSections else {
+            return max(0, min(count, boundary + distance * (grid ? lastPerRun : 1)))
+        }
+        let run = boundary < count ? runs.location(of: boundary).run : runs.count(items: count, perRun: lastPerRun)
+        return runs.start(of: max(0, run + distance), items: count)
     }
 
     /// The density at the incoming edge, shared by visible fill and optional
@@ -441,12 +487,13 @@
     private func nearbyMeasuredRunExtent(perRun: Int, grid: Bool, forward: Bool,
                                          visible: Range<Int>? = nil) -> Double {
         let range = built.isEmpty ? (visible ?? built) : built
-        let first = range.lowerBound / perRun
-        let last = (range.upperBound + perRun - 1) / perRun
+        guard !range.isEmpty else { return 44 }
+        let first = grid ? runs.location(of: range.lowerBound).run : range.lowerBound
+        let last = (grid ? runs.location(of: range.upperBound - 1).run : range.upperBound - 1) + 1
         let sample = forward ? max(first, last - 16)..<last : first..<min(last, first + 16)
         var values: [Double] = []
         for run in sample {
-            let index = run * perRun
+            let index = grid ? runs.start(of: run, items: orderedIdentities.count) : run
             guard index < orderedIdentities.count else { continue }
             let measured = grid ? runs.hasMeasurement(for: run)
                 : extents.hasMeasurement(for: orderedIdentities[index])
@@ -481,14 +528,13 @@
         let forward = plan.target.upperBound > plan.demand.upperBound
         let distance = max(0, prefetchStepDistance)
         let extent = nearbyMeasuredRunExtent(perRun: plan.perRun, grid: plan.grid, forward: forward)
-        let batch = max(1, predictedRuns(for: distance, extent: extent,
-                                         perRun: plan.perRun)) * plan.perRun
+        let batch = max(1, predictedRuns(for: distance, extent: extent, perRun: plan.perRun))
         if forward {
-            upper = min(target.upperBound, upper + batch)
+            upper = min(target.upperBound, movedBoundary(upper, by: batch, grid: plan.grid))
         } else if lower > target.lowerBound {
-            lower = max(target.lowerBound, lower - batch)
+            lower = max(target.lowerBound, movedBoundary(lower, by: -batch, grid: plan.grid))
         } else {
-            upper = min(target.upperBound, upper + batch)
+            upper = min(target.upperBound, movedBoundary(upper, by: batch, grid: plan.grid))
         }
         let within = lower..<upper
         request(within, keeping: retained)
@@ -534,21 +580,24 @@
     /// The corrected viewport origin after measurements or data move its anchor.
     /// A viewport at the end stays at the end. Hosts apply this absolute origin
     /// because their native scroller may already have clamped a shrinking document.
-    public func correctedOrigin(perRun: Int = 1, grid: Bool = false) -> Double? {
+    public func correctedOrigin(perRun: Int = 1, grid: Bool = false,
+                                scrollRange: ClosedRange<Double>? = nil, atTrailingEdge: Bool? = nil) -> Double? {
         let identities = orderedIdentities
         guard let held = anchor, !identities.isEmpty else { return nil }
         let place = position(of: held.identity) ?? min(held.place, identities.count - 1)
+        let count = runs.count(items: identities.count, perRun: perRun)
         let start = grid
-            ? runs.offset(of: place / perRun, count: (identities.count + perRun - 1) / perRun)
+            ? runs.offset(of: runs.location(of: place).run, count: count)
             : extents.offset(of: place, in: identities)
         let total = grid
-            ? runs.total(count: (identities.count + perRun - 1) / perRun)
+            ? runs.total(count: count)
             : extents.total(in: identities)
         // Deleting the anchor or shortening the document can put the requested
         // origin beyond the native scroll reach. Compensate only the offset
         // the scroller can actually apply, not an unreachable presentation shift.
-        let reach = max(0, total - held.viewport)
-        let origin = min(reach, max(0, held.trailing ? reach : start + held.inset))
+        let range = scrollRange ?? 0...max(0, total - held.viewport)
+        let origin = (atTrailingEdge ?? held.trailing) ? range.upperBound
+            : min(range.upperBound, max(range.lowerBound, start + held.inset))
         anchorShift += origin - held.origin
         anchor = (identities[place], place, held.inset, origin, held.viewport, held.trailing)
         return abs(origin - held.origin) > 0.0001 ? origin : nil
@@ -593,10 +642,10 @@
         if grid {
             let oldPerRun = max(1, previous.perRun)
             let newPerRun = max(1, perRun)
-            let oldCount = (previous.source.sequence.count + oldPerRun - 1) / oldPerRun
-            let newCount = (orderedIdentities.count + newPerRun - 1) / newPerRun
-            oldOrigin = previous.runs.offset(of: oldPlace / oldPerRun, count: oldCount)
-            newOrigin = runs.offset(of: newPlace / newPerRun, count: newCount)
+            let oldCount = previous.runs.count(items: previous.source.sequence.count, perRun: oldPerRun)
+            let newCount = runs.count(items: orderedIdentities.count, perRun: newPerRun)
+            oldOrigin = previous.runs.offset(of: previous.runs.location(of: oldPlace).run, count: oldCount)
+            newOrigin = runs.offset(of: runs.location(of: newPlace).run, count: newCount)
         } else {
             oldOrigin = previous.extents.offset(of: oldPlace, in: previous.source.sequence)
             newOrigin = extents.offset(of: newPlace, in: orderedIdentities)
@@ -795,6 +844,9 @@
     private var sums = LazyExtentTree()
     private var source: HostLazySource?
     private var sourcePerRun = 1
+    private var sections: [Int] = []
+    private var packing = LazyGridRunMap(perRun: 1, sections: [])
+    var hasSections: Bool { !sections.isEmpty }
 
     /// Starts with a provisional extent until the first window is measured.
     public init() {}
@@ -829,39 +881,89 @@
 
     mutating func group(perRun: Int, items: Int) {
         guard perRun != sourcePerRun else { return }
+        setSections(sections, items: items, perRun: perRun)
+    }
+
+    mutating func setSections(_ sections: [Int], items: Int, perRun: Int) {
+        guard perRun != sourcePerRun || sections != self.sections else { return }
+        let next = LazyGridRunMap(perRun: perRun, sections: sections)
+        let first: Int
+        if perRun == sourcePerRun {
+            let common = zip(self.sections, sections).prefix { $0.0 == $0.1 }.count
+            let before = common < self.sections.count ? self.sections[common] : items
+            let after = common < sections.count ? sections[common] : items
+            let item = min(before, after)
+            first = min(sums.count, packing.location(of: item).run, next.location(of: item).run)
+        } else {
+            first = 0
+        }
+        let count = next.count(items: items)
+        let kept = min(first, count)
+        sums.replace(kept..<sums.count, with: LazyExtentTree(count: count - kept))
+        self.sections = sections
+        packing = next
         sourcePerRun = perRun
-        sums = LazyExtentTree(count: (items + perRun - 1) / perRun)
         revision += 1
+    }
+
+    /// Convert between content indices and runs without expanding the row source.
+    public func count(items: Int, perRun: Int) -> Int {
+        if perRun == sourcePerRun { return packing.count(items: items) }
+        return LazyGridRunMap(perRun: perRun, sections: sections).count(items: items)
+    }
+
+    /// A nil track means the section occupies this entire run.
+    public func location(of item: Int) -> (run: Int, track: Int?) { packing.location(of: item) }
+
+    public func start(of run: Int, items: Int) -> Int { min(items, packing.start(of: run)) }
+
+    public func items(in runs: Range<Int>, count: Int) -> Range<Int> {
+        start(of: runs.lowerBound, items: count)..<start(of: runs.upperBound, items: count)
     }
 
     /// Aligned edits preserve unaffected grid runs. An edit changing how cells
     /// group invalidates only the suffix starting at its first affected run.
-    public mutating func adopt(_ next: HostLazySource, perRun: Int) {
+    public mutating func adopt(_ next: HostLazySource, perRun: Int, sections: [Int] = []) {
         let perRun = max(1, perRun)
-        let count = (next.sequence.count + perRun - 1) / perRun
+        let nextPacking = LazyGridRunMap(perRun: perRun, sections: sections)
+        let count = nextPacking.count(items: next.sequence.count)
         if let source, next.predecessor == ObjectIdentifier(source), sourcePerRun == perRun {
-            switch next.edit {
-            case .replace(let before, let after):
-                let first = before.lowerBound / perRun
-                if (after.count - before.count).isMultiple(of: perRun) {
-                    let end = min(sums.count, (before.upperBound + perRun - 1) / perRun)
-                    let newEnd = min(count, (after.upperBound + perRun - 1) / perRun)
-                    sums.replace(first..<end, with: LazyExtentTree(count: newEnd - first))
-                } else {
-                    sums.replace(first..<sums.count, with: LazyExtentTree(count: count - first))
+            if !self.sections.isEmpty || !sections.isEmpty {
+                // The edit can move section breaks. Keep measurements for
+                // complete runs before the first affected item.
+                let item: Int
+                switch next.edit {
+                case .replace(let before, _): item = before.lowerBound
+                case .move(let range, let destination): item = min(range.lowerBound, destination)
                 }
-            case .move(let range, let destination):
-                if range.lowerBound.isMultiple(of: perRun), range.upperBound.isMultiple(of: perRun),
-                   destination.isMultiple(of: perRun) {
-                    sums.move((range.lowerBound / perRun)..<(range.upperBound / perRun), to: destination / perRun)
-                } else {
-                    let first = min(range.lowerBound, destination) / perRun
-                    sums.replace(first..<sums.count, with: LazyExtentTree(count: count - first))
+                let first = min(sums.count, count, packing.location(of: item).run, nextPacking.location(of: item).run)
+                sums.replace(first..<sums.count, with: LazyExtentTree(count: count - first))
+            } else {
+                switch next.edit {
+                case .replace(let before, let after):
+                    let first = before.lowerBound / perRun
+                    if (after.count - before.count).isMultiple(of: perRun) {
+                        let end = min(sums.count, (before.upperBound + perRun - 1) / perRun)
+                        let newEnd = min(count, (after.upperBound + perRun - 1) / perRun)
+                        sums.replace(first..<end, with: LazyExtentTree(count: newEnd - first))
+                    } else {
+                        sums.replace(first..<sums.count, with: LazyExtentTree(count: count - first))
+                    }
+                case .move(let range, let destination):
+                    if range.lowerBound.isMultiple(of: perRun), range.upperBound.isMultiple(of: perRun),
+                       destination.isMultiple(of: perRun) {
+                        sums.move((range.lowerBound / perRun)..<(range.upperBound / perRun), to: destination / perRun)
+                    } else {
+                        let first = min(range.lowerBound, destination) / perRun
+                        sums.replace(first..<sums.count, with: LazyExtentTree(count: count - first))
+                    }
                 }
             }
         } else { sums = LazyExtentTree(count: count) }
         source = next
         sourcePerRun = perRun
+        self.sections = sections
+        packing = nextPacking
         revision += 1
     }
 
@@ -898,6 +1000,55 @@
             else { upper = middle }
         }
         return first < lower ? first..<lower : 0..<0
+    }
+}
+
+/// Ordinary items fill tracks in order. A section closes any partial run,
+/// and owns the next one. Only known breaks need an entry in this index.
+private struct LazyGridRunMap: Sendable {
+    private struct SectionBreak: Sendable {
+        let item: Int
+        let run: Int
+    }
+
+    private let perRun: Int
+    private let breaks: [SectionBreak]
+
+    init(perRun: Int, sections: [Int]) {
+        let perRun = max(1, perRun)
+        self.perRun = perRun
+        var item = 0, run = 0
+        breaks = sections.map { section in
+            let distance = section - item
+            let sectionRun = run + (distance + perRun - 1) / perRun
+            item = section + 1
+            run = sectionRun + 1
+            return SectionBreak(item: section, run: sectionRun)
+        }
+    }
+
+    func count(items: Int) -> Int { items == 0 ? 0 : location(of: items - 1).run + 1 }
+
+    func location(of item: Int) -> (run: Int, track: Int?) {
+        guard let section = last(at: item, by: \.item) else { return (item / perRun, item % perRun) }
+        if item == section.item { return (section.run, nil) }
+        let distance = item - section.item - 1
+        return (section.run + 1 + distance / perRun, distance % perRun)
+    }
+
+    func start(of run: Int) -> Int {
+        guard let section = last(at: run, by: \.run) else { return run * perRun }
+        if run == section.run { return section.item }
+        return section.item + 1 + (run - section.run - 1) * perRun
+    }
+
+    private func last(at value: Int, by key: KeyPath<SectionBreak, Int>) -> SectionBreak? {
+        var low = 0, high = breaks.count
+        while low < high {
+            let middle = low + (high - low) / 2
+            if breaks[middle][keyPath: key] <= value { low = middle + 1 } else { high = middle }
+        }
+        return low == 0 ? nil : breaks[low - 1]
     }
 }
 

@@ -92,8 +92,8 @@ class WinUILazyView: WinUITravellingLayout {
         guard let place = cells.position(of: identity) else { return }
         let perRun = self is WinUILazyGridView ? max(1, cells.window?.perRun ?? 1) : 1
         let grid = self is WinUILazyGridView
-        let run = place / perRun
-        let count = (cells.orderedIdentities.count + perRun - 1) / perRun
+        let run = cells.runs.location(of: place).run
+        let count = cells.runs.count(items: cells.orderedIdentities.count, perRun: perRun)
         let start = grid ? cells.runs.offset(of: run, count: count) : cells.offset(of: place)
         let extent = grid ? cells.runs.extent(of: run) : cells.extents.extent(of: identity)
         let target = start..<(start + max(1, extent))
@@ -271,16 +271,17 @@ class WinUILazyView: WinUITravellingLayout {
         if let destination = jumpViewport.flatMap({ windowSpan(in: $0) }) {
             let perRun = cells.window?.perRun ?? 1
             let count = cells.orderedIdentities.count
-            let places = self is WinUILazyGridView
-                ? cells.runs.places(in: destination, overscan: 0, count: (count + perRun - 1) / perRun)
+            let grid = self is WinUILazyGridView
+            let places = grid
+                ? cells.runs.places(in: destination, overscan: 0, count: cells.runs.count(items: count, perRun: perRun))
                 : cells.places(in: destination, overscan: 0)
-            let lower = min(count, max(0, places.lowerBound - 1) * perRun)
-            let upper = min(count, (places.upperBound + 1) * perRun)
+            let neighbours = max(0, places.lowerBound - 1)..<(places.upperBound + 1)
+            let requested = grid ? cells.runs.items(in: neighbours, count: count) : neighbours.clamped(to: 0..<count)
             // Rows already selected by the destination need no extra retention
             // request. Tiny moves within one mounted window must remain no-ops.
             kept = Set(kept.filter { identity in
                 guard let position = cells.position(of: identity) else { return false }
-                return !(lower..<upper).contains(position)
+                return !requested.contains(position)
             })
         }
         return Set(moving.union(kept).filter { cells.position(of: $0) != nil })
@@ -568,8 +569,8 @@ class WinUILazyView: WinUITravellingLayout {
         guard var target = override ?? preparedViewport ?? jumpViewport ?? announcedRect ?? viewport else { return }
         if let identity = readerTarget, let place = cells.position(of: identity) {
             let perRun = self is WinUILazyGridView ? max(1, cells.window?.perRun ?? 1) : 1
-            let run = place / perRun
-            let count = (cells.orderedIdentities.count + perRun - 1) / perRun
+            let run = cells.runs.location(of: place).run
+            let count = cells.runs.count(items: cells.orderedIdentities.count, perRun: perRun)
             let start = self is WinUILazyGridView
                 ? cells.runs.offset(of: run, count: count) : cells.offset(of: place)
             let extent = self is WinUILazyGridView ? cells.runs.extent(of: run) : cells.extents.extent(of: identity)
@@ -656,12 +657,13 @@ class WinUILazyView: WinUITravellingLayout {
            (axis == .vertical ? previous?.width == target.width : previous?.height == target.height),
            let span, let realize {
             let perRun = cells.window?.perRun ?? 1
+            let count = cells.orderedIdentities.count
             let wanted = grid
-                ? cells.runs.places(in: realize, overscan: 0, count: (cells.orderedIdentities.count + perRun - 1) / perRun)
+                ? cells.runs.places(in: realize, overscan: 0, count: cells.runs.count(items: count, perRun: perRun))
                 : cells.places(in: realize, overscan: 0)
-            let lower = min(cells.orderedIdentities.count, max(0, wanted.lowerBound - 1) * perRun)
-            let upper = min(cells.orderedIdentities.count, (wanted.upperBound + 1) * perRun)
-            if !wanted.isEmpty, (lower..<upper) == cells.built {
+            let neighbours = max(0, wanted.lowerBound - 1)..<(wanted.upperBound + 1)
+            let requested = grid ? cells.runs.items(in: neighbours, count: count) : neighbours.clamped(to: 0..<count)
+            if !wanted.isEmpty, requested == cells.built {
                 cells.show(span, perRun: perRun, grid: grid, realize: realize, keeping: keeping,
                            prefetch: true, demand: demand)
                 return
@@ -686,8 +688,9 @@ class WinUILazyView: WinUITravellingLayout {
             if fillingWindow, let incoming, cells.requestedItemsAreCurrent, !needsRowMeasurements,
                !built.isEmpty {
                 let perRun = cells.window?.perRun ?? 1
-                let count = (cells.orderedIdentities.count + perRun - 1) / perRun
-                let first = built.lowerBound / perRun, last = (built.upperBound - 1) / perRun
+                let count = cells.runs.count(items: cells.orderedIdentities.count, perRun: perRun)
+                let first = grid ? cells.runs.location(of: built.lowerBound).run : built.lowerBound
+                let last = grid ? cells.runs.location(of: built.upperBound - 1).run : built.upperBound - 1
                 var known = 0
                 for run in first...last {
                     let measured = grid ? cells.runs.hasMeasurement(for: run)
@@ -809,7 +812,7 @@ class WinUILazyView: WinUITravellingLayout {
         guard scrollVelocity != 0 else { return span }
         let grid = self is WinUILazyGridView
         let perRun = cells.window?.perRun ?? 1
-        let runCount = (cells.orderedIdentities.count + perRun - 1) / perRun
+        let runCount = cells.runs.count(items: cells.orderedIdentities.count, perRun: perRun)
         let extra = predictedTravel
         var expanded = rect
         if axis == .vertical {
@@ -827,10 +830,11 @@ class WinUILazyView: WinUITravellingLayout {
         func offset(_ run: Int) -> Double {
             grid ? cells.runs.offset(of: run, count: runCount) : cells.offset(of: run)
         }
-        let firstBuilt = cells.built.lowerBound / perRun
-        let afterBuilt = (cells.built.upperBound + perRun - 1) / perRun
-        let overlapsBuilt = !cells.built.isEmpty && offset(firstBuilt) < span.upperBound
-            && offset(afterBuilt) > span.lowerBound
+        let built = cells.built
+        let firstBuilt = grid ? cells.runs.location(of: built.lowerBound).run : built.lowerBound
+        let afterBuilt = built.isEmpty ? firstBuilt
+            : (grid ? cells.runs.location(of: built.upperBound - 1).run : built.upperBound - 1) + 1
+        let overlapsBuilt = !built.isEmpty && offset(firstBuilt) < span.upperBound && offset(afterBuilt) > span.lowerBound
         // Subtracting the current neighbour's distance before rounding to rows
         // can lose part of a run. The neighbour at the *predicted* edge may
         // also have a completely different height (for example a Markdown table).
@@ -933,8 +937,23 @@ class WinUILazyView: WinUITravellingLayout {
 
     /// Update anchor bookkeeping; only native viewport reports establish the visible coordinates.
     /// Native scroll anchoring adjusts the offset after layout commits the new extent.
-    func commitAnchor(perRun: Int = 1, grid: Bool = false) {
-        _ = cells.correctedOrigin(perRun: perRun, grid: grid)
+    func commitAnchor(extent: Double, perRun: Int = 1, grid: Bool = false) {
+        if axis == .vertical, let document = placingLayout as? WinUIScrollDocument,
+           let item = document.items.first, item.view === self, let scroll = document.scrollView,
+           scroll.scroller.laidOutFrame.height > 0 {
+            // The window for realizing rows can already show the last row
+            // while the native scroller can still move through the bottom inset.
+            let values = item.values
+            let size = Extent.bounded(values.height ?? extent, minimum: values.minimumHeight, maximum: values.maximumHeight)
+            let insets = values.margin + document.layoutPadding
+            let start = -insets.top
+            let end = max(start, size + insets.bottom - scroll.scroller.laidOutFrame.height)
+            let standing = scroll.scroller.standing
+            let atEnd = standing.reach.y > 0 && abs(standing.reach.y - standing.offset.y) < 0.5
+            _ = cells.correctedOrigin(perRun: perRun, grid: grid, scrollRange: start...end, atTrailingEdge: atEnd)
+        } else {
+            _ = cells.correctedOrigin(perRun: perRun, grid: grid)
+        }
     }
 
     /// Recomputes the places when the scroller's window moved.
@@ -1044,13 +1063,14 @@ class WinUILazyView: WinUITravellingLayout {
     func hasMountedWindow(in span: Range<Double>) -> Bool {
         guard cells.requestedItemsAreCurrent, let window = cells.window else { return false }
         let perRun = window.perRun
-        let wanted = self is WinUILazyGridView
-            ? cells.runs.places(in: span, overscan: 0,
-                                count: (cells.orderedIdentities.count + perRun - 1) / perRun)
+        let grid = self is WinUILazyGridView
+        let count = cells.orderedIdentities.count
+        let wanted = grid
+            ? cells.runs.places(in: span, overscan: 0, count: cells.runs.count(items: count, perRun: perRun))
             : cells.places(in: span, overscan: 0)
         guard !wanted.isEmpty else { return false }
-        let lower = wanted.lowerBound * perRun
-        let upper = min(cells.orderedIdentities.count, wanted.upperBound * perRun)
+        let requested = grid ? cells.runs.items(in: wanted, count: count) : wanted
+        let lower = requested.lowerBound, upper = requested.upperBound
         guard cells.built.lowerBound <= lower, cells.built.upperBound >= upper else { return false }
         // Querying row geometry does not mean that XAML has arranged the
         // incoming native subtree. Do not cancel/follow up a batch while its
@@ -1081,13 +1101,13 @@ class WinUILazyView: WinUITravellingLayout {
         guard cells.requestedItemsAreCurrent, !needsRowMeasurements, let window = cells.window else { return false }
         let grid = self is WinUILazyGridView
         let perRun = window.perRun
-        let count = (cells.orderedIdentities.count + perRun - 1) / perRun
+        let count = cells.orderedIdentities.count
         let wanted = grid
-            ? cells.runs.places(in: span, overscan: 0, count: count)
+            ? cells.runs.places(in: span, overscan: 0, count: cells.runs.count(items: count, perRun: perRun))
             : cells.places(in: span, overscan: 0)
         guard !wanted.isEmpty else { return true }
-        let lower = wanted.lowerBound * perRun
-        let upper = min(cells.orderedIdentities.count, wanted.upperBound * perRun)
+        let requested = grid ? cells.runs.items(in: wanted, count: count) : wanted
+        let lower = requested.lowerBound, upper = requested.upperBound
         guard cells.built.lowerBound <= lower, cells.built.upperBound >= upper else { return false }
         for run in wanted {
             let measured = grid ? cells.runs.hasMeasurement(for: run)
@@ -1171,11 +1191,16 @@ class WinUILazyView: WinUITravellingLayout {
         guard ready else {
             for proposal in preparedLayoutPlan(in: bounds) {
                 guard let view = proposal.view else { continue }
+                // Keep existing rows at their current slots while the native
+                // measurement catches up, but give a newly mounted row its
+                // first slot. Leaving it unplaced makes a sidebar switch
+                // depend on a later scroll notification before it can paint.
                 view.layout(view.placed ?? proposal.place)
             }
             retell()
             return
         }
+        onConsumeTransition?()
         let motion = takeArrivalMotion()
         if cells.animatesChanges, let motion { places.animation = motion }
         places.begin(width: axis == .vertical ? bounds.width : bounds.height,
@@ -1225,6 +1250,13 @@ class WinUILazyView: WinUITravellingLayout {
         for item in mounted.values where item.departing {
             var frame = item.view.placedFrame
             if shift != .zero {
+                // layout(_:) reconstructs the outgoing slot from this frozen
+                // frame. Apply the document shift there so it survives Arrange.
+                if var frozen = item.view.departureFrame {
+                    frozen.x += shift.x
+                    frozen.y += shift.y
+                    item.view.departureFrame = frozen
+                }
                 frame.x += shift.x
                 frame.y += shift.y
             }
@@ -1375,8 +1407,8 @@ final class WinUILazyStackView: WinUILazyView {
                 }
                 naturalAcross = natural
             }
-            commitAnchor()
             let total = cells.total
+            commitAnchor(extent: total)
             if cells.extents.revision != revision || total != measuredExtent {
                 geometryChanged = true
                 forgetLayoutPlans()
@@ -1504,7 +1536,7 @@ final class WinUILazyGridView: WinUILazyView {
     private var perRun: Int { max(1, columns.count) }
 
     /// The runs the cells make.
-    private var runCount: Int { (cells.orderedIdentities.count + perRun - 1) / perRun }
+    private var runCount: Int { cells.runs.count(items: cells.orderedIdentities.count, perRun: perRun) }
 
     override var contentSizeDependsOnHeight: Bool { axis == .horizontal }
 
@@ -1544,16 +1576,22 @@ final class WinUILazyGridView: WinUILazyView {
             var pendingRuns: Set<Int> = []
             var changedRuns: Set<Int> = []
             if !widths.isEmpty {
-                let changed = takeMeasurementRows().union(takeEmptyRows())
+                var changed = takeMeasurementRows().union(takeEmptyRows())
+                if cells.updateGridSections(changed.compactMap { identity in
+                    if let item = mounted[identity], item.departing { return nil }
+                    return (identity, mounted[identity]?.values.columnSpan == LazyVGridContract.sectionColumnSpan)
+                }, perRun: perRun) {
+                    measureMountedRows()
+                    changed.formUnion(takeMeasurementRows())
+                }
                 for identity in changed {
-                    if let place = cells.position(of: identity) { changedRuns.insert(place / widths.count) }
+                    if let place = cells.position(of: identity) { changedRuns.insert(cells.runs.location(of: place).run) }
                 }
             }
             for run in changedRuns {
                 runExtents[run] = 0
-                let start = run * widths.count
-                let end = min(cells.orderedIdentities.count, start + widths.count)
-                for place in start..<end {
+                let items = cells.runs.items(in: run..<(run + 1), count: cells.orderedIdentities.count)
+                for place in items {
                     let identity = cells.orderedIdentities[place]
                     guard let item = mounted[identity] else {
                         // Retained animation cells can stand outside the requested
@@ -1564,10 +1602,11 @@ final class WinUILazyGridView: WinUILazyView {
                         continue
                     }
                     guard !item.departing else { pendingRuns.insert(run); continue }
-                    let track = place % widths.count
+                    let track = cells.runs.location(of: place).track
+                    let width = track.map { widths[$0] } ?? room
                     let margin = item.values.margin
                     let proposal: Double? = axis == .vertical
-                        ? Double(Float(max(0, widths[track] - margin.left - margin.right))) : nil
+                        ? Double(Float(max(0, width - margin.left - margin.right))) : nil
                     let size = rowSize(identity, item: item, proposedWidth: proposal)
                     let extent = axis == .vertical
                         ? size.height + margin.top + margin.bottom
@@ -1584,8 +1623,8 @@ final class WinUILazyGridView: WinUILazyView {
                     _ = item.size(offered: frame.width)
                 }
             }
-            commitAnchor(perRun: perRun, grid: true)
             let total = cells.runs.total(count: runCount)
+            commitAnchor(extent: total, perRun: perRun, grid: true)
             if cells.runs.revision != revision || total != measuredExtent {
                 geometryChanged = true
                 forgetLayoutPlans()
@@ -1594,7 +1633,7 @@ final class WinUILazyGridView: WinUILazyView {
             measuredExtent = total
             if !needsRowMeasurements { measuredRevision = measurementRevision }
         }
-        let count = (cells.orderedIdentities.count + max(1, proposed.count) - 1) / max(1, proposed.count)
+        let count = cells.runs.count(items: cells.orderedIdentities.count, perRun: max(1, proposed.count))
         let total = widths.count == columns.count ? cells.runs.total(count: count)
             : cells.runs.padding.head + cells.runs.padding.tail + Double(count) * cells.runs.estimate
                 + Double(max(0, count - 1)) * runSpacing
@@ -1628,23 +1667,25 @@ final class WinUILazyGridView: WinUILazyView {
 
         for (identity, item) in mounted {
             guard !item.departing, let place = cells.position(of: identity) else { continue }
-            let run = place / widths.count, track = place % widths.count
+            let (run, track) = cells.runs.location(of: place)
+            let trackWidth = track.map { widths[$0] } ?? acrossRoom
+            let trackOrigin = track.map { trackOrigins[$0] } ?? padding.left
             let margin = item.values.margin
             let proposal = axis == .vertical
-                ? Double(Float(max(0, widths[track] - margin.left - margin.right))) : nil
+                ? Double(Float(max(0, trackWidth - margin.left - margin.right))) : nil
             let size = rowSize(identity, item: item, proposedWidth: proposal)
             let origin = cells.runs.offset(of: run, count: runCount)
             let runExtent = cells.runs.extent(of: run)
             let frame: Rect
             if axis == .vertical {
-                let open = widths[track] - margin.left - margin.right
-                let expands = item.values.expandingAxes == .horizontal || item.values.expandingAxes == .both
+                let open = trackWidth - margin.left - margin.right
+                let expands = track == nil || item.values.expandingAxes == .horizontal || item.values.expandingAxes == .both
                 let width = Extent.of(
                     option: expands ? 3 : item.values.horizontal, stated: item.values.width,
                     natural: size.width,
                     available: max(0, open), minimum: item.values.minimumWidth,
                     maximum: item.values.maximumWidth)
-                let x = trackOrigins[track] + margin.left + Extent.start(
+                let x = trackOrigin + margin.left + Extent.start(
                     option: item.values.horizontal, extent: width, start: 0,
                     available: max(0, open),
                     guide: item.values.horizontalGuide?.slot == item.values.horizontal
@@ -1652,14 +1693,14 @@ final class WinUILazyGridView: WinUILazyView {
                 frame = Rect(x: x, y: origin + margin.top, width: width,
                              height: runExtent - margin.top - margin.bottom)
             } else {
-                let open = widths[track] - margin.top - margin.bottom
+                let open = trackWidth - margin.top - margin.bottom
                 let expands = item.values.expandingAxes == .vertical || item.values.expandingAxes == .both
                 let height = Extent.of(
                     option: expands ? 3 : item.values.vertical, stated: item.values.height,
                     natural: size.height,
                     available: max(0, open), minimum: item.values.minimumHeight,
                     maximum: item.values.maximumHeight)
-                let y = trackOrigins[track] + margin.top + Extent.start(
+                let y = trackOrigin + margin.top + Extent.start(
                     option: item.values.vertical, extent: height, start: 0,
                     available: max(0, open),
                     guide: item.values.verticalGuide?.slot == item.values.vertical
