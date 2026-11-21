@@ -33,6 +33,9 @@ public enum LazyVGridContract: ElementContract {
     public static let rowSpacing = ElementProperty<Self, Double>(
         "rowSpacing", layer: .stateUI, moves: .spacing)
 
+    /// Marks a section that spans the resolved tracks, including adaptive columns.
+    @_spi(Host) public static let sectionColumnSpan = Int(Int32.max)
+
     /// The identities standing in or near view, whose subtrees the host needs
     /// built.
     public static let realizedChanged = ElementEvent<Self, [String]>(

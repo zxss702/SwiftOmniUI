@@ -1,6 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Paweł Krzywdziński and Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+struct LazyVGridSectionLayout: Equatable {
+    let columns: [GridItem]
+    let alignment: HorizontalAlignment
+    let spacing: Double?
+}
+
 /// A grid that fills its columns with its children row first, built a row at
 /// a time as a scroller shows them - SwiftUI's `LazyVGrid`:
 ///
@@ -105,7 +111,11 @@ public struct LazyVGrid: View, FragmentDistributionBarrier {
         element.node.lazyRequestGenerationValue = { heldGeneration.wrappedValue }
         let across = alignment.axis
         element.node.write(ViewContract.horizontalContentAlignment, across)
+        let sectionLayout = LazyVGridSectionLayout(columns: columns, alignment: alignment, spacing: spacing)
         children.take(content(), into: &element.node, realized: held) { cell, index in
+            if cell.type == .composed || cell.type == .fragment {
+                cell.lazyGridSectionLayout = sectionLayout
+            }
             let item = columns.isEmpty ? GridItem() : columns[index % count]
             let over = item.alignment?.horizontal.axis ?? .center
             if cell.props[.horizontalAlignment] == nil {

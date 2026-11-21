@@ -14,7 +14,8 @@
 ///     }
 ///
 /// Inside a `List` a section is a group the host draws with its own chrome;
-/// anywhere else it stands its views in a column - header, content, footer.
+/// in a `LazyVGrid` the content uses the grid's columns and the header and
+/// footer span them. In other containers it stands its views in a column.
 public struct Section<Parent: View, Content: View, Footer: View>: View {
     /// What stands before the group's views.
     private let header: Parent
@@ -43,6 +44,27 @@ public struct Section<Parent: View, Content: View, Footer: View>: View {
             content
             footer
         }
+    }
+
+    public var node: Node {
+        var node = Node.composed(self, type: ElementTypeNames.qualified(Self.self)) { body.node }
+        node.buildLazyGridSection = { layout in
+            let hasContent = !(content is EmptyView)
+                && (content as? TupleView)?.lazyElements?.isEmpty != true
+                && (content as? any LazyRows)?.lazyRowCount != 0
+            var section = VStack(alignment: layout.alignment, spacing: layout.spacing) {
+                header
+                if hasContent {
+                    LazyVGrid(columns: layout.columns, alignment: layout.alignment, spacing: layout.spacing) {
+                        content
+                    }
+                }
+                footer
+            }.node
+            section.write(ViewContract.gridColumnSpan, LazyVGridContract.sectionColumnSpan)
+            return section
+        }
+        return node
     }
 }
 

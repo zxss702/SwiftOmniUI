@@ -421,7 +421,12 @@ extension Node {
         /// Builds the subtree and lands what the author wrote on the view onto its
         /// root - or onto each of them, when the body is a fragment of several.
         func expand(over written: Node) -> Node {
-            var node = build()
+            var node: Node
+            if let layout = written.lazyGridSectionLayout, let section = written.buildLazyGridSection {
+                node = section(layout)
+            } else {
+                node = build()
+            }
             if node.type == .fragment { node.materialize() }
             if node.id != nil {
                 node = Node(type: .fragment, children: [node])
@@ -455,6 +460,9 @@ extension Node {
             }
             node.hasExplicitFontBasis = node.hasExplicitFontBasis || written.hasExplicitFontBasis
             node.lazyIdentity = written.lazyIdentity ?? node.lazyIdentity
+            if node.type == .composed || node.type == .fragment {
+                node.lazyGridSectionLayout = written.lazyGridSectionLayout
+            }
 
             // A fragment keeps no element of its own to write on: what the author
             // wrote on the view lands on each child the body splices in.
@@ -563,6 +571,9 @@ extension Node {
             child.absorbPreferenceWrites(of: written)
             child.children += written.children
             child.lazyIdentity = written.lazyIdentity ?? child.lazyIdentity
+            if child.type == .composed || child.type == .fragment {
+                child.lazyGridSectionLayout = written.lazyGridSectionLayout
+            }
             if child.session == nil { child.session = written.session }
             child.id = written.id ?? child.id
             child.key = written.key.map { scope in
@@ -670,6 +681,9 @@ extension Node {
     mutating func absorbFragmentWrites(of fragment: Node, environments: Bool = true) {
         hasExplicitFontBasis = hasExplicitFontBasis || fragment.hasExplicitFontBasis
         lazyIdentity = fragment.lazyIdentity ?? lazyIdentity
+        if type == .composed || type == .fragment {
+            lazyGridSectionLayout = fragment.lazyGridSectionLayout ?? lazyGridSectionLayout
+        }
         props.merge(fragment.props) { _, wrote in wrote }
         driven.merge(fragment.driven) { _, wrote in wrote }
         animation = AnimationPlan.merged(animation, under: fragment.animation)

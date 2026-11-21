@@ -1396,6 +1396,7 @@ extension Differ {
             node.inheritedMembers == kept.inheritedMembers,
             node.hasExplicitFontBasis == kept.hasExplicitFontBasis,
             node.lazyIdentity == kept.lazyIdentity,
+            node.lazyGridSectionLayout == kept.lazyGridSectionLayout,
             node.animation == kept.animation,
             node.children.isEmpty, kept.children.isEmpty,
             node.engines.isEmpty, kept.engines.isEmpty,
