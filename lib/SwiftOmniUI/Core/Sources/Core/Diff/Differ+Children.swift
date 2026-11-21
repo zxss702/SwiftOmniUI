@@ -49,7 +49,24 @@ extension Differ {
 
         var byManualId: [String: RenderedNode] = [:]
         var byKey: [String: RenderedNode] = [:]
+        var lazyRowsById: [ElementId: RenderedNode] = [:]
+        // Nodes put in by hand are matched by position among themselves.
+        var unkeyed: [RenderedNode] = []
+        var used: Set<ElementId> = []
         for child in rendered {
+            if keepingLazyRows, child.lazyIdentity != nil {
+                // A new row can enter before a retained row in source order.
+                // Reserve the old rows' mounted ids before building any new row.
+                // A transparent fragment's children share this same host.
+                if child.type == .fragment {
+                    used.insert(child.id)
+                    hostClaimed.used.formUnion(mountedIds(of: [child]))
+                } else {
+                    hostClaimed.used.insert(child.id)
+                }
+                lazyRowsById[child.id] = child
+                continue
+            }
             if let raw = child.authoredManualId {
                 if byManualId[raw] == nil { byManualId[raw] = child }
             } else if case .manual(let key) = child.id {
@@ -60,24 +77,31 @@ extension Differ {
             if let key = child.key, byKey[key] == nil {
                 byKey[key] = child
             }
+            if child.key == nil { unkeyed.append(child) }
         }
-
-        // Nodes put in by hand are matched by position among themselves.
-        let unkeyed = rendered.filter { $0.key == nil }
 
         var children: [RenderedNode] = []
         var patches: [HostPatch] = []
         var claimed: Set<ElementId> = []
-        var used: Set<ElementId> = []
         var unkeyedSoFar = 0
         var manualSeen: [String: Int] = [:]
 
         for (index, childNode) in node.children.enumerated() {
+            let isWindowRow = keepingLazyRows && childNode.lazyIdentity != nil
+            // The lazy producer's placeholders carry the old mounted id. The
+            // source identity also has to match, in case a new row authored that id.
+            let retainedRow = childNode.id.flatMap { lazyRowsById[.manual($0)] }.flatMap {
+                $0.lazyIdentity == childNode.lazyIdentity ? $0 : nil
+            }
+            if let retainedRow, claimed.contains(retainedRow.id) { continue }
+
             // A repeated `.id()` takes a stable variant: the id, a NUL, its occurrence.
             // Design: docs/design/core/identity-and-diffing.md#repeated-ids
             var childNode = childNode
             let localAuthoredId: String?
-            if let rawId = childNode.id {
+            if let retainedRow {
+                localAuthoredId = retainedRow.authoredManualId
+            } else if let rawId = childNode.id {
                 let occurrence = manualSeen[rawId, default: 0]
                 manualSeen[rawId] = occurrence + 1
 
@@ -92,7 +116,7 @@ extension Differ {
                 localAuthoredId = nil
             }
 
-            let match = self.match(
+            let match = isWindowRow ? retainedRow : self.match(
                 childNode,
                 at: childNode.key == nil ? unkeyedSoFar : index,
                 rendered: unkeyed,
@@ -100,7 +124,7 @@ extension Differ {
                 byKey: byKey,
                 claimed: claimed)
 
-            if childNode.key == nil {
+            if childNode.key == nil, !isWindowRow {
                 unkeyedSoFar += 1
             }
 
@@ -109,7 +133,9 @@ extension Differ {
             }
 
             var id: ElementId
-            if let match, !used.contains(match.id), !hostClaimed.used.contains(match.id) {
+            if let retainedRow {
+                id = retainedRow.id
+            } else if let match, !used.contains(match.id), !hostClaimed.used.contains(match.id) {
                 id = match.id
             } else {
                 id = identity(for: childNode)
@@ -129,10 +155,10 @@ extension Differ {
 
             used.insert(id)
 
-            let (child, childPatch) = if keepingLazyRows, let match {
+            let (child, childPatch) = if let retainedRow {
                 // Only the viewport moved. Keep the retained row's description,
                 // while still visiting any state changes inside its subtree.
-                revisit(match, walking: false)
+                revisit(retainedRow, walking: false)
             } else {
                 element(id: id, rendered: match, node: childNode,
                         sizesArrive: sizesArrive, wrapFragmentChildren: wrapFragmentChildren,

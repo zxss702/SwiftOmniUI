@@ -833,6 +833,33 @@ private struct LazyPage: View {
         XCTAssertNotNil(moved.child("label-5"))
     }
 
+    func testAnEarlierLazyRowCannotTakeARetainedFragmentsChildId() throws {
+        let built = Built()
+        let renders = Renders()
+        let stack = try lazy(.lazyVStack, in: renders.render(LazyPage {
+            LazyVStack {
+                ForEach(0..<3) { row in
+                    built.numbers[row, default: 0] += 1
+                    return Group {
+                        Text("Row \(row)").id("label")
+                        Text("Kind").id("kind-\(row)")
+                    }
+                    .id("entry-\(row)")
+                    .transition(.opacity)
+                }
+            }
+        }.node))
+        let initial = try lazy(.lazyVStack, in: realize(["0.1"], in: renders, lazy: stack))
+        XCTAssertEqual(initial.child("label")?.props[.text], .string("Row 1"))
+
+        let moved = try lazy(.lazyVStack, in: realize(["0.0", "0.1"], in: renders, lazy: stack))
+        let ids = moved.children.map(\.id)
+        XCTAssertEqual(ids.count, 4)
+        XCTAssertEqual(Set(ids).count, ids.count)
+        XCTAssertEqual(ids.dropFirst(2).first, .manual("label"), "row 1 keeps the id it already mounted")
+        XCTAssertEqual(built.numbers, [0: 1, 1: 1])
+    }
+
     func testWindowObservationsStayBoundedWhileTraversingTheWholeSource() throws {
         let differ = Differ()
         var root = differ.reconcile(nil, with: LazyPage {
