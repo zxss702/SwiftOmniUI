@@ -82,6 +82,16 @@ final class WinUIStackView: WinUITravellingLayout {
 
     override var hasNativeProposals: Bool { true }
     override var retainsArithmeticOnNativeMeasure: Bool { true }
+
+    override func prepareAllocation(in bounds: Rect) {
+        // For an attached stack the native Arrange callback owns the child
+        // plan. It receives the actual rectangle and prepares it before
+        // placing children. Preparing here too visits the same children and
+        // their measurement dependencies twice at each new animated width.
+        // Layout-only views have no native Arrange callback.
+        if isLayoutOnly { super.prepareAllocation(in: bounds) }
+    }
+
     override func nativeProposals(width: Double?, size: LayoutSize) -> [NativeProposal] {
         let room = Rect(x: 0, y: 0, width: width ?? size.width, height: size.height)
         let places = StackArithmetic.places(of: items, axis: axis, spacing: spacing, padding: padding,
@@ -102,16 +112,21 @@ final class WinUIStackView: WinUITravellingLayout {
             while index < items.endIndex, items[index].view !== view { index += 1 }
             guard index < items.endIndex else { break }
             let item = items[index]
+            var place = proposal.place
             if axis == .horizontal, item.values.vertical == AxisAlignment.end.rawValue,
                item.values.verticalGuide == nil, item.matchedGeometry == nil {
-                // The row may plan its children at the destination height.
-                // Their bottom alignment belongs to the actual native room.
                 let top = padding.top + item.values.margin.top
-                view.placementBottom = max(top, allocatedBounds.height - padding.bottom - item.values.margin.bottom)
+                let bottom = max(top, allocatedBounds.height - padding.bottom - item.values.margin.bottom)
+                place.y = bottom - place.height
+                // Keep the bottom anchor while the parent is presenting a
+                // different height. The corrected target prevents the child
+                // from following the old destination slot, while the anchor
+                // keeps the layout room growing upward.
+                view.placementBottom = bottom
             } else {
                 view.placementBottom = nil
             }
-            place(item, at: proposal.place)
+            self.place(item, at: place)
             index += 1
         }
     }

@@ -57,9 +57,12 @@ final class GTKStackView: GTKTravellingLayout {
             of: items, axis: axis, spacing: spacing, padding: padding, in: bounds, direction: direction)
         for (item, place) in zip(items, places) {
             guard let place else { continue }
+            var place = place
             if axis == .horizontal, item.values.vertical == AxisAlignment.end.rawValue, item.values.verticalGuide == nil {
                 let top = padding.top + item.values.margin.top
-                item.view.placementBottom = max(top, allocatedBounds.height - padding.bottom - item.values.margin.bottom)
+                let bottom = max(top, allocatedBounds.height - padding.bottom - item.values.margin.bottom)
+                place.y = bottom - place.height
+                item.view.placementBottom = bottom
             } else {
                 item.view.placementBottom = nil
             }
