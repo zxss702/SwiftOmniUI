@@ -50,6 +50,29 @@ final class DepartureTests: XCTestCase {
         XCTAssertTrue(parent.children.isEmpty)
     }
 
+    func testDuplicateChildKeysRequestResyncBeforeReusingANativeViewTwice() {
+        let (runtime, _) = Self.stack(transition: .opacity, room: 120)
+        let parent = runtime.tree.root!
+        let child = parent.children[0]
+        var patch = HostPatch(id: parent.id, type: parent.type)
+        let row = HostPatch(id: child.id, type: child.type)
+        patch.children = .arranged([row, row])
+
+        let intake = runtime.tree.intake
+        XCTAssertFalse(intake.take(patch, generation: 1) {
+            runtime.tree.apply($0, complete: false)
+        })
+        XCTAssertNotNil(intake.lastDrift)
+        XCTAssertEqual(parent.children.map(\.mount), [child.mount])
+
+        patch.children = .arranged([row, HostPatch(id: .manual("b"), type: .text)])
+        XCTAssertTrue(intake.take(patch, generation: 2) {
+            runtime.tree.apply($0, complete: true)
+        })
+        XCTAssertEqual(parent.children.map(\.id), [.manual("a"), .manual("b")])
+        XCTAssertTrue(parent.children.first === child)
+    }
+
     /// A child without a transition still leaves at once.
     func testADropWithoutATransitionLeavesAtOnce() {
         let (runtime, _) = Self.stack(transition: nil)

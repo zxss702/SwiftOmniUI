@@ -297,6 +297,8 @@ final class LayoutMotionTests: XCTestCase {
         data.layoutTransition = HostLayoutMotion(animation: law, lanes: .all)
         runtime.tree.apply(data, complete: false)
         var viewport = HostPatch(id: element.id, type: element.type)
+        viewport.lazyRequestGeneration = 1
+        viewport.lazyContentChanged = true
         viewport.children = .arranged([HostPatch(id: .manual("row"), type: .text)])
         runtime.tree.apply(viewport, complete: false)
         XCTAssertEqual(element.animation?.animation, law, "the rows finish the transaction that requested them")

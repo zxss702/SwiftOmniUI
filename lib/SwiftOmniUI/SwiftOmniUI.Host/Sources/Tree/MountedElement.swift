@@ -262,13 +262,19 @@ import CRT
                 if case .arranged = patch.children { return true }
                 return false
             }()
+            // Acknowledging a lazy window can rebuild retained row content too.
+            // The row source still belongs to the edit that requested this window.
+            let realizesSameSource = isLazyRun && patch.lazyRequestGeneration != nil
+                && patch.lazyRows == nil && !changed.contains(.items)
+                && !patch.customLayoutChanged && patch.properties.isEmpty && patch.clearedProperties.isEmpty
             // A descendant-only state turn (such as List.realizedChanged during Measure)
             // walks through an unarranged ancestor with a forwarding patch. Keep an
             // unconsumed placement transition until this layout's own arrange pass runs.
-            if !placementTransitionPending || isLazyRun || isArrangedPatch || replacesChild
+            if !placementTransitionPending || (!realizesSameSource
+                && (isLazyRun || isArrangedPatch || replacesChild
                 || !patch.properties.isEmpty || !patch.clearedProperties.isEmpty
                 || patch.customLayoutChanged || patch.lazyContentChanged || patch.lazyRows != nil
-                || changed.contains(.items) {
+                || changed.contains(.items))) {
                 // A deferred lazy realization completes the same data change. Keep
                 // its timing until that data is replaced, rather than losing it in
                 // the intervening viewport-only render.
@@ -388,6 +394,13 @@ import CRT
 
     /// Reconciles a complete child arrangement by key.
     private func arrange(_ patches: [HostPatch], tree: MountedTree, virtualized: Bool) {
+        var addressed: Set<ElementId> = []
+        for patch in patches where !addressed.insert(patch.id).inserted {
+            // Reusing a live child twice would hand the same native view to
+            // two slots. Keep the current arrangement until intake resyncs.
+            tree.intake.drifted("an arrangement names child '\(patch.id)' twice under '\(id)'")
+            return
+        }
         // First realization has no identities to reconcile or departures to
         // retain. Compound lazy rows take this path for every nested wrapper.
         guard !children.isEmpty else {
