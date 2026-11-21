@@ -14,6 +14,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <winrt/Windows.System.h>
@@ -25,35 +26,54 @@ using namespace swiftomniui;
 namespace media = winrt::Microsoft::UI::Xaml::Media;
 
 namespace {
+    using winrt::Windows::Foundation::Size;
+    thread_local unsigned panelArrangeDepth = 0;
+
     /// SOUI answers intrinsic queries separately. This boundary consumes an
     /// allocated rectangle without exposing TextBox's template DesiredSize to
     /// SOUI's native parent. In particular, XAML may replay an older Measure
     /// constraint while retaining a newer final Arrange rectangle.
     struct EditorAllocation : controls::PanelT<EditorAllocation> {
         controls::TextBox editor;
+        std::optional<Size> slot;
+        bool queued = false;
 
         explicit EditorAllocation(controls::TextBox const &control) : editor(control) {
             UseLayoutRounding(false);
+            // SOUI animates this viewport. A finite Height keeps a focused
+            // multiline TextBox from starting its own size-change storyboard.
+            editor.Height(0);
             Children().Append(editor);
         }
 
-        winrt::Windows::Foundation::Size MeasureOverride(winrt::Windows::Foundation::Size) {
+        Size MeasureOverride(Size) {
+            // XAML can remeasure a dirty template at an older parent proposal.
+            // Only the last allocation selects the live editor's viewport.
+            if (slot && !queued) editor.Measure(*slot);
             return {0, 0};
         }
 
-        winrt::Windows::Foundation::Size ArrangeOverride(winrt::Windows::Foundation::Size final) {
-            // TextBox::OnSizeChanged animates Height for a focused multiline
-            // editor on Auto. SOUI owns the final allocation, so give the leaf
-            // an explicit height before measuring and arranging its template.
-            // Never prepare it from the allocation boundary's Measure proposal:
-            // that proposal may differ from this actual final rectangle.
-            // https://github.com/microsoft/microsoft-ui-xaml/blob/main/dxaml/xcp/dxaml/lib/TextBox_Partial.cpp
+        void placeEditor(Size final) {
             if (editor.Height() != final.Height) editor.Height(final.Height);
             editor.Measure(final);
             editor.Arrange({0, 0, final.Width, final.Height});
-            return final;
         }
+
+        Size ArrangeOverride(Size final);
     };
+
+    thread_local std::vector<winrt::com_ptr<EditorAllocation>> pendingEditors;
+
+    Size EditorAllocation::ArrangeOverride(Size final) {
+        bool changed = !slot || *slot != final;
+        slot = final;
+        if (panelArrangeDepth && changed && !queued) {
+            pendingEditors.push_back(get_strong());
+            queued = true;
+        }
+        if (!queued) placeEditor(final);
+        return final;
+    }
 
     void centerSingleLine(controls::TextBox const &box) {
         if (box.AcceptsReturn()) return;
@@ -108,6 +128,29 @@ namespace {
         auto control = as<IInspectable>(handle);
         if (auto search = control.try_as<controls::AutoSuggestBox>()) return first<controls::TextBox>(search);
         return control.as<controls::TextBox>();
+    }
+}
+
+EditorLayoutPass::EditorLayoutPass() { ++panelArrangeDepth; }
+
+EditorLayoutPass::~EditorLayoutPass() {
+    if (--panelArrangeDepth || pendingEditors.empty()) return;
+    decltype(pendingEditors) editors;
+    editors.swap(pendingEditors);
+    for (auto const &allocation : editors) {
+        allocation->queued = false;
+        try {
+            auto final = *allocation->slot;
+            allocation->placeEditor(final);
+            // A Height write can make XAML stop accepting Arrange calls until
+            // its next Measure. Sibling slots have already been accepted. If
+            // the editor itself missed its slot, let its own panel replay it.
+            auto actual = controls::Primitives::LayoutInformation::GetLayoutSlot(allocation->editor);
+            if (actual.Width != final.Width || actual.Height != final.Height)
+                allocation->InvalidateArrange();
+        } catch (...) {
+            report("applying an editor's final allocation");
+        }
     }
 }
 
