@@ -165,7 +165,7 @@ final class WinUIScrollPositionTests: XCTestCase {
                     host.frame()
                     guard let scroll = host.views(WinUIScrollView.self).first,
                           scroll !== previous, scroll.scroller.laidOutFrame.height > 0,
-                          scroll.scroller.drawnOpacity > 0 else { continue }
+                          scroll.document.drawnOpacity > 0 else { continue }
                     let standing = scroll.scroller.standing
                     if value == 1 { XCTAssertGreaterThan(standing.reach.y, 0) }
                     XCTAssertEqual(standing.offset.y, standing.reach.y, accuracy: 1)
@@ -174,6 +174,33 @@ final class WinUIScrollPositionTests: XCTestCase {
                 }
                 XCTAssertTrue(visible, "the new conversation must become visible, including when it fits")
             }
+        }
+    }
+
+    func testInitialTrailingEdgeTakesPrecedenceOverDefaultAnchor() throws {
+        try onUIThread {
+            let position = State(wrappedValue: ScrollPosition(edge: .trailing))
+            var reportedOffsets: [CGFloat] = []
+            let host = WinUIRenderer.running(reducesMotion: true) {
+                ScrollView(.horizontal) {
+                    Text("Wide document").frame(width: 800, height: 40)
+                }
+                .scrollPosition(position.projectedValue)
+                .defaultScrollAnchor(.topLeading)
+                .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.x } action: { _, new in
+                    reportedOffsets.append(new)
+                }
+                .frame(width: 240, height: 80)
+            }
+            let scroll = try XCTUnwrap(host.views(WinUIScrollView.self).first)
+            host.settle { scroll.document.drawnOpacity > 0 && !reportedOffsets.isEmpty }
+            let standing = scroll.scroller.standing
+            XCTAssertGreaterThan(standing.reach.x, 0)
+            XCTAssertEqual(standing.offset.x, standing.reach.x, accuracy: 1)
+            XCTAssertEqual(try XCTUnwrap(reportedOffsets.first), standing.reach.x, accuracy: 1)
+            XCTAssertEqual(scroll.scroller.drawnOpacity, 1)
+            XCTAssertEqual(scroll.document.drawnOpacity, 1)
+            XCTAssertFalse(position.wrappedValue.isPositionedByUser)
         }
     }
 }

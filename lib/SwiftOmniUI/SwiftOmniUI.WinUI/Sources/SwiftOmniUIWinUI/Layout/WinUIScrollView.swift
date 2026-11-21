@@ -56,7 +56,7 @@ final class WinUIScrollView: WinUILayoutView {
     }
 
     let scroller = WinUIScrollerView()
-    private let document = WinUIScrollDocument()
+    let document = WinUIScrollDocument()
 
     /// Holds the content in a stack where the scroller was given more than one child.
     private let wrapper = WinUIStackView(axis: .vertical)
@@ -74,21 +74,13 @@ final class WinUIScrollView: WinUILayoutView {
 
     /// The offset the tree writes, kept for the first layout where it comes before it.
     private var writtenOffset = WrittenScrollOffset()
-    /// Edge pinned by `ScrollPosition(edge:)` until the user scrolls or another
-    /// non-edge destination takes over (so growing LazyVStack content stays anchored).
+    /// The edge to follow as the extent changes, until another move takes over.
     private var pinnedEdge: Edge?
-    var positionRequest: ScrollPositionRequest? {
-        didSet {
-            finishReaderDestination()
-            if positionRequest == nil {
-                swiftomniui_winui_scroller_watch_layout(scroller.handle, number, nil)
-            }
-        }
-    }
+    private var positionRequest: ScrollPositionRequest?
     private var appliedPositionRevision: String?
     private var resolvingPosition = false
-    private var waitingForInitialBottom = false
-
+    private var watchingPosition = false
+    private var waitingForInitialEdge = false
 
     /// Content and indicators resolve the same remaining region. These are
     /// arithmetic values; native margin writes are committed after layout.
@@ -142,9 +134,6 @@ final class WinUIScrollView: WinUILayoutView {
     /// again so its scroll range and thumb follow the same geometry as the rows.
     func invalidateContentExtent() {
         document.invalidateOwnMeasurements()
-        if pinnedEdge == .bottom, !held, positionRequest == nil {
-            schedulePositionResolution()
-        }
     }
 
     /// Where a `.defaultScrollAnchor` asks the scroller to begin: fractions
@@ -179,16 +168,29 @@ final class WinUIScrollView: WinUILayoutView {
             scroller.setModes(vertical: modes.vertical, horizontal: modes.horizontal)
         }
         if let position, position.revision != appliedPositionRevision {
-            if position.edge == .bottom, appliedPositionRevision == nil, scroller.laidOutFrame.height == 0 {
-                waitingForInitialBottom = true
-                scroller.setOpacity(0)
-            } else if position.edge != .bottom {
-                revealInitialBottom()
+            finishReaderDestination()
+            if let edge = position.edge {
+                if !anchoredOnce {
+                    // An explicit edge takes precedence over the default anchor.
+                    anchoredOnce = true
+                    let frame = scroller.laidOutFrame
+                    if frame.width <= 0 || frame.height <= 0 {
+                        waitingForInitialEdge = true
+                        // Keep the viewport and its background drawn while the document finds its edge.
+                        document.setOpacity(0)
+                    }
+                }
+                pinnedEdge = edge
+            } else {
+                pinnedEdge = nil
+                revealInitialEdge()
             }
             appliedPositionRevision = position.revision
             positionRequest = position
-            pinnedEdge = position.edge
             schedulePositionResolution()
+        } else if position == nil, appliedPositionRevision != nil {
+            appliedPositionRevision = nil
+            cancelPosition()
         }
         writtenPadding = padding
         let resolvedPadding = SafeAreaArithmetic.physicalInsets(padding, direction: direction) + barsInsets
@@ -279,9 +281,12 @@ final class WinUIScrollView: WinUILayoutView {
     }
 
     private func schedulePositionResolution() {
-        swiftomniui_winui_scroller_watch_layout(scroller.handle, number) { number in
-            MainActor.assumeIsolated {
-                (WinUIView.find(number) as? WinUIScrollView)?.resolvePositionRequest()
+        if !watchingPosition {
+            watchingPosition = true
+            swiftomniui_winui_scroller_watch_layout(scroller.handle, number) { number in
+                MainActor.assumeIsolated {
+                    (WinUIView.find(number) as? WinUIScrollView)?.resolvePositionRequest()
+                }
             }
         }
         WinUIDoorbell.afterPass { [weak self] in
@@ -289,19 +294,24 @@ final class WinUIScrollView: WinUILayoutView {
         }
     }
 
+    private func stopWatchingPosition() {
+        guard watchingPosition else { return }
+        watchingPosition = false
+        swiftomniui_winui_scroller_watch_layout(scroller.handle, number, nil)
+    }
+
+    private func cancelPosition() {
+        positionRequest = nil
+        pinnedEdge = nil
+        stopWatchingPosition()
+        revealInitialEdge()
+    }
+
     /// The native viewport extends under bars; its document alone reserves
     /// their region. Descendants receive a consumed context, independent of
     /// the document's moving origin and of any enclosing scroller.
     override func arrange(in bounds: Rect) {
         for proposal in preparedLayoutPlan(in: bounds) { proposal.view?.layout(proposal.place) }
-        // Initial offsets/anchors wait for the resolved document extent.
-        if positionRequest != nil || (pinnedEdge == .bottom && !held) {
-            swiftomniui_winui_scroller_watch_layout(scroller.handle, number) { number in
-                MainActor.assumeIsolated {
-                    (WinUIView.find(number) as? WinUIScrollView)?.resolvePositionRequest()
-                }
-            }
-        }
         guard document.padding == document.layoutPadding else { return }
         if let target = writtenOffset.laidOutNow() {
             move(to: target)
@@ -314,54 +324,48 @@ final class WinUIScrollView: WinUILayoutView {
     }
 
     private func resolvePositionRequest() {
-        guard !detached, !resolvingPosition, document.padding == document.layoutPadding else { return }
+        guard watchingPosition, !detached, !resolvingPosition, !held,
+              document.padding == document.layoutPadding else { return }
         resolvingPosition = true
         defer { resolvingPosition = false }
 
         let standing = scroller.standing
-        if waitingForInitialBottom, scroller.laidOutFrame.height > 0,
-           !ScrollArithmetic.differs(standing.offset, Point(standing.offset.x, standing.reach.y)) {
-            revealInitialBottom()
-        }
-        guard let request = positionRequest else {
-            if pinnedEdge == .bottom, !held {
-                let target = Point(x: standing.offset.x, y: standing.reach.y)
-                if standing.reach.y > 0, ScrollArithmetic.differs(standing.offset, target) {
-                    move(to: target)
-                }
+        if let edge = pinnedEdge {
+            // A zero range is valid for short documents once WinUI has a real viewport.
+            if waitingForInitialEdge, case .notReady = scroller.viewport(of: document) { return }
+            var target = standing.offset
+            switch edge {
+            case .top: target.y = 0
+            case .bottom: target.y = standing.reach.y
+            case .leading: target.x = direction == .rightToLeft ? standing.reach.x : 0
+            case .trailing: target.x = direction == .rightToLeft ? 0 : standing.reach.x
+            }
+            if !ScrollArithmetic.differs(standing.offset, target) {
+                positionRequest = nil
+                revealInitialEdge()
+            } else if programTarget != target || !swiftomniui_winui_scroller_jump_pending(scroller.handle) {
+                move(to: target)
             }
             return
         }
+        guard let request = positionRequest else { return }
         if let id = request.id {
             guard let root = sourceElement else { return }
             positionRequest = nil
-            pinnedEdge = nil
+            stopWatchingPosition()
             scroll(to: id, in: root, anchorX: request.anchor?.x, anchorY: request.anchor?.y)
             return
         }
-        // Keep the bottom request pending until content has scrollable height
-        // (matching GTK and SwiftUI's `ScrollPosition(edge: .bottom)`).
-        if request.edge == .bottom && standing.reach.y <= 0 {
-            return
-        }
-        var target = standing.offset
-        if let x = request.x { target.x = x }
-        if let y = request.y { target.y = y }
-        switch request.edge {
-        case .top: target.y = 0
-        case .bottom: target.y = standing.reach.y
-        case .leading: target.x = direction == .rightToLeft ? standing.reach.x : 0
-        case .trailing: target.x = direction == .rightToLeft ? 0 : standing.reach.x
-        case nil: break
-        }
         positionRequest = nil
-        move(to: target)
+        stopWatchingPosition()
+        move(to: Point(x: request.x ?? standing.offset.x, y: request.y ?? standing.offset.y))
     }
 
-    private func revealInitialBottom() {
-        guard waitingForInitialBottom else { return }
-        waitingForInitialBottom = false
-        scroller.setOpacity(1)
+    private func revealInitialEdge() {
+        guard waitingForInitialEdge else { return }
+        waitingForInitialEdge = false
+        document.setOpacity(1)
+        onGeometryChanged?()
     }
 
     // MARK: - The user's movement
@@ -369,10 +373,6 @@ final class WinUIScrollView: WinUILayoutView {
     /// The scroller's view changed: the program's move arriving, or the user's, joined to the moves before it until
     /// the display's next frame.
     private func scrolled(to standing: Point) {
-        if waitingForInitialBottom, scroller.laidOutFrame.height > 0,
-           !ScrollArithmetic.differs(standing, Point(standing.x, scroller.standing.reach.y)) {
-            revealInitialBottom()
-        }
         guard standing != offset else { return }
         let previous = offset
         offset = standing
@@ -390,9 +390,8 @@ final class WinUIScrollView: WinUILayoutView {
         }
         // Suppress binding feedback, not the native position itself. Layout
         // anchoring can change that position while a tree patch is being applied.
-        guard !ProgramWrite.isWriting else { return }
-        revealInitialBottom()
-        pinnedEdge = nil
+        guard !ProgramWrite.isWriting, !waitingForInitialEdge else { return }
+        cancelPosition()
         movement.userMoved(from: previous, to: standing)
     }
 
@@ -405,9 +404,7 @@ final class WinUIScrollView: WinUILayoutView {
         lazyInterval = Point(0, 0)
         lazyObservationLead = Point(0, 0)
         if holding {
-            revealInitialBottom()
-            positionRequest = nil
-            pinnedEdge = nil
+            cancelPosition()
             finishReaderDestination()
             programTarget = nil
             movement.holdBegan()
@@ -495,9 +492,9 @@ final class WinUIScrollView: WinUILayoutView {
     }
 
     override func detach() {
-        positionRequest = nil
-        finishReaderDestination()
         detached = true
+        stopWatchingPosition()
+        finishReaderDestination()
         pendingInsets = nil
         super.detach()
         onOffsetChanged = nil
@@ -527,6 +524,7 @@ final class WinUIScrollView: WinUILayoutView {
         }
         let lazy = lazyTarget(in: root)
         guard lazy != nil || root.first(id: .manual(name)) != nil else { return false }
+        cancelPosition()
         readerRoot = root
         readerLazy = lazy?.0
         readerIdentity = lazy?.1
@@ -555,7 +553,10 @@ final class WinUIScrollView: WinUILayoutView {
     }
 
     /// An explicit native scrollbar request supersedes an unfinished reader jump.
-    func cancelReaderDestination() { finishReaderDestination() }
+    func cancelReaderDestination() {
+        finishReaderDestination()
+        cancelPosition()
+    }
 
     private func resolveReaderDestination() {
         guard !resolvingReader, let request = readerDestination, let root = readerRoot else { return }
@@ -614,7 +615,8 @@ final class WinUIScrollView: WinUILayoutView {
         move(to: Point(x: place[0], y: place[1]))
     }
 
-    var scrollGeometryNumbers: [Double] {
+    var scrollGeometryNumbers: [Double]? {
+        guard !waitingForInitialEdge else { return nil }
         let standing = scroller.standing.offset
         let content = document.contentPlacedSize
         let insets = document.layoutPadding

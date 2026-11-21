@@ -589,7 +589,14 @@ class WinUIView {
         self.transform = transform
         writeTransform()
         refreshNativeSafeBarDrawing()
-        WinUIRenderer.shared?.runtime.frames.laidOut()
+        // A render transform changes only the pixels around an already laid
+        // out slot. Most views therefore need no frame-report pass here.
+        // Keep it only for a view that explicitly reads its own transformed
+        // frame. Treating every scale/offset sample as layout completion makes
+        // a native control remeasure while a transition is still running.
+        if sourceElement?.readsOwnFrame == true {
+            WinUIRenderer.shared?.runtime.frames.laidOut()
+        }
     }
 
     /// How the view is drawn over its place: its own transform with a placing layout's over it
@@ -961,8 +968,10 @@ class WinUIView {
     // A placement context already supplies the safe region. Resolve a window
     // fallback only when needed, and reuse the caller's native frame read.
     func frameReport(safeArea: @autoclosure () -> Rect, frame actualFrame: Rect? = nil,
-                     cache: WinUIFrameReportCache? = nil, generation: UInt64 = 0) -> [Double] {
-        let document = cache?.documentCoordinates(of: self, generation: generation)
+                     cache: WinUIFrameReportCache? = nil, generation: UInt64 = 0,
+                     layoutGeneration: UInt64? = nil) -> [Double] {
+        let document = cache?.documentCoordinates(
+            of: self, generation: generation, layoutGeneration: layoutGeneration)
         let corner = document.flatMap { cache?.rootOrigin(of: $0) } ?? origin
         let local = safeAreaContext?.safe
         let safe = local.map { Rect(corner.x + $0.x, corner.y + $0.y, $0.width, $0.height) } ?? safeArea()
@@ -1281,30 +1290,43 @@ final class WinUIFrameReportCache {
             Point(point.x * m11 + point.y * m21 + offsetX, point.x * m12 + point.y * m22 + offsetY)
         }
     }
+    /// A scroll changes the document's root translation, but it does not
+    /// change the local path from a label to that document. Keep that path
+    /// across scroll reports and discard it only after a real layout pass.
     private var generation: UInt64?
+    private var layoutGeneration: UInt64?
     private var coordinates: [Int64: Coordinates] = [:]
     private var unsupported: Set<Int64> = []
     private var documentMatrices: [Int64: DocumentMatrix] = [:]
     private var transformedDocuments: Set<Int64> = []
     private var safeAreas: [UInt64: Rect] = [:]
 
-    private func resetIfNeeded(generation: UInt64) {
+    private func resetIfNeeded(generation: UInt64, layoutGeneration: UInt64? = nil) {
+        if let layoutGeneration, self.layoutGeneration != layoutGeneration {
+            coordinates.removeAll(keepingCapacity: true)
+            unsupported.removeAll(keepingCapacity: true)
+            safeAreas.removeAll(keepingCapacity: true)
+            self.layoutGeneration = layoutGeneration
+        }
+        if layoutGeneration == nil, self.generation != generation {
+            coordinates.removeAll(keepingCapacity: true)
+            unsupported.removeAll(keepingCapacity: true)
+            safeAreas.removeAll(keepingCapacity: true)
+        }
         guard self.generation != generation else { return }
-        coordinates.removeAll(keepingCapacity: true)
-        unsupported.removeAll(keepingCapacity: true)
         documentMatrices.removeAll(keepingCapacity: true)
         transformedDocuments.removeAll(keepingCapacity: true)
-        safeAreas.removeAll(keepingCapacity: true)
         self.generation = generation
     }
 
-    func documentCoordinates(of view: WinUIView, generation: UInt64) -> Coordinates? {
-        resetIfNeeded(generation: generation)
+    func documentCoordinates(of view: WinUIView, generation: UInt64, layoutGeneration: UInt64?) -> Coordinates? {
+        resetIfNeeded(generation: generation, layoutGeneration: layoutGeneration)
         return read(view)
     }
 
-    func safeArea(of element: MountedElement, in host: WinUIRenderer, generation: UInt64) -> Rect {
-        resetIfNeeded(generation: generation)
+    func safeArea(of element: MountedElement, in host: WinUIRenderer, generation: UInt64,
+                  layoutGeneration: UInt64? = nil) -> Rect {
+        resetIfNeeded(generation: generation, layoutGeneration: layoutGeneration)
         if let cached = safeAreas[element.mount] { return cached }
         let area = host.safeArea(of: element)
         safeAreas[element.mount] = area

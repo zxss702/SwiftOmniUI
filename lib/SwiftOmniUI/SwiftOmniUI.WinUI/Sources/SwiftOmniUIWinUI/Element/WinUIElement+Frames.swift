@@ -34,15 +34,19 @@ extension WinUIElement: FrameReporter {
             let frame = ancestorView.laidOutFrame(forLayoutGeneration: layoutGeneration)
             return Rect(x: origin.x, y: origin.y, width: frame.width, height: frame.height)
         }
-        if let scroll = view as? WinUIScrollView, element.events[.scrollGeometryChanged] != nil {
-            element.reportScrollGeometry(scroll.scrollGeometryNumbers, in: host.runtime)
+        if let scroll = view as? WinUIScrollView, element.events[.scrollGeometryChanged] != nil,
+           let numbers = scroll.scrollGeometryNumbers {
+            element.reportScrollGeometry(numbers, in: host.runtime)
         }
         let reportGeneration = host.runtime.frames.reportGeneration
         element.reportFrame(
             view.frameReport(
-                safeArea: host.frameReportCache.safeArea(of: element, in: host, generation: reportGeneration),
+                safeArea: host.frameReportCache.safeArea(
+                    of: element, in: host, generation: reportGeneration,
+                    layoutGeneration: layoutGeneration),
                 frame: frame,
-                cache: host.frameReportCache, generation: reportGeneration),
+                cache: host.frameReportCache, generation: reportGeneration,
+                layoutGeneration: layoutGeneration),
             named: named, in: host.runtime,
             geometryInsets: view.safeAreaContext?.insets)
     }
