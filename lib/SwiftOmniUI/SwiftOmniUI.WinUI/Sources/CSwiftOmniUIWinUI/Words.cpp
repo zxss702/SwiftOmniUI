@@ -690,6 +690,8 @@ extern "C" void swiftomniui_winui_text_set_runs(SwiftOmniUIObjectRef handle, Swi
                     if (run.underline) decorations = decorations | TextDecorations::Underline;
                     if (run.strikethrough) decorations = decorations | TextDecorations::Strikethrough;
                     part.TextDecorations(decorations);
+                    // The inline's plain text gets a native Run before it is measured.
+                    (void)part.ContentStart();
                     part.Measure({INFINITY, INFINITY});
                     auto height = static_cast<double>(part.DesiredSize().Height);
                     controls::Border room;
@@ -969,22 +971,6 @@ extern "C" double swiftomniui_winui_text_whitespace_width(SwiftOmniUIObjectRef h
         widths.emplace(key, width);
         return width;
     } catch (...) { report("measuring whitespace in a text flow"); return 0; }
-}
-
-static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity,
-                                     int32_t *lineCount, bool reuseLeadingCarets);
-
-extern "C" int32_t swiftomniui_winui_text_character_rects(
-    SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity
-) {
-    // Keep the compatibility reader's two-affinity path as a geometry reference.
-    return readCharacterGeometry(handle, rectangles, capacity, nullptr, false);
-}
-
-extern "C" int32_t swiftomniui_winui_text_character_geometry(
-    SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity, int32_t *lineCount
-) {
-    return readCharacterGeometry(handle, rectangles, capacity, lineCount, true);
 }
 
 static winrt::com_ptr<IDWriteFactory> dwriteWordsFactory() {
@@ -1461,6 +1447,56 @@ static int32_t readInlineRunGeometry(
 }
 
 static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity,
+                                     int32_t *lineCount, bool reuseLeadingCarets);
+
+static int32_t selectionGeometry(SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity,
+                                 int32_t *lineCount, bool reuseLeadingCarets, bool *isNative = nullptr) {
+    auto count = readCharacterGeometry(handle, rectangles, capacity, lineCount, reuseLeadingCarets);
+    auto native = count == capacity && count > 0;
+    if (isNative) *isNative = native;
+    if (native) return count;
+
+    // A lazy row can retain its displayed size while XAML invalidates the
+    // text pointers. Keep its text selectable while native reflow is pending.
+    if (lineCount) *lineCount = 0;
+    try {
+        auto block = labelWords(handle);
+        auto rich = richWords(handle);
+        auto visual = rich ? rich.as<xaml::UIElement>() : block.as<xaml::UIElement>();
+        return readInlineRunGeometry(
+            block, rich, visual, as<xaml::UIElement>(handle), rectangles, capacity, lineCount);
+    } catch (...) { report("reading fallback text geometry"); return 0; }
+}
+
+extern "C" void swiftomniui_winui_text_prepare_geometry(SwiftOmniUIObjectRef handle) {
+    try {
+        // XAML can create its inline collection and text view on first access.
+        // Initialize them before the layout pass that supplies the glyph positions.
+        if (auto rich = richWords(handle)) (void)rich.ContentStart();
+        else (void)labelWords(handle).ContentStart();
+    } catch (...) { report("preparing native text geometry"); }
+}
+
+extern "C" int32_t swiftomniui_winui_text_character_rects(
+    SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity
+) {
+    // Keep the compatibility reader's two-affinity path as a geometry reference.
+    return selectionGeometry(handle, rectangles, capacity, nullptr, false);
+}
+
+extern "C" int32_t swiftomniui_winui_text_character_geometry(
+    SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity, int32_t *lineCount
+) {
+    return selectionGeometry(handle, rectangles, capacity, lineCount, true);
+}
+
+extern "C" int32_t swiftomniui_winui_text_selection_geometry(
+    SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity, bool *isNative
+) {
+    return selectionGeometry(handle, rectangles, capacity, nullptr, true, isNative);
+}
+
+static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectangles, int32_t capacity,
                                      int32_t *lineCount, bool reuseLeadingCarets) {
     if (lineCount) *lineCount = 0;
     try {
@@ -1469,6 +1505,9 @@ static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectan
         int32_t at = 0;
         auto rich = richWords(handle);
         auto visual = rich ? rich.as<xaml::UIElement>() : block.as<xaml::UIElement>();
+        auto element = visual.as<xaml::FrameworkElement>();
+        if (element.ActualWidth() <= 0 || element.ActualHeight() <= 0) return 0;
+        swiftomniui_winui_text_prepare_geometry(handle);
         auto transform = visual.TransformToVisual(coordinates);
         // The text normally sits in its Border with only a vertical alignment
         // offset. Snapshot that translation once instead of invoking XAML's
@@ -1493,12 +1532,12 @@ static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectan
         std::map<float, Row> rows;
         std::vector<Glyph> glyphs;
         glyphs.reserve(std::max(0, capacity));
-        // For a unidirectional LTR document, the next leading caret is the
-        // current trailing caret except at a line/run boundary. Read it once
-        // and reuse it for the following character. Mixed bidi documents keep
-        // both native affinities; guessing at their run boundaries is unsafe.
+        // In a unidirectional TextBlock, the next leading caret can supply
+        // the current trailing edge within the same line and run. Bidi text
+        // and RichTextBlock paragraphs need both native caret positions.
         auto plain = block.Text();
-        bool leadingCarets = reuseLeadingCarets && block.FlowDirection() == xaml::FlowDirection::LeftToRight && !plain.empty();
+        bool leadingCarets = reuseLeadingCarets && !rich
+            && block.FlowDirection() == xaml::FlowDirection::LeftToRight && !plain.empty();
         if (leadingCarets) {
             std::vector<WORD> directions(plain.size());
             std::vector<WORD> clusters(plain.size());
@@ -1544,7 +1583,8 @@ static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectan
                 if (next) {
                     if (leadingCarets && i + 1 < static_cast<int32_t>(string.size()))
                         nextLeading = next.GetCharacterRect(documents::LogicalDirection::Forward);
-                    auto end = nextLeading && nextLeading->Height > 0 && std::abs(rect.Y - nextLeading->Y) < 0.5f
+                    auto end = nextLeading && nextLeading->Height > 0 && rect.X != nextLeading->X
+                            && std::abs(rect.Y - nextLeading->Y) < 0.5f
                         ? *nextLeading : next.GetCharacterRect(documents::LogicalDirection::Backward);
                     if (rect.Height > 0 && end.Height > 0 && std::abs(rect.Y - end.Y) < 0.5f) {
                         auto left = std::min(rect.X, end.X);
@@ -1562,11 +1602,58 @@ static int32_t readCharacterGeometry(SwiftOmniUIObjectRef handle, double *rectan
         auto metricsFor = [&](controls::TextBlock const &owner, documents::Run const &run = nullptr) {
             return advance > 0 ? naturalWordsMetrics(owner, run) : NaturalWordsMetrics{};
         };
-        if (rich || block.Inlines().Size() > 0 || !block.Text().empty())
-            return readInlineRunGeometry(block, rich, visual, coordinates, rectangles, capacity, lineCount);
-        auto words = block.Text();
-        append(block.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(block));
-        if (!valid || (at > 0 && rows.empty())) return 0; // Native Arrange has not supplied visible positions.
+        // Walk the visible XAML control's runs, excluding the structural
+        // offsets between runs from the returned UTF-16 character positions.
+        if (!rich && block.Inlines().Size() == 0) {
+            auto words = block.Text();
+            append(block.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(block));
+        } else {
+            std::function<void(documents::Inline const &)> visit = [&](documents::Inline const &inlineValue) {
+                if (auto run = inlineValue.try_as<documents::Run>()) {
+                    auto words = run.Text();
+                    append(run.ContentStart(), std::wstring_view(words.c_str(), words.size()), metricsFor(block, run));
+                } else if (auto span = inlineValue.try_as<documents::Span>()) {
+                    for (auto const &child : span.Inlines()) visit(child);
+                } else if (auto holder = inlineValue.try_as<documents::InlineUIContainer>()) {
+                    auto content = inlineContent(holder);
+                    if (auto child = content.try_as<controls::TextBlock>()) {
+                        auto words = child.Text();
+                        auto inlines = child.Inlines();
+                        if (!words.empty() && inlines.Size() > 0) {
+                            // TextBlock's start includes structural positions. Its
+                            // generated Run starts at the first actual character.
+                            append(inlines.GetAt(0).ContentStart(), std::wstring_view(words.c_str(), words.size()),
+                                   metricsFor(child), child, holder.ContentStart());
+                        }
+                    } else if (content && at < capacity) {
+                        auto height = content.ActualHeight();
+                        auto baseline = height;
+                        if (auto paragraph = holder.Child().try_as<controls::RichTextBlock>()) baseline = paragraph.BaselineOffset();
+                        auto position = holder.ContentStart().GetCharacterRect(documents::LogicalDirection::Forward);
+                        auto row = rowAt(position, {height, baseline});
+                        auto rect = position.Height > 0 ? content.TransformToVisual(visual).TransformBounds(
+                            {0, 0, static_cast<float>(content.ActualWidth()), static_cast<float>(height)})
+                            : winrt::Windows::Foundation::Rect{};
+                        glyphs.push_back({rect, row, true}); ++at;
+                    } else if (at < capacity) {
+                        append(inlineValue.ContentStart(), L"\uFFFC", metricsFor(block));
+                    }
+                } else if (inlineValue.try_as<documents::LineBreak>()) {
+                    append(inlineValue.ContentStart(), L"\n", metricsFor(block));
+                } else {
+                    append(inlineValue.ContentStart(), L"\uFFFC", metricsFor(block));
+                }
+            };
+            if (rich) {
+                for (auto const &value : rich.Blocks()) if (auto paragraph = value.try_as<documents::Paragraph>())
+                    for (auto const &inlineValue : paragraph.Inlines()) visit(inlineValue);
+            } else {
+                for (auto const &inlineValue : block.Inlines()) visit(inlineValue);
+            }
+        }
+        if (!valid || rows.empty() || std::none_of(glyphs.begin(), glyphs.end(), [](Glyph const &glyph) {
+            return glyph.rect.Width > 0 && glyph.rect.Height > 0;
+        })) return 0;
         if (lineCount) *lineCount = static_cast<int32_t>(std::max<size_t>(1, rows.size()));
         NaturalWordsMetrics defaults{};
         if (advance > 0) defaults = naturalWordsMetrics(block);

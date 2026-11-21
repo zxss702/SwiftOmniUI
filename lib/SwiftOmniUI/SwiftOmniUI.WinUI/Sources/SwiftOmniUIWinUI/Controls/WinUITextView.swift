@@ -91,7 +91,10 @@ class WinUITextView: WinUIView {
     }
 
     var onTextLayout: ((TextLayoutReport) -> Void)? {
-        didSet { if onTextLayout != nil { requestTextLayout() } }
+        didSet {
+            if oldValue == nil { prepareTextLayout() }
+            requestTextLayout()
+        }
     }
     private var textLayoutPending = false
     private var lastTextLayoutSize: LayoutSize?
@@ -103,6 +106,11 @@ class WinUITextView: WinUIView {
         textLayoutRevision &+= 1
         textLayoutDirty = true
         requestTextLayout()
+    }
+
+    func prepareTextLayout() {
+        guard onTextLayout != nil else { return }
+        swiftomniui_winui_text_prepare_geometry(handle)
     }
 
     override func commitGeometry(in bounds: Rect) {
@@ -197,13 +205,17 @@ class WinUITextView: WinUIView {
         }
         var rectangles = [Double](repeating: 0, count: count * 4)
         let nativeStart = Self.textWorkObserver == nil ? 0 : WinUIFrameClock.monotonic()
-        guard swiftomniui_winui_text_character_geometry(handle, &rectangles, Int32(count), nil) == count,
+        var isNative = false
+        guard swiftomniui_winui_text_selection_geometry(handle, &rectangles, Int32(count), &isNative) == count,
               stride(from: 3, to: rectangles.count, by: 4).contains(where: { rectangles[$0] > 0 }) else {
             awaitNativeTextLayout()
             return nil
         }
+        if !isNative { awaitNativeTextLayout() }
         Self.textWorkObserver?("native-geometry", WinUIFrameClock.monotonic() - nativeStart)
         let swiftStart = Self.textWorkObserver == nil ? 0 : WinUIFrameClock.monotonic()
+        // A delayed batch must not replace a newer native report with its estimate.
+        textLayoutRevision &+= 1
         textLayoutDirty = false
         lastTextLayoutSize = LayoutSize(width: laidOutFrame.width, height: laidOutFrame.height)
         var offset = 0, line = 0
@@ -239,6 +251,7 @@ class WinUITextView: WinUIView {
             MainActor.assumeIsolated {
                 guard let text = WinUIView.find(number) as? WinUITextView else { return }
                 text.textLayoutAwaitingNative = false
+                text.textLayoutDirty = true
                 text.requestTextLayout()
             }
         }
@@ -252,6 +265,7 @@ class WinUITextView: WinUIView {
     /// The words shown.
     func setText(_ text: String) {
         swiftomniui_winui_text_set_text(handle, text)
+        prepareTextLayout()
         discardMeasurementResults()
         invalidateTextLayout()
     }

@@ -234,13 +234,14 @@ extern "C" void swiftomniui_winui_text_after_layout(
     SwiftOmniUIObjectRef handle, int64_t view, void (*ready)(int64_t)
 ) {
     try {
-        auto block = borrow<controls::Border>(handle).Child().as<xaml::FrameworkElement>();
+        auto label = borrow<controls::Border>(handle);
         auto token = std::make_shared<winrt::event_token>();
-        *token = block.LayoutUpdated(guarded("publishing arranged text geometry",
-            [weak = winrt::make_weak(block), token, view, ready](auto const &, auto const &) {
-                if (auto block = weak.get()) {
-                    if (!block.IsLoaded() || block.ActualWidth() <= 0 || block.ActualHeight() <= 0) return;
-                    block.LayoutUpdated(*token);
+        *token = label.LayoutUpdated(guarded("publishing arranged text geometry",
+            [weak = winrt::make_weak(label), token, view, ready](auto const &, auto const &) {
+                if (auto label = weak.get()) {
+                    auto block = label.Child().try_as<xaml::FrameworkElement>();
+                    if (!block || !block.IsLoaded() || block.ActualWidth() <= 0 || block.ActualHeight() <= 0) return;
+                    label.LayoutUpdated(*token);
                     if (ready) ready(view);
                 }
             }));

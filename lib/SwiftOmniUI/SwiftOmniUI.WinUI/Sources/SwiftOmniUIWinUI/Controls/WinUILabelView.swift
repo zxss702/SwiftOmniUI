@@ -121,6 +121,7 @@ final class WinUILabelView: WinUITextView {
             }
         }
         if !repainted {
+            prepareTextLayout()
             invalidateMeasure()
         }
     }
