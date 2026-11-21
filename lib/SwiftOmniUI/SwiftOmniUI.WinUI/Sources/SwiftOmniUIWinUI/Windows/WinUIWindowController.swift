@@ -41,10 +41,11 @@ final class WinUIWindowController {
         if let overlay = changes.overlay { window.showOverlay(overlay?.winUI.view) }
         if runtime.tree.chromeMayChange || changes.arrangement != nil || changes.traits != nil { refreshChrome(in: runtime) }
         let page = presentation.arrangement?.visiblePage
-        let navigation = presentation.arrangement?.visibleNavigationStack != nil
-            || presentation.arrangement?.visibleSplitView != nil
-        // Standalone content (including popovers) retains local inset hosting.
-        window.showTopSafeAreaBars(navigation ? page?.pageTopSafeAreaBars ?? [] : [], in: navigation ? page : nil)
+        // A navigation page's bars travel inside the page's native viewport.
+        // Standalone split columns still use the native window bar host.
+        let promotesBars = presentation.arrangement?.visibleNavigationStack == nil
+            && presentation.arrangement?.visibleSplitView != nil
+        window.showTopSafeAreaBars(promotesBars ? page?.pageTopSafeAreaBars ?? [] : [], in: promotesBars ? page : nil)
         let screenFrame = element.value(.screenFrame).flatMap(Rect.init(propValue:))
         if let screenFrame {
             // The desktop rectangle owns this window's size across presentations.
@@ -160,6 +161,16 @@ final class WinUIWindowController {
     func refreshChrome(in runtime: HostRuntime) {
         guard let element else { return }
 
+        let stack = presentation.arrangement?.visibleNavigationStack?.winUI.view as? WinUINavigationView
+        if let stack, stack.items.last?.view !== stack.presentedPage {
+            stack.onPagePresented = { [weak self, weak stack, weak runtime] in
+                guard let self, let stack, let runtime,
+                      self.presentation.arrangement?.visibleNavigationStack?.winUI.view === stack else { return }
+                self.refreshChrome(in: runtime)
+            }
+            return
+        }
+        stack?.onPagePresented = nil
         let composed = WindowChrome(window: element, arrangement: presentation.arrangement)
         var chrome = WinUIWindowChrome()
         chrome.title = composed.title ?? ""
@@ -200,7 +211,7 @@ final class WinUIWindowController {
                 dismiss: { [weak self] in self?.dismissTopSheet(in: runtime) })
         }
         window.setBackground(composed.windowBackground)
-        window.apply(chrome, tabs: windowTabs)
+        window.apply(chrome, tabs: windowTabs, navigationDirection: stack?.takeChromeDirection() ?? 0)
     }
 
     /// A page's toolbar entry as a command of the chrome: a spacer's room, the view an item carries, or a

@@ -13,6 +13,14 @@ import CSwiftOmniUIWinUI
 @MainActor
 final class WinUINavigationView: WinUILayoutView {
     private var depth = 0
+    private(set) weak var presentedPage: WinUIView?
+    private var chromeDirection: Int32 = 0
+    var onPagePresented: (() -> Void)?
+
+    func takeChromeDirection() -> Int32 {
+        defer { chromeDirection = 0 }
+        return chromeDirection
+    }
 
     override init() {
         super.init { swiftomniui_winui_navigation_make($0) }
@@ -25,37 +33,44 @@ final class WinUINavigationView: WinUILayoutView {
             release(previous.view)
         }
         let changed = super.setItems(items)
-        for item in items {
-            let page = item.view
-            // Frame/Page owns the native page's proposal and placement. Keeping
-            // a Swift placing parent makes its MeasureOverride return zero and
-            // allows two different widths to be arranged onto the same page.
-            page.placingLayout = nil
-            guard page.nativeLayoutOwner !== self else { continue }
-            page.nativeLayoutOwner = self
-            page.rootSafeAreaContext = { [weak self, weak page] bounds in
-                guard let self, let page else { return SafeAreaContext(bounds: bounds) }
-                // Frame/Page now receive the extended native viewport. Convert
-                // the original proposal once; resizing that already-expanded
-                // proposal before conversion would add the chrome twice.
-                let inherited = self.layoutSafeArea(in: bounds).bounds
-                let top = max(0, bounds.y - inherited.y)
-                let bottom = max(0, inherited.y + inherited.height - bounds.y - bounds.height)
-                let proposal = Rect(0, 0, bounds.width, max(0, bounds.height - top - bottom))
-                let frame = Rect(0, -top, bounds.width, bounds.height)
-                return self.layoutSafeArea(in: proposal)
-                    .child(in: frame, preservingOutsets: page.carriesSafeAreaOutsets)
-                    .resizedLayout(to: bounds)
-            }
-            page.safeAreaContext = nil
-        }
+        for item in items { bindPageLayout(item.view) }
         return changed
     }
 
+    private func bindPageLayout(_ page: WinUIView) {
+        // The native Frame measures and places this page as a single subtree.
+        page.placingLayout = nil
+        guard page.nativeLayoutOwner !== self else { return }
+        page.nativeLayoutOwner = self
+        page.rootSafeAreaContext = { [weak self, weak page] bounds in
+            guard let self, let page else { return SafeAreaContext(bounds: bounds) }
+            // Undo the native viewport's extension before deriving the safe area.
+            let inherited = self.layoutSafeArea(in: bounds).bounds
+            let top = max(0, bounds.y - inherited.y)
+            let bottom = max(0, inherited.y + inherited.height - bounds.y - bounds.height)
+            let proposal = Rect(0, 0, bounds.width, max(0, bounds.height - top - bottom))
+            let frame = Rect(0, -top, bounds.width, bounds.height)
+            return self.layoutSafeArea(in: proposal)
+                .child(in: frame, preservingOutsets: page.carriesSafeAreaOutsets)
+                .resizedLayout(to: bounds)
+        }
+        page.safeAreaContext = nil
+    }
+
     override func holdNativeChildren(_ handles: [SwiftOmniUIObjectRef?]) {
-        swiftomniui_winui_navigation_set(handle, boxView?.presentationHandle, items.last?.view.presentationHandle,
-                                         depth > 0, items.count < depth)
+        let page = items.last?.view
+        // Frame.Navigate can measure immediately. The first native proposal
+        // must already include the inset bar's safe area.
+        if let page { bindPageLayout(page) }
+        let animated = depth > 0 && page !== presentedPage && sourceElement?.winUI.host?.runtime.reducesMotion() != true
+        let direction = swiftomniui_winui_navigation_set(handle, boxView?.presentationHandle, page?.presentationHandle,
+                                                         animated, items.count < depth)
         depth = items.count
+        if presentedPage !== page {
+            presentedPage = page
+            chromeDirection = direction
+            onPagePresented?()
+        }
     }
 
     override func heldViews() -> [WinUIView] {

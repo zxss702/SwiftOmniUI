@@ -271,8 +271,8 @@ namespace {
     /// What a window's chrome holds: its title, its way back, its toggle, its colours and its actions - each action
     /// by its label, "!" before one that cannot be chosen, the overflow's after "|".
     std::optional<std::string> chrome(controls::TitleBar const &bar, std::string_view what) {
-        if (what == "title") return narrow(bar.Title());
-        if (what == "subtitle") return narrow(bar.Subtitle());
+        if (what == "title") return narrow(navigationTitleWord(bar, false));
+        if (what == "subtitle") return narrow(navigationTitleWord(bar, true));
         if (what == "back") return flag(bar.IsBackButtonVisible());
         if (what == "paneToggle") return flag(bar.IsPaneToggleButtonVisible());
         if (what == "background") return colour(bar.Background());

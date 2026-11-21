@@ -13,6 +13,9 @@
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
+#include <winrt/Microsoft.UI.Xaml.Hosting.h>
+#include <winrt/Microsoft.UI.Xaml.Navigation.h>
+#include <winrt/Windows.UI.Xaml.Interop.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 #include <winrt/Microsoft.UI.Content.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -23,6 +26,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <optional>
 #include <vector>
 #include <winrt/Microsoft.UI.Windowing.h>
 
@@ -109,6 +113,190 @@ namespace {
     /// The title bar's left header: the app menu's button first, then the authored leading content.
     controls::StackPanel leftHeader(controls::TitleBar const &bar) {
         return bar.LeftHeader().as<controls::StackPanel>();
+    }
+
+    namespace animation = media::Animation;
+    using Size = winrt::Windows::Foundation::Size;
+    using TimeSpan = winrt::Windows::Foundation::TimeSpan;
+
+    struct NavigationWord : controls::PanelT<NavigationWord> {
+        controls::Frame frame;
+        media::RectangleGeometry clip;
+        media::CompositionTarget::Rendering_revoker frames;
+        std::optional<TimeSpan> start;
+        std::optional<float> outgoingWidth;
+        double textOpacity = 1;
+
+        NavigationWord() {
+            frame.IsNavigationStackEnabled(false);
+            frame.IsTabStop(false);
+            frame.HorizontalContentAlignment(xaml::HorizontalAlignment::Stretch);
+            animation::TransitionCollection transitions;
+            transitions.Append(animation::NavigationThemeTransition());
+            frame.ContentTransitions(transitions);
+            frame.Navigated(guarded("presenting title text", [](auto const &, xaml::Navigation::NavigationEventArgs const &args) {
+                auto page = args.Content().as<controls::Page>();
+                page.Content(args.Parameter().as<xaml::UIElement>());
+                page.IsTabStop(false);
+            }));
+            Children().Append(frame);
+            Clip(clip);
+            VerticalAlignment(xaml::VerticalAlignment::Center);
+            Unloaded([this](auto const &, auto const &) { finish(); });
+        }
+
+        void finish() {
+            frames.revoke();
+            start.reset();
+            if (outgoingWidth) InvalidateMeasure();
+            outgoingWidth.reset();
+            fitClip(ActualSize());
+        }
+
+        void fitClip(winrt::Windows::Foundation::Numerics::float2 size) {
+            const winrt::Windows::Foundation::Rect bounds{0, 0, outgoingWidth.value_or(size.x), size.y};
+            if (clip.Rect() != bounds) clip.Rect(bounds);
+        }
+
+        controls::TextBlock label() {
+            auto page = frame.Content().try_as<controls::Page>();
+            return page ? page.Content().try_as<controls::TextBlock>() : nullptr;
+        }
+
+        winrt::hstring value() {
+            auto text = label();
+            return text ? text.Text() : winrt::hstring{};
+        }
+
+        void foreground(media::Brush const &brush) {
+            if (auto text = label()) {
+                if (text.Foreground() == brush) return;
+                if (brush) text.Foreground(brush);
+                else text.ClearValue(controls::TextBlock::ForegroundProperty());
+            }
+        }
+
+        void show(winrt::hstring const &text, media::Brush const &brush, int32_t direction) {
+            if (value() == text) { foreground(brush); return; }
+            finish();
+            auto caption = xaml::Application::Current().Resources().TryLookup(winrt::box_value(L"CaptionTextBlockStyle"))
+                .try_as<xaml::Style>();
+            controls::TextBlock next;
+            if (caption) next.Style(caption);
+            next.Text(text);
+            next.TextTrimming(xaml::TextTrimming::CharacterEllipsis);
+            if (brush) next.Foreground(brush);
+            next.Opacity(textOpacity);
+            if (text.empty()) next.Visibility(xaml::Visibility::Collapsed);
+            next.VerticalAlignment(xaml::VerticalAlignment::Center);
+            animation::NavigationTransitionInfo transition = animation::SuppressNavigationTransitionInfo();
+            if (direction && IsLoaded() && ActualWidth() > 0) {
+                outgoingWidth = static_cast<float>(ActualWidth());
+                animation::SlideNavigationTransitionInfo slide;
+                slide.Effect(direction < 0 ? animation::SlideNavigationTransitionEffect::FromLeft
+                                           : animation::SlideNavigationTransitionEffect::FromRight);
+                transition = slide;
+                frames = media::CompositionTarget::Rendering(winrt::auto_revoke,
+                    guarded("holding the previous title bounds",
+                        [weak = get_weak()](IInspectable const &, IInspectable const &args) {
+                            if (auto self = weak.get()) {
+                                auto now = args.as<media::RenderingEventArgs>().RenderingTime();
+                                if (!self->start) self->start = now;
+                                if (now - *self->start >= navigationSlideDuration) self->finish();
+                            }
+                        }));
+            }
+            if (!frame.Navigate(winrt::xaml_typename<controls::Page>(), next, transition)) {
+                finish();
+                return;
+            }
+        }
+
+        Size MeasureOverride(Size available) {
+            frame.Measure(available);
+            auto size = frame.DesiredSize();
+            if (outgoingWidth) size.Width = std::min(*outgoingWidth, available.Width);
+            return size;
+        }
+        Size ArrangeOverride(Size size) {
+            frame.Arrange({0, 0, size.Width, size.Height});
+            fitClip({size.Width, size.Height});
+            return size;
+        }
+    };
+
+    struct NavigationTitle : controls::PanelT<NavigationTitle> {
+        controls::StackPanel words;
+        controls::Panel title{nullptr};
+        controls::Panel subtitle{nullptr};
+
+        NavigationTitle() {
+            words.Orientation(controls::Orientation::Horizontal);
+            words.Spacing(8);
+            title = winrt::make<NavigationWord>();
+            subtitle = winrt::make<NavigationWord>();
+            winrt::get_self<NavigationWord>(title.as<xaml::IFrameworkElementOverrides>())->textOpacity = 1;
+            winrt::get_self<NavigationWord>(subtitle.as<xaml::IFrameworkElementOverrides>())->textOpacity = 0.72;
+            words.Children().Append(title);
+            words.Children().Append(subtitle);
+            Children().Append(words);
+            Clip(media::RectangleGeometry());
+            VerticalAlignment(xaml::VerticalAlignment::Center);
+        }
+
+        NavigationWord *wordView(bool isSubtitle) {
+            auto view = isSubtitle ? subtitle : title;
+            return winrt::get_self<NavigationWord>(view.as<xaml::IFrameworkElementOverrides>());
+        }
+
+        winrt::hstring word(bool isSubtitle) {
+            return wordView(isSubtitle)->value();
+        }
+
+        void foreground(media::Brush const &brush) {
+            wordView(false)->foreground(brush);
+            wordView(true)->foreground(brush);
+        }
+
+        void show(winrt::hstring const &newTitle, winrt::hstring const &newSubtitle,
+                  media::Brush const &brush, int32_t direction) {
+            wordView(false)->show(newTitle, brush, direction);
+            wordView(true)->show(newSubtitle, brush, direction);
+        }
+
+        Size MeasureOverride(Size available) {
+            words.Measure(available);
+            return words.DesiredSize();
+        }
+
+        Size ArrangeOverride(Size size) {
+            words.Arrange({0, 0, size.Width, size.Height});
+            auto geometry = Clip().try_as<media::RectangleGeometry>();
+            if (geometry) geometry.Rect({0, 0, size.Width, size.Height});
+            return size;
+        }
+    };
+
+    NavigationTitle *navigationTitle(controls::TitleBar const &bar) {
+        return winrt::get_self<NavigationTitle>(leftHeader(bar).Children().GetAt(3).as<xaml::IFrameworkElementOverrides>());
+    }
+
+    void fadeCommand(controls::TitleBar const &bar, xaml::UIElement const &element, bool entering) {
+        try {
+            using Preview = xaml::Hosting::ElementCompositionPreview;
+            auto fade = Preview::GetElementVisual(bar).Compositor().CreateScalarKeyFrameAnimation();
+            fade.Target(L"Opacity");
+            fade.Duration(navigationSlideDuration / 2);
+            fade.InsertKeyFrame(0, entering ? 0 : 1);
+            fade.InsertKeyFrame(1, entering ? 1 : 0);
+            if (entering) {
+                Preview::SetImplicitHideAnimation(element, nullptr);
+                Preview::SetImplicitShowAnimation(element, fade);
+            } else {
+                Preview::SetImplicitShowAnimation(element, nullptr);
+                Preview::SetImplicitHideAnimation(element, fade);
+            }
+        } catch (...) { report("animating a toolbar command"); }
     }
 
     void fill(controls::ContentControl const &slot, SwiftOmniUIObjectRef element) {
@@ -303,7 +491,8 @@ namespace {
             split.DisplayMode(mode);
         }
         bool handleShown = split.IsPaneOpen() && beside && !alone && resizable;
-        grip.Visibility(handleShown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+        auto gripVisibility = handleShown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed;
+        if (grip.Visibility() != gripVisibility) grip.Visibility(gripVisibility);
         if (split.OpenPaneLength() != length) split.OpenPaneLength(length);
         // SplitView can measure a closed pane at zero while arranging its
         // sliding content at OpenPaneLength. The pane's content has that
@@ -350,6 +539,7 @@ extern "C" SwiftOmniUIObjectRef swiftomniui_winui_title_bar_make(int64_t view) {
         leadingActions.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
         leadingActions.VerticalAlignment(xaml::VerticalAlignment::Center);
         left.Children().Append(leadingActions);
+        left.Children().Append(winrt::make<NavigationTitle>());
         bar.LeftHeader(left);
         bar.Content(controls::ContentControl());
         bar.Loaded(guarded("handling Loaded", [](IInspectable const &sender, xaml::RoutedEventArgs const &) {
@@ -398,13 +588,12 @@ extern "C" double swiftomniui_winui_title_bar_layout_height(SwiftOmniUIObjectRef
 }
 
 extern "C" void swiftomniui_winui_title_bar_set(
-    SwiftOmniUIObjectRef handle, char const *title, bool back, bool paneToggle, bool hasBackground, uint32_t background,
+    SwiftOmniUIObjectRef handle, bool back, bool paneToggle, bool hasBackground, uint32_t background,
     int32_t backgroundVisibility,
     bool hasForeground, uint32_t foreground, int32_t words
 ) {
     try {
         auto bar = borrow<controls::TitleBar>(handle);
-        if (bar.Title() != text(title)) bar.Title(text(title));
         bar.IsBackButtonVisible(back);
         bar.IsPaneToggleButtonVisible(paneToggle);
         if (hasBackground) bar.Background(media::SolidColorBrush(color(background)));
@@ -414,6 +603,7 @@ extern "C" void swiftomniui_winui_title_bar_set(
         setAcrylicTitleBarMode(bar, mode);
         if (hasForeground) bar.Foreground(media::SolidColorBrush(color(foreground)));
         else bar.ClearValue(controls::Control::ForegroundProperty());
+        navigationTitle(bar)->foreground(bar.Foreground());
         auto theme = words == 1 ? xaml::ElementTheme::Dark
             : words == 2 ? xaml::ElementTheme::Light : xaml::ElementTheme::Default;
         if (bar.RequestedTheme() != theme) bar.RequestedTheme(theme);
@@ -426,14 +616,19 @@ extern "C" void swiftomniui_winui_title_bar_set(
     }
 }
 
-extern "C" void swiftomniui_winui_title_bar_set_subtitle(SwiftOmniUIObjectRef handle, char const *subtitle) {
+extern "C" void swiftomniui_winui_title_bar_set_words(
+    SwiftOmniUIObjectRef handle, char const *title, char const *subtitle, int32_t direction
+) {
     try {
         auto bar = borrow<controls::TitleBar>(handle);
-        auto value = text(subtitle);
-        if (bar.Subtitle() != value) bar.Subtitle(value);
+        navigationTitle(bar)->show(text(title), text(subtitle), bar.Foreground(), direction);
     } catch (...) {
-        report("setting a title bar subtitle");
+        report("presenting the title bar's words");
     }
+}
+
+winrt::hstring swiftomniui::navigationTitleWord(controls::TitleBar const &bar, bool subtitle) {
+    return navigationTitle(bar)->word(subtitle);
 }
 
 extern "C" void swiftomniui_winui_title_bar_caption_room(SwiftOmniUIObjectRef handle, double *kept, double *room) {
@@ -560,7 +755,7 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
     SwiftOmniUIObjectRef handle, char const *const *texts, char const *const *identifiers, char const *const *icons,
     char const *const *symbols, bool const *overflows, bool const *enabled, SwiftOmniUIObjectRef const *contents,
     int32_t const *kinds,
-    int32_t count, int32_t leadingCount
+    int32_t count, int32_t leadingCount, bool animate
 ) {
     try {
         auto bar = borrow<controls::TitleBar>(handle);
@@ -636,8 +831,11 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
             auto const &commands = lists[group];
             auto const &next = desired[group];
             for (uint32_t at = 0; at < commands.Size();) {
-                if (std::find(next.begin(), next.end(), commands.GetAt(at)) == next.end()) commands.RemoveAt(at);
-                else ++at;
+                auto current = commands.GetAt(at);
+                if (std::find(next.begin(), next.end(), current) == next.end()) {
+                    if (animate) fadeCommand(bar, current.as<xaml::UIElement>(), false);
+                    commands.RemoveAt(at);
+                } else ++at;
             }
         }
         for (size_t group = 0; group < lists.size(); ++group) {
@@ -647,6 +845,9 @@ extern "C" void swiftomniui_winui_title_bar_set_actions(
                 if (at < commands.Size() && commands.GetAt(at) == next[at]) continue;
                 uint32_t old;
                 if (commands.IndexOf(next[at], old)) commands.RemoveAt(old);
+                if (animate && std::find(previous.begin(), previous.end(), next[at]) == previous.end()) {
+                    fadeCommand(bar, next[at].as<xaml::UIElement>(), true);
+                }
                 commands.InsertAt(at, next[at]);
             }
         }
@@ -803,10 +1004,13 @@ extern "C" void swiftomniui_winui_split_remove(SwiftOmniUIObjectRef handle, Swif
         auto split = borrow<controls::SplitView>(handle);
         auto element = as<xaml::UIElement>(child);
         auto face = split.Pane().as<controls::Grid>().Children().GetAt(0).as<controls::ContentControl>();
-        if (face.Content() == element) face.Content(nullptr);
+        if (face.Content() == element) fill(face, nullptr);
         auto children = split.Content().as<controls::Grid>().Children();
         uint32_t index;
-        if (children.IndexOf(element, index)) children.RemoveAt(index);
+        if (children.IndexOf(element, index)) {
+            children.RemoveAt(index);
+            acrylicStructureChanged(split);
+        }
     } catch (...) { report("releasing a split slot"); }
 }
 
@@ -823,19 +1027,21 @@ extern "C" void swiftomniui_winui_split_set(
             widths.SetAt(2, maximum);
             widths.SetAt(3, std::clamp(ideal, minimum, maximum));
         }
-        widths.SetAt(5, contentMinimum);
-        widths.SetAt(6, contentMaximum);
+        if (widths.GetAt(5) != contentMinimum) widths.SetAt(5, contentMinimum);
+        if (widths.GetAt(6) != contentMaximum) widths.SetAt(6, contentMaximum);
         auto face = split.Pane().as<controls::Grid>().Children().GetAt(0).as<controls::ContentControl>();
         fill(face, pane);
         // IsPaneOpen and the SplitView template own pane visibility. Collapsing
         // its content separately adds another layout/visibility lifecycle.
         auto detail = split.Content().as<controls::Grid>();
-        detail.MinWidth(contentMinimum);
-        detail.MaxWidth(contentMaximum);
-        detail.Visibility(contentShown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
-        standInRow(detail, 0, row);
-        standInRow(detail, 1, content);
-        acrylicStructureChanged(split);
+        if (detail.MinWidth() != contentMinimum) detail.MinWidth(contentMinimum);
+        if (detail.MaxWidth() != contentMaximum) detail.MaxWidth(contentMaximum);
+        auto visibility = contentShown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed;
+        const bool visibilityChanged = detail.Visibility() != visibility;
+        if (visibilityChanged) detail.Visibility(visibility);
+        const bool rowChanged = standInRow(detail, 0, row);
+        const bool contentChanged = standInRow(detail, 1, content);
+        if (visibilityChanged || rowChanged || contentChanged) acrylicStructureChanged(split);
         bool toggled = split.IsPaneOpen() != open;
         if (toggled) split.IsPaneOpen(open);
         sizeSplit(split, split.ActualWidth(), toggled && animated && swiftomniui_winui_animations_enabled());

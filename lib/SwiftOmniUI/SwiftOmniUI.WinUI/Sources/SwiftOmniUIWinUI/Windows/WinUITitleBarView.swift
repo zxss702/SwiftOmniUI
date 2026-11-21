@@ -28,25 +28,25 @@ final class WinUITitleBarView: WinUIView {
     var layoutHeight: Double { swiftomniui_winui_title_bar_layout_height(handle) }
 
     /// Shows `chrome`, writing only the parts that changed.
-    func apply(_ chrome: WinUIWindowChrome) {
+    func apply(_ chrome: WinUIWindowChrome, navigationDirection: Int32 = 0) {
         let previous = self.chrome
         self.chrome = chrome
 
         let background = chrome.background?.argb
         let foreground = chrome.foreground?.argb
-        if previous.subtitle != chrome.subtitle {
-            swiftomniui_winui_title_bar_set_subtitle(handle, chrome.subtitle)
-        }
         // Words on a bar the tree paints: light on a dark one, dark on a light one (`BandWords`).
         let light = chrome.background.flatMap(BandWords.light(on:))
-        if previous.title != chrome.title || (previous.back == nil) != (chrome.back == nil)
+        if (previous.back == nil) != (chrome.back == nil)
             || (previous.sidebarToggle == nil) != (chrome.sidebarToggle == nil)
             || previous.background != chrome.background || previous.backgroundVisibility != chrome.backgroundVisibility
             || previous.foreground != chrome.foreground {
             swiftomniui_winui_title_bar_set(
-                handle, chrome.title, chrome.back != nil, chrome.sidebarToggle != nil,
+                handle, chrome.back != nil, chrome.sidebarToggle != nil,
                 background != nil, background ?? 0, chrome.backgroundVisibility.rawValue,
                 foreground != nil, foreground ?? 0, light.map { $0 ? 1 : 2 } ?? 0)
+        }
+        if previous.title != chrome.title || previous.subtitle != chrome.subtitle {
+            swiftomniui_winui_title_bar_set_words(handle, chrome.title, chrome.subtitle, navigationDirection)
         }
 
         let actions = chrome.leadingActions + chrome.actions + chrome.overflow
@@ -60,7 +60,7 @@ final class WinUITitleBarView: WinUIView {
                         swiftomniui_winui_title_bar_set_actions(
                             handle, titles, identifiers, icons, symbols, overflows, actions.map(\.isEnabled),
                             actions.map(\.view?.presentationHandle), actions.map { $0.spacer.map { Int32($0.rawValue) + 1 } ?? 0 },
-                            Int32(actions.count), Int32(chrome.leadingActions.count))
+                            Int32(actions.count), Int32(chrome.leadingActions.count), navigationDirection != 0)
                     }
                     }
                 }

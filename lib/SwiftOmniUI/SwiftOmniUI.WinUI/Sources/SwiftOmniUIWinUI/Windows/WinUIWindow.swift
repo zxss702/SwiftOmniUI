@@ -307,9 +307,9 @@ final class WinUIWindow {
 
     /// Shows `chrome`, its menus beneath it, and `tabs` - across the split view's detail they stand in, or across the
     /// window.
-    func apply(_ chrome: WinUIWindowChrome, tabs: WinUIWindowTabs?) {
+    func apply(_ chrome: WinUIWindowChrome, tabs: WinUIWindowTabs?, navigationDirection: Int32 = 0) {
         setTitle(chrome.windowTitle ?? chrome.title)
-        titleBar.apply(chrome)
+        titleBar.apply(chrome, navigationDirection: navigationDirection)
         if titleBarStands != chrome.showsToolbar {
             titleBarStands = chrome.showsToolbar
             standChrome()
